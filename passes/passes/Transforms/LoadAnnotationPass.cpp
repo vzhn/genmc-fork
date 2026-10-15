@@ -19,6 +19,9 @@
 #include "passes/LLVMUtils.hpp"
 #include "passes/Transforms/InstAnnotator.hpp"
 
+#include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/IR/CFG.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/InstIterator.h>
 #include <llvm/IR/Instruction.h>
@@ -90,6 +93,56 @@ static auto getSourceLoads(CallInst *assm) -> std::vector<Instruction *>
 	return source;
 }
 
+/* Whether I may lie between LI and an assume on a path along which LI is annotatable */
+static auto isClearFor(const Instruction &i, const Instruction *li) -> bool
+{
+	return &i == li || (!hasSideEffects(&i) /* also CASes */ && !isa<LoadInst>(&i));
+}
+
+static auto isClearRangeFor(BasicBlock::const_iterator begin, BasicBlock::const_iterator end,
+			    const Instruction *li) -> bool
+{
+	return std::all_of(begin, end, [&](const Instruction &i) { return isClearFor(i, li); });
+}
+
+/*
+ * Whether some path from LI to ASSM is clear, i.e., has neither side effects
+ * nor other loads on it.  Only the part of LI's block after LI and the part of
+ * ASSM's block before ASSM count, and blocks strictly inside the path must be
+ * clear as a whole.  The path is simple and stops at the first visit of LI's
+ * block, so finding one is a backward reachability search from ASSM's block
+ * through clear blocks.  (Enumerating the paths is exponential in the size of
+ * the CFG and hangs on large inlined functions.)
+ */
+static auto hasClearPath(const Instruction *li, const CallInst *assm) -> bool
+{
+	const auto *loadBB = li->getParent();
+	const auto *assmBB = assm->getParent();
+
+	/* Same block: the only path is the one inside the block */
+	if (loadBB == assmBB)
+		return li->comesBefore(assm) &&
+		       isClearRangeFor(std::next(li->getIterator()), assm->getIterator(), li);
+
+	if (!isClearRangeFor(assmBB->begin(), assm->getIterator(), li) ||
+	    !isClearRangeFor(std::next(li->getIterator()), loadBB->end(), li))
+		return false;
+
+	SmallPtrSet<const BasicBlock *, 16> visited = {assmBB};
+	SmallVector<const BasicBlock *, 16> worklist = {assmBB};
+	while (!worklist.empty()) {
+		const auto *bb = worklist.pop_back_val();
+		for (const auto *pred : predecessors(bb)) {
+			if (pred == loadBB)
+				return true;
+			if (visited.insert(pred).second &&
+			    isClearRangeFor(pred->begin(), pred->end(), li))
+				worklist.push_back(pred);
+		}
+	}
+	return false;
+}
+
 /*
  * Given an assume's source loads, returns the annotatable ones.
  */
@@ -99,35 +152,9 @@ static auto filterAnnotatableFromSource(CallInst *assm, const std::vector<Instru
 	std::vector<Instruction *> result;
 
 	/* Collect candidates for which the path to the assume is clear */
-	for (auto *li : source) {
-		auto assumeFound = false;
-		auto loadFound = false;
-		auto sideEffects = false;
-		foreachInBackPathTo(assm->getParent(), li->getParent(), [&](Instruction &i) {
-			/* wait until we find the assume */
-			if (!assumeFound) {
-				assumeFound |= (dyn_cast<CallInst>(&i) == assm);
-				return;
-			}
-			/* we should stop when the load is found */
-			if (assumeFound && !loadFound) {
-				sideEffects |= (hasSideEffects(&i) && &i != li); /* also CASes */
-				sideEffects |= (isa<LoadInst>(&i) && &i != li);
-			}
-			if (!loadFound) {
-				loadFound |= (&i == li);
-				if (loadFound) {
-					if (!sideEffects)
-						result.push_back(li);
-					/* reset for next path */
-					assumeFound = false;
-					loadFound = false;
-					sideEffects = false;
-				}
-			}
-		});
-	}
-	result.erase(std::ranges::unique(result).begin(), result.end());
+	for (auto *li : source)
+		if (hasClearPath(li, assm))
+			result.push_back(li);
 	return result;
 }
 
