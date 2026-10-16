@@ -1,0 +1,307 @@
+Error: Safety violation!
+Event (2, 81) in graph:
+<-1, 0>:
+	(0, 1): MALLOC w
+	(0, 2): Wna (qm.__private, 0) pthread.h:351
+	(0, 3): Wna (sm.__private, 0) pthread.h:351
+	(0, 4): CRacq (sm.__private, 0) [(0, 3)] pthread.h:375
+	(0, 5): CWacq (sm.__private, 1) pthread.h:375
+	(0, 6): URsc (remaining, 0) [INIT] pool-model.c:89
+	(0, 7): UWsc (remaining, 1) pool-model.c:89
+	(0, 8): CRacq (qm.__private, 0) [(0, 2)] pthread.h:375
+	(0, 9): CWacq (qm.__private, 1) pthread.h:375
+	(0, 10): Rna (qlen, 0) [INIT] pool-model.c:91
+	(0, 11): Wna (qlen, 1) pool-model.c:91
+	(0, 12): Wna (queue[0], 1) pool-model.c:91
+	(0, 13): Wrel (qm.__private, 0) pthread.h:383
+	(0, 14): URsc (state_cv, 0) [INIT] pool-model.c:76
+	(0, 15): UWsc (state_cv, 1) pool-model.c:76
+	(0, 16): Wrel (sm.__private, 0) pthread.h:383
+	(0, 17): THREAD_CREATE [thread 1] pthread.h:146
+	(0, 18): Wna (, 1) pthread.h:146
+	(0, 19): THREAD_CREATE [thread 2] pthread.h:146
+	(0, 20): Wna (, 2) pthread.h:146
+	(0, 21): LOOP_BEGIN pool-model.c:197
+	(0, 22): SPIN_START
+	(0, 23): CRacq (sm.__private, 0) [(2, 71)] pthread.h:375
+	(0, 24): CWacq (sm.__private, 1) pthread.h:375
+	(0, 25): Rsc (halt, 1) [(1, 41)] pool-model.c:197
+	(0, 26): Wrel (sm.__private, 0) pthread.h:383
+	(0, 27): Rsc (halt, 1) [(1, 41)] pool-model.c:216
+	(0, 28): Rna (, 1) [(0, 18)] pool-model.c:218
+	(0, 29): THREAD_JOIN [thread 1] pthread.h:163
+	(0, 30): Rna (, 2) [(0, 20)]
+	(0, 31): BLOCK[join]
+<0, 1> worker:
+	(1, 1): LOOP_BEGIN pool-model.c:119
+	(1, 2): SPIN_START
+	(1, 3): CRacq (qm.__private, 0) [(2, 9)] pthread.h:375
+	(1, 4): CWacq (qm.__private, 1) pthread.h:375
+	(1, 5): Rna (qlen, 0) [(2, 7)] pool-model.c:111
+	(1, 6): Wrel (qm.__private, 0) pthread.h:383
+	(1, 7): CRacq (sm.__private, 0) [(0, 16)] pthread.h:375
+	(1, 8): CWacq (sm.__private, 1) pthread.h:375
+	(1, 9): Rsc (halt, 0) [INIT] pool-model.c:135
+	(1, 10): Rsc (remaining, 1) [(0, 7)] pool-model.c:135
+	(1, 11): CRacq (qm.__private, 0) [(1, 6)] pthread.h:375
+	(1, 12): CWacq (qm.__private, 1) pthread.h:375
+	(1, 13): Rna (qlen, 0) [(2, 7)] pool-model.c:81
+	(1, 14): Wrel (qm.__private, 0) pthread.h:383
+	(1, 15): CRacq (qm.__private, 0) [(1, 14)] pthread.h:375
+	(1, 16): CWacq (qm.__private, 1) pthread.h:375
+	(1, 17): Rna (qlen, 0) [(2, 7)] pool-model.c:81
+	(1, 18): Wrel (qm.__private, 0) pthread.h:383
+	(1, 19): Rsc (state_cv, 1) [(0, 15)] pool-model.c:69
+	(1, 20): Wrel (sm.__private, 0) pthread.h:383
+	(1, 21): AWAIT_START pool-model.c:72
+	(1, 22): Rsc (state_cv, 2) [(2, 24)] pool-model.c:72
+	(1, 23): CRacq (sm.__private, 0) [(2, 25)] pthread.h:375
+	(1, 24): CWacq (sm.__private, 1) pthread.h:375
+	(1, 25): Wrel (sm.__private, 0) pthread.h:383
+	(1, 26): SPIN_START
+	(1, 27): CRacq (qm.__private, 0) [(2, 22)] pthread.h:375
+	(1, 28): CWacq (qm.__private, 1) pthread.h:375
+	(1, 29): Rna (qlen, 1) [(2, 20)] pool-model.c:111
+	(1, 30): Rna (qlen, 1) [(2, 20)] pool-model.c:112
+	(1, 31): Wna (qlen, 0) pool-model.c:112
+	(1, 32): Rna (queue[0], 0) [(2, 21)] pool-model.c:112
+	(1, 33): Wrel (qm.__private, 0) pthread.h:383
+	(1, 34): Rsc (halt, 0) [INIT] pool-model.c:155
+	(1, 35): URsc (executed, 1) [(2, 12)] pool-model.c:157
+	(1, 36): UWsc (executed, 2) pool-model.c:157
+	(1, 37): URsc (zeros, 0) [INIT] pool-model.c:159
+	(1, 38): UWsc (zeros, 1) pool-model.c:159
+	(1, 39): CRacq (sm.__private, 0) [(1, 25)] pthread.h:375
+	(1, 40): CWacq (sm.__private, 1) pthread.h:375
+	(1, 41): Wsc (halt, 1) pool-model.c:100
+	(1, 42): URsc (state_cv, 2) [(2, 24)] pool-model.c:76
+	(1, 43): UWsc (state_cv, 3) pool-model.c:76
+	(1, 44): URsc (done_cv, 0) [INIT] pool-model.c:76
+	(1, 45): UWsc (done_cv, 1) pool-model.c:76
+	(1, 46): Wrel (sm.__private, 0) pthread.h:383
+	(1, 47): CRacq (sm.__private, 0) [(1, 46)] pthread.h:375
+	(1, 48): CWacq (sm.__private, 1) pthread.h:375
+	(1, 49): URsc (remaining, 2) [(2, 16)] pool-model.c:182
+	(1, 50): UWsc (remaining, 1) pool-model.c:182
+	(1, 51): Wrel (sm.__private, 0) pthread.h:383
+	(1, 52): LOOP_BEGIN pool-model.c:119
+	(1, 53): SPIN_START
+	(1, 54): CRacq (qm.__private, 0) [(1, 33)] pthread.h:375
+	(1, 55): CWacq (qm.__private, 1) pthread.h:375
+	(1, 56): Rna (qlen, 0) [(1, 31)] pool-model.c:111
+	(1, 57): Wrel (qm.__private, 0) pthread.h:383
+	(1, 58): CRacq (sm.__private, 0) [(1, 51)] pthread.h:375
+	(1, 59): CWacq (sm.__private, 1) pthread.h:375
+	(1, 60): Rsc (halt, 1) [(1, 41)] pool-model.c:135
+	(1, 61): Wrel (sm.__private, 0) pthread.h:383
+	(1, 62): THREAD_END
+<0, 2> worker:
+	(2, 1): LOOP_BEGIN pool-model.c:119
+	(2, 2): SPIN_START
+	(2, 3): CRacq (qm.__private, 0) [(0, 13)] pthread.h:375
+	(2, 4): CWacq (qm.__private, 1) pthread.h:375
+	(2, 5): Rna (qlen, 1) [(0, 11)] pool-model.c:111
+	(2, 6): Rna (qlen, 1) [(0, 11)] pool-model.c:112
+	(2, 7): Wna (qlen, 0) pool-model.c:112
+	(2, 8): Rna (queue[0], 1) [(0, 12)] pool-model.c:112
+	(2, 9): Wrel (qm.__private, 0) pthread.h:383
+	(2, 10): Rsc (halt, 0) [INIT] pool-model.c:155
+	(2, 11): URsc (executed, 0) [INIT] pool-model.c:157
+	(2, 12): UWsc (executed, 1) pool-model.c:157
+	(2, 13): CRacq (sm.__private, 0) [(1, 20)] pthread.h:375
+	(2, 14): CWacq (sm.__private, 1) pthread.h:375
+	(2, 15): URsc (remaining, 1) [(0, 7)] pool-model.c:89
+	(2, 16): UWsc (remaining, 2) pool-model.c:89
+	(2, 17): CRacq (qm.__private, 0) [(1, 18)] pthread.h:375
+	(2, 18): CWacq (qm.__private, 1) pthread.h:375
+	(2, 19): Rna (qlen, 0) [(2, 7)] pool-model.c:91
+	(2, 20): Wna (qlen, 1) pool-model.c:91
+	(2, 21): Wna (queue[0], 0) pool-model.c:91
+	(2, 22): Wrel (qm.__private, 0) pthread.h:383
+	(2, 23): URsc (state_cv, 1) [(0, 15)] pool-model.c:76
+	(2, 24): UWsc (state_cv, 2) pool-model.c:76
+	(2, 25): Wrel (sm.__private, 0) pthread.h:383
+	(2, 26): CRacq (sm.__private, 0) [(1, 61)] pthread.h:375
+	(2, 27): CWacq (sm.__private, 1) pthread.h:375
+	(2, 28): URsc (remaining, 1) [(1, 50)] pool-model.c:89
+	(2, 29): UWsc (remaining, 2) pool-model.c:89
+	(2, 30): CRacq (qm.__private, 0) [(1, 57)] pthread.h:375
+	(2, 31): CWacq (qm.__private, 1) pthread.h:375
+	(2, 32): Rna (qlen, 0) [(1, 31)] pool-model.c:91
+	(2, 33): Wna (qlen, 1) pool-model.c:91
+	(2, 34): Wna (queue[0], 0) pool-model.c:91
+	(2, 35): Wrel (qm.__private, 0) pthread.h:383
+	(2, 36): URsc (state_cv, 3) [(1, 43)] pool-model.c:76
+	(2, 37): UWsc (state_cv, 4) pool-model.c:76
+	(2, 38): Wrel (sm.__private, 0) pthread.h:383
+	(2, 39): CRacq (sm.__private, 0) [(2, 38)] pthread.h:375
+	(2, 40): CWacq (sm.__private, 1) pthread.h:375
+	(2, 41): URsc (remaining, 2) [(2, 29)] pool-model.c:89
+	(2, 42): UWsc (remaining, 3) pool-model.c:89
+	(2, 43): CRacq (qm.__private, 0) [(2, 35)] pthread.h:375
+	(2, 44): CWacq (qm.__private, 1) pthread.h:375
+	(2, 45): Rna (qlen, 1) [(2, 33)] pool-model.c:91
+	(2, 46): Wna (qlen, 2) pool-model.c:91
+	(2, 47): Wna (queue[1], 0) pool-model.c:91
+	(2, 48): Wrel (qm.__private, 0) pthread.h:383
+	(2, 49): URsc (state_cv, 4) [(2, 37)] pool-model.c:76
+	(2, 50): UWsc (state_cv, 5) pool-model.c:76
+	(2, 51): Wrel (sm.__private, 0) pthread.h:383
+	(2, 52): CRacq (sm.__private, 0) [(2, 51)] pthread.h:375
+	(2, 53): CWacq (sm.__private, 1) pthread.h:375
+	(2, 54): URsc (remaining, 3) [(2, 42)] pool-model.c:182
+	(2, 55): UWsc (remaining, 2) pool-model.c:182
+	(2, 56): Wrel (sm.__private, 0) pthread.h:383
+	(2, 57): LOOP_BEGIN pool-model.c:119
+	(2, 58): SPIN_START
+	(2, 59): CRacq (qm.__private, 0) [(2, 48)] pthread.h:375
+	(2, 60): CWacq (qm.__private, 1) pthread.h:375
+	(2, 61): Rna (qlen, 2) [(2, 46)] pool-model.c:111
+	(2, 62): Rna (qlen, 2) [(2, 46)] pool-model.c:112
+	(2, 63): Wna (qlen, 1) pool-model.c:112
+	(2, 64): Rna (queue[1], 0) [(2, 47)] pool-model.c:112
+	(2, 65): Wrel (qm.__private, 0) pthread.h:383
+	(2, 66): Rsc (halt, 1) [(1, 41)] pool-model.c:155
+	(2, 67): CRacq (sm.__private, 0) [(2, 56)] pthread.h:375
+	(2, 68): CWacq (sm.__private, 1) pthread.h:375
+	(2, 69): URsc (remaining, 2) [(2, 55)] pool-model.c:182
+	(2, 70): UWsc (remaining, 1) pool-model.c:182
+	(2, 71): Wrel (sm.__private, 0) pthread.h:383
+	(2, 72): LOOP_BEGIN pool-model.c:119
+	(2, 73): SPIN_START
+	(2, 74): CRacq (qm.__private, 0) [(2, 65)] pthread.h:375
+	(2, 75): CWacq (qm.__private, 1) pthread.h:375
+	(2, 76): Rna (qlen, 1) [(2, 63)] pool-model.c:111
+	(2, 77): Rna (qlen, 1) [(2, 63)] pool-model.c:112
+	(2, 78): Wna (qlen, 0) pool-model.c:112
+	(2, 79): Rna (queue[0], 0) [(2, 34)] pool-model.c:112
+	(2, 80): Wrel (qm.__private, 0) pthread.h:383
+	(2, 81): ERROR pool-model.c:178
+Coherence:
+executed: [ (2, 12): UWsc (G#(0, 236), 1) (1, 36): UWsc (G#(0, 236), 2) ]
+state_cv: [ (0, 15): UWsc (G#(0, 228), 1) (2, 24): UWsc (G#(0, 228), 2) (1, 43): UWsc (G#(0, 228), 3) (2, 37): UWsc (G#(0, 228), 4) (2, 50): UWsc (G#(0, 228), 5) ]
+qlen: [ (0, 11): Wna (G#(0, 224), 1) (2, 7): Wna (G#(0, 224), 0) (2, 20): Wna (G#(0, 224), 1) (1, 31): Wna (G#(0, 224), 0) (2, 33): Wna (G#(0, 224), 1) (2, 46): Wna (G#(0, 224), 2) (2, 63): Wna (G#(0, 224), 1) (2, 78): Wna (G#(0, 224), 0) ]
+remaining: [ (0, 7): UWsc (G#(0, 12), 1) (2, 16): UWsc (G#(0, 12), 2) (1, 50): UWsc (G#(0, 12), 1) (2, 29): UWsc (G#(0, 12), 2) (2, 42): UWsc (G#(0, 12), 3) (2, 55): UWsc (G#(0, 12), 2) (2, 70): UWsc (G#(0, 12), 1) ]
+sm.__private: [ (0, 3): Wna (G#(0, 4), 0) (0, 5): CWacq (G#(0, 4), 1) (0, 16): Wrel (G#(0, 4), 0) (1, 8): CWacq (G#(0, 4), 1) (1, 20): Wrel (G#(0, 4), 0) (2, 14): CWacq (G#(0, 4), 1) (2, 25): Wrel (G#(0, 4), 0) (1, 24): CWacq (G#(0, 4), 1) (1, 25): Wrel (G#(0, 4), 0) (1, 40): CWacq (G#(0, 4), 1) (1, 46): Wrel (G#(0, 4), 0) (1, 48): CWacq (G#(0, 4), 1) (1, 51): Wrel (G#(0, 4), 0) (1, 59): CWacq (G#(0, 4), 1) (1, 61): Wrel (G#(0, 4), 0) (2, 27): CWacq (G#(0, 4), 1) (2, 38): Wrel (G#(0, 4), 0) (2, 40): CWacq (G#(0, 4), 1) (2, 51): Wrel (G#(0, 4), 0) (2, 53): CWacq (G#(0, 4), 1) (2, 56): Wrel (G#(0, 4), 0) (2, 68): CWacq (G#(0, 4), 1) (2, 71): Wrel (G#(0, 4), 0) (0, 24): CWacq (G#(0, 4), 1) (0, 26): Wrel (G#(0, 4), 0) ]
+queue[0]: [ (0, 12): Wna (G#(0, 208), 1) (2, 21): Wna (G#(0, 208), 0) (2, 34): Wna (G#(0, 208), 0) ]
+qm.__private: [ (0, 2): Wna (G#(0, 0), 0) (0, 9): CWacq (G#(0, 0), 1) (0, 13): Wrel (G#(0, 0), 0) (2, 4): CWacq (G#(0, 0), 1) (2, 9): Wrel (G#(0, 0), 0) (1, 4): CWacq (G#(0, 0), 1) (1, 6): Wrel (G#(0, 0), 0) (1, 12): CWacq (G#(0, 0), 1) (1, 14): Wrel (G#(0, 0), 0) (1, 16): CWacq (G#(0, 0), 1) (1, 18): Wrel (G#(0, 0), 0) (2, 18): CWacq (G#(0, 0), 1) (2, 22): Wrel (G#(0, 0), 0) (1, 28): CWacq (G#(0, 0), 1) (1, 33): Wrel (G#(0, 0), 0) (1, 55): CWacq (G#(0, 0), 1) (1, 57): Wrel (G#(0, 0), 0) (2, 31): CWacq (G#(0, 0), 1) (2, 35): Wrel (G#(0, 0), 0) (2, 44): CWacq (G#(0, 0), 1) (2, 48): Wrel (G#(0, 0), 0) (2, 60): CWacq (G#(0, 0), 1) (2, 65): Wrel (G#(0, 0), 0) (2, 75): CWacq (G#(0, 0), 1) (2, 80): Wrel (G#(0, 0), 0) ]
+
+Trace to (2, 81):
+[main] pthread.h: 351: return __VERIFIER_mutex_init(__mutex, __mutexattr);
+[main] pthread.h: 351: return __VERIFIER_mutex_init(__mutex, __mutexattr);
+[main] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[main] pool-model.c: 89: atomic_fetch_add(&remaining, 1);
+[main] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[main] pool-model.c: 91: queue[qlen++] = depth;
+[main] pool-model.c: 91: queue[qlen++] = depth;
+[main] pool-model.c: 91: queue[qlen++] = depth;
+[main] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[main] pool-model.c: 76: static void cv_notify(atomic_uint *cv) { atomic_fetch_add(cv, 1); }
+[main] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[main] pthread.h: 146: (*__newthread) = __VERIFIER_thread_create(__attr, __start_routine, __arg);
+[main] pthread.h: 146: (*__newthread) = __VERIFIER_thread_create(__attr, __start_routine, __arg);
+[worker] pool-model.c: 119: for (;;) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 111: if (qlen > 0)
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 155: if (atomic_load(&halt))
+[worker] pool-model.c: 157: atomic_fetch_add(&executed, 1);
+[worker] pool-model.c: 119: for (;;) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 111: if (qlen > 0)
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 135: if (atomic_load(&halt) || atomic_load(&remaining) == 0) {
+[worker] pool-model.c: 135: if (atomic_load(&halt) || atomic_load(&remaining) == 0) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 81: bool e = qlen == 0;
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 81: bool e = qlen == 0;
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 69: unsigned g = atomic_load(cv);
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 89: atomic_fetch_add(&remaining, 1);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 76: static void cv_notify(atomic_uint *cv) { atomic_fetch_add(cv, 1); }
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 72: __VERIFIER_await(atomic_load(cv) != g);
+[worker] pool-model.c: 72: __VERIFIER_await(atomic_load(cv) != g);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 111: if (qlen > 0)
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 155: if (atomic_load(&halt))
+[worker] pool-model.c: 157: atomic_fetch_add(&executed, 1);
+[worker] pool-model.c: 159: if (t == 0 && atomic_fetch_add(&zeros, 1) == 0) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 100: atomic_store(&halt, true);
+[worker] pool-model.c: 76: static void cv_notify(atomic_uint *cv) { atomic_fetch_add(cv, 1); }
+[worker] pool-model.c: 76: static void cv_notify(atomic_uint *cv) { atomic_fetch_add(cv, 1); }
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 182: if (atomic_fetch_sub(&remaining, 1) == 1) {
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 119: for (;;) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 111: if (qlen > 0)
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 135: if (atomic_load(&halt) || atomic_load(&remaining) == 0) {
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 89: atomic_fetch_add(&remaining, 1);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 76: static void cv_notify(atomic_uint *cv) { atomic_fetch_add(cv, 1); }
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 89: atomic_fetch_add(&remaining, 1);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 76: static void cv_notify(atomic_uint *cv) { atomic_fetch_add(cv, 1); }
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 182: if (atomic_fetch_sub(&remaining, 1) == 1) {
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 119: for (;;) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 111: if (qlen > 0)
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 155: if (atomic_load(&halt))
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 182: if (atomic_fetch_sub(&remaining, 1) == 1) {
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 119: for (;;) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 111: if (qlen > 0)
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 178: assert(!saw_halt);	/* a worker that saw the halt starts no task */
+
+*** Verification unsuccesful.
+Number of complete executions explored: 0

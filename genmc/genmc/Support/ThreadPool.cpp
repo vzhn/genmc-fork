@@ -109,6 +109,7 @@ void ThreadPool::addWorker(unsigned int i, std::unique_ptr<GenMCDriver> driver,
 			std::scoped_lock lock(stateMtx_); // NOLINT(misc-const-correctness)
 			if (decRemainingTasks() == 0) {
 				stateCV_.notify_all();
+				doneCV_.notify_all();
 				break;
 			}
 		}
@@ -144,23 +145,38 @@ auto ThreadPool::tryStealOtherQueue() -> ThreadPool::TaskT
 auto ThreadPool::popTask() -> ThreadPool::TaskT
 {
 	while (true) {
-		if (auto task = tryPopPoolQueue())
-			return task;
+		/* Once the pool halts (an error was found), take no more tasks.
+		 * halt() sets the flag under stateMtx_, so checking it and popping
+		 * under stateMtx_ means no task is taken after halt() returns. */
+		{
+			std::scoped_lock lock(stateMtx_); // NOLINT(misc-const-correctness)
+			if (shouldHalt())
+				return nullptr;
+			if (auto task = tryPopPoolQueue())
+				return task;
+		}
 		if (auto task = tryStealOtherQueue())
 			return task;
 
+		/* submit() pushes under stateMtx_, so re-checking the queue under it
+		 * closes the window between the failed pop above and the wait, in
+		 * which a submission's notify_one() would reach no waiter */
 		std::unique_lock<std::mutex> lock(stateMtx_);
+		stateCV_.wait(lock, [this] {
+			return shouldHalt() || getRemainingTasks() == 0 || !queue_.empty();
+		});
 		if (shouldHalt() || getRemainingTasks() == 0)
 			return nullptr;
-		stateCV_.wait(lock);
+		/* a task was queued: pop it (or lose it to another worker and wait) */
 	}
-	return nullptr;
 }
 
 auto ThreadPool::waitForTasks() -> std::vector<std::future<VerificationResult>>
 {
-	while (!shouldHalt() && getRemainingTasks() > 0)
-		std::this_thread::yield();
-
+	/* Sleep until the last task finishes or the pool halts (no busy wait) */
+	{
+		std::unique_lock<std::mutex> lock(stateMtx_);
+		doneCV_.wait(lock, [this] { return shouldHalt() || getRemainingTasks() == 0; });
+	}
 	return std::move(results_);
 }

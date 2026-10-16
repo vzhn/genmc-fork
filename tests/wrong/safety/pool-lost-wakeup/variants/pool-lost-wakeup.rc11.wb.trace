@@ -1,0 +1,150 @@
+Error: Safety violation!
+Event (2, 19) in graph:
+<-1, 0>:
+	(0, 1): MALLOC w
+	(0, 2): Wna (qm.__private, 0) pthread.h:351
+	(0, 3): Wna (sm.__private, 0) pthread.h:351
+	(0, 4): CRacq (sm.__private, 0) [(0, 3)] pthread.h:375
+	(0, 5): CWacq (sm.__private, 1) pthread.h:375
+	(0, 6): URsc (remaining, 0) [INIT] pool-model.c:89
+	(0, 7): UWsc (remaining, 1) pool-model.c:89
+	(0, 8): CRacq (qm.__private, 0) [(0, 2)] pthread.h:375
+	(0, 9): CWacq (qm.__private, 1) pthread.h:375
+	(0, 10): Rna (qlen, 0) [INIT] pool-model.c:91
+	(0, 11): Wna (qlen, 1) pool-model.c:91
+	(0, 12): Wna (queue[0], 1) pool-model.c:91
+	(0, 13): Wrel (qm.__private, 0) pthread.h:383
+	(0, 14): URsc (state_cv, 0) [INIT] pool-model.c:76
+	(0, 15): UWsc (state_cv, 1) pool-model.c:76
+	(0, 16): Wrel (sm.__private, 0) pthread.h:383
+	(0, 17): THREAD_CREATE [thread 1] pthread.h:146
+	(0, 18): Wna (, 1) pthread.h:146
+	(0, 19): THREAD_CREATE [thread 2] pthread.h:146
+	(0, 20): Wna (, 2)
+	(0, 21): LOOP_BEGIN
+	(0, 22): SPIN_START
+	(0, 23): BLOCK[read-opt]
+<0, 1> worker:
+	(1, 1): LOOP_BEGIN pool-model.c:119
+	(1, 2): SPIN_START
+	(1, 3): CRacq (sm.__private, 0) [(0, 16)] pthread.h:375
+	(1, 4): CWacq (sm.__private, 1) pthread.h:375
+	(1, 5): Rsc (halt, 0) [INIT] pool-model.c:122
+	(1, 6): CRacq (qm.__private, 0) [(0, 13)] pthread.h:375
+	(1, 7): CWacq (qm.__private, 1) pthread.h:375
+	(1, 8): Rna (qlen, 1) [(0, 11)] pool-model.c:111
+	(1, 9): Rna (qlen, 1) [(0, 11)] pool-model.c:112
+	(1, 10): Wna (qlen, 0) pool-model.c:112
+	(1, 11): Rna (queue[0], 1) [(0, 12)] pool-model.c:112
+	(1, 12): Wrel (qm.__private, 0) pthread.h:383
+	(1, 13): Wrel (sm.__private, 0) pthread.h:383
+	(1, 14): Rsc (halt, 0) [INIT] pool-model.c:155
+	(1, 15): URsc (executed, 0) [INIT] pool-model.c:157
+	(1, 16): UWsc (executed, 1) pool-model.c:157
+	(1, 17): CRacq (sm.__private, 0) [(2, 10)] pthread.h:375
+	(1, 18): CWacq (sm.__private, 1) pthread.h:375
+	(1, 19): URsc (remaining, 1) [(0, 7)] pool-model.c:89
+	(1, 20): UWsc (remaining, 2) pool-model.c:89
+	(1, 21): CRacq (qm.__private, 0) [(2, 9)] pthread.h:375
+	(1, 22): CWacq (qm.__private, 1) pthread.h:375
+	(1, 23): Rna (qlen, 0) [(1, 10)] pool-model.c:91
+	(1, 24): Wna (qlen, 1) pool-model.c:91
+	(1, 25): Wna (queue[0], 0) pool-model.c:91
+	(1, 26): Wrel (qm.__private, 0) pthread.h:383
+	(1, 27): URsc (state_cv, 1) [(0, 15)] pool-model.c:76
+	(1, 28): UWsc (state_cv, 2) pool-model.c:76
+	(1, 29): Wrel (sm.__private, 0) pthread.h:383
+	(1, 30): CRacq (sm.__private, 0) [(1, 29)] pthread.h:375
+	(1, 31): CWacq (sm.__private, 1) pthread.h:375
+	(1, 32): URsc (remaining, 2) [(1, 20)] pool-model.c:182
+	(1, 33): UWsc (remaining, 1) pool-model.c:182
+	(1, 34): Wrel (sm.__private, 0) pthread.h:383
+	(1, 35): LOOP_BEGIN
+	(1, 36): SPIN_START
+	(1, 37): BLOCK[read-opt]
+<0, 2> worker:
+	(2, 1): LOOP_BEGIN pool-model.c:119
+	(2, 2): SPIN_START
+	(2, 3): CRacq (sm.__private, 0) [(1, 13)] pthread.h:375
+	(2, 4): CWacq (sm.__private, 1) pthread.h:375
+	(2, 5): Rsc (halt, 0) [INIT] pool-model.c:122
+	(2, 6): CRacq (qm.__private, 0) [(1, 12)] pthread.h:375
+	(2, 7): CWacq (qm.__private, 1) pthread.h:375
+	(2, 8): Rna (qlen, 0) [(1, 10)] pool-model.c:111
+	(2, 9): Wrel (qm.__private, 0) pthread.h:383
+	(2, 10): Wrel (sm.__private, 0) pthread.h:383
+	(2, 11): CRacq (sm.__private, 0) [(1, 34)] pthread.h:375
+	(2, 12): CWacq (sm.__private, 1) pthread.h:375
+	(2, 13): Rsc (halt, 0) [INIT] pool-model.c:135
+	(2, 14): Rsc (remaining, 1) [(1, 33)] pool-model.c:135
+	(2, 15): CRacq (qm.__private, 0) [(1, 26)] pthread.h:375
+	(2, 16): CWacq (qm.__private, 1) pthread.h:375
+	(2, 17): Rna (qlen, 1) [(1, 24)] pool-model.c:81
+	(2, 18): Wrel (qm.__private, 0) pthread.h:383
+	(2, 19): ERROR pool-model.c:146
+Coherence:
+state_cv: [ (0, 15): UWsc (G#(0, 252), 1) (1, 28): UWsc (G#(0, 252), 2) ]
+queue[0]: [ (0, 12): Wna (G#(0, 240), 1) (1, 25): Wna (G#(0, 240), 0) ]
+qlen: [ (0, 11): Wna (G#(0, 248), 1) (1, 10): Wna (G#(0, 248), 0) (1, 24): Wna (G#(0, 248), 1) ]
+remaining: [ (0, 7): UWsc (G#(0, 12), 1) (1, 20): UWsc (G#(0, 12), 2) (1, 33): UWsc (G#(0, 12), 1) ]
+sm.__private: [ (0, 3): Wna (G#(0, 4), 0) (0, 5): CWacq (G#(0, 4), 1) (0, 16): Wrel (G#(0, 4), 0) (1, 4): CWacq (G#(0, 4), 1) (1, 13): Wrel (G#(0, 4), 0) (2, 4): CWacq (G#(0, 4), 1) (2, 10): Wrel (G#(0, 4), 0) (1, 18): CWacq (G#(0, 4), 1) (1, 29): Wrel (G#(0, 4), 0) (1, 31): CWacq (G#(0, 4), 1) (1, 34): Wrel (G#(0, 4), 0) (2, 12): CWacq (G#(0, 4), 1) ]
+qm.__private: [ (0, 2): Wna (G#(0, 0), 0) (0, 9): CWacq (G#(0, 0), 1) (0, 13): Wrel (G#(0, 0), 0) (1, 7): CWacq (G#(0, 0), 1) (1, 12): Wrel (G#(0, 0), 0) (2, 7): CWacq (G#(0, 0), 1) (2, 9): Wrel (G#(0, 0), 0) (1, 22): CWacq (G#(0, 0), 1) (1, 26): Wrel (G#(0, 0), 0) (2, 16): CWacq (G#(0, 0), 1) (2, 18): Wrel (G#(0, 0), 0) ]
+
+Trace to (2, 19):
+[main] pthread.h: 351: return __VERIFIER_mutex_init(__mutex, __mutexattr);
+[main] pthread.h: 351: return __VERIFIER_mutex_init(__mutex, __mutexattr);
+[main] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[main] pool-model.c: 89: atomic_fetch_add(&remaining, 1);
+[main] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[main] pool-model.c: 91: queue[qlen++] = depth;
+[main] pool-model.c: 91: queue[qlen++] = depth;
+[main] pool-model.c: 91: queue[qlen++] = depth;
+[main] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[main] pool-model.c: 76: static void cv_notify(atomic_uint *cv) { atomic_fetch_add(cv, 1); }
+[main] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[main] pthread.h: 146: (*__newthread) = __VERIFIER_thread_create(__attr, __start_routine, __arg);
+[main] pthread.h: 146: (*__newthread) = __VERIFIER_thread_create(__attr, __start_routine, __arg);
+[worker] pool-model.c: 119: for (;;) {
+[worker] pool-model.c: 119: for (;;) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 122: if (atomic_load(&halt)) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 111: if (qlen > 0)
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pool-model.c: 112: t = queue[--qlen];
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 122: if (atomic_load(&halt)) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 111: if (qlen > 0)
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 155: if (atomic_load(&halt))
+[worker] pool-model.c: 157: atomic_fetch_add(&executed, 1);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 89: atomic_fetch_add(&remaining, 1);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pool-model.c: 91: queue[qlen++] = depth;
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 76: static void cv_notify(atomic_uint *cv) { atomic_fetch_add(cv, 1); }
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 182: if (atomic_fetch_sub(&remaining, 1) == 1) {
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 135: if (atomic_load(&halt) || atomic_load(&remaining) == 0) {
+[worker] pool-model.c: 135: if (atomic_load(&halt) || atomic_load(&remaining) == 0) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pool-model.c: 81: bool e = qlen == 0;
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pool-model.c: 146: assert(queue_empty());	/* never sleep while a task is queued */
+
+*** Verification unsuccesful.
+Number of complete executions explored: 42
+Number of blocked executions seen: 17
+Tip: 17 of those executions ended with a thread waiting in a spinloop or __VERIFIER_await(). Use -check-liveness to report the waits that can never finish.
