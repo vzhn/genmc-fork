@@ -1833,9 +1833,10 @@ void Interpreter::visitCallInstWrapper(CallInstWrapper CS)
 	// To handle indirect calls, we must get the pointer value from the argument
 	// and treat it as a function pointer.
 	GenericValue SRC = getOperandValue(SF.Caller.getCalledOperand(), SF);
-	auto specialDeps = updateFunArgDeps(getCurThr().id, (Function *)GVTOP(SRC));
-	callFunction((Function *)GVTOP(SRC), ArgVals, specialDeps);
-	updateInternalFunRetDeps(getCurThr().id, (Function *)GVTOP(SRC), &CS);
+	auto *calledFun = getFunctionFromPointer(GVTOP(SRC));
+	auto specialDeps = updateFunArgDeps(getCurThr().id, calledFun);
+	callFunction(calledFun, ArgVals, specialDeps);
+	updateInternalFunRetDeps(getCurThr().id, calledFun, &CS);
 }
 
 // auxiliary function for shift operations
@@ -3040,7 +3041,7 @@ void Interpreter::callThreadSelf(Function *F, const std::vector<GenericValue> &A
 void Interpreter::callThreadCreate(Function *F, const std::vector<GenericValue> &ArgVals,
 				   const std::unique_ptr<EventDeps> &specialDeps)
 {
-	Function *calledFun = (Function *)GVTOP(ArgVals[1]);
+	Function *calledFun = getFunctionFromPointer(GVTOP(ArgVals[1]));
 	ExecutionContext SF;
 
 	/* First, set up the stack frame for the new function.
@@ -3105,7 +3106,7 @@ void Interpreter::callThreadExit(Function *F, const std::vector<GenericValue> &A
 void Interpreter::callAtExit(Function *F, const std::vector<GenericValue> &ArgVals,
 			     const std::unique_ptr<EventDeps> &specialDeps)
 {
-	addAtExitHandler((Function *)GVTOP(ArgVals[0]));
+	addAtExitHandler(getFunctionFromPointer(GVTOP(ArgVals[0])));
 	returnValueToCaller(F->getReturnType(), INT_TO_GV(F->getReturnType(), 0));
 }
 

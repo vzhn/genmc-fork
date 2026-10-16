@@ -360,7 +360,7 @@ GenericValue Interpreter::callExternalFunction(Function *F,
 static GenericValue lle_X_atexit(FunctionType *FT, const std::vector<GenericValue> &Args)
 {
 	assert(Args.size() == 1);
-	TheInterpreter->addAtExitHandler((Function *)GVTOP(Args[0]));
+	TheInterpreter->addAtExitHandler(TheInterpreter->getFunctionFromPointer(GVTOP(Args[0])));
 	GenericValue GV;
 	GV.IntVal = 0;
 	return GV;

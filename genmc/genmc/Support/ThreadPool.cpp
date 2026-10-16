@@ -72,8 +72,9 @@ ThreadPool::ThreadPool(const LLIConfig &lliConfig, const std::shared_ptr<const C
 
 		auto dw = (i == 0) ? std::move(firstDriver) : GenMCDriver::create(conf, this);
 		std::string buf;
+		/* Function addresses are shared through the original module */
 		auto interp = llvm::Interpreter::create(std::move(newmod), std::move(newMI), &*dw,
-							&lliConfig, &buf);
+							&lliConfig, &buf, &*mod);
 		addWorker(i, std::move(dw), std::move(interp), threadFun);
 	}
 #endif

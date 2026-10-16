@@ -129,14 +129,14 @@ public:
 // executing.
 //
 struct ExecutionContext {
-	Function *CurFunction;			// The currently executing function
-	BasicBlock *CurBB;			// The currently executing BB
-	BasicBlock::iterator CurInst;		// The next instruction to execute
-	CallInstWrapper Caller;			// Holds the call that called subframes.
-						// NULL if main func or debugger invoked fn
+	Function *CurFunction;			      // The currently executing function
+	BasicBlock *CurBB;			      // The currently executing BB
+	BasicBlock::iterator CurInst;		      // The next instruction to execute
+	CallInstWrapper Caller;			      // Holds the call that called subframes.
+						      // NULL if main func or debugger invoked fn
 	llvm::DenseMap<Value *, GenericValue> Values; // LLVM values used in this invocation
-	std::vector<GenericValue> VarArgs;	// Values passed through an ellipsis
-	AllocaHolder Allocas;			// Track memory allocated by alloca
+	std::vector<GenericValue> VarArgs;	      // Values passed through an ellipsis
+	AllocaHolder Allocas;			      // Track memory allocated by alloca
 
 	ExecutionContext() : CurFunction(nullptr), CurBB(nullptr), CurInst(nullptr) {}
 };
@@ -251,6 +251,15 @@ protected:
 	/* Information about the module under test */
 	std::unique_ptr<ModuleInfo> MI;
 
+	/* In parallel mode every worker interprets its own clone of the module,
+	 * but workers exchange graphs, and so the function pointers stored in
+	 * memory. A function's address is therefore the Function* of the module
+	 * all clones were made from (it outlives the workers). These map this
+	 * interpreter's functions to those addresses and back. Both are empty
+	 * when the interpreter runs on the original module. */
+	llvm::DenseMap<const Function *, void *> funToCanon_;
+	llvm::DenseMap<const void *, Function *> canonToFun_;
+
 	/* Registers (and their Values) mentioned by each load annotation; filled
 	 * lazily by getCurrentAnnotConcretized() */
 	std::unordered_map<AnnotID, std::vector<std::pair<AnnotID, const Value *>>> annotRegs_;
@@ -295,7 +304,8 @@ protected:
 
 public:
 	explicit Interpreter(std::unique_ptr<Module> M, std::unique_ptr<ModuleInfo> MI,
-			     GenMCDriver *driver, const LLIConfig *userConf);
+			     GenMCDriver *driver, const LLIConfig *userConf,
+			     const Module *canonicalMod = nullptr);
 	virtual ~Interpreter();
 
 	Thread &constructAddThreadFromInfo(const ThreadInfo &ti)
@@ -419,7 +429,8 @@ public:
 	static std::unique_ptr<Interpreter> create(std::unique_ptr<Module> M,
 						   std::unique_ptr<ModuleInfo> MI,
 						   GenMCDriver *driver, const LLIConfig *userConf,
-						   std::string *ErrorStr = nullptr);
+						   std::string *ErrorStr = nullptr,
+						   const Module *canonicalMod = nullptr);
 
 /// run - Start execution with the specified function and arguments.
 ///
@@ -533,6 +544,14 @@ public:
 
 	void addAtExitHandler(Function *F) { dynState.AtExitHandlers.push_back(F); }
 
+	/* Inverse of getPointerToFunction(): the local function a pointer value
+	 * denotes. Every place that calls through a pointer goes through here. */
+	auto getFunctionFromPointer(void *p) const -> Function *
+	{
+		auto it = canonToFun_.find(p);
+		return it == canonToFun_.end() ? static_cast<Function *>(p) : it->second;
+	}
+
 	GenericValue *getFirstVarArg() { return &(ECStack().back().VarArgs[0]); }
 
 private: // Helper functions
@@ -545,7 +564,13 @@ private: // Helper functions
 	//
 	void SwitchToNewBasicBlock(BasicBlock *Dest, ExecutionContext &SF);
 
-	void *getPointerToFunction(Function *F) { return (void *)F; }
+	/* A function's address is the Function* of the canonical module (see
+	 * funToCanon_), so that all workers of a thread pool agree on it */
+	void *getPointerToFunction(Function *F)
+	{
+		auto it = funToCanon_.find(F);
+		return it == funToCanon_.end() ? (void *)F : it->second;
+	}
 	void *getPointerToBasicBlock(BasicBlock *BB) { return (void *)BB; }
 
 	void initializeExecutionEngine() {}

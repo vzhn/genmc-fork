@@ -50,7 +50,7 @@ extern "C" void LLVMLinkInInterpreter() {}
 std::unique_ptr<Interpreter> Interpreter::create(std::unique_ptr<Module> M,
 						 std::unique_ptr<ModuleInfo> MI,
 						 GenMCDriver *driver, const LLIConfig *userConf,
-						 std::string *ErrStr)
+						 std::string *ErrStr, const Module *canonicalMod)
 {
 	// Tell this Module to materialize everything and release the GVMaterializer.
 	if (Error Err = M->materializeAll()) {
@@ -61,7 +61,8 @@ std::unique_ptr<Interpreter> Interpreter::create(std::unique_ptr<Module> M,
 		// We got an error, just return 0
 		return nullptr;
 	}
-	return std::make_unique<Interpreter>(std::move(M), std::move(MI), driver, userConf);
+	return std::make_unique<Interpreter>(std::move(M), std::move(MI), driver, userConf,
+					     canonicalMod);
 }
 
 void Interpreter::resetThread(unsigned int id)
@@ -331,9 +332,25 @@ const GenMCDriver::EventDbgInfo *Interpreter::currDbgInfo(std::optional<SAddr> l
 // Interpreter ctor - Initialize stuff
 //
 Interpreter::Interpreter(std::unique_ptr<Module> M, std::unique_ptr<ModuleInfo> MI,
-			 GenMCDriver *driver, const LLIConfig *userConf)
+			 GenMCDriver *driver, const LLIConfig *userConf, const Module *canonicalMod)
 	: ExecutionEngine(std::move(M)), MI(std::move(MI)), driver(driver)
 {
+	/* Before anything takes a function's address (emitGlobals() below) */
+	if (canonicalMod && canonicalMod != Modules.back().get()) {
+		auto &local = Modules.back()->getFunctionList();
+		const auto &canon = canonicalMod->getFunctionList();
+		VERIFY(local.size() == canon.size());
+		auto cit = canon.begin();
+		for (auto &F : local) {
+			/* A bitcode round trip keeps the function list and its order */
+			VERIFY(F.getName() == cit->getName());
+			// NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+			auto *addr = static_cast<void *>(const_cast<Function *>(&*cit));
+			funToCanon_[&F] = addr;
+			canonToFun_[addr] = &F;
+			++cit;
+		}
+	}
 
 	memset(&dynState.ExitValue.Untyped, 0, sizeof(dynState.ExitValue.Untyped));
 
