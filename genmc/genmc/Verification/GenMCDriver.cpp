@@ -163,6 +163,14 @@ auto GenMCDriver::popExecution() -> bool
 
 void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 {
+	/* A replay that collects an error's metadata belongs to the executions
+	 * being replaced: drop it, or the next schedule would replay to an event
+	 * of the old graph. (It is cut short only when the pool halts, and then
+	 * the error is reported by the worker that halted it.) */
+	getScheduler().setErrorReplayEvent(std::nullopt);
+	bufferedError_ = std::nullopt;
+	dbgInfo_.clear();
+
 	execStack.clear();
 	execStack.emplace_back(std::move(exec->graph), LocalQueueT(), std::move(exec->choices));
 
