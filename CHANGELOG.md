@@ -7,12 +7,42 @@ released.
 
 ## [Unreleased]
 
+- Merge of MIXER [POPL'25] into mainline GenMC
+
+
+## [0.19.0-vzhn.1] - 2026.10.16
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Added
+
 - `__VERIFIER_await(cond)`: a wait that `-check-liveness` reports when it can
   never finish (`__VERIFIER_assume()` keeps pruning silently); without
   `-check-liveness`, a tip points at the flag when executions ended in a wait
-- Merge of MIXER [POPL'25] into mainline GenMC
 - `calloc()`: a zero-initialized allocation is a single event; the block counts
   as initialized by it, so zeroing no longer adds one store per byte to the graph
+- Test scripts: `run-parallel.sh` (the fast suite with `-nthreads`, ctest
+  `run-parallel`), `tsan-parallel.sh` (ctest `tsan-parallel` in ThreadSanitizer
+  builds), `check-liveness-tip.sh` (ctest `liveness-tip`)
+- Mechanized soundness proof of TruSt (Algorithm 1) in Rocq (`proofs/`)
+
+### Fixes
+
+- `-nthreads` > 1: function pointers stored in memory pointed into another
+  worker's copy of the module (unknown external function, or a crash)
+- `-nthreads` > 1 under IMM: graph copies shared `DepView` storage between
+  workers (heap corruption); a race on the thread pool's worker list
+- Memory intrinsics are promoted by byte offset, and `memset` honors its length
+  and byte value
+- Load annotation no longer enumerates every CFG path (exponential on inlined code)
+- The interpreter supports `freeze`
+
+### Performance
+
+- Annotated loads concretize only the registers the annotation mentions
+- Interpreter frame values in a `DenseMap`; no string copies per instruction
+- The use-after-retire check asks the cheap retire lookup before the
+  hazard-pointer walk
 
 
 ## [0.19.0] - 2026.09.24
