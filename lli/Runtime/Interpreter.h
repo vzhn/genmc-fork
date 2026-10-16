@@ -129,14 +129,14 @@ public:
 // executing.
 //
 struct ExecutionContext {
-	Function *CurFunction;			// The currently executing function
-	BasicBlock *CurBB;			// The currently executing BB
-	BasicBlock::iterator CurInst;		// The next instruction to execute
-	CallInstWrapper Caller;			// Holds the call that called subframes.
-						// NULL if main func or debugger invoked fn
+	Function *CurFunction;			      // The currently executing function
+	BasicBlock *CurBB;			      // The currently executing BB
+	BasicBlock::iterator CurInst;		      // The next instruction to execute
+	CallInstWrapper Caller;			      // Holds the call that called subframes.
+						      // NULL if main func or debugger invoked fn
 	llvm::DenseMap<Value *, GenericValue> Values; // LLVM values used in this invocation
-	std::vector<GenericValue> VarArgs;	// Values passed through an ellipsis
-	AllocaHolder Allocas;			// Track memory allocated by alloca
+	std::vector<GenericValue> VarArgs;	      // Values passed through an ellipsis
+	AllocaHolder Allocas;			      // Track memory allocated by alloca
 
 	ExecutionContext() : CurFunction(nullptr), CurBB(nullptr), CurInst(nullptr) {}
 };
