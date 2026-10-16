@@ -16,7 +16,8 @@ struct VerificationResult {
 				    completed successfully */
 	unsigned explored{};			 /**< Number of complete executions explored */
 	unsigned exploredBlocked{};		 /**< Number of blocked executions explored */
-	unsigned boundExceeding{};	  /**< Number of bound-exceeding executions explored */
+	unsigned spinBlocked{};	   /**< Blocked executions with a thread in a spinloop or await */
+	unsigned boundExceeding{}; /**< Number of bound-exceeding executions explored */
 	long double estimationMean{};	  /**< The mean of estimations */
 	long double estimationVariance{}; /**< The (biased) variance of the estimations */
 #ifdef ENABLE_GENMC_DEBUG
@@ -41,6 +42,7 @@ struct VerificationResult {
 		message += other.message;
 		explored += other.explored;
 		exploredBlocked += other.exploredBlocked;
+		spinBlocked += other.spinBlocked;
 		boundExceeding += other.boundExceeding;
 		estimationMean += other.estimationMean;
 		estimationVariance += other.estimationVariance;

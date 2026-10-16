@@ -106,6 +106,28 @@ void __VERIFIER_spin_end(bool cond)
 }
 
 /*
+ * Waits until COND holds.
+ *
+ * __VERIFIER_assume(cond) prunes: GenMC discards the executions where COND
+ * fails. __VERIFIER_await(cond) waits: a thread whose COND fails is blocked,
+ * and with -check-liveness GenMC reports a liveness violation when the wait
+ * can never finish (every read COND made returns the latest value and no
+ * other thread can make progress).
+ *
+ * COND is evaluated once per execution, as with an assume, and must not have
+ * side effects. Do not use it inside a loop that GenMC transforms into an
+ * assume (see the markers above).
+ *
+ * Example: __VERIFIER_await(atomic_load(&ready) == 1);
+ */
+#define __VERIFIER_await(cond)			\
+do {						\
+	__VERIFIER_loop_begin();		\
+	__VERIFIER_spin_start();		\
+	__VERIFIER_spin_end(cond);		\
+} while (0)
+
+/*
  * Marker function that denotes that a store is local.
  * Since non-local stores may preclude the spin-assume transformation,
  * this marker serves as a hint to GenMC.

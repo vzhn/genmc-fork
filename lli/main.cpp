@@ -790,6 +790,15 @@ static void printVerificationResults(const std::shared_ptr<const Config> &conf,
 		PRINT(VerbosityLevel::Error, "\nNumber of blocked executions seen: {}",
 		      res.exploredBlocked);
 	}
+	/* A wait that never finishes is otherwise silent. (Keep "blocked" and
+	 * "explored" out of this line: the test drivers grep for them.) */
+	if (res.spinBlocked != 0U && !conf->checkLiveness) {
+		PRINT(VerbosityLevel::Error,
+		      "\nTip: {} of those executions ended with a thread waiting in a "
+		      "spinloop or __VERIFIER_await(). Use -check-liveness to report the "
+		      "waits that can never finish.",
+		      res.spinBlocked);
+	}
 	GENMC_DEBUG(
 		if (conf->countMootExecs) {
 			PRINT(VerbosityLevel::Error, " (+ {} mooted)", res.exploredMoot);

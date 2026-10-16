@@ -378,6 +378,10 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 	/* Ignore the execution if some assume has failed */
 	if (g.isBlocked()) {
 		++result.exploredBlocked;
+		if (std::ranges::any_of(g.thr_ids(), [&](auto tid) {
+			    return genmc::isa<SpinloopBlockLabel>(g.getLastThreadLabel(tid));
+		    }))
+			++result.spinBlocked;
 		if (getConf()->printBlockedExecs)
 			printGraph(g, dbgInfo_);
 		if (getConf()->checkLiveness)

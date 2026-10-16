@@ -7,6 +7,9 @@ released.
 
 ## [Unreleased]
 
+- `__VERIFIER_await(cond)`: a wait that `-check-liveness` reports when it can
+  never finish (`__VERIFIER_assume()` keeps pruning silently); without
+  `-check-liveness`, a tip points at the flag when executions ended in a wait
 - Merge of MIXER [POPL'25] into mainline GenMC
 - `calloc()`: a zero-initialized allocation is a single event; the block counts
   as initialized by it, so zeroing no longer adds one store per byte to the graph
