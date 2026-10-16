@@ -158,28 +158,29 @@ HANDLE_ALLOC_FUNCTION(31, "__VERIFIER_malloc", Malloc)
 HANDLE_ALLOC_FUNCTION(32, "__VERIFIER_malloc_aligned", MallocAligned)
 HANDLE_ALLOC_FUNCTION(33, "__VERIFIER_palloc", PMalloc)
 HANDLE_ALLOC_FUNCTION(34, "__VERIFIER_hazptr_alloc", HazptrAlloc)
-LAST_ALLOC_FUNCTION(34)
+HANDLE_ALLOC_FUNCTION(35, "__VERIFIER_calloc", Calloc)
+LAST_ALLOC_FUNCTION(35)
 
 /*
  * Free functions - for memory deallocation.
  */
-FIRST_FREE_FUNCTION(35)
-HANDLE_FREE_FUNCTION(35, "__VERIFIER_free", Free)
-HANDLE_FREE_FUNCTION(36, "__VERIFIER_hazptr_free", HazptrFree)
-HANDLE_FREE_FUNCTION(37, "__VERIFIER_hazptr_retire", HazptrRetire)
-LAST_FREE_FUNCTION(37)
+FIRST_FREE_FUNCTION(36)
+HANDLE_FREE_FUNCTION(36, "__VERIFIER_free", Free)
+HANDLE_FREE_FUNCTION(37, "__VERIFIER_hazptr_free", HazptrFree)
+HANDLE_FREE_FUNCTION(38, "__VERIFIER_hazptr_retire", HazptrRetire)
+LAST_FREE_FUNCTION(38)
 
 /*
  * Other functions - other function calls (w/ side effects)
  * that GenMC needs to track.
  */
-FIRST_OTHER_FUNCTION(38)
-HANDLE_OTHER_FUNCTION(38, "__VERIFIER_thread_create", ThreadCreate)
-HANDLE_OTHER_FUNCTION(39, "__VERIFIER_thread_create_symmetric", ThreadCreateSymmetric)
-HANDLE_OTHER_FUNCTION(40, "__VERIFIER_thread_join", ThreadJoin)
-HANDLE_OTHER_FUNCTION(41, "__VERIFIER_thread_exit", ThreadExit)
-HANDLE_OTHER_FUNCTION(42, "__VERIFIER_atexit", AtExit)
-LAST_OTHER_FUNCTION(42)
+FIRST_OTHER_FUNCTION(39)
+HANDLE_OTHER_FUNCTION(39, "__VERIFIER_thread_create", ThreadCreate)
+HANDLE_OTHER_FUNCTION(40, "__VERIFIER_thread_create_symmetric", ThreadCreateSymmetric)
+HANDLE_OTHER_FUNCTION(41, "__VERIFIER_thread_join", ThreadJoin)
+HANDLE_OTHER_FUNCTION(42, "__VERIFIER_thread_exit", ThreadExit)
+HANDLE_OTHER_FUNCTION(43, "__VERIFIER_atexit", AtExit)
+LAST_OTHER_FUNCTION(43)
 
 #undef FIRST_PURE_FUNCTION
 #undef HANDLE_PURE_FUNCTION

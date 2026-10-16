@@ -51,8 +51,10 @@ static constexpr uint64_t BYTE_MASK = 0xFF;
 
 	/* Special case for initializer */
 	if (lab->getPos().isInitializer()) {
-		/* Dynamic-loc accesses can read init only if the graph has been cut */
-		VERIFY(!(haveNAs_ && access.addr.isDynamic() && !pruned_));
+		/* Dynamic-loc accesses can read init only if the graph has been cut,
+		 * or if the block was zero-initialized by its allocation (calloc()) */
+		VERIFY(!(haveNAs_ && access.addr.isDynamic() && !pruned_ &&
+			 !state.isInitialized(access)));
 		auto val = (access.addr.isDynamic() && !initVals_.contains(access.addr))
 				   ? SVal(0)
 				   : getInitVal(access);
