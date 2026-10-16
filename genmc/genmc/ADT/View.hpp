@@ -267,6 +267,14 @@ public:
 
 	auto formatData(std::format_context &ctx) const -> std::format_context::iterator override;
 
+	/** Whether this view and OTHER share their (copy-on-write) storage. The
+	 * refcount on it is not atomic, so a graph copy handed to another thread
+	 * must not share storage with the original. */
+	[[nodiscard]] auto sharesStorageWith(const View &other) const -> bool
+	{
+		return base_ && base_ == other.base_;
+	}
+
 private:
 	friend class ExecutionGraph;
 

@@ -133,7 +133,16 @@ public:
 
 	static auto classof(const VectorClock *vc) -> bool { return vc->getKind() == VC_DepView; }
 
+	/** Whether this view and OTHER share storage (see View::sharesStorageWith()) */
+	[[nodiscard]] auto sharesStorageWith(const DepView &other) const -> bool
+	{
+		return view_.sharesStorageWith(other.view_);
+	}
+
 private:
+	/* Unshares view_ when a graph is copied for another thread */
+	friend class ExecutionGraph;
+
 	/** A view containing the highest index seen for each thread */
 	View view_;
 

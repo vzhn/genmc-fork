@@ -12,6 +12,7 @@
  */
 
 #include "genmc/Execution/ExecutionGraph.hpp"
+#include "genmc/ADT/DepView.hpp"
 #include "genmc/ADT/Rc.hpp"
 #include "genmc/ADT/VSet.hpp"
 #include "genmc/ADT/View.hpp"
@@ -578,9 +579,15 @@ void ExecutionGraph::copyGraphUpTo(ExecutionGraph &other, const VectorClock &v) 
 	for (auto &lab : other.labels()) {
 		for (auto &view : lab.calculatedViews)
 			fixView(view);
-		if (lab.prefixView)
+		/* Prefix views are DepViews under dependency-tracking models; their
+		 * View shares its base like any other and must be unshared too, or
+		 * the copy handed to another worker shares a non-atomic refcount */
+		if (lab.prefixView) {
 			if (auto *v = genmc::dyn_cast<View>(lab.prefixView.get()))
 				fixView(*v);
+			else if (auto *dv = genmc::dyn_cast<DepView>(lab.prefixView.get()))
+				fixView(dv->view_);
+		}
 
 		auto *rLab = genmc::dyn_cast<ReadLabel>(&lab);
 		if (rLab && rLab->getRf()) {
