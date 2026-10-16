@@ -188,7 +188,7 @@ auto LoadAnnotationAnalysis::run(Function &F, FunctionAnalysisManager & /*FAM*/)
 			auto loads = getAnnotatableLoads(call);
 			for (auto *l : loads) {
 				auto rawType = extractAssumeArgument(call);
-				VERIFY(rawType <= static_cast<uint64_t>(AssumeType::Spinloop));
+				VERIFY(rawType <= static_cast<uint64_t>(AssumeType::Await));
 				auto type = static_cast<AssumeType>(rawType);
 				result_.annotMap[l] = std::make_pair(type, annotator.annotate(l));
 			}

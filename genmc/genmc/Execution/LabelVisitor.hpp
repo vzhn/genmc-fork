@@ -61,6 +61,7 @@ public:
 	{
 		return DELEGATE_LABEL(BlockLabel);
 	}
+	void visitAwaitBlockLabel(const AwaitBlockLabel &lab) { return DELEGATE_LABEL(BlockLabel); }
 	void visitFaiZNEBlockLabel(const FaiZNEBlockLabel &lab)
 	{
 		return DELEGATE_LABEL(BlockLabel);
@@ -213,6 +214,7 @@ public:
 	void visitOptionalLabel(const OptionalLabel &lab) { return DELEGATE_LABEL(EventLabel); }
 	void visitLoopBeginLabel(const LoopBeginLabel &lab) { return DELEGATE_LABEL(EventLabel); }
 	void visitSpinStartLabel(const SpinStartLabel &lab) { return DELEGATE_LABEL(EventLabel); }
+	void visitAwaitStartLabel(const AwaitStartLabel &lab) { return DELEGATE_LABEL(EventLabel); }
 	void visitFaiZNESpinEndLabel(const FaiZNESpinEndLabel &lab)
 	{
 		return DELEGATE_LABEL(EventLabel);

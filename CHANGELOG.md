@@ -8,6 +8,9 @@ released.
 ## [Unreleased]
 
 - Merge of MIXER [POPL'25] into mainline GenMC
+- Fix: `__VERIFIER_await()` inside a loop (e.g., a retry loop) was reported as a
+  non-terminating spinloop; awaits now have their own markers (`AWAIT_START`,
+  `BLOCK[await]`) and leave the loop's state alone
 
 
 ## [0.19.0-vzhn.1] - 2026.10.16

@@ -396,6 +396,9 @@ void *waiter(void *unused)
 ```
 
 `cond` is evaluated once per execution and must not have side effects.
+An await may be used inside loops, e.g., in a retry loop that tries to
+take a resource and waits for it otherwise. In execution graphs it shows
+as `AWAIT_START`, and a thread blocked in it as `BLOCK[await]`.
 
 Without `-check-liveness`, GenMC prints a tip after the execution counts
 when some executions ended with a thread waiting in a spinloop or in

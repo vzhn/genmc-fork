@@ -202,6 +202,8 @@ auto BlockLabel::createAssumeBlock(Event pos, AssumeType type) -> std::unique_pt
 		return BarrierBlockLabel::create(pos);
 	case AssumeType::Spinloop:
 		return SpinloopBlockLabel::create(pos);
+	case AssumeType::Await:
+		return AwaitBlockLabel::create(pos);
 	default:
 		UNREACHABLE();
 	}
