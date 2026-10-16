@@ -37,5 +37,15 @@ if(SANITIZE MATCHES "address")
       ENVIRONMENT "${_asan_env}")
 endif()
 
+# Data races between parallel exploration workers (ThreadSanitizer builds only)
+if(SANITIZE MATCHES "thread")
+  add_test(NAME tsan-parallel
+      COMMAND bash -c "${SCRIPT_DIR}/tsan-parallel.sh > ${SCRIPT_DIR}/tsan-parallel.log"
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  )
+  set_tests_properties(tsan-parallel PROPERTIES LABELS "integration;concurrency" TIMEOUT 1800
+      ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+endif()
+
 # Unit tests
 add_subdirectory(unit)
