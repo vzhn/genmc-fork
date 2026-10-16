@@ -2953,6 +2953,24 @@ void Interpreter::callMallocAligned(Function *F, const std::vector<GenericValue>
 	return;
 }
 
+void Interpreter::callCalloc(Function *F, const std::vector<GenericValue> &ArgVals,
+			     const std::unique_ptr<EventDeps> &specialDeps)
+{
+	auto nmemb = ArgVals[0].IntVal.getLimitedValue();
+	auto size = ArgVals[1].IntVal.getLimitedValue();
+
+	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id),
+				  getAddrPoDeps(getCurThr().id), nullptr);
+	auto ret = CALL_DRIVER(handleMalloc, currDbgInfo(), currPos(), nmemb * size,
+			       alignof(std::max_align_t), StorageDuration::SD_Heap,
+			       StorageType::ST_Volatile, AddressSpace::AS_User, nullptr, {},
+			       GET_DEPS(deps), /* zeroed */ true);
+	auto result = std::get_if<SVal>(&ret);
+	if (!result)
+		return;
+	returnValueToCaller(F->getReturnType(), SVAL_TO_GV(*result, F->getReturnType()));
+}
+
 void Interpreter::callPMalloc(Function *F, const std::vector<GenericValue> &ArgVals,
 			      const std::unique_ptr<EventDeps> &specialDeps)
 {

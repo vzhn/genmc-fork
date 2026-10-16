@@ -61,6 +61,9 @@ extern void *__VERIFIER_malloc(size_t) __attribute__ ((__nothrow__));
 
 extern void *__VERIFIER_malloc_aligned(size_t, size_t) __attribute__ ((__nothrow__));
 
+/* Zero-initialized allocation: one event, the whole block counts as written */
+extern void *__VERIFIER_calloc(size_t, size_t) __attribute__ ((__nothrow__));
+
 extern int __VERIFIER_atexit(void (*func)(void)) __attribute__ ((__nothrow__));
 
 

@@ -8,6 +8,8 @@ released.
 ## [Unreleased]
 
 - Merge of MIXER [POPL'25] into mainline GenMC
+- `calloc()`: a zero-initialized allocation is a single event; the block counts
+  as initialized by it, so zeroing no longer adds one store per byte to the graph
 
 
 ## [0.19.0] - 2026.09.24

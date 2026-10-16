@@ -1511,7 +1511,16 @@ public:
 	 * Returns null if no such info is found. */
 	auto getNameInfo() const -> const NameInfo * { return nameInfo; }
 
-	void reset() override { MemLifecycleLabel::reset(); }
+	/** Whether the allocation zero-initializes its block (calloc()):
+	 * the whole range then counts as initialized by this event */
+	auto isZeroed() const -> bool { return zeroed; }
+	void setZeroed(bool z) { zeroed = z; }
+
+	void reset() override
+	{
+		MemLifecycleLabel::reset();
+		zeroed = false;
+	}
 
 	DEFINE_STANDARD_MEMBERS_RANGE(Malloc)
 
@@ -1536,6 +1545,9 @@ private:
 
 	/** Naming information for this allocation */
 	const NameInfo *nameInfo{};
+
+	/** Whether the block is zero-initialized by the allocation */
+	bool zeroed{};
 };
 
 /*******************************************************************************

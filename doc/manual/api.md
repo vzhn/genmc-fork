@@ -34,6 +34,7 @@ The following functions are supported from `stdlib.h`:
 - `int atoi(const char *)`
 - `void free(void *)`
 - `void *malloc(size_t)`
+- `void *calloc(size_t, size_t)` (the block counts as initialized by the allocation, with no per-byte store events)
 - `void *aligned_alloc(size_t, size_t)`
 
 ### `stdio`, `unistd` and `fcntl` API

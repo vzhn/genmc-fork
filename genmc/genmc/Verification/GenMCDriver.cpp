@@ -225,6 +225,9 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 			state.onAlloc(aLab->getPos(), aLab->getSize(), aLab->getAlignment(),
 				      aLab->getStorageDuration(), aLab->getStorageType(),
 				      aLab->getAddressSpace());
+			if (aLab->isZeroed())
+				state.onZeroedAlloc(aLab->getPos(), aLab->getAccess(),
+						    g.getConsChecker()->getHbView(aLab));
 		} else if (const auto *dLab = genmc::dyn_cast<FreeLabel>(lab)) {
 			state.onFree(dLab->getPos(), dLab->getAddr(),
 				     genmc::isa<HpRetireLabel>(dLab));
@@ -2019,7 +2022,8 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 
 auto GenMCDriver::handleMalloc(Event pos, ASize size, uint64_t alignment, StorageDuration sdur,
 			       StorageType styp, AddressSpace spc, const NameInfo *info,
-			       const std::string &name, const EventDeps &deps) -> HandleResult<SVal>
+			       const std::string &name, const EventDeps &deps, bool zeroed)
+	-> HandleResult<SVal>
 {
 	auto &g = getExec().getGraph();
 
@@ -2029,8 +2033,14 @@ auto GenMCDriver::handleMalloc(Event pos, ASize size, uint64_t alignment, Storag
 
 	auto addr = g.getState().onAlloc(pos, size, alignment, sdur, styp, spc);
 	configureProbe(mallocProbeLab_.get(), pos, addr, size, deps);
+	mallocProbeLab_->setZeroed(zeroed);
 
 	auto guard = g.addScoped(mallocProbeLab_);
+	auto *lab = guard.get();
+	/* calloc(): the block is initialized (to zero) by the allocation itself,
+	 * so no store events are needed before it may be read */
+	if (zeroed && addr != SAddr())
+		g.getState().onZeroedAlloc(pos, lab->getAccess(), getConsChecker().getHbView(lab));
 	if constexpr (Config::emitNALabels)
 		guard.commit();
 
@@ -2045,8 +2055,8 @@ auto GenMCDriver::handleMalloc(Event pos, ASize size, uint64_t alignment, Storag
 
 auto GenMCDriver::handleMalloc(const EventDbgInfo *dbg, Event pos, ASize size, uint64_t alignment,
 			       StorageDuration sdur, StorageType styp, AddressSpace spc,
-			       const NameInfo *info, const std::string &name, const EventDeps &deps)
-	-> HandleResult<SVal>
+			       const NameInfo *info, const std::string &name, const EventDeps &deps,
+			       bool zeroed) -> HandleResult<SVal>
 {
 	auto &g = getExec().getGraph();
 
@@ -2064,11 +2074,15 @@ auto GenMCDriver::handleMalloc(const EventDbgInfo *dbg, Event pos, ASize size, u
 			       oldAddr == lab->getAddr());
 		} else {
 			addr = g.getState().onAlloc(pos, size, alignment, sdur, styp, spc);
+			if (zeroed && addr != SAddr())
+				g.getState().onZeroedAlloc(
+					pos, {addr, size},
+					getConsChecker().getHbView(g.getEventLabel(pos.prev())));
 		}
 		return {.result = SVal(addr.get()), .count = Config::emitNALabels ? 1U : 0U};
 	}
 
-	return handleMalloc(pos, size, alignment, sdur, styp, spc, info, name, deps);
+	return handleMalloc(pos, size, alignment, sdur, styp, spc, info, name, deps, zeroed);
 }
 
 auto GenMCDriver::handleRetire(Event pos, SAddr loc, const EventDeps &deps)

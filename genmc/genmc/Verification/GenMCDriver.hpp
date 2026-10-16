@@ -242,8 +242,8 @@ public:
 	/** Returns an appropriate result for malloc() */
 	auto handleMalloc(const EventDbgInfo *dbg, Event pos, ASize size, uint64_t alignment,
 			  StorageDuration sdur, StorageType styp, AddressSpace spc,
-			  const NameInfo *info, const std::string &name, const EventDeps &deps)
-		-> HandleResult<SVal>;
+			  const NameInfo *info, const std::string &name, const EventDeps &deps,
+			  bool zeroed = false) -> HandleResult<SVal>;
 
 	/** A call to free() has been interpreted, nothing for the intepreter */
 	auto handleFree(const EventDbgInfo *dbg, Event pos, SAddr loc, const EventDeps &deps)
@@ -452,7 +452,8 @@ private:
 			   const EventDeps &deps) -> NAStoreResult;
 	auto handleMalloc(Event pos, ASize size, uint64_t alignment, StorageDuration sdur,
 			  StorageType styp, AddressSpace spc, const NameInfo *info,
-			  const std::string &name, const EventDeps &deps) -> HandleResult<SVal>;
+			  const std::string &name, const EventDeps &deps, bool zeroed = false)
+		-> HandleResult<SVal>;
 	auto handleFree(Event pos, SAddr loc, const EventDeps &deps)
 		-> HandleResult<std::monostate>;
 	auto handleRetire(Event pos, SAddr loc, const EventDeps &deps)
