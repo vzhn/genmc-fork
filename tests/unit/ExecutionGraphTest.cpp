@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "StubChecker.hpp"
+#include "genmc/ADT/DepView.hpp"
 #include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
@@ -358,4 +359,70 @@ TEST(ExecutionGraphTest, CurrentMemValueSurvivesFullyPrunedCo)
 	v.updateIdx(Event(0, 2));
 	g.cutToView(v);
 	EXPECT_EQ(g.getCurrentMemValue(addr, ASize(4)).get(), 42U);
+}
+
+/*
+ * A graph copy (e.g., the one handed to another worker in parallel mode) must
+ * not share view storage with the original: the storage is refcounted with a
+ * non-atomic counter, so sharing it across threads corrupts the heap.
+ * Sets PREFIX as the prefix view of a fence, copies the graph, and returns
+ * the copy's prefix view of that fence.
+ */
+template <typename ViewT>
+static auto copyPrefixView(TestGraph &g, const ViewT &prefix, std::unique_ptr<ExecutionGraph> &og)
+	-> const ViewT &
+{
+	g.addFence();
+	auto *lab = g.addFence();
+	lab->setPrefixView(std::make_unique<ViewT>(prefix));
+
+	og = g.graph.clone();
+	const auto *cLab = og->getEventLabel(lab->getPos());
+	EXPECT_NE(cLab, lab);
+	EXPECT_TRUE(cLab->hasPrefixView());
+	return *genmc::cast<ViewT>(&cLab->getPrefixView());
+}
+
+/* A view spanning several threads has shared storage (not just a diff) */
+template <typename ViewT> static auto makeMultiThreadView() -> ViewT
+{
+	ViewT v;
+	v.updateIdx(Event(0, 2));
+	v.updateIdx(Event(1, 3));
+	v.updateIdx(Event(2, 1));
+	return v;
+}
+
+TEST(ExecutionGraphTest, CopyUnsharesViewPrefixes)
+{
+	TestGraph g;
+	auto prefix = makeMultiThreadView<View>();
+	std::unique_ptr<ExecutionGraph> og;
+
+	const auto &copied = copyPrefixView(g, prefix, og);
+	const auto &orig = *genmc::cast<View>(
+		&g.graph.getEventLabel(Event(0, g.graph.getThreadSize(0) - 1))->getPrefixView());
+
+	/* Copying a view shares storage (so the check below is meaningful) ... */
+	EXPECT_TRUE(orig.sharesStorageWith(prefix));
+	/* ... but copying the graph must not */
+	EXPECT_FALSE(copied.sharesStorageWith(orig));
+	EXPECT_EQ(copied, orig);
+}
+
+/* Under dependency-tracking models (IMM) prefix views are DepViews */
+TEST(ExecutionGraphTest, CopyUnsharesDepViewPrefixes)
+{
+	TestGraph g;
+	auto prefix = makeMultiThreadView<DepView>();
+	std::unique_ptr<ExecutionGraph> og;
+
+	const auto &copied = copyPrefixView(g, prefix, og);
+	const auto &orig = *genmc::cast<DepView>(
+		&g.graph.getEventLabel(Event(0, g.graph.getThreadSize(0) - 1))->getPrefixView());
+
+	EXPECT_TRUE(orig.sharesStorageWith(prefix));
+	EXPECT_FALSE(copied.sharesStorageWith(orig));
+	for (auto t = 0; t < 3; t++)
+		EXPECT_EQ(copied.getMax(t), orig.getMax(t));
 }

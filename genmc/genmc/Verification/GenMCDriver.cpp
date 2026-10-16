@@ -2947,7 +2947,7 @@ auto GenMCDriver::backwardRevisit(const BackwardRevisit &br) -> bool
 	 * try submitting the job instead */
 	static constexpr auto kTaskFillFactor = 8; /* max tasks per worker before blocking */
 	auto *pool = getThreadPool();
-	if (pool && pool->getRemainingTasks() < kTaskFillFactor * pool->size()) {
+	if (pool && pool->getRemainingTasks() < kTaskFillFactor * pool->getNumWorkers()) {
 		if (isRevisitValid(br))
 			pool->submit(extractState());
 		return false;
