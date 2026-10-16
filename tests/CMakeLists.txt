@@ -54,5 +54,12 @@ add_test(NAME liveness-tip
 set_tests_properties(liveness-tip PROPERTIES LABELS "integration;fast" TIMEOUT 120
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME liveness-report
+    COMMAND bash -c "${SCRIPT_DIR}/check-liveness-report.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(liveness-report PROPERTIES LABELS "integration;fast" TIMEOUT 300
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 # Unit tests
 add_subdirectory(unit)

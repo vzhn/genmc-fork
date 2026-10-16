@@ -1,0 +1,163 @@
+Error: Liveness violation!
+Event (1, 16) in graph:
+<-1, 0>:
+	(0, 1): MALLOC w
+	(0, 2): Wna (qm.__private, 0) pthread.h:351
+	(0, 3): Wna (sm.__private, 0) pthread.h:351
+	(0, 4): CRacq (sm.__private, 0) [(0, 3)] pthread.h:375
+	(0, 5): CWacq (sm.__private, 1) pthread.h:375
+	(0, 6): URsc (remaining, 0) [INIT] await-stuck-join.c:38
+	(0, 7): UWsc (remaining, 1) await-stuck-join.c:38
+	(0, 8): CRacq (qm.__private, 0) [(0, 2)] pthread.h:375
+	(0, 9): CWacq (qm.__private, 1) pthread.h:375
+	(0, 10): Rna (qlen, 0) [INIT] await-stuck-join.c:40
+	(0, 11): Wna (qlen, 1) await-stuck-join.c:40
+	(0, 12): Wna (queue[0], 1) await-stuck-join.c:40
+	(0, 13): Wrel (qm.__private, 0) pthread.h:383
+	(0, 14): URsc (state_cv, 0) [INIT] await-stuck-join.c:42
+	(0, 15): UWsc (state_cv, 1) await-stuck-join.c:42
+	(0, 16): Wrel (sm.__private, 0) pthread.h:383
+	(0, 17): THREAD_CREATE [thread 1] pthread.h:146
+	(0, 18): Wna (, 1) pthread.h:146
+	(0, 19): THREAD_CREATE [thread 2] pthread.h:146
+	(0, 20): Wna (, 2)
+	(0, 21): Rna (, 1) [(0, 18)]
+	(0, 22): BLOCK[join]
+<0, 1> worker:
+	(1, 1): LOOP_BEGIN await-stuck-join.c:67
+	(1, 2): SPIN_START
+	(1, 3): LOOP_BEGIN await-stuck-join.c:48
+	(1, 4): SPIN_START
+	(1, 5): CRacq (sm.__private, 0) [(2, 45)] pthread.h:375
+	(1, 6): CWacq (sm.__private, 1) pthread.h:375
+	(1, 7): CRacq (qm.__private, 0) [(2, 44)] pthread.h:375
+	(1, 8): CWacq (qm.__private, 1) pthread.h:375
+	(1, 9): Rna (qlen, 0) [(2, 42)] await-stuck-join.c:53
+	(1, 10): Wrel (qm.__private, 0) pthread.h:383
+	(1, 11): Rsc (remaining, 1) [(2, 31)] await-stuck-join.c:56
+	(1, 12): Rsc (state_cv, 2) [(2, 26)] await-stuck-join.c:28
+	(1, 13): Wrel (sm.__private, 0) pthread.h:383
+	(1, 14): AWAIT_START await-stuck-join.c:31
+	(1, 15): Rsc (state_cv, 2) [(2, 26)] await-stuck-join.c:31
+	(1, 16): BLOCK[await]
+<0, 2> worker:
+	(2, 1): LOOP_BEGIN await-stuck-join.c:67
+	(2, 2): SPIN_START
+	(2, 3): LOOP_BEGIN await-stuck-join.c:48
+	(2, 4): SPIN_START
+	(2, 5): CRacq (sm.__private, 0) [(0, 16)] pthread.h:375
+	(2, 6): CWacq (sm.__private, 1) pthread.h:375
+	(2, 7): CRacq (qm.__private, 0) [(0, 13)] pthread.h:375
+	(2, 8): CWacq (qm.__private, 1) pthread.h:375
+	(2, 9): Rna (qlen, 1) [(0, 11)] await-stuck-join.c:53
+	(2, 10): Rna (qlen, 1) [(0, 11)] await-stuck-join.c:54
+	(2, 11): Wna (qlen, 0) await-stuck-join.c:54
+	(2, 12): Rna (queue[0], 1) [(0, 12)] await-stuck-join.c:54
+	(2, 13): Wrel (qm.__private, 0) pthread.h:383
+	(2, 14): Wrel (sm.__private, 0) pthread.h:383
+	(2, 15): CRacq (sm.__private, 0) [(2, 14)] pthread.h:375
+	(2, 16): CWacq (sm.__private, 1) pthread.h:375
+	(2, 17): URsc (remaining, 1) [(0, 7)] await-stuck-join.c:38
+	(2, 18): UWsc (remaining, 2) await-stuck-join.c:38
+	(2, 19): CRacq (qm.__private, 0) [(2, 13)] pthread.h:375
+	(2, 20): CWacq (qm.__private, 1) pthread.h:375
+	(2, 21): Rna (qlen, 0) [(2, 11)] await-stuck-join.c:40
+	(2, 22): Wna (qlen, 1) await-stuck-join.c:40
+	(2, 23): Wna (queue[0], 0) await-stuck-join.c:40
+	(2, 24): Wrel (qm.__private, 0) pthread.h:383
+	(2, 25): URsc (state_cv, 1) [(0, 15)] await-stuck-join.c:42
+	(2, 26): UWsc (state_cv, 2) await-stuck-join.c:42
+	(2, 27): Wrel (sm.__private, 0) pthread.h:383
+	(2, 28): CRacq (sm.__private, 0) [(2, 27)] pthread.h:375
+	(2, 29): CWacq (sm.__private, 1) pthread.h:375
+	(2, 30): URsc (remaining, 2) [(2, 18)] await-stuck-join.c:75
+	(2, 31): UWsc (remaining, 1) await-stuck-join.c:75
+	(2, 32): Wrel (sm.__private, 0) pthread.h:383
+	(2, 33): SPIN_START
+	(2, 34): LOOP_BEGIN await-stuck-join.c:48
+	(2, 35): SPIN_START
+	(2, 36): CRacq (sm.__private, 0) [(2, 32)] pthread.h:375
+	(2, 37): CWacq (sm.__private, 1) pthread.h:375
+	(2, 38): CRacq (qm.__private, 0) [(2, 24)] pthread.h:375
+	(2, 39): CWacq (qm.__private, 1) pthread.h:375
+	(2, 40): Rna (qlen, 1) [(2, 22)] await-stuck-join.c:53
+	(2, 41): Rna (qlen, 1) [(2, 22)] await-stuck-join.c:54
+	(2, 42): Wna (qlen, 0) await-stuck-join.c:54
+	(2, 43): Rna (queue[0], 0) [(2, 23)] await-stuck-join.c:54
+	(2, 44): Wrel (qm.__private, 0) pthread.h:383
+	(2, 45): Wrel (sm.__private, 0) pthread.h:383
+	(2, 46): CRacq (sm.__private, 0) [(1, 13)] pthread.h:375
+	(2, 47): CWacq (sm.__private, 1) pthread.h:375
+	(2, 48): URsc (remaining, 1) [(2, 31)] await-stuck-join.c:75
+	(2, 49): UWsc (remaining, 0) await-stuck-join.c:75
+	(2, 50): Wrel (sm.__private, 0) pthread.h:383
+	(2, 51): THREAD_END
+Coherence:
+queue[0]: [ (0, 12): Wna (G#(0, 40), 1) (2, 23): Wna (G#(0, 40), 0) ]
+qlen: [ (0, 11): Wna (G#(0, 48), 1) (2, 11): Wna (G#(0, 48), 0) (2, 22): Wna (G#(0, 48), 1) (2, 42): Wna (G#(0, 48), 0) ]
+state_cv: [ (0, 15): UWsc (G#(0, 56), 1) (2, 26): UWsc (G#(0, 56), 2) ]
+sm.__private: [ (0, 3): Wna (G#(0, 4), 0) (0, 5): CWacq (G#(0, 4), 1) (0, 16): Wrel (G#(0, 4), 0) (2, 6): CWacq (G#(0, 4), 1) (2, 14): Wrel (G#(0, 4), 0) (2, 16): CWacq (G#(0, 4), 1) (2, 27): Wrel (G#(0, 4), 0) (2, 29): CWacq (G#(0, 4), 1) (2, 32): Wrel (G#(0, 4), 0) (2, 37): CWacq (G#(0, 4), 1) (2, 45): Wrel (G#(0, 4), 0) (1, 6): CWacq (G#(0, 4), 1) (1, 13): Wrel (G#(0, 4), 0) (2, 47): CWacq (G#(0, 4), 1) (2, 50): Wrel (G#(0, 4), 0) ]
+remaining: [ (0, 7): UWsc (G#(0, 52), 1) (2, 18): UWsc (G#(0, 52), 2) (2, 31): UWsc (G#(0, 52), 1) (2, 49): UWsc (G#(0, 52), 0) ]
+qm.__private: [ (0, 2): Wna (G#(0, 0), 0) (0, 9): CWacq (G#(0, 0), 1) (0, 13): Wrel (G#(0, 0), 0) (2, 8): CWacq (G#(0, 0), 1) (2, 13): Wrel (G#(0, 0), 0) (2, 20): CWacq (G#(0, 0), 1) (2, 24): Wrel (G#(0, 0), 0) (2, 39): CWacq (G#(0, 0), 1) (2, 44): Wrel (G#(0, 0), 0) (1, 8): CWacq (G#(0, 0), 1) (1, 10): Wrel (G#(0, 0), 0) ]
+
+Trace to (1, 16):
+[main] pthread.h: 351: return __VERIFIER_mutex_init(__mutex, __mutexattr);
+[main] pthread.h: 351: return __VERIFIER_mutex_init(__mutex, __mutexattr);
+[main] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[main] await-stuck-join.c: 38: atomic_fetch_add(&remaining, 1);
+[main] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[main] await-stuck-join.c: 40: queue[qlen++] = depth;
+[main] await-stuck-join.c: 40: queue[qlen++] = depth;
+[main] await-stuck-join.c: 40: queue[qlen++] = depth;
+[main] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[main] await-stuck-join.c: 42: atomic_fetch_add(&state_cv, 1);
+[main] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[main] pthread.h: 146: (*__newthread) = __VERIFIER_thread_create(__attr, __start_routine, __arg);
+[worker] await-stuck-join.c: 67: for (;;) {
+[worker] await-stuck-join.c: 48: for (;;) {
+[main] pthread.h: 146: (*__newthread) = __VERIFIER_thread_create(__attr, __start_routine, __arg);
+[main] pthread.h: 146: (*__newthread) = __VERIFIER_thread_create(__attr, __start_routine, __arg);
+[worker] await-stuck-join.c: 67: for (;;) {
+[worker] await-stuck-join.c: 48: for (;;) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] await-stuck-join.c: 53: if (qlen > 0)
+[worker] await-stuck-join.c: 54: t = queue[--qlen];
+[worker] await-stuck-join.c: 54: t = queue[--qlen];
+[worker] await-stuck-join.c: 54: t = queue[--qlen];
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] await-stuck-join.c: 38: atomic_fetch_add(&remaining, 1);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] await-stuck-join.c: 40: queue[qlen++] = depth;
+[worker] await-stuck-join.c: 40: queue[qlen++] = depth;
+[worker] await-stuck-join.c: 40: queue[qlen++] = depth;
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] await-stuck-join.c: 42: atomic_fetch_add(&state_cv, 1);
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] await-stuck-join.c: 75: if (atomic_fetch_sub(&remaining, 1) == 1) {
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] await-stuck-join.c: 48: for (;;) {
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] await-stuck-join.c: 53: if (qlen > 0)
+[worker] await-stuck-join.c: 54: t = queue[--qlen];
+[worker] await-stuck-join.c: 54: t = queue[--qlen];
+[worker] await-stuck-join.c: 54: t = queue[--qlen];
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] pthread.h: 375: return __VERIFIER_mutex_lock(__mutex);
+[worker] await-stuck-join.c: 53: if (qlen > 0)
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] await-stuck-join.c: 56: if (t >= 0 || atomic_load(&remaining) == 0) {
+[worker] await-stuck-join.c: 28: unsigned g = atomic_load(&state_cv);
+[worker] pthread.h: 383: return __VERIFIER_mutex_unlock(__mutex);
+[worker] await-stuck-join.c: 31: __VERIFIER_await(atomic_load(&state_cv) != g);
+[worker] await-stuck-join.c: 31: __VERIFIER_await(atomic_load(&state_cv) != g);
+Non-terminating wait: thread 1
+*** Verification unsuccesful.
+Number of complete executions explored: 1
+Number of blocked executions seen: 1
