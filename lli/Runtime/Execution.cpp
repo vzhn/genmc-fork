@@ -2434,6 +2434,15 @@ void Interpreter::visitBitCastInst(BitCastInst &I)
 	SetValue(&I, executeBitCastInst(I.getOperand(0), I.getType(), SF), SF);
 }
 
+/* freeze yields its operand: values computed here are never undef or poison.
+ * LLVM passes in the pipeline (e.g., JumpThreading unfolding a select) emit it. */
+void Interpreter::visitFreezeInst(FreezeInst &I)
+{
+	ExecutionContext &SF = ECStack().back();
+	updateDataDeps(getCurThr().id, &I, I.getOperand(0));
+	SetValue(&I, getOperandValue(I.getOperand(0), SF), SF);
+}
+
 #define IMPLEMENT_VAARG(TY)                                                                        \
 	case Type::TY##TyID:                                                                       \
 		Dest.TY##Val = Src.TY##Val;                                                        \

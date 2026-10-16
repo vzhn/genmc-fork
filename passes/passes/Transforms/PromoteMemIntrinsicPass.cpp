@@ -35,26 +35,11 @@
 #include <llvm/Support/Alignment.h>
 #include <llvm/Support/Casting.h>
 
+#include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <ranges>
-#include <utility>
 #include <vector>
-
-/* With opaque pointers, no ptr->int->ptr cast is needed */
-#define CAST_PTR_TO_TYPE_THROUGH_INT(builder, ptr, dstTy, dataLayout) ptr
-
-#define CONSTEXPR_GET_FIELD_TYPE(MI, Field) MI->get##Field()->getType()
-
-/* Helper macro that moves constant expressions into their own instructions */
-#define LOWER_CONSTEXPR(builder, MI, Field)                                                        \
-	if (auto *constExpr = dyn_cast<ConstantExpr>(MI->get##Field())) {                          \
-		Value *newGEP = builder.Insert(constExpr->getAsInstruction());                     \
-		[[maybe_unused]] Type *destType = CONSTEXPR_GET_FIELD_TYPE(MI, Field);             \
-		Value *castedGEP = CAST_PTR_TO_TYPE_THROUGH_INT(                                   \
-			builder, newGEP, destType,                                                 \
-			MI->getParent()->getParent()->getParent()->getDataLayout());               \
-		MI->set##Field(castedGEP);                                                         \
-	}
 
 using namespace llvm;
 
@@ -141,235 +126,250 @@ static auto lowerFortifiedCalls(Function &F) -> bool
 	return modified;
 }
 
-static auto isPromotableMemIntrinsicOperand(Value *op) -> bool
+/* A scalar field of an object: its byte offset and its type */
+struct MemLeaf {
+	uint64_t offset;
+	Type *type;
+};
+
+/* The object a pointer points into: its type and the pointer's byte offset in it */
+struct MemObject {
+	Type *type;
+	uint64_t offset;
+};
+
+/*
+ * Find the type of the memory PTR points to.  With opaque pointers the type
+ * comes from the instruction that produced the pointer: an alloca, a global,
+ * or the source element type of the GEP chain leading to it.  We walk the
+ * whole constant-offset GEP chain, since LLVM canonicalizes field accesses to
+ * byte offsets (getelementptr i8, ptr %p, i64 12), whose own type says
+ * nothing about the memory.
+ */
+static auto getMemObject(const DataLayout &DL, Value *ptr) -> std::optional<MemObject>
 {
-	/* Constant to capture MemSet too */
-	return isa<Constant>(op) || isa<AllocaInst>(op) || isa<GetElementPtrInst>(op);
+	APInt offset(DL.getIndexTypeSizeInBits(ptr->getType()), 0);
+	Type *typ = nullptr;
+	auto fromGEP = false;
+
+	for (auto *base = ptr;;) {
+		if (auto *ai = dyn_cast<AllocaInst>(base)) {
+			if (!ai->isArrayAllocation()) {
+				typ = ai->getAllocatedType();
+				fromGEP = false;
+			}
+			break;
+		}
+		if (auto *gv = dyn_cast<GlobalVariable>(base)) {
+			typ = gv->getValueType();
+			fromGEP = false;
+			break;
+		}
+		auto *gep = dyn_cast<GEPOperator>(base);
+		auto next = offset;
+		if (!gep || !gep->accumulateConstantOffset(DL, next))
+			break;
+		offset = next;
+		typ = gep->getSourceElementType();
+		fromGEP = true;
+		base = gep->getPointerOperand();
+	}
+	if (!typ || !typ->isSized() || offset.isNegative())
+		return std::nullopt;
+
+	auto size = DL.getTypeAllocSize(typ).getFixedValue();
+	auto off = offset.getZExtValue();
+	/* A GEP may step over whole elements first: p[3].f is still inside a typ */
+	if (fromGEP && size && off >= size)
+		off %= size;
+	return MemObject{typ, off};
 }
 
-static auto getPromotionGEPType(Value *op) -> Type *
+/* Append the scalar fields of TYP (placed at BASE) that overlap [lo, hi) */
+static void collectLeaves(const DataLayout &DL, Type *typ, uint64_t base, uint64_t lo, uint64_t hi,
+			  std::vector<MemLeaf> &leaves)
 {
-	VERIFY(isPromotableMemIntrinsicOperand(op));
-	if (auto *v = dyn_cast<GlobalVariable>(op))
-		return v->getValueType();
-	if (auto *ai = dyn_cast<AllocaInst>(op))
-		return ai->getAllocatedType();
-	if (auto *gepi = dyn_cast<GetElementPtrInst>(op))
-		return gepi->getResultElementType();
-	UNREACHABLE();
-}
-
-static void promoteMemCpy(IRBuilder<> &builder, Value *dst, Value *src,
-			  const std::vector<Value *> &args, Type *typ, uint64_t &remainingLen)
-{
-	if (remainingLen == 0)
+	auto size = DL.getTypeAllocSize(typ).getFixedValue();
+	if (base >= hi || base + size <= lo)
 		return;
 
-	auto *srcGEP =
-		builder.CreateInBoundsGEP(getPromotionGEPType(src), src, args, "memcpy.src.gep");
-	auto *dstGEP =
-		builder.CreateInBoundsGEP(getPromotionGEPType(dst), dst, args, "memcpy.dst.gep");
-
-	auto len = builder.GetInsertBlock()->getModule()->getDataLayout().getTypeStoreSize(typ);
-	VERIFY(len <= remainingLen);
-
-	remainingLen -= len;
-	auto *srcLoad = builder.CreateLoad(typ, srcGEP, "memcpy.src.load");
-	builder.CreateStore(srcLoad, dstGEP);
-}
-
-static void promoteMemSet(IRBuilder<> &builder, Value *dst, Value *argVal,
-			  const std::vector<Value *> &args, Type *typ)
-{
-	VERIFY(typ->isIntegerTy() || typ->isPointerTy());
-	VERIFY(isa<ConstantInt>(argVal));
-
-	const auto &DL = builder.GetInsertBlock()->getParent()->getParent()->getDataLayout();
-	auto sizeInBits = typ->isIntegerTy() ? typ->getIntegerBitWidth()
-					     : DL.getPointerTypeSizeInBits(typ);
-	const long int ival = cast<ConstantInt>(argVal)->getSExtValue();
-	Value *val = Constant::getIntegerValue(typ, APInt(sizeInBits, ival));
-
-	Value *dstGEP =
-		builder.CreateInBoundsGEP(getPromotionGEPType(dst), dst, args, "memset.dst.gep");
-	builder.CreateStore(val, dstGEP);
-}
-
-template <typename F>
-static void promoteMemIntrinsic(Type *typ, std::vector<Value *> &args, F &&promoteFun)
-{
-	auto *i32Ty = IntegerType::getInt32Ty(typ->getContext());
-
-	if (!isa<StructType>(typ) && !isa<ArrayType>(typ) && !isa<VectorType>(typ)) {
-		std::forward<F>(promoteFun)(typ, args);
+	if (auto *st = dyn_cast<StructType>(typ)) {
+		const auto *sl = DL.getStructLayout(st);
+		for (auto i = 0U; i < st->getNumElements(); i++)
+			collectLeaves(DL, st->getElementType(i), base + sl->getElementOffset(i), lo,
+				      hi, leaves);
 		return;
 	}
-
-	if (auto *arrayType = dyn_cast<ArrayType>(typ)) {
-#ifdef LLVM_HAS_GLOBALOBJECT_GET_METADATA
-		auto numElems = arrayType->getNumElements();
-#else
-		auto numElems = arrayType->getArrayNumElements();
-#endif
-		for (auto i = 0U; i < numElems; i++) {
-			args.push_back(Constant::getIntegerValue(i32Ty, APInt(32, i)));
-			promoteMemIntrinsic(arrayType->getElementType(), args, promoteFun);
-			args.pop_back();
-		}
-	} else if (auto *structType = dyn_cast<StructType>(typ)) {
-		for (auto i = 0U; i < structType->getNumElements(); ++i) {
-			args.push_back(Constant::getIntegerValue(i32Ty, APInt(32, i)));
-			promoteMemIntrinsic(structType->getElementType(i), args, promoteFun);
-			args.pop_back();
-		}
-	} else {
-		UNREACHABLE();
+	if (auto *at = dyn_cast<ArrayType>(typ)) {
+		auto *elemTy = at->getElementType();
+		auto stride = DL.getTypeAllocSize(elemTy).getFixedValue();
+		if (stride == 0)
+			return;
+		/* Only visit the elements that overlap the range */
+		auto first = lo > base ? (lo - base) / stride : 0;
+		auto last = std::min<uint64_t>(at->getNumElements(), (hi - base + stride - 1) / stride);
+		for (auto i = first; i < last; i++)
+			collectLeaves(DL, elemTy, base + i * stride, lo, hi, leaves);
+		return;
 	}
+	if (DL.getTypeStoreSize(typ).getFixedValue() == 0)
+		return; /* e.g., empty struct members */
+	leaves.push_back({base, typ});
 }
 
-static auto canPromoteMemIntrinsic(MemIntrinsic *MI) -> bool
+/*
+ * The scalar fields covering the LEN bytes at PTR, with offsets relative to
+ * PTR.  Bytes not covered by any field are padding.  Fails if PTR's type is
+ * unknown, if the range leaves the object, or if a field straddles one of its
+ * ends (copying part of a field would create mixed-size accesses).
+ */
+static auto getLeaves(const DataLayout &DL, Value *ptr, uint64_t len)
+	-> std::optional<std::vector<MemLeaf>>
 {
-	/* Skip if length is not a constant */
+	auto obj = getMemObject(DL, ptr);
+	if (!obj || obj->offset + len > DL.getTypeAllocSize(obj->type).getFixedValue())
+		return std::nullopt;
+
+	auto lo = obj->offset;
+	auto hi = lo + len;
+	std::vector<MemLeaf> leaves;
+	collectLeaves(DL, obj->type, 0, lo, hi, leaves);
+	for (auto &leaf : leaves) {
+		if (leaf.offset < lo ||
+		    leaf.offset + DL.getTypeStoreSize(leaf.type).getFixedValue() > hi)
+			return std::nullopt;
+		leaf.offset -= lo;
+	}
+	return leaves;
+}
+
+static auto getLength(MemIntrinsic *MI) -> std::optional<uint64_t>
+{
 	auto *length = dyn_cast<ConstantInt>(MI->getLength());
 	if (!length) {
 		WARN_ONCE("memintr-length",
 			  "Cannot promote non-constant-length mem intrinsic! Skipping...\n");
-		return false;
+		return std::nullopt;
 	}
-
-	/*
-	 * For memcpy(), make sure source and dest live in the same address space
-	 * (This also makes sure we are not copying from genmc's space to userspace)
-	 */
-	auto *MCI = dyn_cast<MemCpyInst>(MI);
-	VERIFY(!MCI || MCI->getSourceAddressSpace() == MCI->getDestAddressSpace());
-	if (MCI && !(isPromotableMemIntrinsicOperand(MCI->getDest()) ||
-		     isPromotableMemIntrinsicOperand(MCI->getSource()))) {
-		WARN_ONCE("memintr-opaque", "Cannot promote memcpy() due to both src and dst being "
-					    "opaque! Skipping...\n");
-		return false;
-	}
-
-	auto *MSI = dyn_cast<MemSetInst>(MI);
-	if (MSI && !isPromotableMemIntrinsicOperand(MSI->getDest())) {
-		WARN_ONCE("memintr-dst",
-			  "Cannot promote memset() due to dst being opaque! Skipping...\n");
-		return false;
-	}
-
-	/*
-	 * Finally, this is one of the cases we can currently handle.
-	 * We produce a warning anyway because, e.g., if a small struct has no atomic
-	 * fields, clang might initialize it with memcpy(), and then read it with a
-	 * 64bit access, and mixed-size accesses are __bad__ news
-	 */
-	WARN_ONCE("promote-memintrinsic", "Memory intrinsic found! Attempting to promote it...\n");
-	return true;
+	return length->getZExtValue();
 }
 
-/**
- * Due to LLVM's use of opaque pointers, we infer the types based on the instruction defining the
- * value (Alloca, GEP, GlobalVal => @see getPromotionGEPType()). To allow copying between different
- * (compatible) data-types, we perform a cast either src->dst or dst->src.
- *
- * Note: We assume that the compiler only generates memcpy()s between "compatible" types:
- *  - compatible: struct {i32, i32, i32} and [3 x i32]
- *  - non-compatible:  struct {i32, i64, i32} and [4 x i32]
- * Promotion in the second case would lead to "mixed-sized accesses".
- */
-static auto getRecastedOperands(MemCpyInst *MI, IRBuilder<> &builder) -> std::pair<Value *, Value *>
+static auto byteGEP(IRBuilder<> &builder, Value *ptr, uint64_t offset, const Twine &name) -> Value *
 {
-	auto *dst = MI->getDest();
-	auto *src = MI->getSource();
-
-	auto dataLayout = MI->getParent()->getParent()->getParent()->getDataLayout();
-	auto indexSize = dataLayout.getIndexSizeInBits(dst->getType()->getPointerAddressSpace());
-	const std::vector<Value *> gepArgs = {Constant::getIntegerValue(
-		IntegerType::get(builder.getContext(), indexSize),
-		APInt(indexSize, 0))}; // Ex: getelementptr %type, %ptr, i32 0
-
-	/* Case src->dst */
-	if (isPromotableMemIntrinsicOperand(dst)) {
-		src = CAST_PTR_TO_TYPE_THROUGH_INT(builder, src, dst->getType(), dataLayout);
-		return {builder.CreateGEP(getPromotionGEPType(dst), src, ArrayRef(gepArgs)), dst};
-	}
-
-	/* Case dst->src */
-	VERIFY(isPromotableMemIntrinsicOperand(src));
-	dst = CAST_PTR_TO_TYPE_THROUGH_INT(builder, dst, src->getType(), dataLayout);
-	return {src, builder.CreateGEP(getPromotionGEPType(src), dst, ArrayRef(gepArgs))};
+	return builder.CreateConstInBoundsGEP1_64(builder.getInt8Ty(), ptr, offset, name);
 }
 
-/* Tries to promote a memcpy() instruction.
- * We also allow the promotion of memcpy()s w/ constant arguments:
+/*
+ * Tries to promote a memcpy() to a load/store per scalar field.
+ * The fields come from whichever side has a known type (dst first).  Both
+ * sides are addressed by byte offset, so the other side may have a different
+ * but compatible type, e.g.:
+ *  - compatible: struct {i32, i32, i32} and [3 x i32]
+ *  - compatible: %struct.S = {i32, i64} and the initializer type
+ *    {i32, [4 x i8], i64} clang gives a constant of S
+ *  - non-compatible: struct {i32, i64, i32} and [4 x i32]
+ * Promotion in the last case would lead to "mixed-sized accesses".
+ * Pointer operands may also be constant expressions, e.g.:
  *
  * call void @llvm.memcpy.p0.p0.i64(
  *      ptr align 8 getelementptr inbounds (%struct.queue_t, ptr @queue, i64 0, i32 0, i32 1),
  *      ptr align 8 %_3,
  *      i64 8,
  *      i1 false)
- *
- * by moving constant expressions into their own instruction and proceeding as normal. */
+ */
 static auto tryPromoteMemCpy(MemCpyInst *MI, SmallVector<llvm::MemIntrinsic *, 8> &promoted) -> bool
 {
-	if (!canPromoteMemIntrinsic(MI))
+	auto len = getLength(MI);
+	if (!len)
 		return false;
 
-	/* We only copy "len" bytes (3rd arg in llvm.memcpy) */
-	auto len = cast<ConstantInt>(MI->getLength())->getZExtValue();
-
 	/* Remove memcpy's with len=0 completely as no-ops (generated by rustc) */
-	if (len == 0) {
+	if (*len == 0) {
 		WARN_ONCE("memintr-zero-length",
 			  "Cannot promote zero-length mem intrinsic! Removing instruction...\n");
 		promoted.push_back(MI);
 		return true;
 	}
 
+	/* Make sure we are not copying from genmc's space to userspace */
+	VERIFY(MI->getSourceAddressSpace() == MI->getDestAddressSpace());
+
+	const auto &DL = MI->getModule()->getDataLayout();
+	auto leaves = getLeaves(DL, MI->getDest(), *len);
+	if (!leaves)
+		leaves = getLeaves(DL, MI->getSource(), *len);
+	if (!leaves) {
+		WARN_ONCE("memintr-opaque", "Cannot promote memcpy() due to both src and dst being "
+					    "opaque or not matching the length! Skipping...\n");
+		return false;
+	}
+
+	/*
+	 * We produce a warning anyway because, e.g., if a small struct has no atomic
+	 * fields, clang might initialize it with memcpy(), and then read it with a
+	 * 64bit access, and mixed-size accesses are __bad__ news
+	 */
+	WARN_ONCE("promote-memintrinsic", "Memory intrinsic found! Attempting to promote it...\n");
 	IRBuilder<> builder(MI);
-	auto *i64Ty = IntegerType::getInt64Ty(MI->getContext());
-	auto *nullInt = Constant::getNullValue(i64Ty);
-
-	/* Check for constexpr arguments */
-	LOWER_CONSTEXPR(builder, MI, Source); // NOLINT(misc-const-correctness)
-	LOWER_CONSTEXPR(builder, MI, Dest);   // NOLINT(misc-const-correctness)
-
-	/* Recast args to same types for GEP indexing later */
-	auto [src, dst] = getRecastedOperands(MI, builder);
-	auto *dstTyp = getPromotionGEPType(dst);
-	VERIFY(dstTyp);
-
-	/* To ensure we only copy "len" bytes from total */
-	auto typeSizeDst = MI->getParent()->getModule()->getDataLayout().getTypeStoreSize(dstTyp);
-	VERIFY(typeSizeDst >= len);
-
-	std::vector<Value *> args = {nullInt};
-	promoteMemIntrinsic(dstTyp, args, [&](Type *typ, const std::vector<Value *> &args) {
-		promoteMemCpy(builder, dst, src, args, typ, len);
-	});
+	for (const auto &leaf : *leaves) {
+		auto *src = byteGEP(builder, MI->getSource(), leaf.offset, "memcpy.src.gep");
+		auto *dst = byteGEP(builder, MI->getDest(), leaf.offset, "memcpy.dst.gep");
+		builder.CreateStore(builder.CreateLoad(leaf.type, src, "memcpy.src.load"), dst);
+	}
 	promoted.push_back(MI);
 	return true;
 }
 
+/* The constant of type TYP whose every byte is BYTE */
+static auto getSplatConstant(const DataLayout &DL, Type *typ, uint8_t byte) -> Constant *
+{
+	auto bits = DL.getTypeSizeInBits(typ).getFixedValue();
+	auto val = bits < 8 ? APInt(bits, byte & ((1U << bits) - 1))
+			    : APInt::getSplat(bits, APInt(8, byte));
+
+	if (typ->isIntegerTy())
+		return ConstantInt::get(typ, val);
+	if (typ->isPointerTy())
+		return byte == 0 ? Constant::getNullValue(typ)
+				 : ConstantExpr::getIntToPtr(
+					   ConstantInt::get(typ->getContext(), val), typ);
+	return ConstantExpr::getBitCast(ConstantInt::get(typ->getContext(), val), typ);
+}
+
+/* Tries to promote a memset() to a store per scalar field */
 static auto tryPromoteMemSet(MemSetInst *MS, SmallVector<MemIntrinsic *, 8> &promoted) -> bool
 {
-	if (!canPromoteMemIntrinsic(MS))
+	auto len = getLength(MS);
+	if (!len)
 		return false;
+	if (*len == 0) {
+		WARN_ONCE("memintr-zero-length",
+			  "Cannot promote zero-length mem intrinsic! Removing instruction...\n");
+		promoted.push_back(MS);
+		return true;
+	}
 
-	auto *dst = MS->getDest();
-	auto *val = MS->getValue();
+	auto *val = dyn_cast<ConstantInt>(MS->getValue());
+	if (!val) {
+		WARN_ONCE("memintr-val",
+			  "Cannot promote memset() with a non-constant value! Skipping...\n");
+		return false;
+	}
 
-	auto *i64Ty = IntegerType::getInt64Ty(MS->getContext());
-	auto *nullInt = Constant::getNullValue(i64Ty);
-	auto *dstTyp = getPromotionGEPType(dst);
-	VERIFY(dstTyp);
+	const auto &DL = MS->getModule()->getDataLayout();
+	auto leaves = getLeaves(DL, MS->getDest(), *len);
+	if (!leaves) {
+		WARN_ONCE("memintr-dst", "Cannot promote memset() due to dst being opaque or not "
+					 "matching the length! Skipping...\n");
+		return false;
+	}
 
+	WARN_ONCE("promote-memintrinsic", "Memory intrinsic found! Attempting to promote it...\n");
 	IRBuilder<> builder(MS);
-	std::vector<Value *> args = {nullInt};
-
-	promoteMemIntrinsic(dstTyp, args, [&](Type *typ, const std::vector<Value *> &args) {
-		promoteMemSet(builder, dst, val, args, typ);
-	});
+	auto byte = static_cast<uint8_t>(val->getZExtValue());
+	for (const auto &leaf : *leaves)
+		builder.CreateStore(getSplatConstant(DL, leaf.type, byte),
+				    byteGEP(builder, MS->getDest(), leaf.offset, "memset.dst.gep"));
 	promoted.push_back(MS);
 	return true;
 }
@@ -378,15 +378,15 @@ static void removePromoted(std::ranges::input_range auto &&promoted)
 {
 	for (auto *MI : promoted) {
 		/* Are MI's operands used anywhere else? */
-		auto *dst = dyn_cast<BitCastInst>(MI->getRawDest());
-		CastInst *src = nullptr;
+		auto *dst = dyn_cast<Instruction>(MI->getRawDest());
+		Instruction *src = nullptr;
 		if (auto *MC = dyn_cast<MemCpyInst>(MI))
-			src = dyn_cast<BitCastInst>(MC->getRawSource());
+			src = dyn_cast<Instruction>(MC->getRawSource());
 
 		MI->eraseFromParent();
-		if (dst && dst->hasNUses(0))
+		if (dst && isa<GetElementPtrInst, CastInst>(dst) && dst->use_empty())
 			dst->eraseFromParent();
-		if (src && src->hasNUses(0))
+		if (src && src != dst && isa<GetElementPtrInst, CastInst>(src) && src->use_empty())
 			src->eraseFromParent();
 	}
 }
