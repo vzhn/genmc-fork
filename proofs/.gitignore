@@ -1,0 +1,11 @@
+# Rocq build artifacts
+Makefile.rocq
+Makefile.rocq.conf
+*.vo
+*.vok
+*.vos
+*.glob
+.*.aux
+.lia.cache
+.nia.cache
+.Makefile.rocq.d

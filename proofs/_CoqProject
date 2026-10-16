@@ -1,0 +1,12 @@
+-Q trust TruSt
+-arg -w -arg -notation-overridden
+trust/Event.v
+trust/Graph.v
+trust/Program.v
+trust/Lemmas.v
+trust/Order.v
+trust/WF.v
+trust/Model.v
+trust/Algorithm.v
+trust/Soundness.v
+trust/Completeness.v
