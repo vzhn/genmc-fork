@@ -47,5 +47,12 @@ if(SANITIZE MATCHES "thread")
       ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 endif()
 
+add_test(NAME liveness-tip
+    COMMAND bash -c "${SCRIPT_DIR}/check-liveness-tip.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(liveness-tip PROPERTIES LABELS "integration;fast" TIMEOUT 120
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 # Unit tests
 add_subdirectory(unit)

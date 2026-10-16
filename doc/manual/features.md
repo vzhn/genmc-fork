@@ -378,6 +378,29 @@ The `-check-liveness` switch will automatically check for liveness
 violations in all loops that have been captured by the spin-assume
 transformation.
 
+### Waiting with `__VERIFIER_await()`
+
+A wait written as `__VERIFIER_assume(cond)` is never reported, because
+`__VERIFIER_assume()` prunes: GenMC simply discards the executions where
+`cond` fails. To mark a wait, use `__VERIFIER_await(cond)` (defined in
+`genmc.h`). It blocks the thread while `cond` is false, and with
+`-check-liveness` GenMC reports a liveness violation when the wait can
+never finish:
+
+```c
+void *waiter(void *unused)
+{
+    __VERIFIER_await(atomic_load(&ready) == 1);
+    return NULL;
+}
+```
+
+`cond` is evaluated once per execution and must not have side effects.
+
+Without `-check-liveness`, GenMC prints a tip after the execution counts
+when some executions ended with a thread waiting in a spinloop or in
+`__VERIFIER_await()`.
+
 ## Checking Linearizability
 
 GenMC implements the Relinche algorithm [\[Golovin et
