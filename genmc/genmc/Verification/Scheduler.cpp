@@ -104,10 +104,11 @@ static auto calculateReplaySchedule(const ExecutionGraph &g, const Config *conf,
 		});
 	}
 
-	/* Erase NAs as they cannot affect the schedule (unless RD is disabled) */
+	/* Erase NAs as they cannot affect the schedule (unless RD is disabled),
+	 * but keep the error event: a replay must reach it */
 	if (!conf->disableRaceDetection) {
-		std::erase_if(result, [&g](const auto &pos) {
-			return g.getEventLabel(pos)->isNotAtomic();
+		std::erase_if(result, [&g, &errorEvent](const auto &pos) {
+			return pos != errorEvent && g.getEventLabel(pos)->isNotAtomic();
 		});
 	}
 

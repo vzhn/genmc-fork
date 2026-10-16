@@ -88,6 +88,12 @@ public:
 	/** Opt: Whether there is an event to re-execute */
 	[[nodiscard]] auto inErrorReplay() const -> bool { return eventToReexecute_.has_value(); }
 
+	/** Opt: The event an error replay re-executes up to (if any) */
+	[[nodiscard]] auto getErrorReplayEvent() const -> std::optional<Event>
+	{
+		return eventToReexecute_;
+	}
+
 	/** Opt: Sets E as an event to be re-executed */
 	void setErrorReplayEvent(std::optional<Event> e) { eventToReexecute_ = e; }
 

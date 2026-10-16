@@ -366,6 +366,17 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 {
 	auto &g = getExec().getGraph();
 
+	/* An error replay that ended without reaching its target: report the
+	 * error with the metadata collected so far rather than lose it (or carry
+	 * the replay into the next execution) */
+	if (getScheduler().inErrorReplay() && bufferedError_) {
+		WARN_ONCE("incomplete-error-replay",
+			  "The error report may lack source information (incomplete replay).\n");
+		auto details = *bufferedError_;
+		reportError(*getScheduler().getErrorReplayEvent(), details);
+		return details.shouldHalt ? std::optional(details.type) : std::nullopt;
+	}
+
 	if (isMoot()) {
 		GENMC_DEBUG(++result.exploredMoot;);
 		return {};
