@@ -1,0 +1,2 @@
+-check-liveness -disable-ipr |
+-check-liveness -disable-ipr | -DROUNDS=2

@@ -1,0 +1,2 @@
+-check-liveness | -DN=3
+-check-liveness | -DN=3 -DLEFTY
