@@ -135,6 +135,12 @@ public:
 	auto onSpinStart(Event pos) -> bool;
 	auto onAlloc(Event pos, ASize size, uint64_t alignment, StorageDuration sdur,
 		     StorageType styp, AddressSpace spc) -> SAddr;
+	/** A zero-initializing allocation (calloc()) at POS, with hb view VIEW:
+	 * the whole block counts as initialized by the allocation event */
+	void onZeroedAlloc(Event pos, const AAccess &access, const View &view)
+	{
+		markInitialized(access, pos, view);
+	}
 	void onFree(Event pos, SAddr addr, bool isRetire);
 	void onProtect(SAddr hpAddr, SAddr protAddr);
 

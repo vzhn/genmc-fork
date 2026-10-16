@@ -201,12 +201,19 @@ auto isAlloc(const Instruction *i, const VSet<Function *> *allocFuns /* = nullpt
 
 auto hasLoadSemantics(llvm::Instruction *I) -> bool
 {
-	/* Overapproximate with function calls some of which might be modeled as loads */
+	if (llvm::isa<llvm::LoadInst>(I) || llvm::isa<llvm::AtomicCmpXchgInst>(I) ||
+	    llvm::isa<llvm::AtomicRMWInst>(I))
+		return true;
+
+	/* Overapproximate with function calls some of which might be modeled as loads.
+	 * This runs once per interpreted instruction, so compare names in place
+	 * instead of copying them into a std::string for the lookup table. */
 	auto *ci = llvm::dyn_cast<llvm::CallInst>(I);
-	return llvm::isa<llvm::LoadInst>(I) || llvm::isa<llvm::AtomicCmpXchgInst>(I) ||
-	       llvm::isa<llvm::AtomicRMWInst>(I) ||
-	       (ci && ci->getCalledFunction() &&
-		hasGlobalLoadSemantics(ci->getCalledFunction()->getName().str()));
+	if (!ci || !ci->getCalledFunction())
+		return false;
+	auto name = ci->getCalledFunction()->getName();
+	return name == "__VERIFIER_mutex_lock" || name == "__VERIFIER_mutex_trylock" ||
+	       name == "__VERIFIER_cond_wait";
 }
 
 auto getInstKind(llvm::Instruction *I) -> ActionKind

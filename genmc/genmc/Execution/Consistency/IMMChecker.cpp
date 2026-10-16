@@ -7046,8 +7046,11 @@ bool IMMChecker::visitLHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &wo
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
+			/* retire_pos() is a map lookup, isHazptrProtected() a walk over
+			 * the thread's prefix: ask the cheap one first */
 			if (true && genmc::isa<MemAccessLabel>(lab) &&
 			    genmc::dyn_cast<MemAccessLabel>(lab)->getAddr().isDynamic() &&
+			    g.retire_pos(lab).has_value() &&
 			    !isHazptrProtected(genmc::dyn_cast<MemAccessLabel>(lab)))
 				if (auto tmpE = g.retire_pos(lab); tmpE) {
 					return false;

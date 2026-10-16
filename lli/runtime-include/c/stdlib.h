@@ -37,6 +37,13 @@ void *malloc(size_t size)
 }
 
 static inline __attribute__((always_inline))
+void *calloc(size_t nmemb, size_t size)
+{
+	assert(nmemb > 0 && size > 0 && "Zero size in calloc()");
+	return __VERIFIER_calloc(nmemb, size);
+}
+
+static inline __attribute__((always_inline))
 void *aligned_alloc(size_t align, size_t size)
 {
 	assert(align > 0 && (align & (align - 1)) == 0 && "Invalid alignment in aligned_alloc()");

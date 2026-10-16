@@ -199,27 +199,47 @@ void *Interpreter::getStaticAddr(SAddr addr) const
 std::optional<Annotation> Interpreter::getCurrentAnnotConcretized()
 {
 	auto *l = ECStack().back().CurInst->getPrevNode();
-	auto id = MI->idInfo.VID[l];
-	if (!MI->annotInfo.annotMap.count(id))
+	auto idIt = MI->idInfo.VID.find(l);
+	if (idIt == MI->idInfo.VID.end())
+		return {};
+	auto annotIt = MI->annotInfo.annotMap.find(idIt->second);
+	if (annotIt == MI->annotInfo.annotMap.end())
 		return {};
 
-	Annotation result;
-	auto info = MI->annotInfo.annotMap.at(id);
+	const auto &info = annotIt->second;
+
+	/* Only the registers the annotation mentions need a value, so resolve
+	 * those (once per annotation) instead of walking the whole frame, which
+	 * holds every SSA value executed so far after inlining */
+	auto regsIt = annotRegs_.find(idIt->second);
+	if (regsIt == annotRegs_.end()) {
+		std::vector<AnnotID> ids;
+		SExprRegCollector<AnnotID>().collect(info.second.get(), ids);
+		std::vector<std::pair<AnnotID, const Value *>> regs;
+		for (auto id : ids) {
+			auto vIt = MI->idInfo.IDV.find(id);
+			if (vIt != MI->idInfo.IDV.end())
+				regs.emplace_back(id, vIt->second);
+		}
+		regsIt = annotRegs_.emplace(idIt->second, std::move(regs)).first;
+	}
 
 	using Concretizer = SExprConcretizer<AnnotID>;
 	auto &stackVals = ECStack().back().Values;
 	Concretizer::ReplaceMap vMap;
-
-	for (auto &kv : stackVals) {
-		/* (1) Check against NULL due to possibly empty thread parameter list
-		 * (2) Ensure that the load itself will not be concretized */
-		if (kv.first && kv.first != l) {
-			vMap.insert({(MI->idInfo.VID.at(kv.first)),
-				     std::make_pair(GV_TO_SVAL(kv.second, kv.first->getType()),
-						    ASize(getTypeSize(kv.first->getType()) * 8))});
-		}
+	for (const auto &[id, v] : regsIt->second) {
+		/* The load itself must not be concretized */
+		if (v == l)
+			continue;
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+		auto valIt = stackVals.find(const_cast<Value *>(v));
+		if (valIt == stackVals.end())
+			continue;
+		vMap.insert({id, std::make_pair(GV_TO_SVAL(valIt->second, v->getType()),
+						ASize(getTypeSize(v->getType()) * 8))});
 	}
 
+	Annotation result;
 	result.type = info.first;
 	result.expr = Concretizer().concretize(info.second.get(), vMap);
 	return result;
@@ -2951,6 +2971,24 @@ void Interpreter::callMallocAligned(Function *F, const std::vector<GenericValue>
 		return;
 	returnValueToCaller(F->getReturnType(), SVAL_TO_GV(*result, F->getReturnType()));
 	return;
+}
+
+void Interpreter::callCalloc(Function *F, const std::vector<GenericValue> &ArgVals,
+			     const std::unique_ptr<EventDeps> &specialDeps)
+{
+	auto nmemb = ArgVals[0].IntVal.getLimitedValue();
+	auto size = ArgVals[1].IntVal.getLimitedValue();
+
+	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id),
+				  getAddrPoDeps(getCurThr().id), nullptr);
+	auto ret = CALL_DRIVER(handleMalloc, currDbgInfo(), currPos(), nmemb * size,
+			       alignof(std::max_align_t), StorageDuration::SD_Heap,
+			       StorageType::ST_Volatile, AddressSpace::AS_User, nullptr, {},
+			       GET_DEPS(deps), /* zeroed */ true);
+	auto result = std::get_if<SVal>(&ret);
+	if (!result)
+		return;
+	returnValueToCaller(F->getReturnType(), SVAL_TO_GV(*result, F->getReturnType()));
 }
 
 void Interpreter::callPMalloc(Function *F, const std::vector<GenericValue> &ArgVals,
