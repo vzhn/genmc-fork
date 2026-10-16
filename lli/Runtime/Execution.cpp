@@ -364,6 +364,7 @@ unsigned int Interpreter::getTypeSize(Type *typ) const
 #define GENMC_ASSUME_USER 0
 #define GENMC_ASSUME_BARRIER 1
 #define GENMC_ASSUME_SPINLOOP 2
+#define GENMC_ASSUME_AWAIT 3
 
 //===----------------------------------------------------------------------===//
 //                    Binary Instruction Implementations
@@ -2877,6 +2878,14 @@ void Interpreter::callLoopBegin(Function *F, const std::vector<GenericValue> &Ar
 	auto ret = CALL_DRIVER(handleLoopBegin, currDbgInfo(), currPos());
 	VERIFY(std::holds_alternative<std::monostate>(ret));
 	updateCtrlDeps(getCurThr().id, currPos()); /* add a ctrl dep on spin markers */
+}
+
+void Interpreter::callAwaitStart(Function *F, const std::vector<GenericValue> &ArgVals,
+				 const std::unique_ptr<EventDeps> &specialDeps)
+{
+	auto ret = CALL_DRIVER(handleAwaitStart, currDbgInfo(), currPos());
+	VERIFY(std::holds_alternative<std::monostate>(ret));
+	updateCtrlDeps(getCurThr().id, currPos());
 }
 
 void Interpreter::callSpinStart(Function *F, const std::vector<GenericValue> &ArgVals,

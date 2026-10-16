@@ -275,6 +275,7 @@ public:
 
 	/** A call to __VERIFIER_spin_start() has been interpreted */
 	auto handleSpinStart(const EventDbgInfo *dbg, Event pos) -> HandleResult<std::monostate>;
+	auto handleAwaitStart(const EventDbgInfo *dbg, Event pos) -> HandleResult<std::monostate>;
 
 	/** A call to __VERIFIER_faiZNE_spin_end() has been interpreted */
 	auto handleFaiZNESpinEnd(const EventDbgInfo *dbg, Event pos)
@@ -441,6 +442,7 @@ private:
 	auto handleOptional(std::unique_ptr<OptionalLabel> lab) -> HandleResult<bool>;
 	auto handleLoopBegin(std::unique_ptr<LoopBeginLabel> lab) -> HandleResult<std::monostate>;
 	auto handleSpinStart(std::unique_ptr<SpinStartLabel> lab) -> HandleResult<std::monostate>;
+	auto handleAwaitStart(std::unique_ptr<AwaitStartLabel> lab) -> HandleResult<std::monostate>;
 	auto handleFaiZNESpinEnd(std::unique_ptr<FaiZNESpinEndLabel> lab)
 		-> HandleResult<std::monostate>;
 	auto handleLockZNESpinEnd(std::unique_ptr<LockZNESpinEndLabel> lab)

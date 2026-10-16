@@ -510,6 +510,8 @@ BLOCK_PURE_SUBCLASS(ConfirmationBlock);
 BLOCK_PURE_SUBCLASS(BarrierBlock);
 BLOCK_PURE_SUBCLASS(ErrorBlock);
 BLOCK_PURE_SUBCLASS(UserBlock);
+/* A thread blocked in __VERIFIER_await() */
+BLOCK_PURE_SUBCLASS(AwaitBlock);
 
 /**
  * Represents that a thread cannot be scheduled until a child
@@ -1969,6 +1971,8 @@ private:
 
 DEFINE_DUMMY_SUBCLASS(LoopBegin)
 DEFINE_DUMMY_SUBCLASS(SpinStart)
+/* Start of a __VERIFIER_await() (its condition's reads follow) */
+DEFINE_DUMMY_SUBCLASS(AwaitStart)
 DEFINE_DUMMY_SUBCLASS(FaiZNESpinEnd)
 DEFINE_DUMMY_SUBCLASS(LockZNESpinEnd)
 DEFINE_DUMMY_SUBCLASS(Empty)
@@ -2049,6 +2053,9 @@ template <> struct std::formatter<EventLabel::EventLabelKind> {
 			break;
 		case EventLabel::SpinloopBlock:
 			str = "BLOCK[spinloop]";
+			break;
+		case EventLabel::AwaitBlock:
+			str = "BLOCK[await]";
 			break;
 		case EventLabel::FaiZNEBlock:
 			str = "BLOCK[Fai-zne]";
@@ -2165,6 +2172,9 @@ template <> struct std::formatter<EventLabel::EventLabelKind> {
 			break;
 		case EventLabel::SpinStart:
 			str = "SPIN_START";
+			break;
+		case EventLabel::AwaitStart:
+			str = "AWAIT_START";
 			break;
 		case EventLabel::FaiZNESpinEnd:
 		case EventLabel::LockZNESpinEnd:

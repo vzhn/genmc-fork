@@ -25,6 +25,7 @@ enum class AssumeType : std::uint8_t {
 	User = 0,
 	Barrier = 1,
 	Spinloop = 2,
+	Await = 3,
 };
 
 struct Annotation {

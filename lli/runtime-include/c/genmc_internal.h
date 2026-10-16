@@ -143,6 +143,7 @@ typedef enum {
 	GENMC_ASSUME_USER = 0 ,
 	GENMC_ASSUME_BARRIER = 1,
 	GENMC_ASSUME_SPINLOOP = 2,
+	GENMC_ASSUME_AWAIT = 3,
 } __VERIFIER_assume_t;
 
 /* Should match interpreter's assume call (arg size used in annotation passes) */

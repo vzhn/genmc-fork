@@ -130,6 +130,11 @@ public:
 		driver->handleSpinStart(std::unique_ptr<SpinStartLabel>(
 			genmc::cast<SpinStartLabel>(lab.clone().release())));
 	}
+	void visitAwaitStartLabel(const AwaitStartLabel &lab)
+	{
+		driver->handleAwaitStart(std::unique_ptr<AwaitStartLabel>(
+			genmc::cast<AwaitStartLabel>(lab.clone().release())));
+	}
 	void visitFaiZNESpinEndLabel(const FaiZNESpinEndLabel &lab)
 	{
 		driver->handleFaiZNESpinEnd(std::unique_ptr<FaiZNESpinEndLabel>(

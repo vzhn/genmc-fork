@@ -379,7 +379,9 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 	if (g.isBlocked()) {
 		++result.exploredBlocked;
 		if (std::ranges::any_of(g.thr_ids(), [&](auto tid) {
-			    return genmc::isa<SpinloopBlockLabel>(g.getLastThreadLabel(tid));
+			    const auto *lab = g.getLastThreadLabel(tid);
+			    return genmc::isa<SpinloopBlockLabel>(lab) ||
+				   genmc::isa<AwaitBlockLabel>(lab);
 		    }))
 			++result.spinBlocked;
 		if (getConf()->printBlockedExecs)
@@ -880,7 +882,13 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 	 * adjust the detection starting point: DSA-blocked threads
 	 * will have a SpinStart as their last event */
 	VERIFY(genmc::isa<BlockLabel>(g.getLastThreadLabel(tid)));
+	/* A blocked await is judged by the reads of its condition (back to its
+	 * AwaitStart). A blocked spinloop is judged by its whole iteration (back
+	 * to the SpinStart), including the reads of any await nested in it. */
+	const auto isAwait = genmc::isa<AwaitBlockLabel>(g.getLastThreadLabel(tid));
 	const auto *lastLab = g.po_imm_pred(g.getLastThreadLabel(tid));
+	if (isAwait && genmc::isa<AwaitStartLabel>(lastLab))
+		return true;
 	auto start = genmc::isa<SpinStartLabel>(lastLab) ? lastLab->getPos().prev()
 							 : lastLab->getPos();
 
@@ -897,9 +905,9 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 
 	for (auto j = start.index; j > 0; j--) {
 		const auto *lab = g.getEventLabel(Event(tid, j));
-		VERIFY(!genmc::isa<LoopBeginLabel>(lab));
-		if (genmc::isa<SpinStartLabel>(lab))
+		if (isAwait ? genmc::isa<AwaitStartLabel>(lab) : genmc::isa<SpinStartLabel>(lab))
 			return true;
+		VERIFY(!genmc::isa<LoopBeginLabel>(lab));
 		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab)) {
 			if (rLab->getRf() != getCoMax(rLab))
 				return false;
@@ -915,10 +923,11 @@ auto GenMCDriver::checkLiveness() -> std::optional<VerificationError>
 
 	const auto &g = getExec().getGraph();
 
-	/* Collect all threads blocked at spinloops */
+	/* Collect all threads blocked at spinloops or awaits */
 	std::vector<int> spinBlocked;
 	for (auto i = 0; i < g.getNumThreads(); i++) {
-		if (genmc::isa<SpinloopBlockLabel>(g.getLastThreadLabel(i)))
+		const auto *lab = g.getLastThreadLabel(i);
+		if (genmc::isa<SpinloopBlockLabel>(lab) || genmc::isa<AwaitBlockLabel>(lab))
 			spinBlocked.push_back(i);
 	}
 
@@ -931,11 +940,13 @@ auto GenMCDriver::checkLiveness() -> std::optional<VerificationError>
 		    nonTermTID = tid;
 		    return threadReadsMaximal(g, tid);
 	    })) {
-		/* Print some TID blocked by a spinloop */
+		/* Print some TID blocked by a spinloop or an await */
 		auto lastPos = g.getLastThreadLabel(nonTermTID)->getPos();
-		reportError(lastPos,
-			    {lastPos, VerificationError::VE_Liveness,
-			     "Non-terminating spinloop: thread " + std::to_string(nonTermTID)});
+		auto what = genmc::isa<AwaitBlockLabel>(g.getLastThreadLabel(nonTermTID))
+				    ? "Non-terminating wait: thread "
+				    : "Non-terminating spinloop: thread ";
+		reportError(lastPos, {lastPos, VerificationError::VE_Liveness,
+				      what + std::to_string(nonTermTID)});
 		return {VerificationError::VE_Liveness};
 	}
 	return {};
@@ -3078,6 +3089,25 @@ auto GenMCDriver::handleSpinStart(const EventDbgInfo *dbg, Event pos)
 		return {.result = std::monostate(), .count = 1U};
 	}
 	return handleSpinStart(SpinStartLabel::create(pos));
+}
+
+/* An await is not a loop: it does not touch the loop state, so an await
+ * nested in a spinloop leaves the loop's side-effect tracking alone */
+auto GenMCDriver::handleAwaitStart(std::unique_ptr<AwaitStartLabel> lab)
+	-> HandleResult<std::monostate>
+{
+	return handleDummy(std::move(lab));
+}
+
+auto GenMCDriver::handleAwaitStart(const EventDbgInfo *dbg, Event pos)
+	-> HandleResult<std::monostate>
+{
+	++pos;
+	if (auto err = updateErrorInfoAndMaybeExit(pos, false, dbg); err)
+		return {.result = *err};
+	if (isExecutionDrivenByGraph(pos))
+		return {.result = std::monostate(), .count = 1U};
+	return handleAwaitStart(AwaitStartLabel::create(pos));
 }
 
 auto GenMCDriver::areFaiZNEConstraintsSat(const FaiZNESpinEndLabel *lab) -> bool

@@ -115,16 +115,16 @@ void __VERIFIER_spin_end(bool cond)
  * other thread can make progress).
  *
  * COND is evaluated once per execution, as with an assume, and must not have
- * side effects. Do not use it inside a loop that GenMC transforms into an
- * assume (see the markers above).
+ * side effects. An await may be used inside loops, e.g. a retry loop that
+ * tries to take a resource and waits for it otherwise.
  *
  * Example: __VERIFIER_await(atomic_load(&ready) == 1);
  */
-#define __VERIFIER_await(cond)			\
-do {						\
-	__VERIFIER_loop_begin();		\
-	__VERIFIER_spin_start();		\
-	__VERIFIER_spin_end(cond);		\
+void __VERIFIER_await_start(void) __attribute__((__nothrow__));
+#define __VERIFIER_await(cond)						\
+do {									\
+	__VERIFIER_await_start();					\
+	__VERIFIER_assume_internal(cond, GENMC_ASSUME_AWAIT);		\
 } while (0)
 
 /*
