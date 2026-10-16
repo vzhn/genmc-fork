@@ -134,7 +134,7 @@ struct ExecutionContext {
 	BasicBlock::iterator CurInst;		// The next instruction to execute
 	CallInstWrapper Caller;			// Holds the call that called subframes.
 						// NULL if main func or debugger invoked fn
-	std::map<Value *, GenericValue> Values; // LLVM values used in this invocation
+	llvm::DenseMap<Value *, GenericValue> Values; // LLVM values used in this invocation
 	std::vector<GenericValue> VarArgs;	// Values passed through an ellipsis
 	AllocaHolder Allocas;			// Track memory allocated by alloca
 
@@ -250,6 +250,10 @@ protected:
 
 	/* Information about the module under test */
 	std::unique_ptr<ModuleInfo> MI;
+
+	/* Registers (and their Values) mentioned by each load annotation; filled
+	 * lazily by getCurrentAnnotConcretized() */
+	std::unordered_map<AnnotID, std::vector<std::pair<AnnotID, const Value *>>> annotRegs_;
 
 	/* Maps internal functions to their code. Derived once from internalFunNames */
 	llvm::DenseMap<const llvm::Function *, InternalFunctions> internalFunCache_;

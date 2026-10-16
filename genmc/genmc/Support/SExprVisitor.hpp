@@ -383,6 +383,34 @@ private:
 };
 
 /*******************************************************************************
+ **                           SExprRegCollector Class
+ ******************************************************************************/
+
+/** Collects the registers (free variables) an expression mentions */
+template <typename T> class SExprRegCollector : public SExprVisitor<SExprRegCollector, T> {
+
+public:
+	/** Appends the registers of E to REGS (duplicates kept) */
+	void collect(const SExpr<T> *e, std::vector<T> &regs)
+	{
+		regs_ = &regs;
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+		this->visit(const_cast<SExpr<T> *>(e));
+	}
+
+	void visitRegisterExpr(RegisterExpr<T> &e) { regs_->push_back(e.getRegister()); }
+
+	void visitSExpr(SExpr<T> &e)
+	{
+		for (auto i = 0U; i < e.getNumKids(); i++)
+			this->visit(e.getKid(i));
+	}
+
+private:
+	std::vector<T> *regs_{};
+};
+
+/*******************************************************************************
  **                           SExprConcretizer Class
  ******************************************************************************/
 
