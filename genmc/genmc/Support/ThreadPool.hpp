@@ -184,6 +184,7 @@ public:
 		std::scoped_lock lock(stateMtx_); // NOLINT(misc-const-correctness)
 		shouldHalt_.store(true);
 		stateCV_.notify_all();
+		doneCV_.notify_all();
 	}
 
 	/** Waits for all tasks to complete */
@@ -232,9 +233,15 @@ private:
 	static thread_local unsigned int index_;
 
 	/** Mutex+CV to determine whether the pool state has changed:
-	 * a new task has been submitted or all tasks have been completed */
+	 * a new task has been submitted, all tasks have been completed,
+	 * or the pool has halted */
 	std::mutex stateMtx_;
 	std::condition_variable stateCV_;
+
+	/** Waited on by waitForTasks(): notified when the last task finishes or
+	 * the pool halts. Separate from stateCV_ so that a submit()'s notify_one()
+	 * always reaches a worker, never the waiting main thread. */
+	std::condition_variable doneCV_;
 
 	ThreadPinner pinner_;
 
