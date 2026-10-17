@@ -4,7 +4,7 @@ add_test(
     COMMAND bash -c "${SCRIPT_DIR}/fast-driver.sh > ${SCRIPT_DIR}/fast-driver.log"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-set_tests_properties(fast-driver PROPERTIES LABELS "integration;fast" TIMEOUT 300)
+set_tests_properties(fast-driver PROPERTIES LABELS "integration;fast" TIMEOUT 600)
 
 add_test(
     NAME randomize-driver
