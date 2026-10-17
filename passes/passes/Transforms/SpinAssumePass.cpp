@@ -636,10 +636,110 @@ static void addSpinStartCall(Loop *l)
 	CallInst::Create(startFun, {}, "", i);
 }
 
+/*
+ * Returns whether VAL, which flows into the header PHI PHI of L along a backedge, is
+ * either PHI itself or a value read inside L from the location of INIT with INIT's
+ * ordering: a load, or the old value of a CAS, which a failed CAS reads with its
+ * failure ordering.
+ */
+static auto isLoopReadLike(Value *val, const PHINode *phi, const Loop *l, const LoadInst *init,
+			   VSet<const PHINode *> &visited) -> bool
+{
+	if (val == phi)
+		return true;
+
+	auto *inst = dyn_cast<Instruction>(val);
+	if (!inst || !l->contains(inst))
+		return false;
+
+	const auto *ptr = init->getPointerOperand();
+	if (auto *li = dyn_cast<LoadInst>(inst))
+		return !li->isVolatile() && accessSameVariable(li->getPointerOperand(), ptr) &&
+		       areSameLoadOrdering(li->getOrdering(), init->getOrdering());
+	if (auto *extract = dyn_cast<ExtractValueInst>(inst)) {
+		auto *casi = dyn_cast<AtomicCmpXchgInst>(extract->getAggregateOperand());
+		return casi && l->contains(casi) && !casi->isVolatile() &&
+		       extract->getNumIndices() == 1 && *extract->idx_begin() == 0 &&
+		       accessSameVariable(casi->getPointerOperand(), ptr) &&
+		       areSameLoadOrdering(casi->getFailureOrdering(), init->getOrdering());
+	}
+	if (auto *p = dyn_cast<PHINode>(inst)) {
+		if (visited.contains(p))
+			return true;
+		visited.insert(p);
+		return std::ranges::all_of(p->incoming_values(), [&](Value *v) {
+			return isLoopReadLike(v, phi, l, init, visited);
+		});
+	}
+	return false;
+}
+
+/*
+ * A CAS retry loop that refreshes its expected value with the value it read,
+ *     old = load(x); while (!cas(&x, &old, f(old)));
+ * carries that value in a header PHI, so a failed iteration is not repeated by the
+ * next one: the retry compares against what the failed CAS read. If nothing can tell
+ * the initial load apart from a load at the top of the loop, this moves the load
+ * there, so that each iteration reads x afresh:
+ *     do { old = load(x); } while (!cas(&x, &old, f(old)));
+ * Then a failed iteration is pruned like in any other spinloop. This is sound: an
+ * execution where the loop fails k times and then exits corresponds to one where the
+ * load reads the value that the last failed CAS (or a reload) read, followed by the
+ * exiting iteration. The conditions make that execution a valid one with the same
+ * outcome:
+ *   - the PHI is the only one in the header, and every backedge carries a spin-end
+ *     (so that all failed iterations are pruned);
+ *   - its value from the preheader is an atomic load of x whose only user is the PHI,
+ *     and nothing after the load in the preheader accesses memory;
+ *   - every value it gets on a backedge is read from x inside the loop, by a load or
+ *     a CAS, with the ordering of the initial load.
+ * (The same holds for a loop that refreshes the value with a load and has no CAS.)
+ * Returns whether the loop was rewritten.
+ */
+static auto tryMoveInitialLoadToHeader(Loop *l, ModuleAnalysisManager &MAM) -> bool
+{
+	auto *header = l->getHeader();
+	auto *preheader = l->getLoopPreheader();
+	if (!preheader || isBlockPHIClean(header) ||
+	    std::next(header->phis().begin()) != header->phis().end())
+		return false;
+
+	auto *phi = &*header->phis().begin();
+	auto *init = dyn_cast<LoadInst>(phi->getIncomingValueForBlock(preheader));
+	if (!init || init->getParent() != preheader || !init->isAtomic() || init->isVolatile() ||
+	    !init->hasOneUse())
+		return false;
+	if (std::any_of(std::next(init->getIterator()), preheader->end(), [](Instruction &i) {
+		    return i.mayReadOrWriteMemory() || i.mayHaveSideEffects();
+	    }))
+		return false;
+
+	SmallVector<BasicBlock *, 4> latches;
+	l->getLoopLatches(latches);
+	VSet<const PHINode *> visited;
+	if (!std::ranges::all_of(latches, [&](BasicBlock *latch) {
+		    Instruction *lastEffect = nullptr;
+		    auto checkDynamically = false;
+		    return isLoopReadLike(phi->getIncomingValueForBlock(latch), phi, l, init,
+					  visited) &&
+			   !isPathToHeaderFAIZNE(latch, l, MAM, lastEffect) &&
+			   !isPathToHeaderLockZNE(latch, l, MAM, lastEffect) &&
+			   isPathToHeaderEffectFree(latch, l, MAM, checkDynamically);
+	    }))
+		return false;
+
+	/* Move (rather than recreate) the load: analyses may refer to it */
+	init->moveBefore(*header, header->getFirstNonPHIIt());
+	phi->replaceAllUsesWith(init);
+	phi->eraseFromParent();
+	return true;
+}
+
 static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> bool
 {
 	auto *header = l->getHeader();
 
+	auto moved = tryMoveInitialLoadToHeader(l, MAM);
 	if (!isBlockPHIClean(header) && !areBlockPHIsRelatedToLoopCASs(header, l))
 		return false;
 
@@ -686,7 +786,7 @@ static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> b
 	/* Two cases:
 	 * 1) If the transformation applied did not apply in all backedges, this is indeed a loop
 	 * 2) An actual spinloop: we used to remove it from the loop list but let's keep it */
-	return modified;
+	return modified || moved;
 }
 
 auto SpinAssumePass::run(Module &M, ModuleAnalysisManager &MAM) const -> PreservedAnalyses
