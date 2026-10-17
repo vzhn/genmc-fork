@@ -10,6 +10,29 @@ released.
 - Merge of MIXER [POPL'25] into mainline GenMC
 
 
+## [0.19.0-vzhn.3] - 2026.10.16
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Fixes
+
+- `-nthreads`: a worker could sleep while a task was queued (lost wakeup),
+  workers kept taking tasks after another worker found an error and halted the
+  pool, and the main thread busy-waited for the workers to finish
+- `-nthreads`: an error replay left pending by one task leaked into the next
+  task of the same worker, which could crash or garble the error report
+- `-check-liveness`: a liveness violation whose blocked read was non-atomic was
+  lost (the replay dropped its target) or aborted the report; such violations
+  are now reported, with a warning if source information may be missing
+
+### Added
+
+- Tests: a model of the thread-pool protocol (`correct/infr/pool-protocol`,
+  `wrong/safety/pool-*`), `wrong/safety/parallel-error-report`,
+  `wrong/liveness/{spin-na-stuck,await-stuck-join}`, and
+  `check-liveness-report.sh` (ctest `liveness-report`)
+
+
 ## [0.19.0-vzhn.2] - 2026.10.16
 
 Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
