@@ -44,8 +44,9 @@ class Unsupported(Exception):
 
 def strip_comments(s):
     """Removes C comments everywhere and herd's (* ... *) comments outside
-    braces (inside a thread, "(*" is C, as in READ_ONCE(*x))"""
-    out, i, depth = [], 0, 0
+    threads (inside a thread, "(*" is C, as in READ_ONCE(*x)); the first
+    top-level brace block is the init section, where (* ... *) is a comment"""
+    out, i, depth, blocks = [], 0, 0, 0
     while i < len(s):
         if s.startswith("//", i):
             j = s.find("\n", i)
@@ -54,12 +55,14 @@ def strip_comments(s):
             j = s.find("*/", i + 2)
             i = len(s) if j < 0 else j + 2
             out.append(" ")
-        elif depth == 0 and s.startswith("(*", i):
+        elif (depth == 0 or blocks == 1) and s.startswith("(*", i):
             j = s.find("*)", i + 2)
             i = len(s) if j < 0 else j + 2
             out.append(" ")
         else:
             ch = s[i]
+            if ch == "{" and depth == 0:
+                blocks += 1
             depth += {"{": 1, "}": -1}.get(ch, 0)
             out.append(ch)
             i += 1
