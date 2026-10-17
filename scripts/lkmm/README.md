@@ -86,14 +86,14 @@ test, 27 minutes on 12 cores):
 |---|---|
 | agree (states and execution counts) | 3498 |
 | agree-racy (both report a data race) | 187 |
-| skipped (174 LISA, 9 PPC, 32 SRCU, 5 other) | 220 |
+| skipped (174 LISA, 9 PPC, 31 SRCU, 6 other) | 220 |
 | herd7 timeout (60 s) or rejects the test | 123 |
 | disagree, all with a known cause (below) | 1543 |
 
 | result | cause | tests |
 |---|---|---|
 | genmc-timeout | RCU emulation: `synchronize_rcu()` reads every reader's flag | 567 |
-| count | same, with the same states | 463 |
+| count | RCU emulation: same states, more executions | 463 |
 | extra | address dependency to a read (IMM's ppo ends in a write) | 249 |
 | extra | strong-fence cumulativity (`smp_mb()`, `synchronize_rcu()`) | 69 |
 | extra | release chains are A-cumulative in LKMM (`prop`) | 46 |
