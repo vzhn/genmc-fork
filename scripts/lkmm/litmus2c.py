@@ -100,6 +100,14 @@ def split_top(s, sep):
     return parts
 
 
+def widen_int(s):
+    """herd7's int is a machine word, which can hold an address: make every
+    int an intptr_t, so a location written with a pointer has one size"""
+    s = re.sub(r"(?<!unsigned )(?<!long )\bint\b(?!\s+(?:long|short))", "intptr_t", s)
+    # without SRCU calls (which are not supported), an srcu_struct is a word
+    return re.sub(r"\bstruct\s+srcu_struct\b", "intptr_t", s)
+
+
 class Litmus:
     def __init__(self, text):
         self.raw = text
@@ -116,7 +124,7 @@ class Litmus:
         if i < 0:
             raise Unsupported("no init section")
         j = match_brace(body, i)
-        self.init_text = body[i + 1:j - 1]
+        self.init_text = widen_int(body[i + 1:j - 1])
         rest = body[j:]
 
         self.threads = []  # (index, params text, body text)
@@ -126,7 +134,8 @@ class Litmus:
                 continue
             k = m.end() - 1
             end = match_brace(rest, k)
-            self.threads.append((int(m.group(1)), m.group(2), rest[k + 1:end - 1]))
+            self.threads.append((int(m.group(1)), widen_int(m.group(2)),
+                                 widen_int(rest[k + 1:end - 1])))
             pos = end
         if not self.threads:
             raise Unsupported("no threads")
@@ -252,6 +261,13 @@ class Translator:
 
         body = decl.sub(repl, body)
 
+        # herd7 lets a register be assigned without a declaration
+        params = {name for name, _ in self.thread_params[tid]}
+        for m in re.finditer(r"(?:^|[;{}])\s*([A-Za-z_]\w*)\s*=(?!=)", body):
+            name = m.group(1)
+            if name not in params and (tid, name) not in self.regs:
+                self.regs[(tid, name)] = "intptr_t"
+
         # herd7's C is loosely typed: a scalar register can be dereferenced
         for (t, r), typ in self.regs.items():
             if t != tid or "*" in typ:
@@ -298,7 +314,12 @@ class Translator:
     def atoms(self, cond):
         if re.search(r"\[|!=|<|>|\+", cond):
             raise Unsupported("condition syntax %r" % cond.strip())
-        return [a.strip() for a in re.findall(r"([\w]+(?::[\w]+)?)\s*=", cond)]
+        atoms = []
+        for lhs, rhs in re.findall(r"(\w+(?::\w+)?)\s*=\s*(-?\w+(?::\w+)?)", cond):
+            atoms.append(lhs)
+            if re.fullmatch(r"\d+:\w+", rhs):
+                atoms.append(rhs)  # a register compared with a register
+        return atoms
 
     def add_observable(self, o):
         if o in self.observables:
@@ -320,7 +341,7 @@ class Translator:
         def atom(m):
             lhs, rhs = m.group(1), m.group(2)
             return "(%s == %s)" % (self.c_obs_value(lhs), self.c_rhs(rhs))
-        out = re.sub(r"([\w]+(?::[\w]+)?)\s*=\s*(-?[\w]+)", atom, cond)
+        out = re.sub(r"([\w]+(?::[\w]+)?)\s*=\s*(-?\w+(?::\w+)?)", atom, cond)
         out = out.replace("/\\", "&&").replace("\\/", "||").replace("~", "!")
         out = re.sub(r"\btrue\b", "1", out)
         out = re.sub(r"\bfalse\b", "0", out)
@@ -329,6 +350,8 @@ class Translator:
     def c_rhs(self, v):
         if re.fullmatch(r"-?\d+", v):
             return "(intptr_t) %s" % v
+        if re.fullmatch(r"\d+:\w+", v):
+            return self.c_obs_value(v)
         self.note_loc(v)
         return "(intptr_t) &__lk_%s" % v
 

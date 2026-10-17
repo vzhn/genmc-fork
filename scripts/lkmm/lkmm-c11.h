@@ -31,6 +31,10 @@
 #include <pthread.h>
 #include <genmc.h>
 
+/* A pointer argument; an address held in an integer (herd7's registers are
+ * untyped) is taken as a pointer to a word */
+#define __lk_ptr(X) _Generic((X), intptr_t: (intptr_t *) (uintptr_t) (X), default: (X))
+
 /* Marked accesses; X is an lvalue */
 #define READ_ONCE(X) __atomic_load_n(&(X), __ATOMIC_RELAXED)
 #define WRITE_ONCE(X, V) __atomic_store_n(&(X), (V), __ATOMIC_RELAXED)
@@ -38,8 +42,8 @@
 #define rcu_assign_pointer(X, V) __atomic_store_n(&(X), (V), __ATOMIC_RELEASE)
 
 /* Release/acquire; X is a pointer */
-#define smp_load_acquire(X) __atomic_load_n((X), __ATOMIC_ACQUIRE)
-#define smp_store_release(X, V) __atomic_store_n((X), (V), __ATOMIC_RELEASE)
+#define smp_load_acquire(X) __atomic_load_n(__lk_ptr(X), __ATOMIC_ACQUIRE)
+#define smp_store_release(X, V) __atomic_store_n(__lk_ptr(X), (V), __ATOMIC_RELEASE)
 
 /* Fences */
 #define barrier() do {} while (0)
@@ -56,20 +60,20 @@
 #define __LK_FULL(E) ({ smp_mb(); __auto_type __lk_r = (E); smp_mb(); __lk_r; })
 
 /* Exchange; X is a pointer */
-#define xchg(X, V) __LK_FULL(__atomic_exchange_n((X), (V), __ATOMIC_RELAXED))
-#define xchg_relaxed(X, V) __atomic_exchange_n((X), (V), __ATOMIC_RELAXED)
-#define xchg_acquire(X, V) __atomic_exchange_n((X), (V), __ATOMIC_ACQUIRE)
-#define xchg_release(X, V) __atomic_exchange_n((X), (V), __ATOMIC_RELEASE)
+#define xchg(X, V) __LK_FULL(__atomic_exchange_n(__lk_ptr(X), (V), __ATOMIC_RELAXED))
+#define xchg_relaxed(X, V) __atomic_exchange_n(__lk_ptr(X), (V), __ATOMIC_RELAXED)
+#define xchg_acquire(X, V) __atomic_exchange_n(__lk_ptr(X), (V), __ATOMIC_ACQUIRE)
+#define xchg_release(X, V) __atomic_exchange_n(__lk_ptr(X), (V), __ATOMIC_RELEASE)
 
 /* Compare-and-exchange returns the old value; a failed one has no ordering */
 #define __lk_cmpxchg(X, V, W, S) ({						\
-	__auto_type __lk_o = (V);						\
-	__atomic_compare_exchange_n((X), &__lk_o, (W), false, (S), __ATOMIC_RELAXED); \
+	__typeof__(*__lk_ptr(X)) __lk_o = (V);						\
+	__atomic_compare_exchange_n(__lk_ptr(X), &__lk_o, (W), false, (S), __ATOMIC_RELAXED); \
 	__lk_o; })
 #define cmpxchg(X, V, W) ({							\
-	__auto_type __lk_o = (V);						\
+	__typeof__(*__lk_ptr(X)) __lk_o = (V);						\
 	smp_mb();								\
-	if (__atomic_compare_exchange_n((X), &__lk_o, (W), false,		\
+	if (__atomic_compare_exchange_n(__lk_ptr(X), &__lk_o, (W), false,	\
 					__ATOMIC_RELAXED, __ATOMIC_RELAXED))	\
 		smp_mb();							\
 	__lk_o; })
@@ -77,16 +81,19 @@
 #define cmpxchg_acquire(X, V, W) __lk_cmpxchg(X, V, W, __ATOMIC_ACQUIRE)
 #define cmpxchg_release(X, V, W) __lk_cmpxchg(X, V, W, __ATOMIC_RELEASE)
 
-/* atomic_t; X is an atomic_t pointer */
-typedef struct { int counter; } atomic_t;
-#define ATOMIC_INIT(i) { (i) }
-#define atomic_read(X) READ_ONCE((X)->counter)
-#define atomic_set(X, V) WRITE_ONCE((X)->counter, (V))
-#define atomic_read_acquire(X) smp_load_acquire(&(X)->counter)
-#define atomic_set_release(X, V) smp_store_release(&(X)->counter, (V))
+/* atomic_t; X is an atomic_t pointer. As in the kernel's model (where
+ * atomic_read(X) is READ_ONCE(*X)), atomic_t is a word, and the atomic_*()
+ * operations also take a pointer to a plain word */
+typedef intptr_t atomic_t;
+#define ATOMIC_INIT(i) (i)
+#define __lk_ctr(X) (*__lk_ptr(X))
+#define atomic_read(X) READ_ONCE(__lk_ctr(X))
+#define atomic_set(X, V) WRITE_ONCE(__lk_ctr(X), (V))
+#define atomic_read_acquire(X) smp_load_acquire(&__lk_ctr(X))
+#define atomic_set_release(X, V) smp_store_release(&__lk_ctr(X), (V))
 
 /* Non-value-returning RMWs are unordered */
-#define __lk_op(X, OP, V) ((void) __atomic_##OP(&(X)->counter, (V), __ATOMIC_RELAXED))
+#define __lk_op(X, OP, V) ((void) __atomic_##OP(&__lk_ctr(X), (V), __ATOMIC_RELAXED))
 #define atomic_add(V, X) __lk_op(X, fetch_add, V)
 #define atomic_sub(V, X) __lk_op(X, fetch_sub, V)
 #define atomic_and(V, X) __lk_op(X, fetch_and, V)
@@ -97,7 +104,7 @@ typedef struct { int counter; } atomic_t;
 #define atomic_dec(X) atomic_sub(1, X)
 
 /* Value-returning RMWs: OP is fetch_add, add_fetch, ...; M the ordering */
-#define __lk_ret(X, OP, V, M) __atomic_##OP(&(X)->counter, (V), (M))
+#define __lk_ret(X, OP, V, M) __atomic_##OP(&__lk_ctr(X), (V), (M))
 #define atomic_add_return(V, X) __LK_FULL(__lk_ret(X, add_fetch, V, __ATOMIC_RELAXED))
 #define atomic_add_return_relaxed(V, X) __lk_ret(X, add_fetch, V, __ATOMIC_RELAXED)
 #define atomic_add_return_acquire(V, X) __lk_ret(X, add_fetch, V, __ATOMIC_ACQUIRE)
@@ -146,14 +153,14 @@ typedef struct { int counter; } atomic_t;
 #define atomic_fetch_andnot_relaxed(V, X) atomic_fetch_and_relaxed(~(V), X)
 #define atomic_fetch_andnot_acquire(V, X) atomic_fetch_and_acquire(~(V), X)
 #define atomic_fetch_andnot_release(V, X) atomic_fetch_and_release(~(V), X)
-#define atomic_xchg(X, V) xchg(&(X)->counter, V)
-#define atomic_xchg_relaxed(X, V) xchg_relaxed(&(X)->counter, V)
-#define atomic_xchg_acquire(X, V) xchg_acquire(&(X)->counter, V)
-#define atomic_xchg_release(X, V) xchg_release(&(X)->counter, V)
-#define atomic_cmpxchg(X, V, W) cmpxchg(&(X)->counter, V, W)
-#define atomic_cmpxchg_relaxed(X, V, W) cmpxchg_relaxed(&(X)->counter, V, W)
-#define atomic_cmpxchg_acquire(X, V, W) cmpxchg_acquire(&(X)->counter, V, W)
-#define atomic_cmpxchg_release(X, V, W) cmpxchg_release(&(X)->counter, V, W)
+#define atomic_xchg(X, V) xchg(&__lk_ctr(X), V)
+#define atomic_xchg_relaxed(X, V) xchg_relaxed(&__lk_ctr(X), V)
+#define atomic_xchg_acquire(X, V) xchg_acquire(&__lk_ctr(X), V)
+#define atomic_xchg_release(X, V) xchg_release(&__lk_ctr(X), V)
+#define atomic_cmpxchg(X, V, W) cmpxchg(&__lk_ctr(X), V, W)
+#define atomic_cmpxchg_relaxed(X, V, W) cmpxchg_relaxed(&__lk_ctr(X), V, W)
+#define atomic_cmpxchg_acquire(X, V, W) cmpxchg_acquire(&__lk_ctr(X), V, W)
+#define atomic_cmpxchg_release(X, V, W) cmpxchg_release(&__lk_ctr(X), V, W)
 #define atomic_sub_and_test(V, X) (atomic_sub_return(V, X) == 0)
 #define atomic_dec_and_test(X) (atomic_dec_return(X) == 0)
 #define atomic_inc_and_test(X) (atomic_inc_return(X) == 0)
