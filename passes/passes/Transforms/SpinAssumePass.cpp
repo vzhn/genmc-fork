@@ -269,6 +269,9 @@ static auto isPHIRelatedToLoad(const PHINode *phi) -> bool
  * we keep the current path in <phiChain>; if a node is deemed good and the chain
  * is empty (i.e., it does not depend on another node being deemed good), it is
  * moved to <related>, which stores PHIs that are related to some CAS operation.
+ * Good PHIs may still change from one iteration to the next (e.g., a failed CAS
+ * writes the value it read into its expected argument), so the spin-end only
+ * blocks iterations that leave all header PHIs unchanged.
  */
 static auto areBlockPHIsRelatedToLoopCASs(const BasicBlock *bb, Loop *l) -> bool
 {
@@ -595,6 +598,85 @@ static void addLoopBeginCallBeforeTerm(BasicBlock *preheader)
 	ci->setMetadata("dbg", term->getMetadata("dbg"));
 }
 
+/* Whether the header PHIs can be compared for createHeaderChangeCondition() */
+static auto areHeaderPHIsComparable(BasicBlock *header) -> bool
+{
+	return std::ranges::all_of(header->phis(), [](PHINode &phi) {
+		return phi.getType()->isIntegerTy() || phi.getType()->isPointerTy() ||
+		       phi.getType()->isFloatingPointTy();
+	});
+}
+
+static auto canBackedgeChangeHeader(BasicBlock *header, BasicBlock *pred) -> bool
+{
+	return std::ranges::any_of(header->phis(), [&](PHINode &phi) {
+		return phi.getIncomingValueForBlock(pred) != &phi;
+	});
+}
+
+/*
+ * Returns a condition that holds if the edge PRED -> HEADER changes the value of a PHI
+ * of HEADER, i.e., if the next iteration does not repeat the current one. Returns null
+ * if no PHI can change. Instructions are inserted before POS.
+ */
+static auto createHeaderChangeCondition(BasicBlock *header, BasicBlock *pred,
+					BasicBlock::iterator pos) -> Value *
+{
+	Value *changed = nullptr;
+	for (auto &phi : header->phis()) {
+		Value *curr = &phi;
+		Value *next = phi.getIncomingValueForBlock(pred);
+		if (next == curr)
+			continue;
+		if (curr->getType()->isFloatingPointTy()) {
+			/* Compare the bits: the PHI changes, or it does not */
+			auto *intTy = IntegerType::get(header->getContext(),
+						       curr->getType()->getPrimitiveSizeInBits());
+			curr = CastInst::CreateBitOrPointerCast(curr, intTy, "", pos);
+			next = CastInst::CreateBitOrPointerCast(next, intTy, "", pos);
+		}
+		auto *ne =
+			CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_NE, next, curr, "", pos);
+		changed = changed ? BinaryOperator::CreateOr(changed, ne, "", pos)
+				  : static_cast<Value *>(ne);
+	}
+	return changed;
+}
+
+/*
+ * Makes the backedge LATCH -> header of L call __VERIFIER_loop_begin() when it changes a
+ * header PHI. A spin-start blocks the thread if the previous iteration had no side
+ * effects; an iteration that changed a header PHI is not repeated by the next one,
+ * which therefore starts the loop anew. (This also restarts the tracking of the
+ * loop's reads, which decides whether a store to thread-local memory counts as a
+ * side effect; a blocked iteration repeats the previous one, stores included.)
+ */
+static void addLoopBeginOnHeaderChange(BasicBlock *latch, Loop *l, DominatorTree &DT, LoopInfo &LI)
+{
+	auto *header = l->getHeader();
+	if (!canBackedgeChangeHeader(header, latch))
+		return;
+
+	auto *dbg = latch->getTerminator()->getMetadata("dbg");
+	auto *edge = SplitEdge(latch, header, &DT, &LI);
+	auto *changed =
+		createHeaderChangeCondition(header, edge, edge->getTerminator()->getIterator());
+	auto *begin = BasicBlock::Create(header->getContext(), "spin.changed", header->getParent(),
+					 header);
+	BranchInst::Create(header, begin)->setMetadata("dbg", dbg);
+	addLoopBeginCallBeforeTerm(begin);
+	edge->getTerminator()->eraseFromParent();
+	BranchInst::Create(begin, header, changed, edge)->setMetadata("dbg", dbg);
+	for (auto &phi : header->phis())
+		phi.addIncoming(phi.getIncomingValueForBlock(edge), begin);
+	DT.addNewBlock(begin, edge);
+	l->addBasicBlockToLoop(begin, LI);
+}
+
+/*
+ * Blocks the thread at the end of LATCH if the loop does not exit and the next iteration
+ * would repeat the current one (no header PHI changes).
+ */
 static void addSpinEndCallBeforeTerm(BasicBlock *latch, BasicBlock *header)
 {
 	auto *term = latch->getTerminator();
@@ -602,6 +684,12 @@ static void addSpinEndCallBeforeTerm(BasicBlock *latch, BasicBlock *header)
 	VERIFY(endFun);
 
 	auto *cond = getOrCreateExitingCondition(header, term);
+	if (auto *changed = createHeaderChangeCondition(header, latch, term->getIterator())) {
+		auto *ci = dyn_cast<ConstantInt>(cond);
+		cond = (ci && ci->isZero())
+			       ? changed
+			       : BinaryOperator::CreateOr(cond, changed, "", term->getIterator());
+	}
 	auto *assumeType = ConstantInt::get(
 		IntegerType::get(term->getContext(), 8),
 		APInt(8, static_cast<std::underlying_type_t<AssumeType>>(AssumeType::Spinloop)));
@@ -740,7 +828,9 @@ static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> b
 	auto *header = l->getHeader();
 
 	auto moved = tryMoveInitialLoadToHeader(l, MAM);
-	if (!isBlockPHIClean(header) && !areBlockPHIsRelatedToLoopCASs(header, l))
+	auto hasPHIs = !isBlockPHIClean(header);
+	if (hasPHIs &&
+	    (!areBlockPHIsRelatedToLoopCASs(header, l) || !areHeaderPHIsComparable(header)))
 		return false;
 
 	SmallVector<BasicBlock *, 4> latches;
@@ -750,7 +840,9 @@ static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> b
 	auto checkDynamically = false;
 	llvm::Instruction *lastZNEEffect = nullptr;
 	for (auto &latch : latches) {
-		if (isPathToHeaderFAIZNE(latch, l, MAM, lastZNEEffect)) {
+		/* FAI-ZNE blocks ignore header PHIs (lock-ZNE requires none);
+		 * with PHIs such paths are checked dynamically */
+		if (!hasPHIs && isPathToHeaderFAIZNE(latch, l, MAM, lastZNEEffect)) {
 			checkDynamically = true;
 			modified = true;
 			addPotentialSpinEndCallBeforeLastFai(latch, lastZNEEffect);
@@ -781,6 +873,10 @@ static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> b
 		auto &LI = FAM.getResult<LoopAnalysis>(*header->getParent());
 		auto *preheader = llvm::InsertPreheaderForLoop(l, &DT, &LI, nullptr, false);
 		addLoopBeginCallBeforeTerm(preheader);
+		if (hasPHIs) {
+			for (auto *latch : latches)
+				addLoopBeginOnHeaderChange(latch, l, DT, LI);
+		}
 	}
 
 	/* Two cases:
