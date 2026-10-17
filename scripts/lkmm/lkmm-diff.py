@@ -44,6 +44,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.dont_write_bytecode = True  # no __pycache__ in the source tree
 import litmus2c  # noqa: E402
 
 CLANG_FLAGS = ["-Wno-int-conversion", "-Wno-incompatible-pointer-types",

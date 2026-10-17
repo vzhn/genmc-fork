@@ -9,6 +9,7 @@ checking it against herd7, the reference implementation of LKMM.
 | `litmus2c.py` | translates a C litmus test into a GenMC program |
 | `lkmm-diff.py` | runs GenMC on the translations and compares with herd7 |
 | `lkmm-c11.h` | kernel primitives mapped onto C11 atomics (an approximation, for `-imm`) |
+| `classify.py` | sorts the disagreements of a run by likely cause |
 | `kater-export.sh` | regenerates GenMC's consistency checkers from the kat files |
 | `compare-checkers.sh` | compares two GenMC builds under every model |
 
@@ -73,7 +74,8 @@ Results per test: `agree`, `agree-racy`, `missing` (GenMC lacks herd7
 states: stronger), `extra` (GenMC has states herd7 forbids: weaker),
 `differ`, `race`, `count`, `skipped:<reason>`, timeouts and errors, with a
 summary table per directory. `--allowlist` takes classified disagreements;
-anything else that disagrees makes the exit status 1.
+anything else that disagrees makes the exit status 1. `classify.py` groups
+the disagreements of a `--json` file by likely cause.
 
 ## Kater and the generated checkers
 
