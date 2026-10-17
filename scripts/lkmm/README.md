@@ -100,4 +100,9 @@ identical to the checked-in ones: upstream generated those with a newer,
 unreleased Kater (its automata are numbered and minimised differently), and
 0.19's RA and RC11 kat files also have two views (`hbAcq`, `hbRel`) the
 public ones lack. `compare-checkers.sh` compares the two builds program by
-program under all five models.
+program under all five models: on every variant in `tests/correct` and
+`tests/wrong` (3085 program/model pairs, 20 s each), verdicts and execution
+counts are identical, except that the shipped RA and RC11 checkers time out
+on `synthetic/barrier-det` (its default size; the suite uses `-DDIM=4`):
+their extra `hbRel` view is slow there (8.6 s regenerated, over 120 s
+shipped).
