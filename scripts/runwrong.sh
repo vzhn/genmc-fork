@@ -196,14 +196,12 @@ runvariants() {
 		failure=1
 	    fi
 	fi
-	# with an expected-error.in, the error must be that one (e.g., a liveness
-	# violation, not a data race)
-	expected_error="" && [[ -f "${dir}/expected-error.in" ]] &&
-	    expected_error=`head -n 1 "${dir}/expected-error.in"`
-	if test "$status" -eq 42 -a -n "${expected_error}" &&
-		! echo "${output}" | grep -qF -- "${expected_error}"
+	# with an expected-error.in, the error must be one of those it lists, one
+	# per line (e.g., a liveness violation, not a data race)
+	if test "$status" -eq 42 -a -f "${dir}/expected-error.in" &&
+		! echo "${output}" | grep -qF -f "${dir}/expected-error.in"
 	then
-	    failure_status="42, but not \"${expected_error}\""
+	    failure_status="42, but not \"`paste -sd '|' "${dir}/expected-error.in"`\""
 	    outcome_failure=1
 	    failure=1
 	fi

@@ -1,0 +1,2 @@
+-check-liveness |
+-check-liveness | -DNTHREADS=3
