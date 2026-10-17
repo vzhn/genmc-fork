@@ -77,6 +77,39 @@ summary table per directory. `--allowlist` takes classified disagreements;
 anything else that disagrees makes the exit status 1. `classify.py` groups
 the disagreements of a `--json` file by likely cause.
 
+## Baseline: the C11 mapping under `-imm`
+
+`lkmm-c11.h` under `-imm`, on the 5571 corpus tests (2026-10-17, 30 s per
+test, 27 minutes on 12 cores):
+
+| result | tests |
+|---|---|
+| agree (states and execution counts) | 3498 |
+| agree-racy (both report a data race) | 187 |
+| skipped (174 LISA, 9 PPC, 32 SRCU, 5 other) | 220 |
+| herd7 timeout (60 s) or rejects the test | 123 |
+| disagree, all with a known cause (below) | 1543 |
+
+| result | cause | tests |
+|---|---|---|
+| genmc-timeout | RCU emulation: `synchronize_rcu()` reads every reader's flag | 567 |
+| count | same, with the same states | 463 |
+| extra | address dependency to a read (IMM's ppo ends in a write) | 249 |
+| extra | strong-fence cumulativity (`smp_mb()`, `synchronize_rcu()`) | 69 |
+| extra | release chains are A-cumulative in LKMM (`prop`) | 46 |
+| missing | control dependency past the end of the `if` (IMM orders it) | 50 |
+| missing | RCU emulation: the fences of `rcu_read_lock()`/`unlock()` | 26 |
+| missing, race | `smp_rmb()`/`smp_wmb()` as acquire/release fences | 12 |
+| race | plain accesses ordered by dependencies (C11 reports a race) | 41 |
+| extra | `spin_unlock(); spin_lock()` is not ordered in C11 | 9 |
+| extra | same-thread overwrite after a dependency (`overwrite & int`) | 8 |
+| other | control dependency hides a race; mutex events | 3 |
+
+`classify.py` assigns these from the primitives a test uses; every class was
+checked by hand on examples. They are what a real LKMM model has to add to
+IMM: `addr;[R]` in ppo, control dependencies that end at the `if`'s join,
+`prop` (cumulativity, `prop & int`), LKMM's fences and locks, and RCU.
+
 ## Kater and the generated checkers
 
 GenMC's checkers (`genmc/genmc/Execution/Consistency/*Checker.{hpp,cpp}`)

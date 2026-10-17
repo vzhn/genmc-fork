@@ -15,6 +15,15 @@ import json
 import os
 import re
 
+def same_location_writes(src):
+    """Whether a thread writes the same location twice"""
+    for body in re.findall(r"P\d+\s*\([^)]*\)\s*\{(.*?)\n\}", src, re.S):
+        locs = re.findall(r"WRITE_ONCE\s*\(\s*\*\s*(\w+)", body)
+        if len(locs) != len(set(locs)):
+            return True
+    return False
+
+
 RULES = [
     # (result kinds, cause, predicate on (source, result))
     (("count", "genmc-timeout"), "RCU emulation: synchronize_rcu() reads reader flags",
@@ -34,9 +43,13 @@ RULES = [
     (("extra",), "spin_unlock(); spin_lock() (po-unlock-lock-po) is not ordered in C11",
      lambda s, r: "spin_lock" in s),
     (("extra",), "address dependency to a read (IMM's ppo ends in a write)",
-     lambda s, r: re.search(r"rcu_dereference|READ_ONCE\s*\(\s*\*\s*\(", s) is not None),
-    (("extra",), "smp_mb() cumulativity: LKMM propagates writes, C11 needs the reader to synchronise",
-     lambda s, r: "smp_mb" in s),
+     lambda s, r: re.search(r"rcu_dereference|READ_ONCE\s*\(\s*\*\s*(\(|r\w*\s*\))", s)
+     is not None),
+    (("extra",), "same-thread overwrite after a dependency (LKMM's ppo has overwrite & int)",
+     lambda s, r: same_location_writes(s)),
+    (("extra",), "strong-fence cumulativity (smp_mb(), synchronize_rcu()): LKMM propagates "
+     "writes, C11 needs the reader to synchronise",
+     lambda s, r: "smp_mb" in s or "synchronize_rcu" in s),
     (("extra",), "release chains are A-cumulative in LKMM (prop), also through relaxed reads",
      lambda s, r: "smp_store_release" in s),
     (("count",), "same states, different model (the C11 mapping) explores other executions",
