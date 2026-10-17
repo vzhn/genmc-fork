@@ -138,4 +138,5 @@ program under all five models: on every variant in `tests/correct` and
 counts are identical, except that the shipped RA and RC11 checkers time out
 on `synthetic/barrier-det` (its default size; the suite uses `-DDIM=4`):
 their extra `hbRel` view is slow there (8.6 s regenerated, over 120 s
-shipped).
+shipped). The fast suite takes the same time with either (233 s shipped,
+237 s regenerated, on an idle machine).
