@@ -196,6 +196,17 @@ runvariants() {
 		failure=1
 	    fi
 	fi
+	# with an expected-error.in, the error must be that one (e.g., a liveness
+	# violation, not a data race)
+	expected_error="" && [[ -f "${dir}/expected-error.in" ]] &&
+	    expected_error=`head -n 1 "${dir}/expected-error.in"`
+	if test "$status" -eq 42 -a -n "${expected_error}" &&
+		! echo "${output}" | grep -qF -- "${expected_error}"
+	then
+	    failure_status="42, but not \"${expected_error}\""
+	    outcome_failure=1
+	    failure=1
+	fi
 	explored=`echo "${output}" | awk '/explored/ { print $6 }'`
 	time=`echo "${output}" | awk '/wall-clock/ { print substr($4, 1, length($4)-1) }'`
 	time="${time}" && [[ -z "${time}" ]] && time=0 # if pattern was NOT found

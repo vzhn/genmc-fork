@@ -1,0 +1,2 @@
+-check-liveness | -DCAP=2
+-check-liveness | -DCAP=1
