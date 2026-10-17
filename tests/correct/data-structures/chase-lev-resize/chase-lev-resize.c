@@ -34,7 +34,7 @@
  * - BUG_RELAXED_ARRAY: the resize publishes the new array with a relaxed
  *   store (found in the paper's code by CDSChecker, Norris and Demsky, OOPSLA
  *   2013). A thief that loads the new array is not synchronized with its
- *   initialization and reads memory it cannot see allocated.
+ *   initialization and reads it uninitialized.
  */
 
 #ifdef GROW
