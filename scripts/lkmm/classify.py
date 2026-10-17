@@ -16,18 +16,33 @@ import os
 import re
 
 RULES = [
-    # (result kinds, cause, predicate on the test's source)
+    # (result kinds, cause, predicate on (source, result))
     (("count", "genmc-timeout"), "RCU emulation: synchronize_rcu() reads reader flags",
-     lambda s: "synchronize_rcu" in s),
+     lambda s, r: "synchronize_rcu" in s),
+    (("count",), "locks: pthread mutex events, not herd7's lock events",
+     lambda s, r: "spin_lock" in s),
+    (("missing",), "RCU emulation: rcu_read_lock()/unlock() fence, LKMM's do not order",
+     lambda s, r: "rcu_read_lock" in s),
     (("missing",), "control dependency past the end of the if (IMM orders it, LKMM does not)",
-     lambda s: re.search(r"\bif\s*\(", s) is not None),
-    (("race",), "smp_rmb()/smp_wmb() as acquire/release fences order more than LKMM",
-     lambda s: "smp_rmb" in s or "smp_wmb" in s),
+     lambda s, r: re.search(r"\bif\s*\(", s) is not None),
+    (("race", "missing"), "smp_rmb()/smp_wmb() as acquire/release fences order more than LKMM",
+     lambda s, r: not r.get("genmc_race") and ("smp_rmb" in s or "smp_wmb" in s)),
+    (("race",), "control dependency past the end of the if hides the racy execution",
+     lambda s, r: not r.get("genmc_race") and re.search(r"\bif\s*\(", s) is not None),
+    (("race",), "LKMM orders plain accesses by dependencies and fences C11 ignores",
+     lambda s, r: r.get("genmc_race")),
     (("extra",), "spin_unlock(); spin_lock() (po-unlock-lock-po) is not ordered in C11",
-     lambda s: "spin_lock" in s),
+     lambda s, r: "spin_lock" in s),
     (("extra",), "address dependency to a read (IMM's ppo ends in a write)",
-     lambda s: re.search(r"(READ_ONCE|rcu_dereference)\s*\(\s*\*\s*\(", s) is not None
-     or re.search(r"rcu_dereference", s) is not None),
+     lambda s, r: re.search(r"rcu_dereference|READ_ONCE\s*\(\s*\*\s*\(", s) is not None),
+    (("extra",), "smp_mb() cumulativity: LKMM propagates writes, C11 needs the reader to synchronise",
+     lambda s, r: "smp_mb" in s),
+    (("extra",), "release chains are A-cumulative in LKMM (prop), also through relaxed reads",
+     lambda s, r: "smp_store_release" in s),
+    (("count",), "same states, different model (the C11 mapping) explores other executions",
+     lambda s, r: True),
+    (("herd-error",), "herd7 rejects the test (unknown macro or annotation)",
+     lambda s, r: True),
 ]
 
 
@@ -48,7 +63,7 @@ def main():
             continue
         src = open(os.path.join(args.litmus_root, r["test"]), errors="replace").read()
         for ks, cause, pred in RULES:
-            if kind in ks and pred(src):
+            if kind in ks and pred(src, r):
                 causes[(kind, cause)].append(r["test"])
                 break
         else:

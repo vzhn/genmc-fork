@@ -12,8 +12,10 @@
  *   smp_mb__after_unlock_lock() are full fences, not tied to an RMW or lock;
  * - a fully ordered cmpxchg() is fenced before the CAS even when it fails;
  * - RCU is a reader-flag implementation (readers publish themselves with a
- *   full fence; synchronize_rcu() waits for every reader it sees), not LKMM's
- *   grace-period axiom.
+ *   full fence; synchronize_rcu() waits for every reader it sees, its own
+ *   included, so calling it in a read-side critical section deadlocks, as in
+ *   LKMM), not LKMM's grace-period axiom; the fences in rcu_read_lock() and
+ *   rcu_read_unlock() order the critical section with the code around it.
  * Others (cumulativity, the po-unlock-lock-po ordering, plain accesses) are
  * what the differential runs against herd7 measure.
  *
@@ -200,9 +202,8 @@ static int __lk_rcu_reader[LK_MAX_THREADS];
 #define synchronize_rcu() do {							\
 	smp_mb();								\
 	for (int __lk_i = 0; __lk_i < LK_MAX_THREADS; __lk_i++)		\
-		if (__lk_i != __LK_TID)						\
-			__VERIFIER_await(__atomic_load_n(&__lk_rcu_reader[__lk_i], \
-							 __ATOMIC_RELAXED) == 0); \
+		__VERIFIER_await(__atomic_load_n(&__lk_rcu_reader[__lk_i],	\
+						 __ATOMIC_RELAXED) == 0);	\
 	smp_mb();								\
 } while (0)
 #define synchronize_rcu_expedited() synchronize_rcu()
