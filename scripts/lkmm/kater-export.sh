@@ -37,6 +37,7 @@ mkdir -p "${out}"
 models=("$@")
 test ${#models[@]} -gt 0 || models=(sc tso ra rc11 imm)
 
+rev="$(git -C "${KATER_SRC}" describe --always --dirty 2>/dev/null || echo unknown)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 for m in "${models[@]}"; do
@@ -44,8 +45,12 @@ for m in "${models[@]}"; do
 	"${KATER}" -e -n "${name}" -p "${tmp}" "${KATER_SRC}/kat/${m}-genmc.kat" > "${tmp}/${m}.log" 2>&1 ||
 		{ cat "${tmp}/${m}.log" >&2; exit 1; }
 	for f in "${name}Checker.hpp" "${name}Checker.cpp"; do
-		clang-format --style="file:${ROOT}/.clang-format" --assume-filename="${f}" \
-			"${tmp}/${f}" > "${out}/${f}"
+		# record what generated the file, below Kater's DO-NOT-EDIT banner
+		sed "/generated automatically by Kater/a\\
+ * From kat/${m}-genmc.kat, Kater ${rev} (scripts/lkmm/kater-export.sh)." \
+			"${tmp}/${f}" |
+			clang-format --style="file:${ROOT}/.clang-format" --assume-filename="${f}" \
+				> "${out}/${f}"
 	done
 	echo "${name}: ${out}/${name}Checker.{hpp,cpp}"
 done
