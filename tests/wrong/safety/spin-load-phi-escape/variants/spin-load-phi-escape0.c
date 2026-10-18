@@ -10,9 +10,7 @@
  * the next one. The spin-assume transformation pruned every iteration that
  * returned to the header, so the loop never exited with a value other than the
  * initial one, and the assertion was never reached with r != first.
- * The code condenser merges the initial load into the loop's reload and thus
- * also hides this case (a separate bug), so it is disabled here: with default
- * flags GenMC still misses the assertion until the condenser is fixed.
+ * (The code condenser used to hide this case too; see condenser-reused-value.)
  */
 
 atomic_uint x;
