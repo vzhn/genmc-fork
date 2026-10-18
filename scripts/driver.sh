@@ -24,7 +24,7 @@ CONFIG_FILE="$(dirname "$(dirname "${GenMC}")")/include/genmc/config.h"
 # Set the directories for testing
 if [ -z ${CORRECT_DIRS+x} ]
 then
-    CORRECT_DIRS=(infr litmus saver ipr sr liveness synthetic data-structures classic)
+    CORRECT_DIRS=(infr litmus saver ipr sr liveness synthetic data-structures classic lkmm)
     CORRECT_DIRS=("${CORRECT_DIRS[@]/#/${SCRIPT_DIR}/../tests/correct/}" )
 fi
 if [ -z ${WRONG_DIRS+x} ]
