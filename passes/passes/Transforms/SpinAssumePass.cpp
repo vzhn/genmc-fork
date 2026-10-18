@@ -269,6 +269,9 @@ static auto isPHIRelatedToLoad(const PHINode *phi) -> bool
  * we keep the current path in <phiChain>; if a node is deemed good and the chain
  * is empty (i.e., it does not depend on another node being deemed good), it is
  * moved to <related>, which stores PHIs that are related to some CAS operation.
+ * Good PHIs may still change from one iteration to the next (e.g., a failed CAS
+ * writes the value it read into its expected argument), so the spin-end only
+ * blocks iterations that leave all header PHIs unchanged.
  */
 static auto areBlockPHIsRelatedToLoopCASs(const BasicBlock *bb, Loop *l) -> bool
 {
@@ -595,6 +598,85 @@ static void addLoopBeginCallBeforeTerm(BasicBlock *preheader)
 	ci->setMetadata("dbg", term->getMetadata("dbg"));
 }
 
+/* Whether the header PHIs can be compared for createHeaderChangeCondition() */
+static auto areHeaderPHIsComparable(BasicBlock *header) -> bool
+{
+	return std::ranges::all_of(header->phis(), [](PHINode &phi) {
+		return phi.getType()->isIntegerTy() || phi.getType()->isPointerTy() ||
+		       phi.getType()->isFloatingPointTy();
+	});
+}
+
+static auto canBackedgeChangeHeader(BasicBlock *header, BasicBlock *pred) -> bool
+{
+	return std::ranges::any_of(header->phis(), [&](PHINode &phi) {
+		return phi.getIncomingValueForBlock(pred) != &phi;
+	});
+}
+
+/*
+ * Returns a condition that holds if the edge PRED -> HEADER changes the value of a PHI
+ * of HEADER, i.e., if the next iteration does not repeat the current one. Returns null
+ * if no PHI can change. Instructions are inserted before POS.
+ */
+static auto createHeaderChangeCondition(BasicBlock *header, BasicBlock *pred,
+					BasicBlock::iterator pos) -> Value *
+{
+	Value *changed = nullptr;
+	for (auto &phi : header->phis()) {
+		Value *curr = &phi;
+		Value *next = phi.getIncomingValueForBlock(pred);
+		if (next == curr)
+			continue;
+		if (curr->getType()->isFloatingPointTy()) {
+			/* Compare the bits: the PHI changes, or it does not */
+			auto *intTy = IntegerType::get(header->getContext(),
+						       curr->getType()->getPrimitiveSizeInBits());
+			curr = CastInst::CreateBitOrPointerCast(curr, intTy, "", pos);
+			next = CastInst::CreateBitOrPointerCast(next, intTy, "", pos);
+		}
+		auto *ne =
+			CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_NE, next, curr, "", pos);
+		changed = changed ? BinaryOperator::CreateOr(changed, ne, "", pos)
+				  : static_cast<Value *>(ne);
+	}
+	return changed;
+}
+
+/*
+ * Makes the backedge LATCH -> header of L call __VERIFIER_loop_begin() when it changes a
+ * header PHI. A spin-start blocks the thread if the previous iteration had no side
+ * effects; an iteration that changed a header PHI is not repeated by the next one,
+ * which therefore starts the loop anew. (This also restarts the tracking of the
+ * loop's reads, which decides whether a store to thread-local memory counts as a
+ * side effect; a blocked iteration repeats the previous one, stores included.)
+ */
+static void addLoopBeginOnHeaderChange(BasicBlock *latch, Loop *l, DominatorTree &DT, LoopInfo &LI)
+{
+	auto *header = l->getHeader();
+	if (!canBackedgeChangeHeader(header, latch))
+		return;
+
+	auto *dbg = latch->getTerminator()->getMetadata("dbg");
+	auto *edge = SplitEdge(latch, header, &DT, &LI);
+	auto *changed =
+		createHeaderChangeCondition(header, edge, edge->getTerminator()->getIterator());
+	auto *begin = BasicBlock::Create(header->getContext(), "spin.changed", header->getParent(),
+					 header);
+	BranchInst::Create(header, begin)->setMetadata("dbg", dbg);
+	addLoopBeginCallBeforeTerm(begin);
+	edge->getTerminator()->eraseFromParent();
+	BranchInst::Create(begin, header, changed, edge)->setMetadata("dbg", dbg);
+	for (auto &phi : header->phis())
+		phi.addIncoming(phi.getIncomingValueForBlock(edge), begin);
+	DT.addNewBlock(begin, edge);
+	l->addBasicBlockToLoop(begin, LI);
+}
+
+/*
+ * Blocks the thread at the end of LATCH if the loop does not exit and the next iteration
+ * would repeat the current one (no header PHI changes).
+ */
 static void addSpinEndCallBeforeTerm(BasicBlock *latch, BasicBlock *header)
 {
 	auto *term = latch->getTerminator();
@@ -602,6 +684,12 @@ static void addSpinEndCallBeforeTerm(BasicBlock *latch, BasicBlock *header)
 	VERIFY(endFun);
 
 	auto *cond = getOrCreateExitingCondition(header, term);
+	if (auto *changed = createHeaderChangeCondition(header, latch, term->getIterator())) {
+		auto *ci = dyn_cast<ConstantInt>(cond);
+		cond = (ci && ci->isZero())
+			       ? changed
+			       : BinaryOperator::CreateOr(cond, changed, "", term->getIterator());
+	}
 	auto *assumeType = ConstantInt::get(
 		IntegerType::get(term->getContext(), 8),
 		APInt(8, static_cast<std::underlying_type_t<AssumeType>>(AssumeType::Spinloop)));
@@ -636,11 +724,113 @@ static void addSpinStartCall(Loop *l)
 	CallInst::Create(startFun, {}, "", i);
 }
 
+/*
+ * Returns whether VAL, which flows into the header PHI PHI of L along a backedge, is
+ * either PHI itself or a value read inside L from the location of INIT with INIT's
+ * ordering: a load, or the old value of a CAS, which a failed CAS reads with its
+ * failure ordering.
+ */
+static auto isLoopReadLike(Value *val, const PHINode *phi, const Loop *l, const LoadInst *init,
+			   VSet<const PHINode *> &visited) -> bool
+{
+	if (val == phi)
+		return true;
+
+	auto *inst = dyn_cast<Instruction>(val);
+	if (!inst || !l->contains(inst))
+		return false;
+
+	const auto *ptr = init->getPointerOperand();
+	if (auto *li = dyn_cast<LoadInst>(inst))
+		return !li->isVolatile() && accessSameVariable(li->getPointerOperand(), ptr) &&
+		       areSameLoadOrdering(li->getOrdering(), init->getOrdering());
+	if (auto *extract = dyn_cast<ExtractValueInst>(inst)) {
+		auto *casi = dyn_cast<AtomicCmpXchgInst>(extract->getAggregateOperand());
+		return casi && l->contains(casi) && !casi->isVolatile() &&
+		       extract->getNumIndices() == 1 && *extract->idx_begin() == 0 &&
+		       accessSameVariable(casi->getPointerOperand(), ptr) &&
+		       areSameLoadOrdering(casi->getFailureOrdering(), init->getOrdering());
+	}
+	if (auto *p = dyn_cast<PHINode>(inst)) {
+		if (visited.contains(p))
+			return true;
+		visited.insert(p);
+		return std::ranges::all_of(p->incoming_values(), [&](Value *v) {
+			return isLoopReadLike(v, phi, l, init, visited);
+		});
+	}
+	return false;
+}
+
+/*
+ * A CAS retry loop that refreshes its expected value with the value it read,
+ *     old = load(x); while (!cas(&x, &old, f(old)));
+ * carries that value in a header PHI, so a failed iteration is not repeated by the
+ * next one: the retry compares against what the failed CAS read. If nothing can tell
+ * the initial load apart from a load at the top of the loop, this moves the load
+ * there, so that each iteration reads x afresh:
+ *     do { old = load(x); } while (!cas(&x, &old, f(old)));
+ * Then a failed iteration is pruned like in any other spinloop. This is sound: an
+ * execution where the loop fails k times and then exits corresponds to one where the
+ * load reads the value that the last failed CAS (or a reload) read, followed by the
+ * exiting iteration. The conditions make that execution a valid one with the same
+ * outcome:
+ *   - the PHI is the only one in the header, and every backedge carries a spin-end
+ *     (so that all failed iterations are pruned);
+ *   - its value from the preheader is an atomic load of x whose only user is the PHI,
+ *     and nothing after the load in the preheader accesses memory;
+ *   - every value it gets on a backedge is read from x inside the loop, by a load or
+ *     a CAS, with the ordering of the initial load.
+ * (The same holds for a loop that refreshes the value with a load and has no CAS.)
+ * Returns whether the loop was rewritten.
+ */
+static auto tryMoveInitialLoadToHeader(Loop *l, ModuleAnalysisManager &MAM) -> bool
+{
+	auto *header = l->getHeader();
+	auto *preheader = l->getLoopPreheader();
+	if (!preheader || isBlockPHIClean(header) ||
+	    std::next(header->phis().begin()) != header->phis().end())
+		return false;
+
+	auto *phi = &*header->phis().begin();
+	auto *init = dyn_cast<LoadInst>(phi->getIncomingValueForBlock(preheader));
+	if (!init || init->getParent() != preheader || !init->isAtomic() || init->isVolatile() ||
+	    !init->hasOneUse())
+		return false;
+	if (std::any_of(std::next(init->getIterator()), preheader->end(), [](Instruction &i) {
+		    return i.mayReadOrWriteMemory() || i.mayHaveSideEffects();
+	    }))
+		return false;
+
+	SmallVector<BasicBlock *, 4> latches;
+	l->getLoopLatches(latches);
+	VSet<const PHINode *> visited;
+	if (!std::ranges::all_of(latches, [&](BasicBlock *latch) {
+		    Instruction *lastEffect = nullptr;
+		    auto checkDynamically = false;
+		    return isLoopReadLike(phi->getIncomingValueForBlock(latch), phi, l, init,
+					  visited) &&
+			   !isPathToHeaderFAIZNE(latch, l, MAM, lastEffect) &&
+			   !isPathToHeaderLockZNE(latch, l, MAM, lastEffect) &&
+			   isPathToHeaderEffectFree(latch, l, MAM, checkDynamically);
+	    }))
+		return false;
+
+	/* Move (rather than recreate) the load: analyses may refer to it */
+	init->moveBefore(*header, header->getFirstNonPHIIt());
+	phi->replaceAllUsesWith(init);
+	phi->eraseFromParent();
+	return true;
+}
+
 static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> bool
 {
 	auto *header = l->getHeader();
 
-	if (!isBlockPHIClean(header) && !areBlockPHIsRelatedToLoopCASs(header, l))
+	auto moved = tryMoveInitialLoadToHeader(l, MAM);
+	auto hasPHIs = !isBlockPHIClean(header);
+	if (hasPHIs &&
+	    (!areBlockPHIsRelatedToLoopCASs(header, l) || !areHeaderPHIsComparable(header)))
 		return false;
 
 	SmallVector<BasicBlock *, 4> latches;
@@ -650,7 +840,9 @@ static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> b
 	auto checkDynamically = false;
 	llvm::Instruction *lastZNEEffect = nullptr;
 	for (auto &latch : latches) {
-		if (isPathToHeaderFAIZNE(latch, l, MAM, lastZNEEffect)) {
+		/* FAI-ZNE blocks ignore header PHIs (lock-ZNE requires none);
+		 * with PHIs such paths are checked dynamically */
+		if (!hasPHIs && isPathToHeaderFAIZNE(latch, l, MAM, lastZNEEffect)) {
 			checkDynamically = true;
 			modified = true;
 			addPotentialSpinEndCallBeforeLastFai(latch, lastZNEEffect);
@@ -681,12 +873,16 @@ static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> b
 		auto &LI = FAM.getResult<LoopAnalysis>(*header->getParent());
 		auto *preheader = llvm::InsertPreheaderForLoop(l, &DT, &LI, nullptr, false);
 		addLoopBeginCallBeforeTerm(preheader);
+		if (hasPHIs) {
+			for (auto *latch : latches)
+				addLoopBeginOnHeaderChange(latch, l, DT, LI);
+		}
 	}
 
 	/* Two cases:
 	 * 1) If the transformation applied did not apply in all backedges, this is indeed a loop
 	 * 2) An actual spinloop: we used to remove it from the loop list but let's keep it */
-	return modified;
+	return modified || moved;
 }
 
 auto SpinAssumePass::run(Module &M, ModuleAnalysisManager &MAM) const -> PreservedAnalyses
