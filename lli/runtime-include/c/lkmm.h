@@ -1,21 +1,31 @@
 /*
- * GenMC -- Generic Model Checking.
+ * Linux-kernel primitives for GenMC: the names of the kernel memory model's
+ * tools/memory-model/linux-kernel.def, plus a few that kernel code uses,
+ * mapped onto C11 atomics.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3 of the License, or
- * (at your option) any later version.
+ * Run programs that use this header under -imm: it keeps the dependencies
+ * that READ_ONCE()/rcu_dereference() ordering relies on. The mapping is an
+ * approximation of the Linux-kernel memory model (LKMM), until GenMC has an
+ * -lkmm model; scripts/lkmm/README.md has the differences measured against
+ * herd7. The ones known in advance:
+ * - stronger than LKMM: smp_rmb()/smp_wmb() are acquire/release fences
+ *   (they also order reads before writes); smp_mb__before_atomic(),
+ *   smp_mb__after_atomic(), smp_mb__after_spinlock() and
+ *   smp_mb__after_unlock_lock() are full fences wherever they stand; a
+ *   fully ordered cmpxchg() is fenced before the CAS even when it fails;
+ *   rcu_read_lock() and rcu_read_unlock() carry full fences;
+ * - weaker than LKMM: IMM orders a dependency into a write only, so
+ *   rcu_dereference(p) followed by READ_ONCE(*p) is unordered; the
+ *   cumulativity of smp_mb() and of release chains (LKMM's prop) is
+ *   missing; a thread's spin_unlock() followed by its spin_lock() orders
+ *   nothing (po-unlock-lock-po).
+ * RCU is a reader-flag implementation: synchronize_rcu() waits for every
+ * reader it sees, its own included, so calling it inside a read-side
+ * critical section deadlocks, as in LKMM. The flags are indexed by GenMC's
+ * thread id: a program with more than LKMM_MAX_THREADS (16) threads must
+ * define it higher.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, you can access it online at
- * http://www.gnu.org/licenses/gpl-3.0.html.
- *
- * Author: Michalis Kokologiannakis <michalis@mpi-sws.org>
+ * Not provided: SRCU.
  */
 
 #ifndef __LKMM_H__
@@ -25,280 +35,293 @@
 #error "Only one of <stdatomic.h> and <lkmm.h> may be used!"
 #endif
 
-/* Rely on pthread types for the time being */
-#include <pthread.h>
+#include <stdbool.h>
 #include <stdint.h>
-#include <genmc_internal.h>
+#include <pthread.h>
+#include <genmc.h>
 
 /*
- * Helper macros for the rest of definitions
- *
- * We define these in C11 style so that user programs that use C11 atomics can
- * be tested under the LKMM too (provided that variables are redefined).
- * The parts that are LKMM-specific are translated to special internal functions.
+ * Pointer arguments go through __lkmm_ptr(); scripts/lkmm/lkmm-c11.h
+ * predefines it (and LKMM_WORD_ATOMIC) for the untyped registers of herd7's
+ * C litmus tests
  */
-
-typedef enum memory_order {
-  memory_order_relaxed = __ATOMIC_RELAXED,
-  memory_order_consume = __ATOMIC_CONSUME,
-  memory_order_acquire = __ATOMIC_ACQUIRE,
-  memory_order_release = __ATOMIC_RELEASE,
-  memory_order_acq_rel = __ATOMIC_ACQ_REL,
-  memory_order_seq_cst = __ATOMIC_SEQ_CST
-} memory_order;
-
-#define atomic_load_explicit(p, m)     __atomic_load_n(p, m)
-#define atomic_store_explicit(p, v, m) __atomic_store_n(p, v, m)
-
-#define atomic_exchange_explicit(p, v, m) __atomic_exchange_n(p, v, m)
-
-#define atomic_compare_exchange_strong_explicit(p, e, d, ms, mf)	\
-	__atomic_compare_exchange_n(p, e, d, 0, ms, mf)
-#define atomic_compare_exchange_weak_explicit(p, e, d, ms, mf)		\
-	__atomic_compare_exchange_n(p, e, d, 1, ms, mf)
-
-#define atomic_fetch_add_explicit(p, v, m) __atomic_fetch_add(p, v, m)
-#define atomic_fetch_sub_explicit(p, v, m) __atomic_fetch_sub(p, v, m)
-#define atomic_fetch_or_explicit(p, v, m)  __atomic_fetch_or(p, v, m)
-#define atomic_fetch_xor_explicit(p, v, m) __atomic_fetch_xor(p, v, m)
-#define atomic_fetch_and_explicit(p, v, m) __atomic_fetch_and(p, v, m)
-
-/* These do not exist in C11 */
-#define atomic_add_fetch_explicit(p, v, m) __atomic_add_fetch(p, v, m)
-#define atomic_sub_fetch_explicit(p, v, m) __atomic_sub_fetch(p, v, m)
-#define atomic_or_fetch_explicit(p, v, m)  __atomic_or_fetch(p, v, m)
-#define atomic_xor_fetch_explicit(p, v, m) __atomic_xor_fetch(p, v, m)
-#define atomic_and_fetch_explicit(p, v, m) __atomic_and_fetch(p, v, m)
-
+#ifndef __lkmm_ptr
+#define __lkmm_ptr(X) (X)
+#endif
 
 /*******************************************************************************
- **                         ONCE, FENCES AND FRIENDS
+ **                        MARKED ACCESSES AND FENCES
  ******************************************************************************/
 
-/* ONCE */
-#define READ_ONCE(x)     atomic_load_explicit(&x, memory_order_relaxed)
-#define WRITE_ONCE(x, v) atomic_store_explicit(&x, v, memory_order_relaxed)
+/* X is an lvalue */
+#define READ_ONCE(X) __atomic_load_n(&(X), __ATOMIC_RELAXED)
+#define WRITE_ONCE(X, V) __atomic_store_n(&(X), (V), __ATOMIC_RELAXED)
 
-/* Fences */
+/* X is a pointer */
+#define smp_load_acquire(X) __atomic_load_n(__lkmm_ptr(X), __ATOMIC_ACQUIRE)
+#define smp_store_release(X, V) __atomic_store_n(__lkmm_ptr(X), (V), __ATOMIC_RELEASE)
 
-/* atomic_signal_fence(memory_order_relaxed) is useless for barrier() */
-#define barrier() __asm__ __volatile__ (""   : : : "memory")
+/* RCU-protected pointers; X is an lvalue */
+#define rcu_dereference(X) READ_ONCE(X)
+#define rcu_dereference_raw(X) READ_ONCE(X)
+#define rcu_dereference_check(X, C) READ_ONCE(X)
+#define rcu_dereference_protected(X, C) READ_ONCE(X)
+#define rcu_access_pointer(X) READ_ONCE(X)
+#define rcu_assign_pointer(X, V) __atomic_store_n(&(X), (V), __ATOMIC_RELEASE)
+#define RCU_INIT_POINTER(X, V) WRITE_ONCE(X, V)
 
-void __VERIFIER_lkmm_fence(const char *);
+/* Fences; barrier() is a compiler barrier, and GenMC never reorders */
+#define barrier() do { } while (0)
+#define cpu_relax() do { } while (0)
+#define smp_mb() __atomic_thread_fence(__ATOMIC_SEQ_CST)
+#define smp_rmb() __atomic_thread_fence(__ATOMIC_ACQUIRE)
+#define smp_wmb() __atomic_thread_fence(__ATOMIC_RELEASE)
+#define smp_mb__before_atomic() smp_mb()
+#define smp_mb__after_atomic() smp_mb()
+#define smp_mb__after_spinlock() smp_mb()
+#define smp_mb__after_unlock_lock() smp_mb()
+#define smp_acquire__after_ctrl_dep() smp_rmb()
+#define smp_store_mb(X, V) do { WRITE_ONCE(X, V); smp_mb(); } while (0)
 
-#define __LKMM_FENCE(type) __VERIFIER_lkmm_fence(#type)
-#define smp_mb()  __LKMM_FENCE(mb)
-#define smp_rmb() __LKMM_FENCE(rmb)
-#define smp_wmb() __LKMM_FENCE(wmb)
-#define smp_mb__before_atomic()     __LKMM_FENCE(ba)
-#define smp_mb__after_atomic()      __LKMM_FENCE(aa)
-#define smp_mb__after_spinlock()    __LKMM_FENCE(as)
-#define smp_mb__after_unlock_lock() __LKMM_FENCE(aul)
+/* Wait until COND, which refers to the value read as VAL, holds; X is a pointer */
+#define smp_cond_load_relaxed(X, COND) ({				\
+	__typeof__(*__lkmm_ptr(X)) VAL;					\
+	__VERIFIER_await((VAL = READ_ONCE(*__lkmm_ptr(X)), (COND)));	\
+	VAL; })
+#define smp_cond_load_acquire(X, COND) ({				\
+	__typeof__(*__lkmm_ptr(X)) VAL;					\
+	__VERIFIER_await((VAL = smp_load_acquire(X), (COND)));		\
+	VAL; })
 
-/* Acquire/Release and friends */
-#define smp_load_acquire(p)      atomic_load_explicit(p, memory_order_acquire)
-#define smp_store_release(p, v)  atomic_store_explicit(p, v, memory_order_release)
-#define rcu_dereference(p)       READ_ONCE(p)
-#define rcu_assign_pointer(p, v) smp_store_release(&(p), v)
-#define smp_store_mb(x, v)					\
-do {								\
-	atomic_store_explicit(&x, v, memory_order_relaxed);	\
-	smp_mb();						\
+/*******************************************************************************
+ **                        EXCHANGE AND COMPARE-EXCHANGE
+ ******************************************************************************/
+
+/* A value-returning RMW without an ordering suffix is fully ordered */
+#define __lkmm_full(E) ({ smp_mb(); __auto_type __lkmm_r = (E); smp_mb(); __lkmm_r; })
+
+/* X is a pointer */
+#define xchg(X, V) __lkmm_full(__atomic_exchange_n(__lkmm_ptr(X), (V), __ATOMIC_RELAXED))
+#define xchg_relaxed(X, V) __atomic_exchange_n(__lkmm_ptr(X), (V), __ATOMIC_RELAXED)
+#define xchg_acquire(X, V) __atomic_exchange_n(__lkmm_ptr(X), (V), __ATOMIC_ACQUIRE)
+#define xchg_release(X, V) __atomic_exchange_n(__lkmm_ptr(X), (V), __ATOMIC_RELEASE)
+
+/* cmpxchg() returns the old value; a failed one has no ordering */
+#define __lkmm_cmpxchg(X, V, W, M) ({						\
+	__typeof__(*__lkmm_ptr(X)) __lkmm_o = (V);				\
+	__atomic_compare_exchange_n(__lkmm_ptr(X), &__lkmm_o, (W), false, (M),	\
+				    __ATOMIC_RELAXED);				\
+	__lkmm_o; })
+#define cmpxchg(X, V, W) ({							\
+	__typeof__(*__lkmm_ptr(X)) __lkmm_o = (V);				\
+	smp_mb();								\
+	if (__atomic_compare_exchange_n(__lkmm_ptr(X), &__lkmm_o, (W), false,	\
+					__ATOMIC_RELAXED, __ATOMIC_RELAXED))	\
+		smp_mb();							\
+	__lkmm_o; })
+#define cmpxchg_relaxed(X, V, W) __lkmm_cmpxchg(X, V, W, __ATOMIC_RELAXED)
+#define cmpxchg_acquire(X, V, W) __lkmm_cmpxchg(X, V, W, __ATOMIC_ACQUIRE)
+#define cmpxchg_release(X, V, W) __lkmm_cmpxchg(X, V, W, __ATOMIC_RELEASE)
+
+/* try_cmpxchg() returns whether it succeeded; V points to the expected
+ * value, which a failure replaces with the value found */
+#define __lkmm_try_cmpxchg(X, V, W, M)						\
+	__atomic_compare_exchange_n(__lkmm_ptr(X), (V), (W), false, (M), __ATOMIC_RELAXED)
+#define try_cmpxchg(X, V, W) ({							\
+	smp_mb();								\
+	bool __lkmm_ok = __lkmm_try_cmpxchg(X, V, W, __ATOMIC_RELAXED);		\
+	if (__lkmm_ok)								\
+		smp_mb();							\
+	__lkmm_ok; })
+#define try_cmpxchg_relaxed(X, V, W) __lkmm_try_cmpxchg(X, V, W, __ATOMIC_RELAXED)
+#define try_cmpxchg_acquire(X, V, W) __lkmm_try_cmpxchg(X, V, W, __ATOMIC_ACQUIRE)
+#define try_cmpxchg_release(X, V, W) __lkmm_try_cmpxchg(X, V, W, __ATOMIC_RELEASE)
+
+/*******************************************************************************
+ **                              ATOMIC_T
+ ******************************************************************************/
+
+#ifdef LKMM_WORD_ATOMIC
+/* herd7's atomic_t is a word: atomic_read(X) is READ_ONCE(*X) */
+typedef intptr_t atomic_t;
+#define ATOMIC_INIT(i) (i)
+#define __lkmm_ctr(X) (*__lkmm_ptr(X))
+#else
+typedef struct {
+	int counter;
+} atomic_t;
+typedef struct {
+	int64_t counter;
+} atomic64_t;
+typedef atomic64_t atomic_long_t;
+#define ATOMIC_INIT(i) { (i) }
+#define __lkmm_ctr(X) ((X)->counter)
+#endif
+
+/* X is an atomic_t pointer (or an atomic64_t/atomic_long_t one) */
+#define atomic_read(X) READ_ONCE(__lkmm_ctr(X))
+#define atomic_set(X, V) WRITE_ONCE(__lkmm_ctr(X), (V))
+#define atomic_read_acquire(X) smp_load_acquire(&__lkmm_ctr(X))
+#define atomic_set_release(X, V) smp_store_release(&__lkmm_ctr(X), (V))
+
+/* Non-value-returning RMWs are unordered; GenMC records that they return
+ * nothing (smp_rmb() does not order them in LKMM) */
+#define __lkmm_noret(X, OP, V) do {						\
+	__VERIFIER_annotate_begin(GENMC_KIND_NONVR);				\
+	__atomic_##OP(&__lkmm_ctr(X), (V), __ATOMIC_RELAXED);			\
+	__VERIFIER_annotate_end(GENMC_KIND_NONVR);				\
 } while (0)
+#define atomic_add(V, X) __lkmm_noret(X, fetch_add, V)
+#define atomic_sub(V, X) __lkmm_noret(X, fetch_sub, V)
+#define atomic_and(V, X) __lkmm_noret(X, fetch_and, V)
+#define atomic_or(V, X) __lkmm_noret(X, fetch_or, V)
+#define atomic_xor(V, X) __lkmm_noret(X, fetch_xor, V)
+#define atomic_andnot(V, X) __lkmm_noret(X, fetch_and, ~(V))
+#define atomic_inc(X) atomic_add(1, X)
+#define atomic_dec(X) atomic_sub(1, X)
 
-/* Exchange */
-#define __xchg(p, v, m)				\
-	atomic_exchange_explicit(p, v, m)
-#define xchg(p, v)							\
-({									\
-	__typeof__((v)) _v_ = (v);					\
-	smp_mb__before_atomic();					\
-	_v_ = __xchg(p, v, memory_order_relaxed);			\
-	smp_mb__after_atomic();						\
-	_v_;								\
-})
-#define xchg_relaxed(p, v) __xchg(p, v, memory_order_relaxed)
-#define xchg_release(p, v) __xchg(p, v, memory_order_release)
-#define xchg_acquire(p, v) __xchg(p, v, memory_order_acquire)
+/* Value-returning RMWs: OP is fetch_add, add_fetch, ...; M the ordering */
+#define __lkmm_ret(X, OP, V, M) __atomic_##OP(&__lkmm_ctr(X), (V), (M))
+#define atomic_add_return(V, X) __lkmm_full(__lkmm_ret(X, add_fetch, V, __ATOMIC_RELAXED))
+#define atomic_add_return_relaxed(V, X) __lkmm_ret(X, add_fetch, V, __ATOMIC_RELAXED)
+#define atomic_add_return_acquire(V, X) __lkmm_ret(X, add_fetch, V, __ATOMIC_ACQUIRE)
+#define atomic_add_return_release(V, X) __lkmm_ret(X, add_fetch, V, __ATOMIC_RELEASE)
+#define atomic_sub_return(V, X) __lkmm_full(__lkmm_ret(X, sub_fetch, V, __ATOMIC_RELAXED))
+#define atomic_sub_return_relaxed(V, X) __lkmm_ret(X, sub_fetch, V, __ATOMIC_RELAXED)
+#define atomic_sub_return_acquire(V, X) __lkmm_ret(X, sub_fetch, V, __ATOMIC_ACQUIRE)
+#define atomic_sub_return_release(V, X) __lkmm_ret(X, sub_fetch, V, __ATOMIC_RELEASE)
+#define atomic_inc_return(X) atomic_add_return(1, X)
+#define atomic_inc_return_relaxed(X) atomic_add_return_relaxed(1, X)
+#define atomic_inc_return_acquire(X) atomic_add_return_acquire(1, X)
+#define atomic_inc_return_release(X) atomic_add_return_release(1, X)
+#define atomic_dec_return(X) atomic_sub_return(1, X)
+#define atomic_dec_return_relaxed(X) atomic_sub_return_relaxed(1, X)
+#define atomic_dec_return_acquire(X) atomic_sub_return_acquire(1, X)
+#define atomic_dec_return_release(X) atomic_sub_return_release(1, X)
+#define atomic_fetch_add(V, X) __lkmm_full(__lkmm_ret(X, fetch_add, V, __ATOMIC_RELAXED))
+#define atomic_fetch_add_relaxed(V, X) __lkmm_ret(X, fetch_add, V, __ATOMIC_RELAXED)
+#define atomic_fetch_add_acquire(V, X) __lkmm_ret(X, fetch_add, V, __ATOMIC_ACQUIRE)
+#define atomic_fetch_add_release(V, X) __lkmm_ret(X, fetch_add, V, __ATOMIC_RELEASE)
+#define atomic_fetch_sub(V, X) __lkmm_full(__lkmm_ret(X, fetch_sub, V, __ATOMIC_RELAXED))
+#define atomic_fetch_sub_relaxed(V, X) __lkmm_ret(X, fetch_sub, V, __ATOMIC_RELAXED)
+#define atomic_fetch_sub_acquire(V, X) __lkmm_ret(X, fetch_sub, V, __ATOMIC_ACQUIRE)
+#define atomic_fetch_sub_release(V, X) __lkmm_ret(X, fetch_sub, V, __ATOMIC_RELEASE)
+#define atomic_fetch_inc(X) atomic_fetch_add(1, X)
+#define atomic_fetch_inc_relaxed(X) atomic_fetch_add_relaxed(1, X)
+#define atomic_fetch_inc_acquire(X) atomic_fetch_add_acquire(1, X)
+#define atomic_fetch_inc_release(X) atomic_fetch_add_release(1, X)
+#define atomic_fetch_dec(X) atomic_fetch_sub(1, X)
+#define atomic_fetch_dec_relaxed(X) atomic_fetch_sub_relaxed(1, X)
+#define atomic_fetch_dec_acquire(X) atomic_fetch_sub_acquire(1, X)
+#define atomic_fetch_dec_release(X) atomic_fetch_sub_release(1, X)
+#define atomic_fetch_and(V, X) __lkmm_full(__lkmm_ret(X, fetch_and, V, __ATOMIC_RELAXED))
+#define atomic_fetch_and_relaxed(V, X) __lkmm_ret(X, fetch_and, V, __ATOMIC_RELAXED)
+#define atomic_fetch_and_acquire(V, X) __lkmm_ret(X, fetch_and, V, __ATOMIC_ACQUIRE)
+#define atomic_fetch_and_release(V, X) __lkmm_ret(X, fetch_and, V, __ATOMIC_RELEASE)
+#define atomic_fetch_or(V, X) __lkmm_full(__lkmm_ret(X, fetch_or, V, __ATOMIC_RELAXED))
+#define atomic_fetch_or_relaxed(V, X) __lkmm_ret(X, fetch_or, V, __ATOMIC_RELAXED)
+#define atomic_fetch_or_acquire(V, X) __lkmm_ret(X, fetch_or, V, __ATOMIC_ACQUIRE)
+#define atomic_fetch_or_release(V, X) __lkmm_ret(X, fetch_or, V, __ATOMIC_RELEASE)
+#define atomic_fetch_xor(V, X) __lkmm_full(__lkmm_ret(X, fetch_xor, V, __ATOMIC_RELAXED))
+#define atomic_fetch_xor_relaxed(V, X) __lkmm_ret(X, fetch_xor, V, __ATOMIC_RELAXED)
+#define atomic_fetch_xor_acquire(V, X) __lkmm_ret(X, fetch_xor, V, __ATOMIC_ACQUIRE)
+#define atomic_fetch_xor_release(V, X) __lkmm_ret(X, fetch_xor, V, __ATOMIC_RELEASE)
+#define atomic_fetch_andnot(V, X) atomic_fetch_and(~(V), X)
+#define atomic_fetch_andnot_relaxed(V, X) atomic_fetch_and_relaxed(~(V), X)
+#define atomic_fetch_andnot_acquire(V, X) atomic_fetch_and_acquire(~(V), X)
+#define atomic_fetch_andnot_release(V, X) atomic_fetch_and_release(~(V), X)
+#define atomic_xchg(X, V) xchg(&__lkmm_ctr(X), V)
+#define atomic_xchg_relaxed(X, V) xchg_relaxed(&__lkmm_ctr(X), V)
+#define atomic_xchg_acquire(X, V) xchg_acquire(&__lkmm_ctr(X), V)
+#define atomic_xchg_release(X, V) xchg_release(&__lkmm_ctr(X), V)
+#define atomic_cmpxchg(X, V, W) cmpxchg(&__lkmm_ctr(X), V, W)
+#define atomic_cmpxchg_relaxed(X, V, W) cmpxchg_relaxed(&__lkmm_ctr(X), V, W)
+#define atomic_cmpxchg_acquire(X, V, W) cmpxchg_acquire(&__lkmm_ctr(X), V, W)
+#define atomic_cmpxchg_release(X, V, W) cmpxchg_release(&__lkmm_ctr(X), V, W)
+#define atomic_try_cmpxchg(X, V, W) try_cmpxchg(&__lkmm_ctr(X), V, W)
+#define atomic_try_cmpxchg_relaxed(X, V, W) try_cmpxchg_relaxed(&__lkmm_ctr(X), V, W)
+#define atomic_try_cmpxchg_acquire(X, V, W) try_cmpxchg_acquire(&__lkmm_ctr(X), V, W)
+#define atomic_try_cmpxchg_release(X, V, W) try_cmpxchg_release(&__lkmm_ctr(X), V, W)
+#define atomic_sub_and_test(V, X) (atomic_sub_return(V, X) == 0)
+#define atomic_dec_and_test(X) (atomic_dec_return(X) == 0)
+#define atomic_inc_and_test(X) (atomic_inc_return(X) == 0)
+#define atomic_add_negative(V, X) (atomic_add_return(V, X) < 0)
+#define atomic_add_negative_relaxed(V, X) (atomic_add_return_relaxed(V, X) < 0)
+#define atomic_add_negative_acquire(V, X) (atomic_add_return_acquire(V, X) < 0)
+#define atomic_add_negative_release(V, X) (atomic_add_return_release(V, X) < 0)
 
-#define __cmpxchg(p, o, n, s, f)					\
-({									\
-	__typeof__((o)) _o_ = (o);					\
-	(atomic_compare_exchange_strong_explicit(p, &_o_, n, s, f));	\
-	_o_;								\
-})
-#define cmpxchg(p, o, n)						\
-({									\
-	__typeof__((o)) _o_ = (o);					\
-	smp_mb__before_atomic();					\
-	_o_ = __cmpxchg(p, o, n, memory_order_relaxed, memory_order_relaxed); \
-	smp_mb__after_atomic();						\
-	_o_;								\
-})
-#define cmpxchg_relaxed(p, o, n)				\
-	__cmpxchg(p, o, n, memory_order_relaxed, memory_order_relaxed)
-#define cmpxchg_acquire(p, o, n)				\
-	__cmpxchg(p, o, n, memory_order_acquire, memory_order_acquire)
-#define cmpxchg_release(p, o, n)				\
-	__cmpxchg(p, o, n, memory_order_release, memory_order_release)
-
+/* Adds V unless the value is W; returns the old value (fully ordered when
+ * it adds). atomic_add_unless() returns whether it added */
+#define atomic_fetch_add_unless(X, V, W) ({					\
+	__typeof__(__lkmm_ctr(X)) __lkmm_o = atomic_read(X);			\
+	smp_mb();								\
+	while (__lkmm_o != (W) &&						\
+	       !__atomic_compare_exchange_n(&__lkmm_ctr(X), &__lkmm_o,		\
+					   __lkmm_o + (V), false,		\
+					   __ATOMIC_RELAXED, __ATOMIC_RELAXED))	\
+		;								\
+	if (__lkmm_o != (W))							\
+		smp_mb();							\
+	__lkmm_o; })
+#define atomic_add_unless(X, V, W) (atomic_fetch_add_unless(X, V, W) != (W))
+#define atomic_inc_not_zero(X) atomic_add_unless(X, 1, 0)
 
 /*******************************************************************************
  **                               SPINLOCKS
  ******************************************************************************/
 
-/* Spinlocks */
+/* X is a pointer; the interrupt and bottom-half variants are plain locks */
 typedef pthread_mutex_t spinlock_t;
-
-#define spin_lock(l)      pthread_mutex_lock(l)
-#define spin_unlock(l)    pthread_mutex_unlock(l)
-#define spin_trylock(l)   !pthread_mutex_trylock(l)
-#define spin_is_locked(l) (atomic_load_explicit(&((l)->__private), memory_order_relaxed) == 1)
-
-
-/*******************************************************************************
- **                               RCU
- ******************************************************************************/
-
-#define rcu_read_lock()   __VERIFIER_rcu_read_lock()
-#define rcu_read_unlock() __VERIFIER_rcu_read_unlock()
-#define synchronize_rcu() __VERIFIER_synchronize_rcu()
-#define synchronize_rcu_expedited() __VERIFIER_synchronize_rcu()
-
+#define __SPIN_LOCK_UNLOCKED(x) PTHREAD_MUTEX_INITIALIZER
+#define DEFINE_SPINLOCK(x) spinlock_t x = __SPIN_LOCK_UNLOCKED(x)
+#define spin_lock_init(X) pthread_mutex_init(X, NULL)
+#define spin_lock(X) pthread_mutex_lock(X)
+#define spin_unlock(X) pthread_mutex_unlock(X)
+#define spin_trylock(X) (pthread_mutex_trylock(X) == 0)
+#define spin_is_locked(X) (__atomic_load_n(&(X)->__private, __ATOMIC_RELAXED) != 0)
+#define spin_lock_bh(X) spin_lock(X)
+#define spin_unlock_bh(X) spin_unlock(X)
+#define spin_lock_irq(X) spin_lock(X)
+#define spin_unlock_irq(X) spin_unlock(X)
+#define spin_lock_irqsave(X, flags) do { (void) (flags); spin_lock(X); } while (0)
+#define spin_unlock_irqrestore(X, flags) do { (void) (flags); spin_unlock(X); } while (0)
 
 /*******************************************************************************
- **                            ATOMIC OPERATIONS
+ **                                  RCU
  ******************************************************************************/
 
-/* Atomic data types */
-typedef struct {
-	int counter;
-} atomic_t;
+/* A reader announces itself with a full fence after setting its flag and
+ * before clearing it; synchronize_rcu() fences and waits for every reader
+ * flag it finds set. Each thread uses the slot of its GenMC thread id */
+#ifndef LKMM_MAX_THREADS
+#define LKMM_MAX_THREADS 16
+#endif
+static int __lkmm_rcu_nesting[LKMM_MAX_THREADS];
+static int __lkmm_rcu_reader[LKMM_MAX_THREADS];
+#define __lkmm_tid() ((int) __VERIFIER_thread_self())
 
-typedef struct {
-	int64_t counter;
-} atomic64_t;
-typedef atomic64_t  atomic_long_t;
-
-/* Initialization */
-#define ATOMIC_INIT(i) { (i) }
-
-/* Basic operations */
-#define atomic_read(v)   READ_ONCE((v)->counter)
-#define atomic_set(v, i) WRITE_ONCE(((v)->counter), (i))
-#define atomic_read_acquire(v)   smp_load_acquire(&(v)->counter)
-#define atomic_set_release(v, i) smp_store_release(&(v)->counter, (i))
-
-/* Not using __atomic in all definitions below (but rather _atomic) so
- * as to not clash with the compiler builtins */
-
-/* Non-value-returning atomics */
-#define __VERIFIER_fetch_add_noret(v, i, m) 		\
-do {							\
-	__VERIFIER_annotate_begin(GENMC_KIND_NONVR);	\
-	atomic_fetch_add_explicit(v, i, m);		\
-	__VERIFIER_annotate_end(GENMC_KIND_NONVR);	\
-} while(0)
-
-#define __VERIFIER_fetch_sub_noret(v, i, m) 		\
-do {							\
-	__VERIFIER_annotate_begin(GENMC_KIND_NONVR);	\
-	atomic_fetch_sub_explicit(v, i, m);		\
-	__VERIFIER_annotate_end(GENMC_KIND_NONVR);	\
-} while(0)
-
-#define _atomic_add(i, v, m) __VERIFIER_fetch_add_noret(&(v)->counter, i, m)
-#define _atomic_sub(i, v, m) __VERIFIER_fetch_sub_noret(&(v)->counter, i, m)
-
-#define atomic_add(i, v) _atomic_add(i, v, memory_order_relaxed)
-#define atomic_sub(i, v) _atomic_sub(i, v, memory_order_relaxed)
-#define atomic_inc(v) atomic_add(1, v)
-#define atomic_dec(v) atomic_sub(1, v)
-
-/* Value-returning atomics */
-#define _atomic_fetch_add(i, v, m) atomic_fetch_add_explicit(&(v)->counter, i, m)
-#define _atomic_fetch_sub(i, v, m) atomic_fetch_sub_explicit(&(v)->counter, i, m)
-#define _atomic_add_return(i, v, m) atomic_add_fetch_explicit(&(v)->counter, i, m)
-#define _atomic_sub_return(i, v, m) atomic_sub_fetch_explicit(&(v)->counter, i, m)
-
-#define atomic_add_return(i, v)						\
-({									\
-	__typeof__((i)) _i_ = (i);					\
-	smp_mb__before_atomic();					\
-	_i_ = _atomic_add_return(i, v, memory_order_relaxed);		\
-	smp_mb__after_atomic();						\
-	_i_;								\
-})
-#define atomic_add_return_relaxed(i, v) _atomic_add_return(i, v, memory_order_relaxed)
-#define atomic_add_return_acquire(i, v) _atomic_add_return(i, v, memory_order_acquire)
-#define atomic_add_return_release(i, v) _atomic_add_return(i, v, memory_order_release)
-
-#define atomic_fetch_add(i, v)						\
-({									\
-	__typeof__((i)) _i_ = (i);					\
-	smp_mb__before_atomic();					\
-	_i_ = _atomic_fetch_add(i, v, memory_order_relaxed);		\
-	smp_mb__after_atomic();						\
-	_i_;								\
-})
-#define atomic_fetch_add_relaxed(i, v) _atomic_fetch_add(i, v, memory_order_relaxed)
-#define atomic_fetch_add_acquire(i, v) _atomic_fetch_add(i, v, memory_order_acquire)
-#define atomic_fetch_add_release(i, v) _atomic_fetch_add(i, v, memory_order_release)
-
-#define atomic_inc_return(v)         atomic_add_return(1, v)
-#define atomic_inc_return_relaxed(v) atomic_add_return_relaxed(1, v)
-#define atomic_inc_return_acquire(v) atomic_add_return_acquire(1, v)
-#define atomic_inc_return_release(v) atomic_add_return_release(1, v)
-#define atomic_fetch_inc(v)         atomic_fetch_add(1, v)
-#define atomic_fetch_inc_relaxed(v) atomic_fetch_add_relaxed(1, v)
-#define atomic_fetch_inc_acquire(v) atomic_fetch_add_acquire(1, v)
-#define atomic_fetch_inc_release(v) atomic_fetch_add_release(1, v)
-
-#define atomic_sub_return(i, v)						\
-({									\
-	__typeof__((i)) _i_ = (i);					\
-	smp_mb__before_atomic();					\
-	_i_ = _atomic_sub_return(i, v, memory_order_relaxed);		\
-	smp_mb__after_atomic();						\
-	_i_;								\
-})
-#define atomic_sub_return_relaxed(i, v) _atomic_sub_return(i, v, memory_order_relaxed)
-#define atomic_sub_return_acquire(i, v) _atomic_sub_return(i, v, memory_order_acquire)
-#define atomic_sub_return_release(i, v) _atomic_sub_return(i, v, memory_order_release)
-
-#define atomic_fetch_sub(i, v)						\
-({									\
-	__typeof__((i)) _i_ = (i);					\
-	smp_mb__before_atomic();					\
-	_i_ = _atomic_fetch_sub(i, v, memory_order_relaxed);		\
-	smp_mb__after_atomic();						\
-	_i_;								\
-})
-#define atomic_fetch_sub_relaxed(i, v) _atomic_fetch_sub(i, v, memory_order_relaxed)
-#define atomic_fetch_sub_acquire(i, v) _atomic_fetch_sub(i, v, memory_order_acquire)
-#define atomic_fetch_sub_release(i, v) _atomic_fetch_sub(i, v, memory_order_release)
-
-#define atomic_dec_return(v)         atomic_sub_return(1, v)
-#define atomic_dec_return_relaxed(v) atomic_sub_return_relaxed(1, v)
-#define atomic_dec_return_acquire(v) atomic_sub_return_acquire(1, v)
-#define atomic_dec_return_release(v) atomic_sub_return_release(1, v)
-#define atomic_fetch_dec(v)         atomic_fetch_sub(1, v)
-#define atomic_fetch_dec_relaxed(v) atomic_fetch_sub_relaxed(1, v)
-#define atomic_fetch_dec_acquire(v) atomic_fetch_sub_acquire(1, v)
-#define atomic_fetch_dec_release(v) atomic_fetch_sub_release(1, v)
-
-#define atomic_xchg(x, i)         xchg(&(x)->counter, i)
-#define atomic_xchg_relaxed(x, i) xchg_relaxed(&(x)->counter, i)
-#define atomic_xchg_release(x, i) xchg_release(&(x)->counter, i)
-#define atomic_xchg_acquire(x, i) xchg_acquire(&(x)->counter, i)
-#define atomic_cmpxchg(x, o, n)         cmpxchg(&(x)->counter, o, n)
-#define atomic_cmpxchg_relaxed(x, o, n) cmpxchg_relaxed(&(x)->counter, o, n)
-#define atomic_cmpxchg_acquire(x, o, n) cmpxchg_acquire(&(x)->counter, o, n)
-#define atomic_cmpxchg_release(x, o, n) cmpxchg_release(&(x)->counter, o, n)
-
-#define atomic_sub_and_test(i, v) (atomic_sub_return(i, v) == 0)
-#define atomic_dec_and_test(v)    (atomic_dec_return(v) == 0)
-#define atomic_inc_and_test(v)    (atomic_inc_return(v) == 0)
-#define atomic_add_negative(i, v) (atomic_add_return(i, v) < 0)
+#define rcu_read_lock() do {							\
+	if (__lkmm_rcu_nesting[__lkmm_tid()]++ == 0) {				\
+		WRITE_ONCE(__lkmm_rcu_reader[__lkmm_tid()], 1);			\
+		smp_mb();							\
+	}									\
+} while (0)
+#define rcu_read_unlock() do {							\
+	if (--__lkmm_rcu_nesting[__lkmm_tid()] == 0) {				\
+		smp_mb();							\
+		WRITE_ONCE(__lkmm_rcu_reader[__lkmm_tid()], 0);			\
+	}									\
+} while (0)
+#define synchronize_rcu() do {							\
+	smp_mb();								\
+	for (int __lkmm_i = 0; __lkmm_i < LKMM_MAX_THREADS; __lkmm_i++)		\
+		__VERIFIER_await(READ_ONCE(__lkmm_rcu_reader[__lkmm_i]) == 0);	\
+	smp_mb();								\
+} while (0)
+#define synchronize_rcu_expedited() synchronize_rcu()
+#define rcu_read_lock_bh() rcu_read_lock()
+#define rcu_read_unlock_bh() rcu_read_unlock()
+#define rcu_read_lock_sched() rcu_read_lock()
+#define rcu_read_unlock_sched() rcu_read_unlock()
 
 #endif /* __LKMM_H__ */

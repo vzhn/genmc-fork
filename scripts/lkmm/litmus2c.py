@@ -31,7 +31,6 @@ OUTPUT_MARK = "lkmm-state"
 UNSUPPORTED_CALLS = [
     "srcu_read_lock", "srcu_read_unlock", "srcu_down_read", "srcu_up_read",
     "synchronize_srcu", "smp_mb__after_srcu_read_unlock", "smp_cond_load",
-    "atomic_add_unless", "spin_is_locked",
 ]
 
 SCALAR_TYPES = r"(?:intptr_t|uintptr_t|int|long|short|char|unsigned|signed|bool|u8|u16|u32|u64|s32|s64)"
@@ -420,7 +419,6 @@ class Translator:
         out.append("")
         for tid, body in bodies:
             regs = sorted(r for (t, r) in self.regs if t == tid)
-            out.append("#define __LK_TID %d" % tid)
             for r in regs:
                 out.append("#define %s __P%d_%s" % (r, tid, r))
             out.append("void *P%d(void *__lk_arg)" % tid)
@@ -432,7 +430,6 @@ class Translator:
             out.append("}")
             for r in regs:
                 out.append("#undef %s" % r)
-            out.append("#undef __LK_TID")
             out.append("")
 
         # encode a value: an address of a location becomes its sentinel
@@ -445,7 +442,6 @@ class Translator:
         out.append("}")
         out.append("")
         n = len(self.lt.threads)
-        out.append("#define __LK_TID %d" % n)
         out.append("int main()")
         out.append("{")
         out.append("\tpthread_t t[%d];" % n)
