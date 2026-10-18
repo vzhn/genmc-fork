@@ -1052,6 +1052,10 @@ public:
 	/* Cuts a graph so that it only contains events with stamp <= st */
 	virtual void cutToStamp(Stamp st);
 
+	/** Removes the trailing threads that only have a begin whose create was
+	 * cut, and marks the begins of such threads elsewhere as terminated */
+	void removeOrphanBegins();
+
 	/* Prunes the events denoted by V from the graph.
 	 * Returns the number of removed labels.
 	 *

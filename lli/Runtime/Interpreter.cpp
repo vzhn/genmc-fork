@@ -105,8 +105,20 @@ Thread &Interpreter::addNewThread(Thread &&thread)
 	if (thread.id < getNumThreads()) {
 		auto &exstThr = dynState.threads[thread.id];
 		VERIFY(exstThr.id == thread.id);
-		VERIFY(exstThr.parentId == thread.parentId);
-		VERIFY(exstThr.threadFun == thread.threadFun);
+		if (exstThr.parentId == thread.parentId && exstThr.threadFun == thread.threadFun &&
+		    exstThr.threadArg == thread.threadArg)
+			return exstThr;
+		/* The driver revived a thread whose begin outlived its create: the
+		 * entry was set up from the stale begin and has not run (the begin
+		 * was terminated), so replace it. (Any other mismatch is a replay
+		 * divergence) */
+		VERIFY(exstThr.ECStack.size() == exstThr.initEC.size() &&
+		       exstThr.ECStack.back().CurInst == exstThr.initEC.back().CurInst &&
+		       dynState.globalInstructions[thread.id].event.index == 0);
+		auto id = thread.id;
+		exstThr = std::move(thread);
+		dynState.globalInstructions[id] = {getInstKind(&*exstThr.initEC.back().CurInst),
+						   Event(id, 0)};
 		return exstThr;
 	}
 
