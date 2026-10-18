@@ -110,6 +110,38 @@ checked by hand on examples. They are what a real LKMM model has to add to
 IMM: `addr;[R]` in ppo, control dependencies that end at the `if`'s join,
 `prop` (cumulativity, `prop & int`), LKMM's fences and locks, and RCU.
 
+## Phase 1: `<lkmm.h>` and the kernel models
+
+GenMC's `lli/runtime-include/c/lkmm.h` is now this C11 mapping (it was a
+header of intrinsics nobody implemented); `lkmm-c11.h` only adds what
+herd7's untyped litmus C needs. The rewrite reproduces the baseline: on the
+corpus 5561 of 5571 results are identical, the other 10 are large RCU tests
+that finished within 30 s in one run and not in the other (`compare-runs.py`
+compares two `--json` runs). `spin_is_locked()` and `atomic_add_unless()`
+translate now (kernel tests: 31 agree, 4 known gaps).
+
+The kernel models of `tests/correct/classic` (wait queue, futex, refcount,
+RCU list removal, SLAB_TYPESAFE_BY_RCU lookup) written with the kernel's
+primitives are in `tests/correct/lkmm`, with their bug variants (`-lkmm`
+suffix) in `tests/wrong`; they run under `-imm` with the mapping and pass,
+with the same counts as the C11 versions except where the port differs (the
+RCU list removal frees the entry after `synchronize_rcu()`, which the C11
+version did not model; the lookup's lock-free CAS loops explore more).
+The lock-less list (`llist`) fails under the mapping for a reason that is
+LKMM's `addr` in `to-r` plus `wr-vis` and not a bug, so it waits in
+`tests/cooking/lkmm` as an acceptance test for `-lkmm`.
+
+The 82 v0.9 tests in `tests/cooking/lkmm` run under `-imm` with the
+mapping: 51 give v0.9's LKMM count; the 31 others are RCU (more executions
+or, for three `rcu+ar-link` tests, a safety violation: the reader-flag
+emulation lacks LKMM's grace-period guarantee in those shapes), plain-access
+races (C11 reports them), locks and `rmb` with no-return RMWs.
+
+Two GenMC reports met on the way were false and are filed as separate
+tasks (the ports sidestep them): a liveness violation for a retry loop
+that contains a fenced CAS loop, and a same-thread data race under `-imm`
+after a dependency-based revisit.
+
 ## Kater and the generated checkers
 
 GenMC's checkers (`genmc/genmc/Execution/Consistency/*Checker.{hpp,cpp}`)
