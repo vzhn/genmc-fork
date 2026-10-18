@@ -10,6 +10,33 @@ released.
 - Merge of MIXER [POPL'25] into mainline GenMC
 
 
+## [0.19.0-vzhn.4] - 2026.10.18
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Fixes
+
+- Spin-assume: loops whose header carries state from one iteration to the
+  next were pruned as if each failed iteration repeated the previous one. The
+  C11 CAS retry loop (`old = load(x); while (!cas(&x, &old, ...))`, where a
+  failed CAS writes the value it read into `old`), loops that refresh a value
+  with a load, and CAS success flags set before the loop were affected: GenMC
+  could miss safety violations reachable only through a retry, and
+  `-check-liveness` reported terminating loops as non-terminating spinloops.
+  Such loops now reload the value at the top of the loop when that is sound,
+  which keeps their exploration cost; otherwise only iterations that leave
+  the loop state unchanged are pruned (#26)
+
+### Added
+
+- Tests: classic concurrency problems, correct and with known bugs
+  (`correct/classic` and variants in `wrong/{safety,liveness,racy}`), with
+  shared `tests/lib/{lock,sem,cond}.h`
+- A wrong test can name the error it must find (`expected-error.in`)
+- Tests for the spin-assume fix (`spin-cas-writeback*`, `spin-phi-*`,
+  `spin-load-phi-*`, `spin-weak-cas-phi`, `spin-cas-order-race`)
+
+
 ## [0.19.0-vzhn.3] - 2026.10.16
 
 Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
