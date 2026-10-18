@@ -1597,6 +1597,21 @@ void Interpreter::visitFenceInst(FenceInst &I)
 		    GET_DEPS(deps));
 }
 
+void Interpreter::callLkmmFence(Function *F, const std::vector<GenericValue> &ArgVals,
+				 const std::unique_ptr<EventDeps> &specialDeps)
+{
+	auto kind = ArgVals[0].IntVal.getLimitedValue();
+	ERROR_ON(kind > static_cast<uint64_t>(LkmmFenceKind::LAST),
+		 "Unknown kind of LKMM fence ({})\n", kind);
+
+	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id), nullptr, nullptr);
+	CALL_DRIVER(handleLkmmFence, currDbgInfo(), currPos(), static_cast<LkmmFenceKind>(kind),
+		    GET_DEPS(deps));
+
+	/* Handle invoke-instruction */
+	returnValueToCaller(F->getReturnType() /* void */, PTOGV(nullptr));
+}
+
 void Interpreter::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I)
 {
 	Thread &thr = getCurThr();

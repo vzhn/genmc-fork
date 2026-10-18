@@ -255,6 +255,10 @@ public:
 	auto handleFence(const EventDbgInfo *dbg, Event pos, MemOrdering ord, const EventDeps &deps)
 		-> HandleResult<std::monostate>;
 
+	/** A Linux-kernel memory barrier (__VERIFIER_lkmm_fence()) has been interpreted */
+	auto handleLkmmFence(const EventDbgInfo *dbg, Event pos, LkmmFenceKind kind,
+			     const EventDeps &deps) -> HandleResult<std::monostate>;
+
 	/** Returns the TID of the newly created thread */
 	auto handleThreadCreate(const EventDbgInfo *dbg, Event pos, const ThreadInfo &info,
 				const EventDeps &deps) -> HandleResult<int>;

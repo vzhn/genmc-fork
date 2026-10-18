@@ -203,6 +203,15 @@ public:
 	/** Whether this label can have outgoing dep edges */
 	auto isDependable() const -> bool { return isDependable(getKind()); }
 
+	/** LKMM: whether this is the read or the write of a fully ordered RMW
+	 * (xchg(), atomic_add_return(), a cmpxchg() that succeeded, ...), which
+	 * orders like smp_mb() around it (needs to be part of a graph) */
+	auto isLkmmMb() const -> bool;
+
+	/** LKMM: whether this is the read of an RMW that returns no value
+	 * (atomic_add() and friends), which smp_rmb() does not order */
+	auto isLkmmNoreturn() const -> bool { return getKind() == NoRetFaiRead; }
+
 	/** Whether this label returns a value */
 	auto returnsValue() const -> bool { return returnsValue(getKind()); }
 
@@ -414,6 +423,7 @@ public:
 	auto rf_end(SAddr addr) -> rf_iterator { return initRfs[addr].end(); }
 	auto rf_end(SAddr addr) const -> const_rf_iterator { return initRfs.at(addr).end(); }
 	auto rfs(SAddr addr) const { return std::views::all(initRfs.at(addr)); }
+	auto hasRfs(SAddr addr) const -> bool { return initRfs.contains(addr); }
 	auto rfs(SAddr addr) { return std::views::all(initRfs.at(addr)); }
 
 	/* Returns the I-th view recorded for location ADDR, or an empty view if
@@ -1615,6 +1625,62 @@ public:
 };
 
 /*******************************************************************************
+ **                     LkmmFenceLabel Class
+ ******************************************************************************/
+
+/** The memory barriers of the Linux kernel (<lkmm.h>). The values are those
+ * of __VERIFIER_lkmm_fence()'s argument (genmc_internal.h) */
+enum class LkmmFenceKind : std::uint8_t {
+	Mb = 0,		 /* smp_mb() */
+	Rmb = 1,	 /* smp_rmb() */
+	Wmb = 2,	 /* smp_wmb() */
+	BeforeAtomic = 3,  /* smp_mb__before_atomic() */
+	AfterAtomic = 4,   /* smp_mb__after_atomic() */
+	AfterSpinlock = 5, /* smp_mb__after_spinlock() */
+	AfterUnlockLock = 6, /* smp_mb__after_unlock_lock() */
+	LAST = AfterUnlockLock
+};
+
+template <> struct std::formatter<LkmmFenceKind> {
+	constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+	auto format(const LkmmFenceKind &kind, std::format_context &ctx) const
+	{
+		static const char *const names[] = {"mb", "rmb", "wmb", "ba", "aa", "as", "aul"};
+		return std::format_to(ctx.out(), "{}", names[static_cast<size_t>(kind)]);
+	}
+};
+
+/** A memory barrier of the Linux kernel. The LKMM checker orders by its kind;
+ * for the rest of GenMC it carries the C11 fence closest to it (smp_mb() is
+ * seq_cst, smp_rmb() acquire, smp_wmb() release, the rest seq_cst) */
+class LkmmFenceLabel : public FenceLabel {
+
+public:
+	LkmmFenceLabel(Event pos, LkmmFenceKind kind, const EventDeps &deps = EventDeps())
+		: FenceLabel(LkmmFence, pos, orderingOf(kind), deps), kind(kind)
+	{}
+
+	auto getFenceKind() const -> LkmmFenceKind { return kind; }
+
+	static auto orderingOf(LkmmFenceKind kind) -> MemOrdering
+	{
+		switch (kind) {
+		case LkmmFenceKind::Rmb:
+			return MemOrdering::Acquire;
+		case LkmmFenceKind::Wmb:
+			return MemOrdering::Release;
+		default:
+			return MemOrdering::SequentiallyConsistent;
+		}
+	}
+
+	DEFINE_STANDARD_MEMBERS(LkmmFence)
+
+private:
+	LkmmFenceKind kind;
+};
+
+/*******************************************************************************
  **                     ThreadCreateLabel Class
  ******************************************************************************/
 
@@ -2129,6 +2195,7 @@ template <> struct std::formatter<EventLabel::EventLabelKind> {
 			str = "UW";
 			break;
 		case EventLabel::Fence:
+		case EventLabel::LkmmFence:
 			str = "F";
 			break;
 		case EventLabel::Malloc:

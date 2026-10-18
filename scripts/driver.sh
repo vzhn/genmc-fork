@@ -17,7 +17,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 GenMC="${GenMC:-$DIR/../RelWithDebInfo/bin/genmc}"
 GENMCFLAGS="${GENMCFLAGS:-}"
-MODELS=(rc11 imm)
+MODELS=(rc11 imm lkmm)
 
 CONFIG_FILE="$(dirname "$(dirname "${GenMC}")")/include/genmc/config.h"
 
@@ -114,6 +114,11 @@ do
 	then
 	    continue
 	fi
+	# the lkmm category is the only one with expected files for lkmm
+	if [[ ("${model}" == "lkmm" && "${cat}" != "lkmm") || ("${model}" != "lkmm" && "${cat}" == "lkmm") ]]
+	then
+	    continue
+	fi
 
 	check_blocked="" && [[ "${cat}" == "saver" || "${cat}" == "helper" ]] &&
 	    [[ (! "${GENMCFLAGS}" =~ "policy=arbitrary") ]] && [[ "${model}" != "imm" ]] &&
@@ -137,6 +142,11 @@ do
 	cat="${testdir##*/}"
 	# under IMM, only run safety and liveness tests
 	if test "${model}" = "imm" -a "${cat}" != "safety" -a "${cat}" != "liveness"
+	then
+	    continue
+	fi
+	# under LKMM, only the lkmm category (programs written with <lkmm.h>)
+	if [[ ("${model}" == "lkmm" && "${cat}" != "lkmm") || ("${model}" != "lkmm" && "${cat}" == "lkmm") ]]
 	then
 	    continue
 	fi

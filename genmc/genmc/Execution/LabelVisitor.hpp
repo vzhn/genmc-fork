@@ -197,7 +197,7 @@ public:
 	}
 
 	void visitFenceLabel(const FenceLabel &lab) { return DELEGATE_LABEL(EventLabel); }
-	// void visitSubFenceLabel(const SubFenceLabel &lab) { return DELEGATE_LABEL(FenceLabel); }
+	void visitLkmmFenceLabel(const LkmmFenceLabel &lab) { return DELEGATE_LABEL(FenceLabel); }
 
 	void visitMallocLabel(const MallocLabel &lab) { return DELEGATE_LABEL(EventLabel); }
 
@@ -299,6 +299,12 @@ public:
 	{
 		DELEGATE_LABEL(EventLabel);
 		out << std::format("{}", lab.getOrdering());
+	}
+
+	void visitLkmmFenceLabel(const LkmmFenceLabel &lab)
+	{
+		DELEGATE_LABEL(EventLabel);
+		out << std::format("{}", lab.getFenceKind());
 	}
 
 	void visitMallocLabel(const MallocLabel &lab)
@@ -428,6 +434,12 @@ public:
 	{
 		visitEventLabel(lab);
 		printOrdering(lab);
+	}
+
+	void visitLkmmFenceLabel(const LkmmFenceLabel &lab)
+	{
+		visitEventLabel(lab);
+		out << std::format("<SUP>{}</SUP>", lab.getFenceKind());
 	}
 
 	void visitThreadCreateLabel(const ThreadCreateLabel &lab) { visitEventLabel(lab); }

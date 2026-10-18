@@ -3,11 +3,14 @@
  * tools/memory-model/linux-kernel.def, plus a few that kernel code uses,
  * mapped onto C11 atomics.
  *
- * Run programs that use this header under -imm: it keeps the dependencies
- * that READ_ONCE()/rcu_dereference() ordering relies on. The mapping is an
- * approximation of the Linux-kernel memory model (LKMM), until GenMC has an
- * -lkmm model; scripts/lkmm/README.md has the differences measured against
- * herd7. The ones known in advance:
+ * Under -lkmm (GenMC defines __GENMC_LKMM__) the barriers and the fully
+ * ordered RMWs are GenMC's own events, which the LKMM checker orders as the
+ * kernel's memory model does. Under the other models the header maps them
+ * onto C11 atomics; run such programs under -imm, which keeps the
+ * dependencies that READ_ONCE()/rcu_dereference() ordering relies on. That
+ * mapping is an approximation of the Linux-kernel memory model (LKMM);
+ * scripts/lkmm/README.md has the differences measured against herd7. The
+ * ones known in advance:
  * - stronger than LKMM: smp_rmb()/smp_wmb() are acquire/release fences
  *   (they also order reads before writes); smp_mb__before_atomic(),
  *   smp_mb__after_atomic(), smp_mb__after_spinlock() and
@@ -73,6 +76,15 @@
 /* Fences; barrier() is a compiler barrier, and GenMC never reorders */
 #define barrier() do { } while (0)
 #define cpu_relax() do { } while (0)
+#ifdef __GENMC_LKMM__
+#define smp_mb() __VERIFIER_lkmm_fence(GENMC_LKMM_FENCE_MB)
+#define smp_rmb() __VERIFIER_lkmm_fence(GENMC_LKMM_FENCE_RMB)
+#define smp_wmb() __VERIFIER_lkmm_fence(GENMC_LKMM_FENCE_WMB)
+#define smp_mb__before_atomic() __VERIFIER_lkmm_fence(GENMC_LKMM_FENCE_BEFORE_ATOMIC)
+#define smp_mb__after_atomic() __VERIFIER_lkmm_fence(GENMC_LKMM_FENCE_AFTER_ATOMIC)
+#define smp_mb__after_spinlock() __VERIFIER_lkmm_fence(GENMC_LKMM_FENCE_AFTER_SPINLOCK)
+#define smp_mb__after_unlock_lock() __VERIFIER_lkmm_fence(GENMC_LKMM_FENCE_AFTER_UNLOCK_LOCK)
+#else
 #define smp_mb() __atomic_thread_fence(__ATOMIC_SEQ_CST)
 #define smp_rmb() __atomic_thread_fence(__ATOMIC_ACQUIRE)
 #define smp_wmb() __atomic_thread_fence(__ATOMIC_RELEASE)
@@ -80,6 +92,7 @@
 #define smp_mb__after_atomic() smp_mb()
 #define smp_mb__after_spinlock() smp_mb()
 #define smp_mb__after_unlock_lock() smp_mb()
+#endif
 #define smp_acquire__after_ctrl_dep() smp_rmb()
 #define smp_store_mb(X, V) do { WRITE_ONCE(X, V); smp_mb(); } while (0)
 
@@ -97,8 +110,18 @@
  **                        EXCHANGE AND COMPARE-EXCHANGE
  ******************************************************************************/
 
-/* A value-returning RMW without an ordering suffix is fully ordered */
+/* A value-returning RMW without an ordering suffix is fully ordered: under
+ * -lkmm its accesses carry the Mb attribute (a cmpxchg() that fails loses
+ * it), under the C11 mapping it stands between two full fences */
+#ifdef __GENMC_LKMM__
+#define __lkmm_full(E) ({							\
+	__VERIFIER_annotate_begin(GENMC_ATTR_LKMM_MB);				\
+	__auto_type __lkmm_r = (E);						\
+	__VERIFIER_annotate_end(GENMC_ATTR_LKMM_MB);				\
+	__lkmm_r; })
+#else
 #define __lkmm_full(E) ({ smp_mb(); __auto_type __lkmm_r = (E); smp_mb(); __lkmm_r; })
+#endif
 
 /* X is a pointer */
 #define xchg(X, V) __lkmm_full(__atomic_exchange_n(__lkmm_ptr(X), (V), __ATOMIC_RELAXED))
@@ -112,6 +135,14 @@
 	__atomic_compare_exchange_n(__lkmm_ptr(X), &__lkmm_o, (W), false, (M),	\
 				    __ATOMIC_RELAXED);				\
 	__lkmm_o; })
+#ifdef __GENMC_LKMM__
+#define cmpxchg(X, V, W) ({							\
+	__typeof__(*__lkmm_ptr(X)) __lkmm_o = (V);				\
+	__lkmm_full(__atomic_compare_exchange_n(__lkmm_ptr(X), &__lkmm_o, (W),	\
+						false, __ATOMIC_RELAXED,	\
+						__ATOMIC_RELAXED));		\
+	__lkmm_o; })
+#else
 #define cmpxchg(X, V, W) ({							\
 	__typeof__(*__lkmm_ptr(X)) __lkmm_o = (V);				\
 	smp_mb();								\
@@ -119,6 +150,7 @@
 					__ATOMIC_RELAXED, __ATOMIC_RELAXED))	\
 		smp_mb();							\
 	__lkmm_o; })
+#endif
 #define cmpxchg_relaxed(X, V, W) __lkmm_cmpxchg(X, V, W, __ATOMIC_RELAXED)
 #define cmpxchg_acquire(X, V, W) __lkmm_cmpxchg(X, V, W, __ATOMIC_ACQUIRE)
 #define cmpxchg_release(X, V, W) __lkmm_cmpxchg(X, V, W, __ATOMIC_RELEASE)
@@ -127,12 +159,16 @@
  * value, which a failure replaces with the value found */
 #define __lkmm_try_cmpxchg(X, V, W, M)						\
 	__atomic_compare_exchange_n(__lkmm_ptr(X), (V), (W), false, (M), __ATOMIC_RELAXED)
+#ifdef __GENMC_LKMM__
+#define try_cmpxchg(X, V, W) __lkmm_full(__lkmm_try_cmpxchg(X, V, W, __ATOMIC_RELAXED))
+#else
 #define try_cmpxchg(X, V, W) ({							\
 	smp_mb();								\
 	bool __lkmm_ok = __lkmm_try_cmpxchg(X, V, W, __ATOMIC_RELAXED);		\
 	if (__lkmm_ok)								\
 		smp_mb();							\
 	__lkmm_ok; })
+#endif
 #define try_cmpxchg_relaxed(X, V, W) __lkmm_try_cmpxchg(X, V, W, __ATOMIC_RELAXED)
 #define try_cmpxchg_acquire(X, V, W) __lkmm_try_cmpxchg(X, V, W, __ATOMIC_ACQUIRE)
 #define try_cmpxchg_release(X, V, W) __lkmm_try_cmpxchg(X, V, W, __ATOMIC_RELEASE)
@@ -252,6 +288,17 @@ typedef atomic64_t atomic_long_t;
 
 /* Adds V unless the value is W; returns the old value (fully ordered when
  * it adds). atomic_add_unless() returns whether it added */
+#ifdef __GENMC_LKMM__
+#define atomic_fetch_add_unless(X, V, W) ({					\
+	__typeof__(__lkmm_ctr(X)) __lkmm_o = atomic_read(X);			\
+	while (__lkmm_o != (W) &&						\
+	       !__lkmm_full(__atomic_compare_exchange_n(&__lkmm_ctr(X), &__lkmm_o, \
+						       __lkmm_o + (V), false,	\
+						       __ATOMIC_RELAXED,	\
+						       __ATOMIC_RELAXED)))	\
+		;								\
+	__lkmm_o; })
+#else
 #define atomic_fetch_add_unless(X, V, W) ({					\
 	__typeof__(__lkmm_ctr(X)) __lkmm_o = atomic_read(X);			\
 	smp_mb();								\
@@ -263,6 +310,7 @@ typedef atomic64_t atomic_long_t;
 	if (__lkmm_o != (W))							\
 		smp_mb();							\
 	__lkmm_o; })
+#endif
 #define atomic_add_unless(X, V, W) (atomic_fetch_add_unless(X, V, W) != (W))
 #define atomic_inc_not_zero(X) atomic_add_unless(X, 1, 0)
 

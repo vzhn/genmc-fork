@@ -26,6 +26,7 @@ enum class WriteAttr : std::uint8_t {
 	Local = 0x1,
 	Final = 0x2,
 	WWRacy = 0x4,
+	LkmmMb = 0x8, /* LKMM: a fully ordered RMW (xchg(), cmpxchg() if it succeeds, ...) */
 };
 
 ENABLE_BITMASK_OPERATORS(WriteAttr);

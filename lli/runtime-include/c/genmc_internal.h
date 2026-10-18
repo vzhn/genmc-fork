@@ -129,6 +129,7 @@ extern int __VERIFIER_barrier_destroy (__VERIFIER_barrier_t *__barrier) __attrib
 
 #define GENMC_ATTR_LOCAL   0x00000001
 #define GENMC_ATTR_FINAL   0x00000002
+#define GENMC_ATTR_LKMM_MB 0x00000008 /* LKMM: a fully ordered RMW */
 
 #define GENMC_KIND_NONVR   0x00010000
 #define GENMC_KIND_HELPED  0x00020000
@@ -166,6 +167,15 @@ extern void __VERIFIER_hazptr_free(__VERIFIER_hazptr_t *hp) __attribute__ ((__no
 extern void __VERIFIER_hazptr_retire(void *p) __attribute__ ((__nothrow__));
 
 /* RCU functions */
+/* The Linux kernel's memory barriers (<lkmm.h>); the values are LkmmFenceKind's */
+#define GENMC_LKMM_FENCE_MB  0
+#define GENMC_LKMM_FENCE_RMB 1
+#define GENMC_LKMM_FENCE_WMB 2
+#define GENMC_LKMM_FENCE_BEFORE_ATOMIC    3
+#define GENMC_LKMM_FENCE_AFTER_ATOMIC     4
+#define GENMC_LKMM_FENCE_AFTER_SPINLOCK   5
+#define GENMC_LKMM_FENCE_AFTER_UNLOCK_LOCK 6
+extern void __VERIFIER_lkmm_fence(int kind) __attribute__ ((__nothrow__));
 extern void __VERIFIER_rcu_read_lock(void) __attribute__ ((__nothrow__));
 extern void __VERIFIER_rcu_read_unlock(void) __attribute__ ((__nothrow__));
 extern void __VERIFIER_synchronize_rcu(void) __attribute__ ((__nothrow__));

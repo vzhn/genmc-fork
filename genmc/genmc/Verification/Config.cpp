@@ -46,9 +46,10 @@ auto Config::validate(std::vector<std::string> &warnings) -> ValidationStatus
 	if (confirmation) {
 		errors.emplace_back("Confirmation is temporarily disabled.");
 	}
-	if (model == ModelType::IMM && (ipr || symmetryReduction)) {
-		warnings.emplace_back(
-			"In-place revisiting and symmetry reduction have no effect under IMM");
+	if (::isDepTrackingModel(model) && (ipr || symmetryReduction)) {
+		warnings.emplace_back(std::format("In-place revisiting and symmetry reduction "
+						  "have no effect under {}",
+						  model));
 		symmetryReduction = false;
 		ipr = false;
 	}
@@ -65,8 +66,9 @@ auto Config::validate(std::vector<std::string> &warnings) -> ValidationStatus
 	if (maxGraphSize.has_value()) {
 		if (mode != ExplorationMode::random)
 			errors.emplace_back("--max-graph-size requires --mode=random.");
-		if (model == ModelType::IMM)
-			errors.emplace_back("--max-graph-size does not support IMM (yet).");
+		if (::isDepTrackingModel(model))
+			errors.emplace_back(
+				std::format("--max-graph-size does not support {} (yet).", model));
 		if (*maxGraphSize == 0)
 			errors.emplace_back("--max-graph-size must be greater than 0.");
 		if (collectLinSpec || checkLinSpec)

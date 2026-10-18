@@ -13,6 +13,7 @@
 
 #include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
 #include "genmc/Execution/Consistency/IMMChecker.hpp"  // NOLINT(misc-include-cleaner)
+#include "genmc/Execution/Consistency/LKMMChecker.hpp" // NOLINT(misc-include-cleaner)
 #include "genmc/Execution/Consistency/RAChecker.hpp"   // NOLINT(misc-include-cleaner)
 #include "genmc/Execution/Consistency/RC11Checker.hpp" // NOLINT(misc-include-cleaner)
 #include "genmc/Execution/Consistency/SCChecker.hpp"   // NOLINT(misc-include-cleaner)
@@ -41,6 +42,7 @@ auto ConsistencyChecker::create(const Config *conf) -> std::unique_ptr<Consisten
 		CREATE_CHECKER(RA);
 		CREATE_CHECKER(RC11);
 		CREATE_CHECKER(IMM);
+		CREATE_CHECKER(LKMM);
 	default:
 		UNREACHABLE();
 	}
