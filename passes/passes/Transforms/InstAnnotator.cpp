@@ -32,6 +32,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Support/Casting.h>
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 
@@ -41,6 +42,7 @@ void InstAnnotator::reset()
 {
 	statusMap.clear();
 	annotMap.clear();
+	unmodeled.clear();
 }
 
 auto InstAnnotator::getAnnotMapKey(Value *i) -> Value * { return i; }
@@ -83,8 +85,8 @@ auto InstAnnotator::generateOperandExpr(Module *mod, Value *op) -> InstAnnotator
 			VERIFY(isa<ConstantPointerNull>(constant)); /* will fire for GlobalValue */
 			return ConcreteExpr<Value *>::create(bitWidth, SVal(0));
 		}
-		ERROR("Only integer and null constants currently allowed in assume() "
-		      "expressions.");
+		/* Other constants (e.g., floats) cannot be modeled */
+		return nullptr;
 	}
 
 	/* Otherwise, it has to be an instruction or an argument */
@@ -98,11 +100,25 @@ auto InstAnnotator::generateInstExpr(Instruction *curr) -> InstAnnotator::IRExpr
 	/*
 	 * Next, we try to generate an annotation for a whole bunch of instructions,
 	 * apart from function calls, memory instructions, and some pointer casts.
-	 * For the cases we do not handle, we simply return false.
+	 * For the cases we do not handle, we return nullptr: the register of the
+	 * instruction is then left in the annotation, so that its evaluation reports
+	 * an unknown (annotate() drops such annotations altogether).
+	 * generateOperandExpr() never returns nullptr for the operands of the handled
+	 * instructions: non-constant operands become registers, and constants of
+	 * other types are rejected by the check below.
 	 */
 #define HANDLE_INST(op, ...)                                                                       \
 	case Instruction::op:                                                                      \
 		return op##Expr<Value *>::create(__VA_ARGS__)
+
+	/* Only integer and pointer values can be modeled */
+	auto isModelable = [](const Type *typ) { return typ->isIntegerTy() || typ->isPointerTy(); };
+	if (!isModelable(curr->getType()))
+		return nullptr;
+	if (std::ranges::any_of(curr->operands(), [&](const Use &op) {
+		    return isa<Constant>(op.get()) && !isModelable(op->getType());
+	    }))
+		return nullptr;
 
 	auto *mod = curr->getModule();
 	switch (curr->getOpcode()) {
@@ -238,14 +254,14 @@ auto InstAnnotator::generateInstExpr(Instruction *curr) -> InstAnnotator::IRExpr
 				generateOperandExpr(mod, curr->getOperand(1)));
 		default:
 			/* Unsupported compare predicate; quit */
-			break;
+			return nullptr;
 		}
 	}
 	default:
 		/* Don't know how to annotate this */
 		break;
 	}
-	return ConcreteExpr<Value *>::createTrue();
+	return nullptr;
 }
 
 static auto getNextOrBranchSuccessors(Instruction *i) -> std::vector<Instruction *>
@@ -289,13 +305,21 @@ auto InstAnnotator::propagateAnnotFromSucc(Instruction *curr, Instruction *succ)
 	     iit = iit->getNextNode()) {
 		auto phiOp = generateOperandExpr(
 			curr->getModule(), succPhi->getIncomingValueForBlock(curr->getParent()));
-		succExp = substitutor.substitute(succExp.get(), getAnnotMapKey(iit), phiOp.get());
+		if (!phiOp)
+			unmodeled.insert(getAnnotMapKey(iit));
+		else
+			succExp = substitutor.substitute(succExp.get(), getAnnotMapKey(iit),
+							 phiOp.get());
 	}
 
 	if (isa<BranchInst>(curr) || (isa<PHINode>(curr) && curr->getParent() == succ->getParent()))
 		return succExp;
 
 	auto currOp = generateInstExpr(curr);
+	if (!currOp) {
+		unmodeled.insert(getAnnotMapKey(curr));
+		return succExp;
+	}
 	return substitutor.substitute(succExp.get(), getAnnotMapKey(curr), currOp.get());
 }
 
@@ -351,7 +375,16 @@ auto InstAnnotator::annotate(Instruction *curr) -> InstAnnotator::IRExprUP
 	/* The load annotation will be the expression from its successor to the assume */
 	VERIFY(isa<LoadInst>(curr) || isa<AtomicCmpXchgInst>(curr));
 	annotateDFS(curr->getNextNode());
-	return releaseAnnot(curr->getNextNode());
+	auto annot = releaseAnnot(curr->getNextNode());
+
+	/* An instruction that could not be modeled leaves its register in the
+	 * annotation. It is defined after the load and has no value when the load
+	 * executes, so the annotation is unusable */
+	std::vector<Value *> regs;
+	SExprRegCollector<Value *>().collect(annot.get(), regs);
+	if (std::ranges::any_of(regs, [&](Value *reg) { return unmodeled.contains(reg); }))
+		return nullptr;
+	return annot;
 }
 
 auto InstAnnotator::annotateBBCond(BasicBlock *bb, BasicBlock *pred /* = nullptr */)
@@ -427,7 +460,11 @@ auto InstAnnotator::propagateAnnotFromSuccInLoop(Instruction *curr, Instruction 
 	     iit = iit->getNextNode()) {
 		auto phiOp = generateOperandExpr(
 			mod, succPhi->getIncomingValueForBlock(curr->getParent()));
-		succExp = substitutor.substitute(succExp.get(), getAnnotMapKey(iit), phiOp.get());
+		if (!phiOp)
+			unmodeled.insert(getAnnotMapKey(iit));
+		else
+			succExp = substitutor.substitute(succExp.get(), getAnnotMapKey(iit),
+							 phiOp.get());
 	}
 
 	if (isa<BranchInst>(curr) ||
@@ -444,6 +481,10 @@ auto InstAnnotator::propagateAnnotFromSuccInLoop(Instruction *curr, Instruction 
 	}
 
 	auto currOp = generateInstExpr(curr);
+	if (!currOp) {
+		unmodeled.insert(getAnnotMapKey(curr));
+		return succExp;
+	}
 	return substitutor.substitute(succExp.get(), getAnnotMapKey(curr), currOp.get());
 }
 

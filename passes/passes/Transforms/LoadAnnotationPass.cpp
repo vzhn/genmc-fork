@@ -190,7 +190,8 @@ auto LoadAnnotationAnalysis::run(Function &F, FunctionAnalysisManager & /*FAM*/)
 				auto rawType = extractAssumeArgument(call);
 				VERIFY(rawType <= static_cast<uint64_t>(AssumeType::Await));
 				auto type = static_cast<AssumeType>(rawType);
-				result_.annotMap[l] = std::make_pair(type, annotator.annotate(l));
+				if (auto annot = annotator.annotate(l))
+					result_.annotMap[l] = std::make_pair(type, std::move(annot));
 			}
 		}
 	}
