@@ -19,12 +19,15 @@
 
 #include "genmc/Execution/Consistency/LKMMChecker.hpp"
 
-/** The Linux-kernel memory model: the Kater-generated LKMMChecker, plus RCU's
- * axiom (irreflexive rb), which counts grace periods against critical
- * sections and is no regular relation. A direct evaluation of the model
- * (LkmmModel.cpp) decides it for the graphs that have a synchronize_rcu();
- * with -lkmm-reference it checks every graph, and stops at the first one
- * where it and the generated checker disagree. The checks of an access
+/** The Linux-kernel memory model: the Kater-generated LKMMChecker, plus the
+ * axioms it cannot generate: RCU's (irreflexive rb), which counts grace
+ * periods against critical sections and is no regular relation, and
+ * plain-coherence, which intersects relations. A direct evaluation of the
+ * model (LkmmModel.cpp) decides them for the graphs that have a
+ * synchronize_rcu() or a potential race; with -lkmm-reference it checks
+ * every graph, and stops at the first one where it and the generated
+ * checker disagree. Data races are found on complete executions (the
+ * driver asks lkmm::findRace()). The checks of an access
  * against a free of its memory are here too, as a grace period orders the
  * accesses of a reader before a kfree() after synchronize_rcu() */
 class LKMMRcuChecker : public LKMMChecker {

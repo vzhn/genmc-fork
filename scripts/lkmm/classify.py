@@ -4,9 +4,9 @@ likely cause, from the primitives a test uses.
 
 The default rules describe what a run under -imm with lkmm-c11.h is
 expected to show (the C11 mapping is not LKMM). --model lkmm selects the
-rules for a run of the -lkmm model: what the model does not cover yet
-(plain accesses before phase 4, RCU before phase 3) and its one permanent
-gap (control dependencies past the if); every other disagreement is a bug.
+rules for a run of the -lkmm model: its one permanent gap (control
+dependencies past the if), herd7's symbolic thin-air values, and what
+herd7 itself rejects; every other disagreement is a bug.
 --allowlist writes the classified disagreements in lkmm-diff.py's
 --allowlist format, so that a rerun fails only on new ones.
 
@@ -29,21 +29,21 @@ def same_location_writes(src):
     return False
 
 
-def plain_accesses(src):
-    """Whether a test has plain (non-READ_ONCE/WRITE_ONCE) accesses"""
-    body = "\n".join(re.findall(r"P\d+\s*\([^)]*\)\s*\{(.*?)\n\}", src, re.S))
-    body = re.sub(r"\b(?:READ_ONCE|WRITE_ONCE|smp_load_acquire|smp_store_release|rcu_dereference"
-                  r"|rcu_assign_pointer|xchg\w*|cmpxchg\w*|atomic_\w+)\s*\([^;]*;", "", body)
-    return re.search(r"(^|[^\w)])\*\s*\w+\s*(=[^=]|;)|=\s*\*\s*\w+", body, re.M) is not None
+def symbolic(r):
+    """Whether a missing state has one of herd7's symbolic values (S<n>)"""
+    return any(re.fullmatch(r"S\d+", v) for st in r.get("missing", []) for v in st.values())
 
 
 LKMM_RULES = [
+    (("missing",), "herd7's symbolic value (S<n>) of a thin-air cycle through plain "
+     "accesses: no execution of the C program has it",
+     lambda s, r: symbolic(r)),
     (("missing",), "control dependency past the end of the if: GenMC keeps every later "
      "event dependent on the branch (its revisit prefixes need it; plan 3.6), LKMM does not",
      lambda s, r: re.search(r"\bif\s*\(", s) is not None),
-    (("race", "extra", "differ", "missing"), "plain accesses: LKMM's plain-access rules "
-     "(races, plain-coherence, their fences) are phase 4",
-     lambda s, r: plain_accesses(s)),
+    (("race",), "control dependency past the end of the if hides the racy execution "
+     "(GenMC does not explore it)",
+     lambda s, r: not r.get("genmc_race") and re.search(r"\bif\s*\(", s) is not None),
     (("count",), "locks: GenMC's mutex events, not herd7's lock events (same states)",
      lambda s, r: "spin_lock" in s),
     (("count",), "same states, other execution count (failed cmpxchg reads); not a "

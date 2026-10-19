@@ -517,6 +517,9 @@ private:
 	/** Reports an error if there is unfreed memory */
 	auto checkUnfreedMemory() -> std::optional<VerificationError>;
 
+	/** Under LKMM, reports a data race of the complete execution */
+	auto checkLkmmRace() -> std::optional<VerificationError>;
+
 	/** Returns true if the exploration is guided by a graph */
 	auto isExecutionDrivenByGraph(Event curr) -> bool;
 

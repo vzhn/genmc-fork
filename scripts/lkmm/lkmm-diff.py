@@ -7,14 +7,18 @@ onto the condition's observables), and GenMC's race report with herd7's
 "Flag data-race".
 
 herd7's outputs come from run-herd.sh: <herd-out>/<path relative to
---litmus-root>.out. GenMC runs once on the litmus2c.py translation, with
--print-exec-graphs: a race stops it (and only the race verdicts are
-compared); otherwise it has printed every execution's final state.
+--litmus-root>.out. GenMC runs on the litmus2c.py translation, with
+-print-exec-graphs: unless a race stops it, it has printed every execution's
+final state. Under -lkmm, a racy test (by either tool) runs again with
+-disable-race-detection, and its states are compared too: LKMM's executions
+of a racy program are still defined (herd7 lists them), and plain-coherence
+shapes them.
 
 Each test gets one result:
   agree                  same states (and same race verdict)
-  agree-racy             both report a data race (a racy program's states are
-                         undefined in C11 and LKMM alike, so not compared)
+  agree-racy             both report a data race (and, under -lkmm, the same
+                         states; under C11 a racy program's states are
+                         undefined, so not compared)
   agree-deadlock         synchronize_rcu() in a critical section: herd7 has no
                          execution, GenMC reports invalid RCU usage
   missing                GenMC lacks some of herd7's states (stronger)
@@ -152,8 +156,19 @@ def check(args, path):
             else:
                 res["result"] = "genmc-error:" + msg[:80]
             return res
+        racyStates = args.model == "lkmm" and (grace or "data-race" in hflags)
+        if racyStates and grace:
+            out, rc = run_genmc(args, c, ["-print-exec-graphs", "-disable-race-detection"])
+            if out is None:
+                res["result"] = rc
+                return res
+            err = re.search(r"^(Error[^\n]*|[A-Z][\w-]* violation[^\n]*)", out, re.M)
+            if rc != 0 or err:
+                msg = err.group(1) if err else out.strip().split("\n")[-1]
+                res["result"] = "genmc-error:" + msg[:80]
+                return res
         try:
-            gstates = set() if grace else genmc_states(out, meta)
+            gstates = set() if grace and not racyStates else genmc_states(out, meta)
         except RuntimeError as e:
             res["result"] = "genmc-error:" + str(e)
             return res
@@ -167,8 +182,11 @@ def check(args, path):
     res["missing"] = [dict(s) for s in sorted(missing, key=sorted)][:5]
     res["extra"] = [dict(s) for s in sorted(extra, key=sorted)][:5]
     if grace or "data-race" in hflags:
-        res["result"] = "agree-racy" if grace and "data-race" in hflags else "race"
         res["genmc_race"] = grace
+    if (grace or "data-race" in hflags) and not (grace and "data-race" in hflags):
+        res["result"] = "race"
+    elif grace and not racyStates:
+        res["result"] = "agree-racy"
         res["missing"], res["extra"] = [], []
     elif missing and extra:
         res["result"] = "differ"
@@ -179,7 +197,7 @@ def check(args, path):
     elif res["herd_execs"] is not None and res["genmc_execs"] != res["herd_execs"]:
         res["result"] = "count"
     else:
-        res["result"] = "agree"
+        res["result"] = "agree-racy" if grace else "agree"
     return res
 
 

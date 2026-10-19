@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater 4a1ab82 (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater 1648f85 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -29,7 +29,7 @@
 
 bool LKMMChecker::isDepTracking() const { return 1; }
 
-bool LKMMChecker::visitCalc117Iterative(std::vector<DFSWorklistEntry> &worklist,
+bool LKMMChecker::visitCalc118Iterative(std::vector<DFSWorklistEntry> &worklist,
 					View &calcRes) const
 {
 	while (!worklist.empty()) {
@@ -104,7 +104,7 @@ bool LKMMChecker::visitCalc117Iterative(std::vector<DFSWorklistEntry> &worklist,
 	return true;
 }
 
-View LKMMChecker::visitCalc117(const EventLabel *lab) const
+View LKMMChecker::visitCalc118(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
@@ -116,18 +116,18 @@ View LKMMChecker::visitCalc117(const EventLabel *lab) const
 		{2, lab},
 	};
 
-	visitCalc117Iterative(startStates, calcRes);
+	visitCalc118Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto LKMMChecker::checkCalc117(const EventLabel *lab) const
+auto LKMMChecker::checkCalc118(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc117(lab);
+	return visitCalc118(lab);
 }
 
-bool LKMMChecker::visitCalc118Iterative(std::vector<DFSWorklistEntry> &worklist,
+bool LKMMChecker::visitCalc119Iterative(std::vector<DFSWorklistEntry> &worklist,
 					View &calcRes) const
 {
 	while (!worklist.empty()) {
@@ -218,7 +218,7 @@ bool LKMMChecker::visitCalc118Iterative(std::vector<DFSWorklistEntry> &worklist,
 	return true;
 }
 
-View LKMMChecker::visitCalc118(const EventLabel *lab) const
+View LKMMChecker::visitCalc119(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
@@ -230,15 +230,15 @@ View LKMMChecker::visitCalc118(const EventLabel *lab) const
 		{2, lab},
 	};
 
-	visitCalc118Iterative(startStates, calcRes);
+	visitCalc119Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto LKMMChecker::checkCalc118(const EventLabel *lab) const
+auto LKMMChecker::checkCalc119(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc118(lab);
+	return visitCalc119(lab);
 }
 
 void LKMMChecker::calculateSaved([[maybe_unused]] EventLabel *lab) {}
@@ -249,12 +249,12 @@ void LKMMChecker::calculateViews(EventLabel *lab)
 
 	{
 		lab->addView({});
-		lab->setView(std::move(checkCalc117(lab)), 0);
+		lab->setView(std::move(checkCalc118(lab)), 0);
 	}
 
 	{
 		lab->addView({});
-		lab->setView(std::move(checkCalc118(lab)), 1);
+		lab->setView(std::move(checkCalc119(lab)), 1);
 	}
 }
 
@@ -29701,117 +29701,9 @@ bool LKMMChecker::checkError6(const EventLabel *lab) const
 	return visitError6(lab);
 }
 
-bool LKMMChecker::visitError7([[maybe_unused]] const EventLabel *lab) const { return false; }
+bool LKMMChecker::visitWarning7([[maybe_unused]] const EventLabel *lab) const { return false; }
 
-bool LKMMChecker::visitLHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &worklist,
-						const View &v) const
-{
-	while (!worklist.empty()) {
-		auto [stateId, lab, isFinishing] = worklist.back();
-		worklist.pop_back();
-		switch (stateId) {
-		case 0: {
-			if (isFinishing) {
-				break;
-			}
-
-			if (!v.contains(lab->getPos())) {
-				cexLab = lab;
-				return false;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-
-			break;
-		}
-		case 1: {
-			if (isFinishing) {
-				break;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (true && genmc::isa<ReadLabel>(lab))
-				for (auto tmpE : g.pomax_na_writes_pos(lab)) {
-					if (!v.contains(tmpE)) {
-						cexLab = g.getEventLabelIfPresent(tmpE);
-						return false;
-					}
-				}
-			if (true && genmc::isa<WriteLabel>(lab))
-				for (auto tmpE : g.pomax_na_reads_pos(lab)) {
-					if (!v.contains(tmpE)) {
-						cexLab = g.getEventLabelIfPresent(tmpE);
-						return false;
-					}
-				}
-			if (true && genmc::isa<WriteLabel>(lab))
-				for (auto tmpE : g.pomax_na_writes_pos(lab)) {
-					if (!v.contains(tmpE)) {
-						cexLab = g.getEventLabelIfPresent(tmpE);
-						return false;
-					}
-				}
-			if (true && lab->isNotAtomic() && genmc::isa<ReadLabel>(lab))
-				for (auto tmpE : g.pomax_at_writes_pos(lab)) {
-					if (!v.contains(tmpE)) {
-						cexLab = g.getEventLabelIfPresent(tmpE);
-						return false;
-					}
-				}
-			if (true && lab->isNotAtomic() && genmc::isa<WriteLabel>(lab))
-				for (auto tmpE : g.pomax_at_reads_pos(lab)) {
-					if (!v.contains(tmpE)) {
-						cexLab = g.getEventLabelIfPresent(tmpE);
-						return false;
-					}
-				}
-			if (true && lab->isNotAtomic() && genmc::isa<WriteLabel>(lab))
-				for (auto tmpE : g.pomax_at_writes_pos(lab)) {
-					if (!v.contains(tmpE)) {
-						cexLab = g.getEventLabelIfPresent(tmpE);
-						return false;
-					}
-				}
-
-			break;
-		}
-		default:
-			UNREACHABLE();
-		}
-	}
-	return true;
-}
-
-bool LKMMChecker::visitUnlessError7(const EventLabel *lab) const
-{
-	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedLHSUnlessError7Accepting.clear();
-	visitedLHSUnlessError7Accepting.resize(g.getMaxStamp().get() + 1, false);
-
-	auto &v = lab->view(1);
-
-	/* Explore from all accepting states in LHS using DFS */
-	std::vector<DFSWorklistEntry> startStatesLHS = {
-		{1, lab},
-	};
-
-	return visitLHSUnlessError7Iterative(startStatesLHS, v);
-}
-
-bool LKMMChecker::checkError7(const EventLabel *lab) const
-{
-	[[maybe_unused]] auto &g = *lab->getParent();
-
-	if (visitUnlessError7(lab))
-		return true;
-
-	return visitError7(lab);
-}
-
-bool LKMMChecker::visitWarning8([[maybe_unused]] const EventLabel *lab) const { return false; }
-
-bool LKMMChecker::visitLHSUnlessWarning8Iterative(std::vector<DFSWorklistEntry> &worklist,
+bool LKMMChecker::visitLHSUnlessWarning7Iterative(std::vector<DFSWorklistEntry> &worklist,
 						  const View &v) const
 {
 	while (!worklist.empty()) {
@@ -29855,12 +29747,12 @@ bool LKMMChecker::visitLHSUnlessWarning8Iterative(std::vector<DFSWorklistEntry> 
 	return true;
 }
 
-bool LKMMChecker::visitUnlessWarning8(const EventLabel *lab) const
+bool LKMMChecker::visitUnlessWarning7(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessWarning8Accepting.clear();
-	visitedLHSUnlessWarning8Accepting.resize(g.getMaxStamp().get() + 1, false);
+	visitedLHSUnlessWarning7Accepting.clear();
+	visitedLHSUnlessWarning7Accepting.resize(g.getMaxStamp().get() + 1, false);
 
 	auto &v = lab->view(1);
 
@@ -29869,17 +29761,17 @@ bool LKMMChecker::visitUnlessWarning8(const EventLabel *lab) const
 		{1, lab},
 	};
 
-	return visitLHSUnlessWarning8Iterative(startStatesLHS, v);
+	return visitLHSUnlessWarning7Iterative(startStatesLHS, v);
 }
 
-bool LKMMChecker::checkWarning8(const EventLabel *lab) const
+bool LKMMChecker::checkWarning7(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	if (visitUnlessWarning8(lab))
+	if (visitUnlessWarning7(lab))
 		return true;
 
-	return visitWarning8(lab);
+	return visitWarning7(lab);
 }
 
 std::optional<VerificationError>
@@ -29906,11 +29798,6 @@ LKMMChecker::checkErrors([[maybe_unused]] const EventLabel *lab,
 		return {VerificationError::VE_AccessFreed};
 	}
 
-	if (!checkError7(lab)) {
-		race = cexLab;
-		return {VerificationError::VE_RaceNotAtomic};
-	}
-
 	return {};
 }
 
@@ -29920,7 +29807,7 @@ LKMMChecker::checkWarnings(const EventLabel *lab, const VSet<VerificationError> 
 {
 	std::vector<VerificationError> result;
 
-	if (seenWarnings.count(VerificationError::VE_WWRace) == 0 && !checkWarning8(lab)) {
+	if (seenWarnings.count(VerificationError::VE_WWRace) == 0 && !checkWarning7(lab)) {
 		racyLabs.push_back(cexLab);
 		result.push_back(VerificationError::VE_WWRace);
 	}
@@ -30111,56 +29998,64 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf1(pLab, pporf);
 		}
 	if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease())
-		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
-		}
-	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic())) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ReadLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab)) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadCreateLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ReadLabel>(pLab)) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadCreateLabel>(pLab)) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadStartLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadJoinLabel>(pLab)) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadFinishLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadStartLabel>(pLab)) {
+				auto status = visitedPPoRf1[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf1(pLab, pporf);
+			}
+	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadFinishLabel>(pLab)) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
@@ -30180,7 +30075,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 			}
 	if (true && genmc::isa<ReadLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
@@ -30193,21 +30089,24 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 		}
 	if (true && genmc::isa<ThreadCreateLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
 			}
 	if (true && genmc::isa<ThreadJoinLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
 			}
 	if (true && genmc::isa<ThreadStartLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
@@ -30220,7 +30119,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 		}
 	if (true && genmc::isa<ThreadFinishLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf1[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
@@ -30311,9 +30211,9 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				if (status == NodeStatus::unseen)
 					visitPPoRf7(pLab, pporf);
 			}
-	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
+	if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab))
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()))
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30321,7 +30221,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ReadLabel>(pLab))
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab))
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30329,7 +30230,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadCreateLabel>(pLab))
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ReadLabel>(pLab))
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30337,7 +30239,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadJoinLabel>(pLab))
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadCreateLabel>(pLab))
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30345,7 +30248,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadStartLabel>(pLab))
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadJoinLabel>(pLab))
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30353,7 +30257,17 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadFinishLabel>(pLab))
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadStartLabel>(pLab))
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedPPoRf7[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitPPoRf7(pLab, pporf);
+				}
+	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadFinishLabel>(pLab))
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30361,7 +30275,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30369,7 +30284,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<ReadLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30377,7 +30293,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<ThreadCreateLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30385,7 +30302,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<ThreadJoinLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30393,7 +30311,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<ThreadStartLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30401,7 +30320,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (true && genmc::isa<ThreadFinishLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf7[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -30975,26 +30895,11 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf21(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease())
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf22[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf22(pLab, pporf);
-			}
-	if (true && genmc::isa<ThreadCreateLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf22[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf22(pLab, pporf);
-			}
-	if (true && genmc::isa<ThreadFinishLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf22[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf22(pLab, pporf);
-			}
+		if (auto pLab = g.po_imm_pred(lab); pLab) {
+			auto status = visitedPPoRf22[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf22(pLab, pporf);
+		}
 	if (auto pLab = g.tc_pred(lab); pLab) {
 		auto status = visitedPPoRf23[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
@@ -31057,56 +30962,64 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf23(pLab, pporf);
 		}
 	if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease())
-		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf23[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf23(pLab, pporf);
-		}
-	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic())) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ReadLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab)) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadCreateLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ReadLabel>(pLab)) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadCreateLabel>(pLab)) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadStartLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadJoinLabel>(pLab)) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ThreadFinishLabel>(pLab)) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadStartLabel>(pLab)) {
+				auto status = visitedPPoRf23[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf23(pLab, pporf);
+			}
+	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<ThreadFinishLabel>(pLab)) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
@@ -31126,7 +31039,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 			}
 	if (true && genmc::isa<ReadLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
@@ -31139,21 +31053,24 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 		}
 	if (true && genmc::isa<ThreadCreateLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ThreadJoinLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ThreadStartLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
@@ -31166,7 +31083,8 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 		}
 	if (true && genmc::isa<ThreadFinishLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf23(pLab, pporf);
@@ -31187,6 +31105,20 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 			if (status == NodeStatus::unseen)
 				visitPPoRf25(pLab, pporf);
 		}
+	if (true && genmc::isa<ThreadCreateLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf28[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf28(pLab, pporf);
+			}
+	if (true && genmc::isa<ThreadFinishLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf28[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf28(pLab, pporf);
+			}
 	visitedPPoRf1[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -31434,13 +31366,15 @@ void LKMMChecker::visitPPoRf12(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf12[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab))
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
@@ -31458,7 +31392,8 @@ void LKMMChecker::visitPPoRf12(const EventLabel *lab, DepView &pporf) const
 			visitPPoRf12(pLab, pporf);
 	}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
@@ -31493,78 +31428,90 @@ void LKMMChecker::visitPPoRf14(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf14[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadCreateLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadCreateLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadJoinLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadStartLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadStartLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadFinishLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadFinishLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab))
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab))
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadCreateLabel>(pLab))
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadCreateLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadJoinLabel>(pLab))
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadJoinLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadStartLabel>(pLab))
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadStartLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadFinishLabel>(pLab))
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadFinishLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
@@ -31576,37 +31523,43 @@ void LKMMChecker::visitPPoRf14(const EventLabel *lab, DepView &pporf) const
 			visitPPoRf14(pLab, pporf);
 	}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadCreateLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadCreateLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadJoinLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadStartLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadStartLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ThreadFinishLabel>(pLab)) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ThreadFinishLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
@@ -31620,13 +31573,15 @@ void LKMMChecker::visitPPoRf15(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf15[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
@@ -31687,7 +31642,8 @@ void LKMMChecker::visitPPoRf15(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf21(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
@@ -31722,7 +31678,8 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf17[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
@@ -31731,7 +31688,8 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
@@ -31740,7 +31698,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31750,7 +31708,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31760,7 +31718,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31770,7 +31728,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31780,7 +31738,8 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
 			if (pporf.updateIdx(pLab->getPos()); true) {
@@ -31789,7 +31748,8 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
 			if (pporf.updateIdx(pLab->getPos()); true) {
@@ -31798,7 +31758,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31809,7 +31769,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31820,7 +31780,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31831,7 +31791,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31856,7 +31816,8 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 			visitPPoRf17(pLab, pporf);
 	}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<WriteLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
@@ -31865,7 +31826,8 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
@@ -31874,7 +31836,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31884,7 +31846,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31894,7 +31856,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31904,7 +31866,7 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
@@ -31922,49 +31884,56 @@ void LKMMChecker::visitPPoRf18(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf18[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<WriteLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ReadLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadCreateLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadJoinLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadStartLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadFinishLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<WriteLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
@@ -31972,7 +31941,8 @@ void LKMMChecker::visitPPoRf18(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ReadLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
@@ -31980,7 +31950,8 @@ void LKMMChecker::visitPPoRf18(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadCreateLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
@@ -31988,7 +31959,8 @@ void LKMMChecker::visitPPoRf18(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadJoinLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
@@ -31996,7 +31968,8 @@ void LKMMChecker::visitPPoRf18(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadStartLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
@@ -32004,7 +31977,8 @@ void LKMMChecker::visitPPoRf18(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadFinishLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
@@ -32024,42 +31998,48 @@ void LKMMChecker::visitPPoRf18(const EventLabel *lab, DepView &pporf) const
 			visitPPoRf18(pLab, pporf);
 	}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<WriteLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ReadLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadCreateLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadJoinLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadStartLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+			    genmc::isa<LockCasWriteLabel>(pLab) ||
 		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ThreadFinishLabel>(pLab)) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
@@ -32137,17 +32117,29 @@ void LKMMChecker::visitPPoRf22(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf22[lab->getStamp().get()] = NodeStatus::entered;
-	pporf.updateIdx(lab->getPos());
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic())) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf1[pLab->getStamp().get()];
+		auto status = visitedPPoRf22[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf1(pLab, pporf);
+			visitPPoRf22(pLab, pporf);
 	}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (pporf.updateIdx(pLab->getPos()); true) {
-			auto status = visitedPPoRf22[pLab->getStamp().get()];
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic())) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf22(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
 	visitedPPoRf22[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -32158,7 +32150,8 @@ void LKMMChecker::visitPPoRf23(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf23[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
 		    (!genmc::isa<CasReadLabel>(pLab) ||
 		     static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
 			     ->isRMW())) {
@@ -32185,7 +32178,8 @@ void LKMMChecker::visitPPoRf23(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
 		    (!genmc::isa<CasReadLabel>(pLab) ||
 		     static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
 			     ->isRMW()))
@@ -32221,7 +32215,8 @@ void LKMMChecker::visitPPoRf23(const EventLabel *lab, DepView &pporf) const
 			visitPPoRf23(pLab, pporf);
 	}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
 		    (!genmc::isa<CasReadLabel>(pLab) ||
 		     static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
 			     ->isRMW())) {
@@ -32252,18 +32247,18 @@ void LKMMChecker::visitPPoRf23(const EventLabel *lab, DepView &pporf) const
 		    (genmc::isa<LockCasReadLabel>(pLab) || genmc::isa<TrylockCasReadLabel>(pLab)) &&
 		    static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
 			    ->isRMW()) {
-			auto status = visitedPPoRf27[pLab->getStamp().get()];
+			auto status = visitedPPoRf26[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf27(pLab, pporf);
+				visitPPoRf26(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true &&
 		    (genmc::isa<LockCasReadLabel>(pLab) || genmc::isa<TrylockCasReadLabel>(pLab)) &&
 		    static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
 			    ->isRMW()) {
-			auto status = visitedPPoRf28[pLab->getStamp().get()];
+			auto status = visitedPPoRf27[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf28(pLab, pporf);
+				visitPPoRf27(pLab, pporf);
 		}
 	visitedPPoRf23[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -32274,20 +32269,23 @@ void LKMMChecker::visitPPoRf24(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf24[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn()) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn()) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn())
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn())
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf7(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn()) {
+		if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
+		    genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn()) {
 			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf23(pLab, pporf);
@@ -32326,22 +32324,12 @@ void LKMMChecker::visitPPoRf26(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf26[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf1[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf1(pLab, pporf);
-	}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (pporf.updateIdx(pLab->getPos()); true) {
-			auto status = visitedPPoRf7[pLab->getStamp().get()];
+		if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
+			auto status = visitedPPoRf22[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf7(pLab, pporf);
+				visitPPoRf22(pLab, pporf);
 		}
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf23[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf23(pLab, pporf);
-	}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
 		auto status = visitedPPoRf26[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
@@ -32355,17 +32343,12 @@ void LKMMChecker::visitPPoRf27(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf27[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.po_imm_pred(lab); pLab)
+	if (auto pLab = g.rfi_pred(lab); pLab)
 		if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-			auto status = visitedPPoRf26[pLab->getStamp().get()];
+			auto status = visitedPPoRf22[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf26(pLab, pporf);
+				visitPPoRf22(pLab, pporf);
 		}
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf27[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf27(pLab, pporf);
-	}
 	visitedPPoRf27[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -32374,11 +32357,17 @@ void LKMMChecker::visitPPoRf28(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf28[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.rfi_pred(lab); pLab)
-		if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-			auto status = visitedPPoRf26[pLab->getStamp().get()];
+	pporf.updateIdx(lab->getPos());
+	if (auto pLab = g.po_imm_pred(lab); pLab) {
+		auto status = visitedPPoRf1[pLab->getStamp().get()];
+		if (status == NodeStatus::unseen)
+			visitPPoRf1(pLab, pporf);
+	}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (pporf.updateIdx(pLab->getPos()); true) {
+			auto status = visitedPPoRf28[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf26(pLab, pporf);
+				visitPPoRf28(pLab, pporf);
 		}
 	visitedPPoRf28[lab->getStamp().get()] = NodeStatus::left;
 }

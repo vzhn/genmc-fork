@@ -16,7 +16,7 @@
 
 /*
  * The Linux-kernel memory model (the kernel's tools/memory-model/
- * linux-kernel.cat, marked accesses) evaluated on a whole execution graph.
+ * linux-kernel.cat) evaluated on a whole execution graph.
  * The events are the graph's labels but the initial one (nothing precedes
  * it, so it lies on no cycle); Marked is GenMC's atomic labels, fences and
  * RCU events included, as in herd7. GenMC's additions are those of
@@ -37,6 +37,20 @@
  *
  * fence and strong-fence also gain rcu-fence after rb, but only the
  * plain-access rules use those.
+ *
+ * Plain accesses, as the cat file has them (xbstar = (hb | pb | rb)*):
+ *
+ *   vis = cumul-fence* ; rfe? ; [Marked] ;
+ *         ((strong-fence ; [Marked] ; xbstar) | (xbstar & int))
+ *   w-pre-bounded, r-pre-bounded, w-post-bounded, r-post-bounded: a plain
+ *         access's fence or address dependency to a marked one
+ *   ww-vis, wr-vis, rw-xbstar: what orders two conflicting accesses
+ *   pre-race = ext & ((Plain * M) | ((M \ IW) * Plain))
+ *   plain-coherence: empty (wr-incoh | rw-incoh | ww-incoh), an axiom
+ *   data-race: ww-race | wr-race | rw-race, a flag (GenMC's error)
+ *
+ * GenMC's thread creation and join count as a release write read by an
+ * acquire read, and the pairs they order are no potential races.
  */
 
 #include "genmc/Execution/LkmmModel.hpp"
@@ -44,9 +58,11 @@
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Support/Cast.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -440,6 +456,8 @@ public:
 		return r;
 	}
 
+	[[nodiscard]] auto label(size_t i) const -> const EventLabel * { return labs[i]; }
+
 	const ExecutionGraph &g;
 
 private:
@@ -492,6 +510,12 @@ private:
 	std::vector<std::pair<size_t, size_t>> rscs;
 };
 
+/* What orders two conflicting accesses, for the plain-access rules, and
+ * GenMC's thread order (po | tc | tj)+ */
+struct PlainRules {
+	Rel wwVis, wrVis, rwXbstar, threadOrder;
+};
+
 /* The model's relations on a graph */
 struct Relations {
 	/* Unless FULL, the verdict's pb is not decided */
@@ -502,36 +526,44 @@ struct Relations {
 	[[nodiscard]] auto rcuOrder(const Rel &reach) const -> Rel;
 	/* rcu-fence */
 	[[nodiscard]] auto rcuFence() const -> Rel;
+	/* The plain-access rules, with RCU's rb when HASGP */
+	[[nodiscard]] auto plainRules(bool hasGp) const -> PlainRules;
 
 	const Model &m;
-	Set marked;
+	Set marked, plain, access, W, r4rmb, noreturn, release, threadOut, threadIn;
 	Rel po, poq, rf, co, fr, rmw, tc, tj;
+	Rel in, ext, rfe, carryAddr, poRel, acqPo, rmbRel, wmb, ulp, strongFence, fence,
+		cumulFence, rmwSequence;
 	Rel prop, hb, hbStar, pb;
 	lkmm::Verdict verdict;
 };
 
 Relations::Relations(const Model &mod, bool full)
 	: m(mod), po(m.po()), poq(po.opt()), rf(m.rf()), co(m.co()), fr(m.fr(co)), rmw(m.rmw()),
-	  tc(m.tc()), tj(m.tj()), prop(0), hb(0), hbStar(0), pb(0)
+	  tc(m.tc()), tj(m.tj()), in(0), ext(0), rfe(0), carryAddr(0), poRel(0), acqPo(0),
+	  rmbRel(0), wmb(0), ulp(0), strongFence(0), fence(0), cumulFence(0), rmwSequence(0),
+	  prop(0), hb(0), hbStar(0), pb(0)
 {
 	/* Events */
 	auto R = m.set([](auto *l) { return genmc::isa<ReadLabel>(l); });
-	auto W = m.set([](auto *l) { return genmc::isa<WriteLabel>(l); });
+	W = m.set([](auto *l) { return genmc::isa<WriteLabel>(l); });
 	auto M = m.set([](auto *l) { return genmc::isa<MemAccessLabel>(l); });
+	access = M;
 	marked = m.set([](auto *l) { return !l->isNotAtomic(); });
-	auto plain = m.set([](auto *l) { return l->isNotAtomic(); });
+	plain = m.set([](auto *l) { return l->isNotAtomic(); });
 	auto kind = [&](LkmmFenceKind k) {
 		return m.set([k](auto *l) { return isFence(l, k); });
 	};
 	auto mbR = m.set([](auto *l) { return genmc::isa<ReadLabel>(l) && l->isLkmmMb(); });
 	auto mbW = m.set([](auto *l) { return genmc::isa<WriteLabel>(l) && l->isLkmmMb(); });
-	auto r4rmb = m.set([](auto *l) { return genmc::isa<ReadLabel>(l) && !l->isLkmmNoreturn(); });
+	r4rmb = m.set([](auto *l) { return genmc::isa<ReadLabel>(l) && !l->isLkmmNoreturn(); });
+	noreturn = m.set([](auto *l) { return genmc::isa<ReadLabel>(l) && l->isLkmmNoreturn(); });
 	/* The bell's Acquire and Release: no fences, no failed RMWs */
 	auto acq = m.set([](auto *l) {
 		const auto *r = genmc::dyn_cast<ReadLabel>(l);
 		return r && r->isAtLeastAcquire() && (!genmc::isa<CasReadLabel>(r) || r->isRMW());
 	});
-	auto rel = m.set([](auto *l) { return genmc::isa<WriteLabel>(l) && l->isAtLeastRelease(); });
+	release = m.set([](auto *l) { return genmc::isa<WriteLabel>(l) && l->isAtLeastRelease(); });
 	auto lkr = m.set([](auto *l) {
 		return (genmc::isa<LockCasReadLabel>(l) || genmc::isa<TrylockCasReadLabel>(l)) &&
 		       genmc::cast<ReadLabel>(l)->isRMW();
@@ -541,21 +573,21 @@ Relations::Relations(const Model &mod, bool full)
 	});
 	auto ul = m.set([](auto *l) { return genmc::isa<UnlockWriteLabel>(l); });
 	auto excl = m.set(isRMWAccess);
-	auto threadOut = m.set([](auto *l) {
+	threadOut = m.set([](auto *l) {
 		return genmc::isa<ThreadCreateLabel>(l) || genmc::isa<ThreadFinishLabel>(l);
 	});
-	auto threadIn = m.set([](auto *l) {
+	threadIn = m.set([](auto *l) {
 		return genmc::isa<ThreadStartLabel>(l) || genmc::isa<ThreadJoinLabel>(l);
 	});
 	auto syncRcu = kind(LkmmFenceKind::SyncRcu);
 
 	/* Base relations */
-	auto in = m.sameThread();
-	auto ext = m.otherThread();
+	in = m.sameThread();
+	ext = m.otherThread();
 	auto addr = m.deps(&EventDeps::addr);
 	auto data = m.deps(&EventDeps::data);
 	auto ctrl = m.deps(&EventDeps::ctrl);
-	auto rfe = rf & ext;
+	rfe = rf & ext;
 	auto rfi = rf & in;
 	auto coe = co & ext;
 	auto fre = fr & ext;
@@ -564,13 +596,14 @@ Relations::Relations(const Model &mod, bool full)
 	/* Fences */
 	auto fencerel = [&](const Set &f) { return po.range(f).seq(po); };
 	auto fenceAt = [&](LkmmFenceKind k) { return fencerel(kind(k)); };
-	auto acqPo = po.restrict(acq, M);
-	auto poRel = po.restrict(M, rel);
+	acqPo = po.restrict(acq, M);
+	poRel = po.restrict(M, release);
 	auto ulpInt = po.range(ul).seq(po | rfi).range(lkr).seq(po);
 	auto ulpExt = po.range(ul).seq(rfe).range(lkr).seq(po);
-	auto ulp = ulpInt | ulpExt;
-	auto rmb = fenceAt(LkmmFenceKind::Rmb).restrict(r4rmb, r4rmb);
-	auto wmb = fenceAt(LkmmFenceKind::Wmb).restrict(W, W);
+	ulp = ulpInt | ulpExt;
+	rmbRel = fenceAt(LkmmFenceKind::Rmb);
+	auto rmb = rmbRel.restrict(r4rmb, r4rmb);
+	wmb = fenceAt(LkmmFenceKind::Wmb).restrict(W, W);
 	/* The cat's [M] endpoints, with GenMC's thread events: creation and
 	 * join synchronise like a release and an acquire, which a strong fence
 	 * reaches (the kat's mb-int and mb-ext) */
@@ -584,8 +617,8 @@ Relations::Relations(const Model &mod, bool full)
 		  poq.range(lkw).seq(fenceAt(LkmmFenceKind::AfterSpinlock)).restrict(MT, MT) |
 		  ulp.range(kind(LkmmFenceKind::AfterUnlockLock)).seq(po).restrict(MT, MT);
 	auto gp = po.range(syncRcu).seq(poq);
-	auto strongFence = mb | gp;
-	auto fence = strongFence | poRel | acqPo | wmb | rmb;
+	strongFence = mb | gp;
+	fence = strongFence | poRel | acqPo | wmb | rmb;
 
 	/* Preserved program order (GenMC's dependencies: rmw? after them) */
 	auto rmwq = rmw.opt();
@@ -593,8 +626,9 @@ Relations::Relations(const Model &mod, bool full)
 	auto dep = carryDep.seq(addr | data);
 	auto cdep = carryDep.seq(ctrl);
 	auto rwdep = (dep | cdep).seq(rmwq).range(W);
-	auto toW = rwdep | (overwrite & in) | carryDep.seq(addr).range(plain).seq(wmb);
-	auto toR = carryDep.seq(addr).range(R) | dep.seq(rmwq).range(marked).seq(rfi);
+	carryAddr = carryDep.seq(addr);
+	auto toW = rwdep | (overwrite & in) | carryAddr.range(plain).seq(wmb);
+	auto toR = carryAddr.range(R) | dep.seq(rmwq).range(marked).seq(rfi);
 	auto ppo = toR | toW | (fence & in) | (ulp & in);
 	auto threadPo = po.range(threadOut) | po.dom(threadIn);
 
@@ -603,9 +637,9 @@ Relations::Relations(const Model &mod, bool full)
 	verdict.atomicity = (rmw & fre.seq(coe)).empty();
 
 	/* Propagation and happens-before */
-	auto rmwSequence = rf.seq(rmw).star();
+	rmwSequence = rf.seq(rmw).star();
 	auto aCumul = rfe.range(marked).opt().seq(strongFence | poRel);
-	auto cumulFence = (aCumul | wmb | ulp).restrict(marked, marked).seq(rmwSequence);
+	cumulFence = (aCumul | wmb | ulp).restrict(marked, marked).seq(rmwSequence);
 	prop = ((overwrite & ext).opt().seq(cumulFence.star()).range(marked).seq(rfe.opt()))
 		       .restrict(marked, marked);
 	auto propInt = (prop - Rel::id(Set(m.size(), 1))) & in;
@@ -668,7 +702,171 @@ auto Relations::rcuFence() const -> Rel
 	return po.seq(rcuOrder(reachFrom(f))).seq(poq);
 }
 
+/* The cat's plain-access part. Its fence and strong-fence gain rcu-fence
+ * (nonrw-fence, bound before, does not). GenMC's thread creation and join
+ * synchronise like a release write read by an acquire read: the thread
+ * events are releases (TC, TE) and acquires (TB, TJ) to po-rel, acq-po and
+ * the fences, and tc and tj are rfe, in cumul-fence too (as a release is
+ * A-cumulative), as the kat's thread-po makes them for hb */
+auto Relations::plainRules(bool hasGp) const -> PlainRules
+{
+	const auto n = m.size();
+	auto rcuF = hasGp ? rcuFence() : Rel(n);
+	auto rb = hasGp ? prop.seq(rcuF).seq(hbStar).seq(pb.star()).range(marked) : Rel(n);
+	auto xbstar = (hb | pb | rb).star();
+
+	auto MT = access;
+	auto relT = release;
+	for (auto i = 0U; i < n; i++) {
+		MT[i] = MT[i] || threadOut[i] || threadIn[i];
+		relT[i] = relT[i] || threadOut[i];
+	}
+	auto threadRel = po.range(threadOut) | po.dom(threadIn);
+	auto rfeT = rfe | tc | tj;
+	auto poRelT = po.restrict(MT, relT);
+	auto sf = strongFence | rcuF;
+	auto fen = fence | rcuF | threadRel;
+	auto nonrwFence = strongFence | poRel | acqPo | threadRel;
+	/* cumul-fence is bound before strong-fence gains rcu-fence */
+	auto aCumul = rfeT.range(marked).opt().seq(strongFence | poRelT);
+	auto cumulFenceT = (aCumul | wmb | ulp).restrict(marked, marked).seq(rmwSequence);
+	auto vis = cumulFenceT.star()
+			   .seq(rfeT.opt())
+			   .range(marked)
+			   .seq(sf.range(marked).seq(xbstar) | (xbstar & in));
+
+	/* Boundaries for the lifetimes of plain accesses */
+	auto notNoreturn = noreturn;
+	for (auto &b : notNoreturn)
+		b = !b;
+	auto wPre = (carryAddr | fen).opt().dom(marked);
+	auto rPre = (carryAddr | nonrwFence | rmbRel.restrict(r4rmb, notNoreturn)).opt().dom(marked);
+	auto wPost = fen.opt().range(marked).seq(rmwSequence);
+	auto rPost = (nonrwFence | rmbRel.restrict(notNoreturn, r4rmb)).opt().range(marked);
+
+	return {.wwVis = fen | sf.seq(xbstar).seq(wPre) | wPost.seq(vis).seq(wPre),
+		.wrVis = fen | sf.seq(xbstar).seq(rPre) | wPost.seq(vis).seq(rPre),
+		.rwXbstar = fen | rPost.seq(xbstar).seq(wPre),
+		.threadOrder = (po | tc | tj).plus()};
+}
+
+/* Whether accesses I and J are a potential race (the cat's pre-race): of
+ * different threads, to the same location, at least one plain (the initial
+ * writes are none). GenMC leaves out the pairs that thread creation and
+ * join order: these are full synchronisation, and GenMC's coherence
+ * already orders such a pair by them */
+auto isPreRace(const Relations &r, const PlainRules &rules, size_t i, size_t j) -> bool
+{
+	return r.access[i] && r.access[j] && (r.plain[i] || r.plain[j]) && r.ext.get(i, j) &&
+	       !rules.threadOrder.get(i, j) && !rules.threadOrder.get(j, i);
+}
+
+/* The pairs of a potential race: a write and a read (rf, or co? ; rf for
+ * the races), a read and a write (fr), two writes (co) */
+enum class Pair { WR, RW, WW };
+
+/* Calls F(pair, a, b) on each potential race (a, b) */
+template <typename F>
+void forEachPreRace(const Relations &r, const PlainRules &rules, bool coRf, F f)
+{
+	auto visit = [&](Pair pair, const Rel &rel) {
+		rel.forAll([&](size_t i, size_t j) {
+			if (isPreRace(r, rules, i, j))
+				f(pair, i, j);
+		});
+	};
+	visit(Pair::WR, coRf ? r.co.opt().seq(r.rf) : r.rf);
+	visit(Pair::RW, r.fr);
+	visit(Pair::WW, r.co);
+}
+
+/* GenMC's thread order (po | tc | tj)+ on a graph, by the clocks of its
+ * threads: a thread's clock changes at its start and at its joins */
+class ThreadOrder {
+public:
+	explicit ThreadOrder(const ExecutionGraph &g) : g(g), segments(g.getNumThreads()) {}
+
+	/* Whether A is before B */
+	auto before(const EventLabel *a, const EventLabel *b) -> bool
+	{
+		if (a->getThread() == b->getThread())
+			return a->getIndex() < b->getIndex();
+		return a->getIndex() <= clockAt(b->getThread(), b->getIndex())[a->getThread()];
+	}
+
+private:
+	/* The last index of each thread before an event (-1 for none) */
+	using Clock = std::vector<int>;
+
+	auto clockAt(int t, int index) -> Clock
+	{
+		auto &segs = segments[t];
+		if (segs.empty())
+			computeSegments(t);
+		const Clock *c = &segs.front().second;
+		for (const auto &[from, clock] : segs)
+			if (from <= index)
+				c = &clock;
+		auto result = *c;
+		result[t] = index;
+		return result;
+	}
+
+	void computeSegments(int t)
+	{
+		auto &segs = segments[t];
+		Clock start(g.getNumThreads(), -1);
+		const auto *bLab = genmc::dyn_cast<ThreadStartLabel>(g.getFirstThreadLabel(t));
+		if (const auto *cLab = bLab ? bLab->getCreate() : nullptr)
+			start = clockAt(cLab->getThread(), cLab->getIndex());
+		segs.emplace_back(0, start);
+		for (auto k = 1; k < g.getThreadSize(t); k++) {
+			const auto *jLab =
+				genmc::dyn_cast_if_present<ThreadJoinLabel>(g.getEventLabelIfPresent(Event(t, k)));
+			if (!jLab || g.getLastThreadLabel(jLab->getChildId()) == nullptr)
+				continue;
+			const auto *last = g.getLastThreadLabel(jLab->getChildId());
+			auto child = clockAt(last->getThread(), last->getIndex());
+			auto merged = segments[t].back().second;
+			for (auto u = 0U; u < merged.size(); u++)
+				merged[u] = std::max(merged[u], child[u]);
+			segments[t].emplace_back(k, std::move(merged));
+		}
+	}
+
+	const ExecutionGraph &g;
+	std::vector<std::vector<std::pair<int, Clock>>> segments;
+};
+
 } // namespace
+
+auto lkmm::hasPreRace(const ExecutionGraph &g) -> bool
+{
+	/* The accesses of each location that another thread's access to it
+	 * shares (as plain accesses are usually few, by their locations) */
+	std::unordered_map<SAddr, std::vector<const MemAccessLabel *>> byAddr;
+	auto plain = false;
+	for (const auto &lab : g.labels())
+		if (const auto *a = genmc::dyn_cast<MemAccessLabel>(&lab)) {
+			byAddr[a->getAddr()].push_back(a);
+			plain |= a->isNotAtomic();
+		}
+	if (!plain)
+		return false;
+
+	ThreadOrder order(g);
+	for (const auto &[addr, accesses] : byAddr)
+		for (auto i = 0U; i < accesses.size(); i++)
+			for (auto j = i + 1; j < accesses.size(); j++) {
+				const auto *a = accesses[i];
+				const auto *b = accesses[j];
+				if (a->getThread() != b->getThread() &&
+				    (a->isNotAtomic() || b->isNotAtomic()) && !order.before(a, b) &&
+				    !order.before(b, a))
+					return true;
+			}
+	return false;
+}
 
 auto lkmm::hasGracePeriod(const ExecutionGraph &g) -> bool
 {
@@ -680,10 +878,25 @@ auto lkmm::hasGracePeriod(const ExecutionGraph &g) -> bool
 
 auto lkmm::evaluate(const ExecutionGraph &g, bool full) -> Verdict
 {
-	Model m(g, false, !full);
+	auto plain = hasPreRace(g);
+	Model m(g, false, !full && !plain);
 	Relations r(m, full);
 	auto v = r.verdict;
-	if (!v.hb || !v.pb || !hasGracePeriod(g))
+	if (!v.hb || !v.pb)
+		return v;
+	if (plain) {
+		auto rules = r.plainRules(hasGracePeriod(g));
+		/* wr-incoh = pre-race & rf & rw-xbstar^-1, rw-incoh = pre-race & fr &
+		 * wr-vis^-1, ww-incoh = pre-race & co & ww-vis^-1 */
+		forEachPreRace(r, rules, false, [&](Pair pair, size_t a, size_t b) {
+			const auto &back = pair == Pair::WR   ? rules.rwXbstar
+					   : pair == Pair::RW ? rules.wrVis
+							      : rules.wwVis;
+			if (back.get(b, a))
+				v.plainCoherence = false;
+		});
+	}
+	if (!hasGracePeriod(g))
 		return v;
 
 	/* RCU: rb = prop ; po ; rcu-order ; po? ; hb* ; pb* ; [Marked] is
@@ -704,6 +917,42 @@ auto lkmm::evaluate(const ExecutionGraph &g, bool full) -> Verdict
 		});
 	}
 	return v;
+}
+
+auto lkmm::findRace(const ExecutionGraph &g) -> std::optional<Race>
+{
+	if (!hasPreRace(g))
+		return std::nullopt;
+	Model m(g, false);
+	Relations r(m, true);
+	auto rules = r.plainRules(hasGracePeriod(g));
+	std::optional<Race> race;
+	forEachPreRace(r, rules, true, [&](Pair pair, size_t a, size_t b) {
+		if (race)
+			return;
+		/* ww-race = (pre-race & co) \ ww-nonrace, with ww-nonrace = ww-vis &
+		 * ((Marked * W) | rw-xbstar) & ((W * Marked) | wr-vis);
+		 * wr-race = (pre-race & (co? ; rf)) \ wr-vis \ rw-xbstar^-1;
+		 * rw-race = (pre-race & fr) \ rw-xbstar */
+		auto racy = false;
+		switch (pair) {
+		case Pair::WW:
+			racy = !(rules.wwVis.get(a, b) && (r.marked[a] || rules.rwXbstar.get(a, b)) &&
+				 (r.marked[b] || rules.wrVis.get(a, b)));
+			break;
+		case Pair::WR:
+			racy = !rules.wrVis.get(a, b) && !rules.rwXbstar.get(b, a);
+			break;
+		case Pair::RW:
+			racy = !rules.rwXbstar.get(a, b);
+			break;
+		}
+		static constexpr const char *names[] = {"wr-race", "rw-race", "ww-race"};
+		if (racy)
+			race = Race{.a = m.label(a), .b = m.label(b),
+				    .kind = names[static_cast<int>(pair)]};
+	});
+	return race;
 }
 
 auto lkmm::isRcuOrderedBefore(const ExecutionGraph &g, const EventLabel *a, const EventLabel *b)
