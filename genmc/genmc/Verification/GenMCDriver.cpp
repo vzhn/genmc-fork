@@ -922,6 +922,29 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 						     : (const EventLabel *)&*coIt;
 	};
 
+	/* A failed lock acquisition or condition-variable wait blocks on its
+	 * read alone, with no loop markers around it. (A successful one inside
+	 * a spinloop may also end the iteration: that is judged below.) */
+	if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lastLab);
+	    rLab && (genmc::isa<LockCasReadLabel>(rLab) || genmc::isa<CondVarWaitReadLabel>(rLab)) &&
+	    rLab->getAnnot() &&
+	    !rLab->valueMakesAssumeSucceed(rLab->getAccessValue(rLab->getAccess()))) {
+		const auto *coMax = getCoMax(rLab);
+		if (rLab->getRf() != coMax)
+			return false;
+		/* A lock ZNE spinloop is blocked between its lock and its
+		 * unlock: if the lock was taken in that blocked iteration, its
+		 * holder releases it */
+		const auto *hLast = g.getLastThreadLabel(coMax->getThread());
+		if (!genmc::isa<LockZNEBlockLabel>(hLast))
+			return true;
+		for (const auto *lab = g.po_imm_pred(hLast); lab; lab = g.po_imm_pred(lab)) {
+			if (genmc::isa<SpinStartLabel>(lab))
+				return !(lab->getPos() < coMax->getPos());
+		}
+		return true;
+	}
+
 	for (auto j = start.index; j > 0; j--) {
 		const auto *lab = g.getEventLabel(Event(tid, j));
 		if (isAwait ? genmc::isa<AwaitStartLabel>(lab) : genmc::isa<SpinStartLabel>(lab))

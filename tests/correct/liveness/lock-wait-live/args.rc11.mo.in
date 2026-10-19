@@ -1,0 +1,4 @@
+-check-liveness | -DCONTENDED
+-check-liveness | -DHOLDER_SPINS
+-check-liveness | -DCONDVAR_LOOP
+-check-liveness | -DZNE_HOLDER
