@@ -239,6 +239,11 @@ do
 	    "access-freed-hp") continue;;
 	    "destroyed-mutex") continue;;
 	esac
+    # under LKMM only programs written for it (they opt in with a genmc.lkmm.*.in)
+    if [[ "${model}" == "lkmm" && ! -f "${dir}/genmc.lkmm.${coherence}.in" ]]
+    then
+	continue
+    fi
     runtest "${dir}"
 done
 printfooter

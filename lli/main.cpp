@@ -69,7 +69,9 @@ static llvm::cl::opt<ModelType> clModelType(
 			 clEnumValN(ModelType::TSO, "tso", "TSO memory model"),
 			 clEnumValN(ModelType::RA, "ra", "RA+RLX memory model"),
 			 clEnumValN(ModelType::RC11, "rc11", "RC11 memory model (default)"),
-			 clEnumValN(ModelType::IMM, "imm", "IMM memory model")),
+			 clEnumValN(ModelType::IMM, "imm", "IMM memory model"),
+			 clEnumValN(ModelType::LKMM, "lkmm",
+				    "Linux-kernel memory model (programs using <lkmm.h>)")),
 	llvm::cl::cat(clGeneral), llvm::cl::init(ModelType::RC11),
 	llvm::cl::desc("Choose model type:"));
 
@@ -369,6 +371,9 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 {
 	/* LLI */
 	lliConfig.cflags.insert(lliConfig.cflags.end(), clCFLAGS.begin(), clCFLAGS.end());
+	/* <lkmm.h> uses the LKMM intrinsics under -lkmm and C11 atomics otherwise */
+	if (clModelType == ModelType::LKMM)
+		lliConfig.cflags.emplace_back("-D__GENMC_LKMM__");
 	lliConfig.inputFile = std::move(clInputFile);
 	lliConfig.threads = clThreads;
 	lliConfig.disableStopOnSystemError = clDisableStopOnSystemError;
@@ -388,7 +393,9 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	lliConfig.codeCondenser = !clDisableCodeCondenser;
 	lliConfig.loadAnnot = !clDisableLoadAnnot;
 	lliConfig.assumePropagation = !clDisableAssumePropagation;
-	lliConfig.mmDetector = !clDisableMMDetector;
+	/* The detector suggests a model from the orderings used; kernel code is
+	 * relaxed by design (READ_ONCE()), so it has nothing to say under LKMM */
+	lliConfig.mmDetector = !clDisableMMDetector && clModelType != ModelType::LKMM;
 	lliConfig.helper = !clDisableHelper;
 	lliConfig.confirmation = clConfirmation; /* could be two options: pass + annot */
 	lliConfig.finalWrite = !clDisableFinalWrite;
@@ -407,7 +414,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 				  extraLang == InputLanguage::cargo;
 	}
 	lliConfig.programEntryFun = std::move(clProgramEntryFunction);
-	lliConfig.isDepTrackingModel = (clModelType == ModelType::IMM);
+	lliConfig.isDepTrackingModel = isDepTrackingModel(clModelType);
 
 	/* Exploration */
 	conf.mode = clExplorationMode;
@@ -480,7 +487,7 @@ static void adjustConfig(const ModuleInfo &modInfo, Config &conf)
 	/* Perhaps override the MM under which verification will take place */
 	if (modInfo.determinedMM.has_value() && isStrongerThan(*modInfo.determinedMM, conf.model)) {
 		conf.model = *modInfo.determinedMM;
-		conf.isDepTrackingModel = (conf.model == ModelType::IMM);
+		conf.isDepTrackingModel = isDepTrackingModel(conf.model);
 		LOG(VerbosityLevel::Tip,
 		    "Automatically adjusting memory model to {}. You can disable this behavior "
 		    "with -disable-mm-detector.",

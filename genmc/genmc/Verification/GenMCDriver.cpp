@@ -1450,6 +1450,22 @@ auto GenMCDriver::handleFence(const EventDbgInfo *dbg, Event pos, MemOrdering or
 	return handleFence(FenceLabel::create(pos, ord, deps));
 }
 
+auto GenMCDriver::handleLkmmFence(const EventDbgInfo *dbg, Event pos, LkmmFenceKind kind,
+				  const EventDeps &deps) -> HandleResult<std::monostate>
+{
+	++pos;
+	if (auto err = updateErrorInfoAndMaybeExit(pos, false, dbg); err)
+		return {.result = *err};
+	if (isExecutionDrivenByGraph(pos)) {
+		if constexpr (!Config::emitNALabels)
+			getExec().getGraph().getState().onFence(
+				pos, isAtLeastOrStrongerThan(LkmmFenceLabel::orderingOf(kind),
+							     MemOrdering::Release));
+		return {.result = std::monostate{}, .count = 1U};
+	}
+	return handleFence(LkmmFenceLabel::create(pos, kind, deps));
+}
+
 void GenMCDriver::checkReconsiderFaiSpinloop(const MemAccessLabel *lab)
 {
 	auto &g = getExec().getGraph();

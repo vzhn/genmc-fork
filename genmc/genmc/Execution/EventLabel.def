@@ -196,7 +196,8 @@ LAST_LABEL(Mem, HpRetire)
  */
 FIRST_LABEL(Fence, Fence)
 HANDLE_FENCE_LABEL(Fence)
-LAST_LABEL(Fence, Fence)
+HANDLE_FENCE_LABEL(LkmmFence)
+LAST_LABEL(Fence, LkmmFence)
 
 /*
  * Other labels - other operations that GenMC needs to track.

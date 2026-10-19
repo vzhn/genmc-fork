@@ -17,14 +17,14 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 GenMC="${GenMC:-$DIR/../RelWithDebInfo/bin/genmc}"
 GENMCFLAGS="${GENMCFLAGS:-}"
-MODELS=(rc11 imm)
+MODELS=(rc11 imm lkmm)
 
 CONFIG_FILE="$(dirname "$(dirname "${GenMC}")")/include/genmc/config.h"
 
 # Set the directories for testing
 if [ -z ${CORRECT_DIRS+x} ]
 then
-    CORRECT_DIRS=(infr litmus saver ipr sr liveness synthetic data-structures classic)
+    CORRECT_DIRS=(infr litmus saver ipr sr liveness synthetic data-structures classic lkmm)
     CORRECT_DIRS=("${CORRECT_DIRS[@]/#/${SCRIPT_DIR}/../tests/correct/}" )
 fi
 if [ -z ${WRONG_DIRS+x} ]
@@ -114,6 +114,7 @@ do
 	then
 	    continue
 	fi
+	# (under lkmm, a test runs iff it has an expected.lkmm.mo.in: runcorrect.sh)
 
 	check_blocked="" && [[ "${cat}" == "saver" || "${cat}" == "helper" ]] &&
 	    [[ (! "${GENMCFLAGS}" =~ "policy=arbitrary") ]] && [[ "${model}" != "imm" ]] &&
@@ -140,6 +141,7 @@ do
 	then
 	    continue
 	fi
+	# (under LKMM, a test runs iff it has a genmc.lkmm.<coherence>.in: runwrong.sh)
 	if [[ "${cat}" == "liveness" || "${cat}" == "helper" ]]
 	then
 	    coherence="mo"

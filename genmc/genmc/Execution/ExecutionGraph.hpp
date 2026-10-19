@@ -736,6 +736,85 @@ public:
 	DEFINE_POMAX_ITER_POS(pomax_at_writes, getMaxAWriteView)
 
 	/***************************************************************************
+	 * Internal/external coherence and from-reads (moi/moe/fri/fre)
+	 **************************************************************************/
+
+	auto moi_preds(const EventLabel *lab) const
+	{
+		return co_preds(lab) | std::views::filter([t = lab->getThread()](auto &wLab) {
+			       return wLab.getThread() == t;
+		       });
+	}
+	auto moe_preds(const EventLabel *lab) const
+	{
+		return co_preds(lab) | std::views::filter([t = lab->getThread()](auto &wLab) {
+			       return wLab.getThread() != t;
+		       });
+	}
+	auto moi_succs(const EventLabel *lab) const
+	{
+		return co_succs(lab) | std::views::filter([t = lab->getThread()](auto &wLab) {
+			       return wLab.getThread() == t;
+		       });
+	}
+	auto moe_succs(const EventLabel *lab) const
+	{
+		return co_succs(lab) | std::views::filter([t = lab->getThread()](auto &wLab) {
+			       return wLab.getThread() != t;
+		       });
+	}
+	auto fri_succs(const EventLabel *lab) const
+	{
+		return fr_succs(lab) | std::views::filter([t = lab->getThread()](auto &wLab) {
+			       return wLab.getThread() == t;
+		       });
+	}
+	auto fre_succs(const EventLabel *lab) const
+	{
+		return fr_succs(lab) | std::views::filter([t = lab->getThread()](auto &wLab) {
+			       return wLab.getThread() != t;
+		       });
+	}
+	/** The reads fr-before a write: those of a write co-before it or of the
+	 * initial value (an owning range, as fr has no stored predecessors) */
+	auto fr_preds(const EventLabel *lab) const
+	{
+		std::vector<const EventLabel *> preds;
+		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(lab)) {
+			if (getInitLabel()->hasRfs(wLab->getAddr()))
+				for (const auto &rLab : getInitLabel()->rfs(wLab->getAddr()))
+					preds.push_back(&rLab);
+			for (const auto &pLab : co_preds(wLab))
+				for (const auto &rLab : rf_succs(&pLab))
+					preds.push_back(&rLab);
+		}
+		return std::move(preds) | std::views::transform(
+						  [](const EventLabel *rLab) -> const EventLabel & {
+							  return *rLab;
+						  });
+	}
+	auto fri_preds(const EventLabel *lab) const
+	{
+		return fr_preds(lab) | std::views::filter([t = lab->getThread()](auto &rLab) {
+			       return rLab.getThread() == t;
+		       });
+	}
+	auto fre_preds(const EventLabel *lab) const
+	{
+		return fr_preds(lab) | std::views::filter([t = lab->getThread()](auto &rLab) {
+			       return rLab.getThread() != t;
+		       });
+	}
+
+	/***************************************************************************
+	 * LKMM (hand-written relations; LkmmRelations.cpp)
+	 **************************************************************************/
+
+	/** The events of lab's thread that LKMM's prop orders before it:
+	 * (prop \ id) & int, which Kater cannot generate */
+	auto prop_int_preds(const EventLabel *lab) const -> std::vector<const EventLabel *>;
+
+	/***************************************************************************
 	 * Linearization / Methods (lin)
 	 **************************************************************************/
 

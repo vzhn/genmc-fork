@@ -257,6 +257,8 @@ EventLabel::EventLabelKind getReadKind(LoadInst &I)
 	VERIFY(op);
 
 	auto flags = dyn_cast<ConstantInt>(op->getValue())->getZExtValue();
+	if (!GENMC_KIND(flags)) /* attributes only */
+		return Kind::Read;
 	if (GENMC_KIND(flags) == GENMC_KIND_SPECUL)
 		return Kind::SpeculativeRead;
 	else if (GENMC_KIND(flags) == GENMC_KIND_CONFIRM)
@@ -346,6 +348,8 @@ std::pair<EventLabel::EventLabelKind, EventLabel::EventLabelKind> getFaiKinds(At
 	VERIFY(op);
 
 	auto flags = dyn_cast<ConstantInt>(op->getValue())->getZExtValue();
+	if (!GENMC_KIND(flags)) /* attributes only (e.g. LKMM's fully ordered RMWs) */
+		return std::make_pair(Kind::FaiRead, Kind::FaiWrite);
 	if (GENMC_KIND(flags) == GENMC_KIND_NONVR)
 		return std::make_pair(Kind::NoRetFaiRead, Kind::NoRetFaiWrite);
 	else if (GENMC_KIND(flags) == GENMC_KIND_BARRIER)
@@ -1595,6 +1599,21 @@ void Interpreter::visitFenceInst(FenceInst &I)
 	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id), nullptr, nullptr);
 	CALL_DRIVER(handleFence, currDbgInfo(), currPos(), toGenMCOrdering(I.getOrdering()),
 		    GET_DEPS(deps));
+}
+
+void Interpreter::callLkmmFence(Function *F, const std::vector<GenericValue> &ArgVals,
+				 const std::unique_ptr<EventDeps> &specialDeps)
+{
+	auto kind = ArgVals[0].IntVal.getLimitedValue();
+	ERROR_ON(kind > static_cast<uint64_t>(LkmmFenceKind::LAST),
+		 "Unknown kind of LKMM fence ({})\n", kind);
+
+	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id), nullptr, nullptr);
+	CALL_DRIVER(handleLkmmFence, currDbgInfo(), currPos(), static_cast<LkmmFenceKind>(kind),
+		    GET_DEPS(deps));
+
+	/* Handle invoke-instruction */
+	returnValueToCaller(F->getReturnType() /* void */, PTOGV(nullptr));
 }
 
 void Interpreter::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I)

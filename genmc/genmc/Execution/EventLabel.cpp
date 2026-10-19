@@ -95,6 +95,17 @@ auto WriteLabel::isRMW() const -> bool
 	return CasWriteLabel::classofKind(getKind()) || FaiWriteLabel::classofKind(getKind());
 }
 
+auto EventLabel::isLkmmMb() const -> bool
+{
+	if (const auto *wLab = genmc::dyn_cast<WriteLabel>(this))
+		return wLab->isRMW() && wLab->hasAttr(WriteAttr::LkmmMb);
+	if (const auto *fLab = genmc::dyn_cast<FaiReadLabel>(this))
+		return fLab->hasAttr(WriteAttr::LkmmMb);
+	if (const auto *cLab = genmc::dyn_cast<CasReadLabel>(this))
+		return cLab->hasAttr(WriteAttr::LkmmMb) && cLab->isRMW();
+	return false;
+}
+
 auto ReadLabel::isRMW() const -> bool
 {
 	if (!CasReadLabel::classofKind(getKind()) && !FaiReadLabel::classofKind(getKind()))
