@@ -15,6 +15,8 @@ Each test gets one result:
   agree                  same states (and same race verdict)
   agree-racy             both report a data race (a racy program's states are
                          undefined in C11 and LKMM alike, so not compared)
+  agree-deadlock         synchronize_rcu() in a critical section: herd7 has no
+                         execution, GenMC reports invalid RCU usage
   missing                GenMC lacks some of herd7's states (stronger)
   extra                  GenMC has states herd7 forbids (weaker)
   differ                 both missing and extra states
@@ -143,7 +145,12 @@ def check(args, path):
         err = re.search(r"^(Error[^\n]*|[A-Z][\w-]* violation[^\n]*)", out, re.M)
         if not grace and (rc != 0 or err):
             msg = err.group(1) if err else out.strip().split("\n")[-1]
-            res["result"] = "genmc-error:" + msg[:80]
+            # an RCU self-deadlock (synchronize_rcu() in a critical section):
+            # herd7 has no execution, GenMC reports the misuse
+            if msg.startswith("Error: Invalid RCU usage") and not hstates:
+                res["result"] = "agree-deadlock"
+            else:
+                res["result"] = "genmc-error:" + msg[:80]
             return res
         try:
             gstates = set() if grace else genmc_states(out, meta)
@@ -152,6 +159,8 @@ def check(args, path):
             return res
         m = re.search(r"complete executions explored: (\d+)", out)
         res["genmc_execs"] = int(m.group(1)) if m else None
+        m = re.search(r"Total wall-clock time: ([\d.]+)s", out)
+        res["genmc_time"] = float(m.group(1)) if m else None
     res["herd_states"] = len(hstates)
     res["genmc_states"] = len(gstates)
     missing, extra = hstates - gstates, gstates - hstates
