@@ -714,6 +714,17 @@ private:
 				     std::vector<EventLabel *> &stores) const;
 
 	/** SAVer: Filters stores that will lead to an assume-blocked execution */
+	/** Removes the stores LAB can read from only by placing itself before an
+	 * identical blind RMW (see --blind-rmw-reduction) */
+	void filterCommutingBlindRMWs(const ReadLabel *lab,
+				      std::vector<EventLabel *> &stores) const;
+
+	/** Reports an error if SLAB is a write the blind-RMW reduction did not account for */
+	auto checkBlindRMWWellFormedness(const WriteLabel *sLab) -> bool;
+
+	/** Reports an error if RLAB observes an order the blind-RMW reduction fixed */
+	auto checkBlindRMWWellFormedness(const ReadLabel *rLab) -> bool;
+
 	void filterValuesFromAnnotSAVER(const ReadLabel *rLab, std::vector<EventLabel *> &stores);
 
 	/*** Estimation-related ***/

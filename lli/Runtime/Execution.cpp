@@ -1758,6 +1758,11 @@ void Interpreter::visitAtomicRMWInst(AtomicRMWInst &I)
 
 	VERIFY(typ->isIntegerTy());
 
+	/* An RMW whose result is never used may commute with identical ones */
+	auto wattr = getWriteAttr(I);
+	if (I.use_empty() && !hasSCFence_)
+		wattr |= WriteAttr::Blind;
+
 	WARN_ON_ONCE(I.getOperation() == AtomicRMWInst::BinOp::Xchg && getDepTracker(),
 		     "unsupported-xchg-deps",
 		     "Atomic xchg support is experimental under dependency-tracking models!");
@@ -1779,8 +1784,8 @@ void Interpreter::visitAtomicRMWInst(AtomicRMWInst &I)
 	case switchPair(EventLabel::__kindR, EventLabel::__kindW): {                               \
 		auto ret = CALL_DRIVER(handle##__kindR, currDbgInfo(ptr), currPos(),               \
 				       toGenMCOrdering(I.getOrdering()), ptr, size,                \
-				       toGenMCBinOp(I.getOperation()), val, getWriteAttr(I),       \
-				       nullptr, std::nullopt, GET_DEPS(deps));                     \
+				       toGenMCBinOp(I.getOperation()), val, wattr, nullptr,        \
+				       std::nullopt, GET_DEPS(deps));                              \
                                                                                                    \
 		auto retVal = std::get_if<SVal>(&ret);                                             \
 		if (!retVal)                                                                       \
@@ -1791,7 +1796,7 @@ void Interpreter::visitAtomicRMWInst(AtomicRMWInst &I)
 		updateAddrPoDeps(getCurThr().id, I.getPointerOperand());                           \
 		auto newVal = executeRMWBinOp(res, val, size, toGenMCBinOp(I.getOperation()));     \
 		CALL_DRIVER(handle##__kindW, currDbgInfo(ptr), currPos(),                          \
-			    toGenMCOrdering(I.getOrdering()), ptr, size, newVal, getWriteAttr(I),  \
+			    toGenMCOrdering(I.getOrdering()), ptr, size, newVal, wattr,            \
 			    GET_DEPS(deps));                                                       \
 		break;                                                                             \
 	}

@@ -1149,6 +1149,178 @@ void GenMCDriver::filterSymmetricStoresSR(const ReadLabel *rLab,
 	std::erase_if(stores, [&](auto &sLab) { return lab->getRf()->getPos() == sLab->getPos(); });
 }
 
+/* Returns LAB as a blind relaxed FAI that may be reordered with identical ones, or null */
+static auto asCommutingBlindFai(const EventLabel *lab) -> const FaiReadLabel *
+{
+	const auto *fLab = genmc::dyn_cast_if_present<FaiReadLabel>(lab);
+	if (!fLab || fLab->getKind() != EventLabel::FaiRead ||
+	    fLab->getAttr() != WriteAttr::Blind || fLab->getOrdering() != MemOrdering::Relaxed)
+		return nullptr;
+
+	/* A release fence before it would make its write a synchronization source */
+	const auto &g = *fLab->getParent();
+	for (auto i = 0; i < fLab->getIndex(); i++) {
+		const auto *pLab =
+			genmc::dyn_cast<FenceLabel>(g.getEventLabel(Event(fLab->getThread(), i)));
+		if (pLab && pLab->isAtLeastRelease())
+			return nullptr;
+	}
+	return fLab;
+}
+
+/* Whether A and B are distinct blind FAIs that can be reordered with each other */
+static auto areCommutingTwins(const EventLabel *a, const EventLabel *b) -> bool
+{
+	const auto *fA = asCommutingBlindFai(a);
+	const auto *fB = asCommutingBlindFai(b);
+	return fA && fB && fA != fB && fA->getAddr() == fB->getAddr() &&
+	       fA->getSize() == fB->getSize() && fA->getOp() == fB->getOp() &&
+	       fA->getOpVal() == fB->getOpVal();
+}
+
+/* The read part of WLAB if it is an RMW write, or null */
+static auto getRMWRead(const WriteLabel &wLab) -> const ReadLabel *
+{
+	const auto *rLab =
+		genmc::dyn_cast_if_present<ReadLabel>(wLab.getParent()->po_imm_pred(&wLab));
+	return rLab && rLab->isRMW() ? rLab : nullptr;
+}
+
+/*
+ * Two blind relaxed FAIs that apply the same operation with the same operand
+ * to the same location write the same sequence of values in either order, and
+ * neither synchronizes with anything.  Executions that differ only in their
+ * relative order are thus equivalent, and we keep the order in which they are
+ * added: a new such FAI does not read from a store that an identical FAI
+ * already reads from (which would place it before that FAI).  The co-maximal
+ * store is always kept, so reads stay extensible.
+ *
+ * Reading co-maximally puts everything before the co-maximal store into the
+ * new FAI's prefix, so later writes hb-after it can no longer revisit those
+ * reads.  That loses no behavior only if (a) all writes to the location are
+ * identical blind FAIs, so the only reads affected are theirs, whose revisits
+ * are again swaps, and (b) no other read lies between the skipped store and the
+ * co-maximal one in prefix order.  A different write to the location that
+ * arrives later is reported by checkBlindRMWWellFormedness().
+ */
+void GenMCDriver::filterCommutingBlindRMWs(const ReadLabel *rLab,
+					   std::vector<EventLabel *> &stores) const
+{
+	const auto *fLab = asCommutingBlindFai(rLab);
+	if (!fLab)
+		return;
+
+	const auto &g = getExec().getGraph();
+	auto addr = fLab->getAddr();
+
+	/* (a): every write to the location so far is an identical blind FAI */
+	if (!std::ranges::all_of(g.co(addr), [&](auto &wLab) {
+		    const auto *pLab = getRMWRead(wLab);
+		    return pLab && areCommutingTwins(pLab, fLab);
+	    }))
+		return;
+
+	const auto *coMax = g.co_max(addr);
+	if (genmc::isa<InitLabel>(coMax))
+		return;
+
+	/* (b): between SLAB and the co-maximal store, the prefix holds only twins */
+	const auto &maxView = getPrefixView(coMax);
+	const auto &ownView = getPrefixView(fLab);
+	auto onlyTwinsAfter = [&](const EventLabel *sLab) {
+		const auto *sView = genmc::isa<InitLabel>(sLab) ? nullptr : &getPrefixView(sLab);
+		for (auto t = 0; t < g.getNumThreads(); t++) {
+			auto from = std::max(ownView.getMax(t), sView ? sView->getMax(t) : -1);
+			for (auto i = std::max(from + 1, 0); i <= maxView.getMax(t); i++) {
+				const auto *lab = g.getEventLabel(Event(t, i));
+				if (genmc::isa<ReadLabel>(lab) && !areCommutingTwins(lab, fLab))
+					return false;
+			}
+		}
+		return true;
+	};
+	auto isReadByTwin = [&](const EventLabel *sLab) {
+		auto isTwin = [&](auto &oLab) { return areCommutingTwins(&oLab, fLab); };
+		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(sLab))
+			return std::ranges::any_of(wLab->readers(), isTwin);
+		return std::ranges::any_of(genmc::cast<InitLabel>(sLab)->rfs(addr), isTwin);
+	};
+
+	auto kept = stores;
+	std::erase_if(kept, [&](auto *sLab) {
+		return sLab != coMax && isReadByTwin(sLab) && onlyTwinsAfter(sLab);
+	});
+	if (!kept.empty())
+		stores = std::move(kept);
+}
+
+auto GenMCDriver::checkBlindRMWWellFormedness(const ReadLabel *rLab) -> bool
+{
+	if (!getConf()->blindRMWReduction || asCommutingBlindFai(rLab))
+		return true;
+
+	/*
+	 * A read that is hb-after one blind FAI but not after an identical one
+	 * observes their order: it may see the first without the second.  The
+	 * reduction may have fixed that order, so such a read is not supported.
+	 */
+	const auto &g = getExec().getGraph();
+	const auto &view = getConsChecker().getHbView(rLab);
+	std::vector<const ReadLabel *> twins;
+	for (const auto &wLab : g.co(rLab->getAddr())) {
+		if (const auto *pLab = getRMWRead(wLab); asCommutingBlindFai(pLab))
+			twins.push_back(pLab);
+	}
+	auto valid = std::ranges::none_of(twins, [&](auto *aLab) {
+		return view.contains(aLab->getPos()) && std::ranges::any_of(twins, [&](auto *bLab) {
+			       return areCommutingTwins(aLab, bLab) &&
+				      !view.contains(bLab->getPos());
+		       });
+	});
+	if (!valid)
+		reportError(
+			rLab->getPos(),
+			{rLab->getPos(), VerificationError::VE_BlindRMWWellFormedness,
+			 "This read observes the order of blind RMWs that --blind-rmw-reduction "
+			 "treats as unordered. Rerun without --blind-rmw-reduction.\n"});
+	return valid;
+}
+
+auto GenMCDriver::checkBlindRMWWellFormedness(const WriteLabel *sLab) -> bool
+{
+	if (!getConf()->blindRMWReduction)
+		return true;
+
+	/*
+	 * The reduction assumed that identical blind FAIs are the only writes to
+	 * their location.  If another write is not hb-after one of them, an order
+	 * we skipped might have let it revisit that FAI.  (Its prefix is no guide:
+	 * the order we kept may have put the FAIs there through their rf chain,
+	 * which creates no hb, as they are relaxed.)
+	 */
+	const auto &g = getExec().getGraph();
+	const auto *ownRead = getRMWRead(*sLab);
+	const auto &view = getConsChecker().getHbView(sLab);
+	std::vector<const ReadLabel *> twins;
+	for (const auto &wLab : g.co(sLab->getAddr())) {
+		const auto *rLab = getRMWRead(wLab);
+		if (&wLab != sLab && asCommutingBlindFai(rLab) && !areCommutingTwins(rLab, ownRead))
+			twins.push_back(rLab);
+	}
+	auto valid = std::ranges::none_of(twins, [&](auto *aLab) {
+		return !view.contains(aLab->getPos()) &&
+		       std::ranges::any_of(
+			       twins, [&](auto *bLab) { return areCommutingTwins(aLab, bLab); });
+	});
+	if (!valid)
+		reportError(
+			sLab->getPos(),
+			{sLab->getPos(), VerificationError::VE_BlindRMWWellFormedness,
+			 "Blind RMWs on this location are reordered by --blind-rmw-reduction, but "
+			 "this write is not one of them. Rerun without --blind-rmw-reduction.\n"});
+	return valid;
+}
+
 void GenMCDriver::filterValuesFromAnnotSAVER(const ReadLabel *rLab,
 					     std::vector<EventLabel *> &validStores)
 {
@@ -1677,6 +1849,10 @@ void GenMCDriver::filterOptimizeRfs(const ReadLabel *lab, std::vector<EventLabel
 	if (!getConf()->disableBAM)
 		filterConflictingBarriers(lab, stores);
 
+	/* Identical blind RMWs commute */
+	if (getConf()->blindRMWReduction)
+		filterCommutingBlindRMWs(lab, stores);
+
 	/* Keep values that do not lead to blocking */
 	filterValuesFromAnnotSAVER(lab, stores);
 }
@@ -1767,6 +1943,9 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 		frontier.onNALoad(lab->getPos(), lab->getAccess(), getConsChecker().getHbView(lab));
 	else
 		frontier.onATLoad(lab->getPos(), lab->getAccess(), getConsChecker().getHbView(lab));
+
+	if (!checkBlindRMWWellFormedness(lab))
+		return {.result = VerificationError::VE_BlindRMWWellFormedness};
 
 	/* Check whether the load forces us to reconsider some existing event */
 	checkReconsiderFaiSpinloop(lab);
@@ -3067,6 +3246,9 @@ auto GenMCDriver::copyGraph(const BackwardRevisit *br, VectorClock *v) const
 
 void GenMCDriver::calcRevisits(WriteLabel *sLab)
 {
+	if (!checkBlindRMWWellFormedness(sLab))
+		return;
+
 	/* Random mode neither revisits nor IPRs */
 	if (inRandomMode())
 		return;
