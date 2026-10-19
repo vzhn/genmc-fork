@@ -41,7 +41,8 @@ public:
 	using IRExpr = SExpr<Value *>;
 	using IRExprUP = std::unique_ptr<SExpr<Value *>>;
 
-	/* Returns the annotation for a load */
+	/* Returns the annotation for a load, or nullptr if the annotation would
+	 * mention a register that has no value when the load executes */
 	auto annotate(Instruction *curr) -> IRExprUP;
 
 	/* Returns the condition under which bb jumps to its first successor.
@@ -106,6 +107,10 @@ private:
 
 	/* A helper status map */
 	InstStatusMap statusMap;
+
+	/* Registers that propagateAnnotFromSucc*() could not substitute (consulted
+	 * only by annotate(), where they belong to instructions after the load) */
+	VSet<Value *> unmodeled;
 
 	/* Maps instructions to annotations */
 	InstAnnotMap annotMap;
