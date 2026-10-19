@@ -178,7 +178,14 @@ extern void __VERIFIER_hazptr_retire(void *p) __attribute__ ((__nothrow__));
 #define GENMC_LKMM_RCU_LOCK   7
 #define GENMC_LKMM_RCU_UNLOCK 8
 #define GENMC_LKMM_SYNC_RCU   9
+#define GENMC_LKMM_FENCE_AFTER_SRCU_READ_UNLOCK 10
 extern void __VERIFIER_lkmm_fence(int kind) __attribute__ ((__nothrow__));
+/* SRCU (<lkmm.h>, -lkmm only): srcu_read_lock() reads an int of its
+ * srcu_struct, srcu_read_unlock() writes the index back to it, and
+ * synchronize_srcu() is a grace period of that srcu_struct */
+extern int __VERIFIER_srcu_read_lock(void *ssp) __attribute__ ((__nothrow__));
+extern void __VERIFIER_srcu_read_unlock(void *ssp, int idx) __attribute__ ((__nothrow__));
+extern void __VERIFIER_synchronize_srcu(void *ssp) __attribute__ ((__nothrow__));
 extern void __VERIFIER_rcu_read_lock(void) __attribute__ ((__nothrow__));
 extern void __VERIFIER_rcu_read_unlock(void) __attribute__ ((__nothrow__));
 extern void __VERIFIER_synchronize_rcu(void) __attribute__ ((__nothrow__));

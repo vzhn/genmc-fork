@@ -1251,12 +1251,22 @@ void Interpreter::exitCalled(GenericValue GV)
 /// from an invoke.
 ///
 void Interpreter::popStackAndReturnValueToCaller(Type *RetTy, GenericValue Result,
-						 ReturnInst *retI /* = nullptr */)
+						 ReturnInst *retI /* = nullptr */,
+						 DepInfo exitDeps /* = DepInfo() */)
 {
 	// Keep track of the ret inst to update deps if necessary:
 	// We check whether there _was_ an instruction which caused the
 	// stack frame to be popped, and that the instruction was a ret inst
 	// (That's why we have an extra parameter.)
+
+	// The thread's end depends on the value it returns (or passes to
+	// pthread_exit(): EXITDEPS)
+	if (ECStack().size() == 1 && retI)
+		if (const auto *d = getDataDeps(getCurThr().id, retI->getReturnValue()))
+			exitDeps.update(*d);
+	auto finishDeps = ECStack().size() == 1
+				  ? makeEventDeps(nullptr, &exitDeps, nullptr, nullptr, nullptr)
+				  : nullptr;
 
 	// Pop the current stack frame.
 	freeAllocas(ECStack().back().Allocas);
@@ -1273,7 +1283,7 @@ void Interpreter::popStackAndReturnValueToCaller(Type *RetTy, GenericValue Resul
 			runAtExitHandlers();
 		if (getProgramState() != ProgramState::Dtors)
 			CALL_DRIVER(handleThreadFinish, currDbgInfo(), currPos(),
-				    GV_TO_SVAL(Result, RetTy));
+				    GV_TO_SVAL(Result, RetTy), GET_DEPS(finishDeps));
 	} else {
 		// If we have a previous stack frame, and we have a previous call,
 		// fill in the return value...
@@ -1605,7 +1615,8 @@ void Interpreter::callLkmmFence(Function *F, const std::vector<GenericValue> &Ar
 				 const std::unique_ptr<EventDeps> &specialDeps)
 {
 	auto kind = ArgVals[0].IntVal.getLimitedValue();
-	ERROR_ON(kind > static_cast<uint64_t>(LkmmFenceKind::LAST),
+	ERROR_ON(kind > static_cast<uint64_t>(LkmmFenceKind::LAST) ||
+			 kind == static_cast<uint64_t>(LkmmFenceKind::SyncSrcu),
 		 "Unknown kind of LKMM fence ({})\n", kind);
 
 	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id), nullptr, nullptr);
@@ -1613,6 +1624,47 @@ void Interpreter::callLkmmFence(Function *F, const std::vector<GenericValue> &Ar
 		    GET_DEPS(deps));
 
 	/* Handle invoke-instruction */
+	returnValueToCaller(F->getReturnType() /* void */, PTOGV(nullptr));
+}
+
+void Interpreter::callSrcuReadLock(Function *F, const std::vector<GenericValue> &ArgVals,
+				    const std::unique_ptr<EventDeps> &specialDeps)
+{
+	auto *ssp = (GenericValue *)GVTOP(ArgVals[0]);
+	auto *typ = F->getReturnType();
+	auto size = getTypeSize(typ);
+
+	auto ret = CALL_DRIVER(handleSrcuLockRead, currDbgInfo(ssp), currPos(),
+			       MemOrdering::Relaxed, ssp, size, nullptr, std::nullopt,
+			       GET_DEPS(specialDeps));
+	auto *result = std::get_if<SVal>(&ret);
+	if (!result)
+		return;
+
+	returnValueToCaller(typ, SVAL_TO_GV(*result, typ));
+}
+
+void Interpreter::callSrcuReadUnlock(Function *F, const std::vector<GenericValue> &ArgVals,
+				      const std::unique_ptr<EventDeps> &specialDeps)
+{
+	auto *ssp = (GenericValue *)GVTOP(ArgVals[0]);
+	auto *typ = F->getFunctionType()->getParamType(1);
+
+	CALL_DRIVER(handleSrcuUnlockWrite, currDbgInfo(ssp), currPos(), MemOrdering::Relaxed, ssp,
+		    getTypeSize(typ), GV_TO_SVAL(ArgVals[1], typ), WriteAttr::None,
+		    GET_DEPS(specialDeps));
+
+	returnValueToCaller(F->getReturnType() /* void */, PTOGV(nullptr));
+}
+
+void Interpreter::callSyncSrcu(Function *F, const std::vector<GenericValue> &ArgVals,
+				const std::unique_ptr<EventDeps> &specialDeps)
+{
+	auto *ssp = (GenericValue *)GVTOP(ArgVals[0]);
+
+	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id), nullptr, nullptr);
+	CALL_DRIVER(handleSyncSrcu, currDbgInfo(), currPos(), SAddr(ssp), GET_DEPS(deps));
+
 	returnValueToCaller(F->getReturnType() /* void */, PTOGV(nullptr));
 }
 
@@ -3088,9 +3140,10 @@ void Interpreter::callThreadCreate(Function *F, const std::vector<GenericValue> 
 
 	SetValue(&*calledFun->arg_begin(), ArgVals[2], SF);
 
-	/* Then, inform the driver about the thread creation */
-	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id),
-				  getAddrPoDeps(getCurThr().id), nullptr);
+	/* Then, inform the driver about the thread creation (the create
+	 * depends on the argument passed) */
+	auto deps = makeEventDeps(nullptr, getDataDeps(getCurThr().id, ECStack().back().Caller.arg_begin()[2]),
+				  getCtrlDeps(getCurThr().id), getAddrPoDeps(getCurThr().id), nullptr);
 	int symm = ArgVals.size() > 3 ? ArgVals[3].IntVal.getLimitedValue() : -1;
 	auto info = ThreadInfo(-1, currPos().thread, MI->idInfo.VID.at(calledFun),
 			       SVal((uintptr_t)ArgVals[2].PointerVal), calledFun->getName().str(),
@@ -3103,6 +3156,7 @@ void Interpreter::callThreadCreate(Function *F, const std::vector<GenericValue> 
 	/* Prepare the execution context for the new thread */
 	info.id = *tid;
 	constructAddThreadFromInfo(info);
+	setThreadArgDeps(*tid);
 
 	/* ... and return the TID of the created thread to the caller */
 	Type *typ = F->getReturnType();
@@ -3132,11 +3186,14 @@ void Interpreter::callThreadJoin(Function *F, const std::vector<GenericValue> &A
 void Interpreter::callThreadExit(Function *F, const std::vector<GenericValue> &ArgVals,
 				 const std::unique_ptr<EventDeps> &specialDeps)
 {
+	DepInfo exitDeps;
+	if (const auto *d = getDataDeps(getCurThr().id, ECStack().back().Caller.arg_begin()[0]))
+		exitDeps = *d;
 	while (ECStack().size() > 1) {
 		freeAllocas(ECStack().back().Allocas);
 		ECStack().pop_back();
 	}
-	popStackAndReturnValueToCaller(F->getReturnType(), ArgVals[0]);
+	popStackAndReturnValueToCaller(F->getReturnType(), ArgVals[0], nullptr, exitDeps);
 }
 
 void Interpreter::callAtExit(Function *F, const std::vector<GenericValue> &ArgVals,

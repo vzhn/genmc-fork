@@ -477,8 +477,9 @@ private:
 class TerminatorLabel : public EventLabel {
 
 protected:
-	TerminatorLabel(EventLabelKind kind, MemOrdering ord, Event pos)
-		: EventLabel(kind, pos, ord, EventDeps())
+	TerminatorLabel(EventLabelKind kind, MemOrdering ord, Event pos,
+			const EventDeps &deps = EventDeps())
+		: EventLabel(kind, pos, ord, deps)
 	{}
 
 public:
@@ -588,12 +589,13 @@ public:
 class ThreadFinishLabel : public TerminatorLabel {
 
 public:
-	ThreadFinishLabel(Event pos, MemOrdering ord, SVal retVal)
-		: TerminatorLabel(ThreadFinish, ord, pos), retVal(retVal)
+	ThreadFinishLabel(Event pos, MemOrdering ord, SVal retVal,
+			  const EventDeps &deps = EventDeps())
+		: TerminatorLabel(ThreadFinish, ord, pos, deps), retVal(retVal)
 	{}
 
-	ThreadFinishLabel(Event pos, SVal retVal)
-		: ThreadFinishLabel(pos, MemOrdering::Release, retVal)
+	ThreadFinishLabel(Event pos, SVal retVal, const EventDeps &deps = EventDeps())
+		: ThreadFinishLabel(pos, MemOrdering::Release, retVal, deps)
 	{}
 
 	/** Returns the join() operation waiting on this thread or
@@ -827,6 +829,8 @@ READ_PURE_SUBCLASS(SpeculativeRead);
 READ_PURE_SUBCLASS(ConfirmingRead);
 READ_PURE_SUBCLASS(BWaitRead);
 READ_PURE_SUBCLASS(CondVarWaitRead);
+/* LKMM: srcu_read_lock(), a read of its srcu_struct */
+READ_PURE_SUBCLASS(SrcuLockRead);
 
 /*******************************************************************************
  **                         FaiReadLabel Class
@@ -1242,6 +1246,9 @@ WRITE_PURE_SUBCLASS(CondVarInitWrite);
 WRITE_PURE_SUBCLASS(CondVarSignalWrite);
 WRITE_PURE_SUBCLASS(CondVarBcastWrite);
 WRITE_PURE_SUBCLASS(CondVarDestroyWrite);
+/* LKMM: srcu_read_unlock(), a write of its srcu_struct (the index that its
+ * srcu_read_lock() returned) */
+WRITE_PURE_SUBCLASS(SrcuUnlockWrite);
 
 /** Represents releasing a lock (e.g., pthread_mutex_unlock) */
 class UnlockWriteLabel : public WriteLabel {
@@ -1641,7 +1648,9 @@ enum class LkmmFenceKind : std::uint8_t {
 	RcuLock = 7,	     /* rcu_read_lock() */
 	RcuUnlock = 8,	     /* rcu_read_unlock() */
 	SyncRcu = 9,	     /* synchronize_rcu() */
-	LAST = SyncRcu
+	AfterSrcuReadUnlock = 10, /* smp_mb__after_srcu_read_unlock() */
+	SyncSrcu = 11,		  /* synchronize_srcu(), of an srcu_struct */
+	LAST = SyncSrcu
 };
 
 template <> struct std::formatter<LkmmFenceKind> {
@@ -1649,7 +1658,8 @@ template <> struct std::formatter<LkmmFenceKind> {
 	auto format(const LkmmFenceKind &kind, std::format_context &ctx) const
 	{
 		static const char *const names[] = {"mb", "rmb", "wmb", "ba", "aa", "as", "aul",
-						     "rcu-lock", "rcu-unlock", "sync-rcu"};
+						     "rcu-lock", "rcu-unlock", "sync-rcu",
+						     "asru", "sync-srcu"};
 		return std::format_to(ctx.out(), "{}", names[static_cast<size_t>(kind)]);
 	}
 };
@@ -1658,15 +1668,22 @@ template <> struct std::formatter<LkmmFenceKind> {
  * these fence events too). The LKMM checker orders by its kind; for the rest
  * of GenMC it carries the C11 fence closest to it (smp_mb() is seq_cst,
  * smp_rmb() and rcu_read_lock() acquire, smp_wmb() and rcu_read_unlock()
- * release, the rest seq_cst) */
+ * release, the rest seq_cst). A synchronize_srcu() has the address of its
+ * srcu_struct (herd7's location of the event), which is no memory access */
 class LkmmFenceLabel : public FenceLabel {
 
 public:
 	LkmmFenceLabel(Event pos, LkmmFenceKind kind, const EventDeps &deps = EventDeps())
 		: FenceLabel(LkmmFence, pos, orderingOf(kind), deps), kind(kind)
 	{}
+	LkmmFenceLabel(Event pos, LkmmFenceKind kind, SAddr srcu, const EventDeps &deps = EventDeps())
+		: FenceLabel(LkmmFence, pos, orderingOf(kind), deps), kind(kind), srcu(srcu)
+	{}
 
 	auto getFenceKind() const -> LkmmFenceKind { return kind; }
+
+	/** The srcu_struct of a synchronize_srcu() */
+	auto getSrcuAddr() const -> SAddr { return srcu; }
 
 	static auto orderingOf(LkmmFenceKind kind) -> MemOrdering
 	{
@@ -1686,6 +1703,7 @@ public:
 
 private:
 	LkmmFenceKind kind;
+	SAddr srcu;
 };
 
 /*******************************************************************************
@@ -2166,6 +2184,7 @@ template <> struct std::formatter<EventLabel::EventLabelKind> {
 		case EventLabel::CondVarWaitRead:
 		case EventLabel::SpeculativeRead:
 		case EventLabel::ConfirmingRead:
+		case EventLabel::SrcuLockRead:
 			str = "R";
 			break;
 		case EventLabel::CasRead:
@@ -2187,6 +2206,7 @@ template <> struct std::formatter<EventLabel::EventLabelKind> {
 		case EventLabel::CondVarBcastWrite:
 		case EventLabel::CondVarDestroyWrite:
 		case EventLabel::UnlockWrite:
+		case EventLabel::SrcuUnlockWrite:
 			str = "W";
 			break;
 		case EventLabel::CasWrite:

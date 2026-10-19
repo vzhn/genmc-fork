@@ -101,6 +101,10 @@ public:
 	{
 		return DELEGATE_LABEL(ReadLabel);
 	}
+	void visitSrcuLockReadLabel(const SrcuLockReadLabel &lab)
+	{
+		return DELEGATE_LABEL(ReadLabel);
+	}
 	void visitSpeculativeReadLabel(const SpeculativeReadLabel &lab)
 	{
 		return DELEGATE_LABEL(ReadLabel);
@@ -162,6 +166,10 @@ public:
 		return DELEGATE_LABEL(WriteLabel);
 	}
 	void visitCondVarDestroyWriteLabel(const CondVarDestroyWriteLabel &lab)
+	{
+		return DELEGATE_LABEL(WriteLabel);
+	}
+	void visitSrcuUnlockWriteLabel(const SrcuUnlockWriteLabel &lab)
 	{
 		return DELEGATE_LABEL(WriteLabel);
 	}

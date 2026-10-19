@@ -51,7 +51,8 @@ auto LKMMRcuChecker::withModel(const ExecutionGraph &g, bool generated) const ->
  * when LAB is the last event of its thread and has no successor (a read of
  * the co-maximal write, a co-maximal write, an event that is neither), as
  * an rb cycle, or a pair a plain-coherence rule forbids, has to leave it;
- * but closing a critical section orders the events already in it */
+ * but closing a critical section (rcu_read_unlock(), srcu_read_unlock())
+ * orders the events already in it */
 static auto mayBreakModel(const EventLabel *lab) -> bool
 {
 	const auto &g = *lab->getParent();
@@ -59,6 +60,8 @@ static auto mayBreakModel(const EventLabel *lab) -> bool
 		return true;
 	if (const auto *fLab = genmc::dyn_cast<LkmmFenceLabel>(lab))
 		return fLab->getFenceKind() == LkmmFenceKind::RcuUnlock;
+	if (genmc::isa<SrcuUnlockWriteLabel>(lab))
+		return true;
 	if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab))
 		return rLab->getRf() != g.co_max(rLab->getAddr());
 	if (const auto *wLab = genmc::dyn_cast<WriteLabel>(lab))

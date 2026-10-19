@@ -75,6 +75,7 @@ void Interpreter::resetThread(unsigned int id)
 	thr.currDbgInfo = {};
 
 	clearDeps(id);
+	setThreadArgDeps(id);
 
 	/* We don't _have to_ figure out the initial action for each thread here (since this is
 	 * done by addNewThread() which is called at the beginning of each execution), but
@@ -83,6 +84,19 @@ void Interpreter::resetThread(unsigned int id)
 	auto kind = thr.initEC.empty() ? ActionKind::Load
 				       : getInstKind(&*thr.initEC.back().CurInst);
 	dynState.globalInstructions[thr.id] = {kind, Event(thr.id, 0)};
+}
+
+void Interpreter::setThreadArgDeps(unsigned int id)
+{
+	/* A thread's argument depends on its start, as the start on the
+	 * create, which depends on the argument passed (LKMM's SRCU follows
+	 * these, as data dependencies through memory, to match an unlock) */
+	auto &thr = getThrById(id);
+	if (thr.id == 0 || thr.initEC.empty())
+		return;
+	auto *F = thr.initEC.back().CurFunction;
+	if (F && !F->arg_empty())
+		updateDataDeps(id, &*F->arg_begin(), Event(id, 0));
 }
 
 void Interpreter::reset()
@@ -266,9 +280,16 @@ std::unique_ptr<EventDeps> Interpreter::updateFunArgDeps(unsigned int tid, Funct
 		return nullptr;
 	}
 	/* We have addr dependency on the argument of mutex/barrier/condvar calls */
-	if (isMutexCode(iFunCode) || isCondVarCode(iFunCode)) {
+	if (isMutexCode(iFunCode) || isCondVarCode(iFunCode) ||
+	    iFunCode == InternalFunctions::SrcuReadLock) {
 		return makeEventDeps(getDataDeps(tid, *SF.Caller.arg_begin()), nullptr,
 				     getCtrlDeps(tid), getAddrPoDeps(tid), nullptr);
+	}
+	/* srcu_read_unlock() writes its second argument: a data dependency */
+	if (iFunCode == InternalFunctions::SrcuReadUnlock) {
+		return makeEventDeps(getDataDeps(tid, SF.Caller.arg_begin()[0]),
+				     getDataDeps(tid, SF.Caller.arg_begin()[1]), getCtrlDeps(tid),
+				     getAddrPoDeps(tid), nullptr);
 	}
 	return nullptr;
 }
@@ -279,7 +300,10 @@ void Interpreter::updateInternalFunRetDeps(unsigned int tid, Function *F, Instru
 	if (it == internalFunCache_.end())
 		return;
 
-	if (isAllocCode(it->second))
+	/* The value a join returns depends on the join, as the join on the
+	 * thread's end, which depends on the value returned */
+	if (isAllocCode(it->second) || it->second == InternalFunctions::SrcuReadLock ||
+	    it->second == InternalFunctions::ThreadJoin)
 		updateDataDeps(tid, CS, threadPos(tid));
 }
 

@@ -595,7 +595,7 @@ private: // Helper functions
 	translateExternalCallArgs(Function *F, const std::vector<GenericValue> &Args) const;
 	void returnValueToCaller(Type *RetTy, GenericValue Result);
 	void popStackAndReturnValueToCaller(Type *RetTy, GenericValue Result,
-					    ReturnInst *retI = nullptr);
+					    ReturnInst *retI = nullptr, DepInfo exitDeps = DepInfo());
 
 	void setProgramState(ProgramState s) { dynState.programState = s; }
 
@@ -689,6 +689,8 @@ private: // Helper functions
 
 	std::unique_ptr<EventDeps> updateFunArgDeps(unsigned int tid, Function *F);
 	void updateInternalFunRetDeps(unsigned int tid, Function *F, Instruction *CS);
+
+	void setThreadArgDeps(unsigned int id);
 
 	void clearDeps(unsigned int tid)
 	{
