@@ -415,6 +415,18 @@ auto ExecutionState::onAlloc(Event pos, ASize size, uint64_t alignment, StorageD
 	return addr;
 }
 
+void ExecutionState::onAllocAt(Event pos, SAddr addr, ASize size, uint64_t alignment)
+{
+	/* The allocation failed (out of memory) */
+	if (addr == SAddr())
+		return;
+
+	VERIFY(!allocInfoMap_.contains(addr));
+	allocInfoMap_.add(
+		{{addr, addr + size}, {pos, AAccess(addr, size), static_cast<unsigned int>(alignment)}});
+	getAllocator().reserve(addr, size.get());
+}
+
 void ExecutionState::onFree(Event pos, SAddr addr, bool isRetire)
 {
 	auto it = allocInfoMap_.find(addr);

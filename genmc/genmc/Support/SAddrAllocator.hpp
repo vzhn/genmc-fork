@@ -84,6 +84,10 @@ public:
 
 	void restrict(const VectorClock &view);
 
+	/** Marks the dynamic block [ADDR, ADDR + SIZE) as taken, so that its
+	 * thread's later allocations come after it */
+	void reserve(SAddr addr, uint64_t size);
+
 	friend struct std::formatter<SAddrAllocator>;
 
 private:
