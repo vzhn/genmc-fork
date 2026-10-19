@@ -141,3 +141,24 @@ TEST(RelocateTest, ViewBelowTheMoveIsUnchanged)
 	v.relocateThread(2, 3, 1);
 	EXPECT_EQ(v.getMax(2), 5);
 }
+
+/* A view that owns its storage and has a pending diff_ (it took the
+ * diff_ while the storage was shared, then the other owner went away):
+ * moving the thread down must not keep the diff_'s larger index */
+TEST(RelocateTest, ViewWithPendingDiffMovesDown)
+{
+	View v;
+	{
+		View shared;
+		shared.setMax(Event(1, 3));
+		shared.setMax(Event(2, 4)); /* hydrates */
+		v = shared;		    /* shares the storage */
+		v.updateIdx(Event(0, 7));   /* a diff_, as the storage is shared */
+	}
+	ASSERT_EQ(v.getMax(0), 7);
+
+	v.relocateThread(0, 5, -2);
+	EXPECT_EQ(v.getMax(0), 5);
+	EXPECT_EQ(v.getMax(1), 3);
+	EXPECT_EQ(v.getMax(2), 4);
+}

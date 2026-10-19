@@ -240,8 +240,12 @@ public:
 	void relocateThread(int thread, int from, int delta) override
 	{
 		auto max = getMax(thread);
-		if (auto nmax = relocatedIndex(max, from, delta); nmax != max)
-			setMax(Event(thread, nmax));
+		if (auto nmax = relocatedIndex(max, from, delta); nmax != max) {
+			/* Not setMax(): with a pending diff_, its fast paths can keep a
+			 * larger index than the one set */
+			hydrate();
+			base_->setMax(Event(thread, nmax));
+		}
 	}
 
 	/** Updates the view based on another vector clock. We can

@@ -12,6 +12,8 @@ checking it against herd7, the reference implementation of LKMM.
 | `classify.py` | sorts the disagreements of a run by likely cause |
 | `kater-export.sh` | regenerates GenMC's consistency checkers from the kat files |
 | `compare-checkers.sh` | compares two GenMC builds under every model |
+| `fuzz-ctrl.py` | random litmus tests with branches of different lengths |
+| `feature-matrix.py` | runs the `-lkmm` tests under GenMC's options |
 
 ## Oracles (pinned)
 
@@ -584,6 +586,21 @@ vzhn.8 (an indirect call's callee did not depend on the pointer's read);
 `cas-fail-then-write`, a failed relaxed `cmpxchg()` followed by a kept
 write that a revisit makes succeed, crashed before its write got a slot
 (vzhn.8 misses its LB execution: 3 of herd7's 4).
+
+Random tests (`fuzz-ctrl.py`, seeds 0-799: two to three threads, nested
+`if`/`else` of different lengths, fences, acquire/release, relaxed
+`cmpxchg()`), with `--strict-counts`: vzhn.8 agrees on 723, this branch on
+746 (28 fixed: missing states or counts). 5 now miss executions
+(seeds 158, 372, 560, 606, 671): the existence of an event after a join
+depends on a register a branch set, or a marked read in a branch is ordered
+before a later write (fri), and GenMC's optimality check then rejects the
+only revisit that builds the execution (see the prefix stability above;
+a static rule for marked reads fixes 158 and breaks `C-viro-2020.09.29a`).
+Over herd7's counts: those with `cmpxchg()` (failed reads counted
+differently, as before), and a duplicate that vzhn.8 has too
+(`tests/cooking/lkmm/dup-revisit-nested-if`, reduced from seed 586; not
+under `-imm`). The fuzzing also found a view corrupted by a move
+(`RelocateTest.ViewWithPendingDiffMovesDown`, fixed).
 
 Results (2026-10-20):
 
