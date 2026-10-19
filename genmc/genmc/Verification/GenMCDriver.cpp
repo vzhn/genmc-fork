@@ -794,7 +794,7 @@ auto GenMCDriver::checkAccessValidity(Event pos, const AAccess &access)
 	auto &state = getExec().getGraph().getState();
 	if ((!getConf()->disableStaticValidityChecks && !access.addr.isDynamic() &&
 	     !state.isStatic(access.addr)) ||
-	    (access.addr.isDynamic() && !state.isAllocated(access.addr))) {
+	    (access.addr.isDynamic() && !state.isAccessible(access.addr))) {
 		reportError(pos, {pos, VerificationError::VE_AccessNonMalloc});
 		return {VerificationError::VE_AccessNonMalloc};
 	}

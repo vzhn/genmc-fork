@@ -32,14 +32,12 @@ void free(void *ptr)
 static inline __attribute__((always_inline))
 void *malloc(size_t size)
 {
-	assert(size > 0 && "Zero size in malloc()");
 	return __VERIFIER_malloc(size);
 }
 
 static inline __attribute__((always_inline))
 void *calloc(size_t nmemb, size_t size)
 {
-	assert(nmemb > 0 && size > 0 && "Zero size in calloc()");
 	return __VERIFIER_calloc(nmemb, size);
 }
 
