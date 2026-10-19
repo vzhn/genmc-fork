@@ -1,1 +1,2 @@
-|
+-lkmm-reference |
+-lkmm-reference -schedule-policy=arbitrary -schedule-seed=1 |

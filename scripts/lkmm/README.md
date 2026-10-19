@@ -155,7 +155,7 @@ barriers to `__VERIFIER_lkmm_fence()` (an `LkmmFenceLabel` with the kind)
 and the fully ordered RMWs carry the `Mb` attribute; everything else is the
 C11 mapping. The models' `tests/correct/lkmm` category has the kernel-model
 ports (phase 1, now also with `-lkmm` expected counts), v0.9's LKMM litmus
-tests (54 of 82: the RCU and plain-access ones stay in `tests/cooking/lkmm`),
+tests (54 of 82: the RCU ones came in phase 3, the plain-access ones stay in `tests/cooking/lkmm`),
 the lock-free `llist` (correct under `-lkmm` only: it relies on an address
 dependency into a read) and the regression test of a bug found on the way.
 `driver.sh` runs a correct test under `lkmm` iff it has an
@@ -240,6 +240,103 @@ The kernel-model ports under `-lkmm` versus `-imm`: `slab-rcu-lookup` has 9
 executions instead of 11 (IMM lets the reader read the republished bucket
 and then the stale key through the address dependency; LKMM's `to-r` orders
 it), the others are equal.
+
+## Phase 3: RCU
+
+Under `-lkmm`, `rcu_read_lock()`, `rcu_read_unlock()` and
+`synchronize_rcu()` are events, as in herd7 (`LkmmFenceLabel` kinds
+`rcu-lock`, `rcu-unlock`, `sync-rcu`); under the other models `<lkmm.h>`
+keeps its reader-flag emulation. The kat puts the grace period into
+`strong-fence` (`gp`, between accesses); the rest of RCU, `rcu-order`, counts
+grace periods against critical sections and is no regular relation. GenMC
+evaluates it directly: `genmc/Execution/LkmmModel.cpp` computes the model's
+relations on the whole graph as bit matrices (with herd7's own `gp` and
+`rcu-rscs`, the bell's innermost-first matching), `rcu-order` as the cat's
+least fixpoint, and checks `irreflexive rb`. `LKMMRcuChecker`, a subclass of
+the generated `LKMMChecker` (Kater's printer now makes its overrides
+protected), runs it for graphs with a `synchronize_rcu()`, when the added
+event can close an `rb` cycle. `-lkmm-reference` runs the evaluation on every
+graph and stops where it and the generated checker disagree on coherence,
+atomicity, `hb` or `pb` (plan 5.2); the RCU tests in `tests/correct/lkmm`
+run with it.
+
+A grace period orders a reader's accesses before a `kfree()` that follows
+`synchronize_rcu()`, which GenMC's porf view does not see: the two
+freed-memory rules (`last_accesses ; [FREE] <= hb`, `free ; [R | W] = 0`)
+moved from the kat into `LKMMRcuChecker`, which also accepts an access
+`(po | rf | tc | tj | rcu-fence)+`-before the free. A critical section still
+open counts as closed at the end of its thread (the access is checked when
+it is added, before its `rcu_read_unlock()`).
+
+Invalid RCU usage, which the kernel's lockdep reports, is an error under
+`-lkmm`: `rcu_read_unlock()` without a lock (herd7 flags
+`unmatched-rcu-unlock`), a thread that ends in a critical section
+(`unmatched-rcu-lock`), and `synchronize_rcu()` in a critical section (an
+RCU self-deadlock: LKMM has no execution, `lkmm-diff.py` counts that as
+`agree-deadlock`). A self-deadlock across threads (a critical section that
+creates and joins a thread calling `synchronize_rcu()`) is not reported.
+
+Bugs found on the way, each with a regression test that fails without its
+fix:
+
+- the driver does not check a read that takes the co-maximal write, or a
+  fence: sound for orderings within ppo, but `rcu_read_unlock()` closes a
+  critical section and so orders events already in the graph. It is now
+  checked when added (`tests/correct/lkmm/rcu-gp2`: the forbidden outcome
+  was reported as a safety violation);
+- a revisit kept a read's later events but not the fences among them (no
+  fence was in the revisit prefix): `synchronize_rcu()` and
+  `rcu_read_unlock()` came back later in the middle of their thread,
+  unchecked; and a revisited read that takes the co-maximal write skipped
+  the check while `rcu-link` and `rcu-fence` order by `po`, not `ppo`. The
+  kat's prefix relation has `[F] ; po` now (no access gains an ordering:
+  whatever ppo leads from an event into a fence already orders it before
+  every event after the fence), and `LKMMRcuChecker` refuses the
+  co-maximal shortcut for a read that is not the last of its thread
+  (`tests/correct/lkmm/rcu-gp-revisit`, the corpus's `C-RW-G+RW-R1`: five
+  corpus tests allowed a forbidden state, with either fix alone too);
+- the freed-memory check needs the open critical sections closed: without
+  it, `rcu-list-del` reported a use of freed memory under
+  `-schedule-policy=arbitrary` (`tests/correct/lkmm/rcu-list-del`, seed 1);
+- strong fences ordered only accesses, as the cat's `[M]` has it, but
+  GenMC's thread creation and join synchronise like a release and an
+  acquire: `WRITE_ONCE(x, 1); smp_mb(); pthread_create()` did not order the
+  child's writes after `x` for a reader with `smp_rmb()` (allowed under
+  `-lkmm` since phase 2), and with `synchronize_rcu()` the generated checker
+  and the model disagreed (found by the review; `tests/correct/lkmm/fence-thread`:
+  creation and join, `smp_mb()` and `synchronize_rcu()`; under RC11 and IMM
+  the outcome is allowed, as `y` is written without a release). The kat's
+  `mb`, the model and `prop-int` let a strong fence reach thread events.
+
+Tests: v0.9's RCU tests (16, v0.9's counts; `rcu+wb-ext` is the wrong
+test `tests/wrong/safety/rcu+wb-ext-lkmm`, herd7 allows its outcome), the
+kernel's `RCU+sync+free` with `call_rcu()` emulated
+(`tests/correct/lkmm/rcu-sync-free`; without the grace period,
+`tests/wrong/memory/rcu-sync-free-no-gp-lkmm`), publication with
+`rcu_assign_pointer()` (`rcu-publish`; with `WRITE_ONCE()`,
+`tests/wrong/safety/rcu-publish-write-once-lkmm`), liburcu's urcu-mb on
+the kernel's primitives (`urcu-mb`, 34 executions as in C11; one phase
+flip, `tests/wrong/memory/urcu-single-flip-lkmm`), the misuses
+(`tests/wrong/locking/rcu-invalid-lkmm`), message passing through thread
+creation and join after a strong fence (`fence-thread`), and the kernel ports, whose RCU is
+now the model's: `rcu-list-del` has 2 executions (3 with the emulation),
+`slab-rcu-lookup` 9. A wrong test named `*-lkmm` runs under another model
+only with that model's `genmc.<model>.*.in`.
+
+Results (2026-10-19), herd7 7.58:
+
+| suite | result |
+|---|---|
+| corpus with `rcu_read_lock`/`synchronize_rcu`, no SRCU (1544 files) | 1373 agree, 1 agree-racy, 8 agree-deadlock, 47 skipped (LISA), 109 herd7 timeout, 2 herd7 error, 2 race (plain accesses, phase 4), 2 GenMC timeout at 30 s (below) |
+| corpus without RCU (3167 files) | as in phase 2 |
+
+The two GenMC timeouts are 7-thread grace-period tests with 16384
+executions (herd7: 58 s); alone, without `-print-exec-graphs`, they take
+9-13 s depending on the machine's load (20.8 s before three optimisations:
+the evaluation only where an `rb` cycle can close, sparse closures, and
+`prop-int` remembered within one check), over the plan's 10 s. The
+12-thread grace-period tests take about 4 s (herd7: 26 s). Plan phase 6
+(an incremental RCU computation) is the next step for these.
 
 ## Kater and the generated checkers
 

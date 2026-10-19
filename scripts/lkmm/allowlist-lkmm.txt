@@ -66,3 +66,7 @@ manual/plain/C-non-conflicting-writes.litmus race plain accesses: LKMM's plain-a
 manual/plain/C-non-race1-rrdep.litmus race plain accesses: LKMM's plain-access rules (races, plain-coherence, their fences) are phase 4
 manual/plain/C-non-race1-rwdep.litmus race plain accesses: LKMM's plain-access rules (races, plain-coherence, their fences) are phase 4
 manual/plain/C-non-race1.litmus race plain accesses: LKMM's plain-access rules (races, plain-coherence, their fences) are phase 4
+manual/plain/C-S-rcunoderef-2.litmus race plain accesses: LKMM's plain-access rules (races, plain-coherence, their fences) are phase 4
+manual/plain/C-S-rcunoderef-3.litmus race plain accesses: LKMM's plain-access rules (races, plain-coherence, their fences) are phase 4
+manual/memb/C-memb-RCU-0.litmus herd-error herd7 rejects the test (unknown macro or annotation)
+manual/memb/C-memb-RCU-1.litmus herd-error herd7 rejects the test (unknown macro or annotation)

@@ -1638,21 +1638,27 @@ enum class LkmmFenceKind : std::uint8_t {
 	AfterAtomic = 4,   /* smp_mb__after_atomic() */
 	AfterSpinlock = 5, /* smp_mb__after_spinlock() */
 	AfterUnlockLock = 6, /* smp_mb__after_unlock_lock() */
-	LAST = AfterUnlockLock
+	RcuLock = 7,	     /* rcu_read_lock() */
+	RcuUnlock = 8,	     /* rcu_read_unlock() */
+	SyncRcu = 9,	     /* synchronize_rcu() */
+	LAST = SyncRcu
 };
 
 template <> struct std::formatter<LkmmFenceKind> {
 	constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
 	auto format(const LkmmFenceKind &kind, std::format_context &ctx) const
 	{
-		static const char *const names[] = {"mb", "rmb", "wmb", "ba", "aa", "as", "aul"};
+		static const char *const names[] = {"mb", "rmb", "wmb", "ba", "aa", "as", "aul",
+						     "rcu-lock", "rcu-unlock", "sync-rcu"};
 		return std::format_to(ctx.out(), "{}", names[static_cast<size_t>(kind)]);
 	}
 };
 
-/** A memory barrier of the Linux kernel. The LKMM checker orders by its kind;
- * for the rest of GenMC it carries the C11 fence closest to it (smp_mb() is
- * seq_cst, smp_rmb() acquire, smp_wmb() release, the rest seq_cst) */
+/** A memory barrier of the Linux kernel, or an RCU primitive (herd7 makes
+ * these fence events too). The LKMM checker orders by its kind; for the rest
+ * of GenMC it carries the C11 fence closest to it (smp_mb() is seq_cst,
+ * smp_rmb() and rcu_read_lock() acquire, smp_wmb() and rcu_read_unlock()
+ * release, the rest seq_cst) */
 class LkmmFenceLabel : public FenceLabel {
 
 public:
@@ -1666,8 +1672,10 @@ public:
 	{
 		switch (kind) {
 		case LkmmFenceKind::Rmb:
+		case LkmmFenceKind::RcuLock:
 			return MemOrdering::Acquire;
 		case LkmmFenceKind::Wmb:
+		case LkmmFenceKind::RcuUnlock:
 			return MemOrdering::Release;
 		default:
 			return MemOrdering::SequentiallyConsistent;

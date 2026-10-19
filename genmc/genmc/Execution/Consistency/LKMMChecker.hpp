@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater 4aa0c4d (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater 4a1ab82 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_LKMM_CHECKER_HPP
@@ -157,7 +157,7 @@ private:
 public:
 	LKMMChecker(const Config *conf) : ConsistencyChecker(conf) {};
 
-private:
+protected: // subclasses may refine the generated checks (e.g., hand-written axioms)
 	bool isConsistent(const EventLabel *lab) const override;
 	bool isConsistent(const ExecutionGraph &g) const override;
 	bool isCoherentRelinche(const ExecutionGraph &g) const override;
@@ -180,27 +180,27 @@ private:
 	void maybeDecreaseCacheCounters(const EventLabel *lab) const override;
 	void maybeIncreaseCacheCounters(const EventLabel *lab) const override;
 
-	mutable NodeStatusVector<uint32_t> visitedCalc114_0;
-	mutable NodeStatusVector<uint32_t> visitedCalc114_1;
-	mutable NodeStatusVector<uint32_t> visitedCalc114_2;
+	mutable NodeStatusVector<uint32_t> visitedCalc117_0;
+	mutable NodeStatusVector<uint32_t> visitedCalc117_1;
+	mutable NodeStatusVector<uint32_t> visitedCalc117_2;
 
-	bool visitCalc114Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
+	bool visitCalc117Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
-	View visitCalc114(const EventLabel *lab) const;
+	View visitCalc117(const EventLabel *lab) const;
 	auto getCohView(const EventLabel *lab) const -> const View & { return lab->view(0); }
 	auto getCohViewIndex() const -> unsigned { return 0; }
 
-	auto checkCalc114(const EventLabel *lab) const;
-	mutable NodeStatusVector<uint32_t> visitedCalc115_0;
-	mutable NodeStatusVector<uint32_t> visitedCalc115_1;
-	mutable NodeStatusVector<uint32_t> visitedCalc115_2;
+	auto checkCalc117(const EventLabel *lab) const;
+	mutable NodeStatusVector<uint32_t> visitedCalc118_0;
+	mutable NodeStatusVector<uint32_t> visitedCalc118_1;
+	mutable NodeStatusVector<uint32_t> visitedCalc118_2;
 
-	bool visitCalc115Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
+	bool visitCalc118Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
-	View visitCalc115(const EventLabel *lab) const;
+	View visitCalc118(const EventLabel *lab) const;
 	auto getHbViewIndex() const -> unsigned { return 1; }
 
-	auto checkCalc115(const EventLabel *lab) const;
+	auto checkCalc118(const EventLabel *lab) const;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_0;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_1;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_2;
@@ -357,38 +357,16 @@ private:
 	mutable std::vector<bool> visitedLHSUnlessError7Accepting;
 	bool visitUnlessError7(const EventLabel *lab) const;
 	bool checkError7(const EventLabel *lab) const;
-	bool visitError8(const EventLabel *lab) const;
-	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError8_0;
-	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError8_1;
+	bool visitWarning8(const EventLabel *lab) const;
+	mutable NodeStatusVector<uint32_t> visitedLHSUnlessWarning8_0;
+	mutable NodeStatusVector<uint32_t> visitedLHSUnlessWarning8_1;
 
-	bool visitLHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &worklist) const;
+	bool visitLHSUnlessWarning8Iterative(std::vector<DFSWorklistEntry> &worklist,
+					     const View &v) const;
 
-	bool visitRHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &worklist) const;
-
-	mutable std::vector<bool> visitedLHSUnlessError8Accepting;
-	mutable std::vector<bool> visitedRHSUnlessError8Accepting;
-	bool visitUnlessError8(const EventLabel *lab) const;
-	bool checkError8(const EventLabel *lab) const;
-	bool visitError9(const EventLabel *lab) const;
-	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError9_0;
-	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError9_1;
-
-	bool visitLHSUnlessError9Iterative(std::vector<DFSWorklistEntry> &worklist,
-					   const View &v) const;
-
-	mutable std::vector<bool> visitedLHSUnlessError9Accepting;
-	bool visitUnlessError9(const EventLabel *lab) const;
-	bool checkError9(const EventLabel *lab) const;
-	bool visitWarning10(const EventLabel *lab) const;
-	mutable NodeStatusVector<uint32_t> visitedLHSUnlessWarning10_0;
-	mutable NodeStatusVector<uint32_t> visitedLHSUnlessWarning10_1;
-
-	bool visitLHSUnlessWarning10Iterative(std::vector<DFSWorklistEntry> &worklist,
-					      const View &v) const;
-
-	mutable std::vector<bool> visitedLHSUnlessWarning10Accepting;
-	bool visitUnlessWarning10(const EventLabel *lab) const;
-	bool checkWarning10(const EventLabel *lab) const;
+	mutable std::vector<bool> visitedLHSUnlessWarning8Accepting;
+	bool visitUnlessWarning8(const EventLabel *lab) const;
+	bool checkWarning8(const EventLabel *lab) const;
 
 	void visitPPoRf0(const EventLabel *lab, DepView &pporf) const;
 	void visitPPoRf1(const EventLabel *lab, DepView &pporf) const;

@@ -563,7 +563,8 @@ auto GenMCDriver::isExecutionValid(const EventLabel *lab) -> bool
 {
 	const auto *rLab = genmc::dyn_cast<ReadLabel>(lab);
 	return (!getConf()->symmetryReduction || getSymmChecker().isSymmetryOK(lab)) &&
-	       ((rLab && rLab->getRf() == getExec().getGraph().co_max(rLab->getAddr())) ||
+	       ((rLab && rLab->getRf() == getExec().getGraph().co_max(rLab->getAddr()) &&
+		 getConsChecker().isCoMaxReadConsistent(rLab)) ||
 		getConsChecker().isConsistent(lab)) &&
 	       !partialExecutionExceedsBound();
 }
@@ -1399,12 +1400,34 @@ auto GenMCDriver::handleThreadJoin(const EventDbgInfo *dbg, Event pos, int child
 	return handleThreadJoin(ThreadJoinLabel::create(pos, childTid, deps));
 }
 
+/* The depth of the RCU read-side critical sections open in POS's thread
+ * before POS (an rcu_read_unlock() without a lock leaves it at zero) */
+static auto getRcuNesting(const ExecutionGraph &g, Event pos) -> unsigned
+{
+	auto nesting = 0U;
+	for (auto i = 0; i < pos.index; i++) {
+		const auto *fLab =
+			genmc::dyn_cast_if_present<LkmmFenceLabel>(g.getEventLabelIfPresent(Event(pos.thread, i)));
+		if (fLab && fLab->getFenceKind() == LkmmFenceKind::RcuLock)
+			++nesting;
+		else if (fLab && fLab->getFenceKind() == LkmmFenceKind::RcuUnlock && nesting > 0)
+			--nesting;
+	}
+	return nesting;
+}
+
 auto GenMCDriver::handleThreadFinish(std::unique_ptr<ThreadFinishLabel> eLab)
 	-> HandleResult<std::monostate>
 {
 	auto &g = getExec().getGraph();
 
 	auto *lab = addLabelToGraph(std::move(eLab));
+	if (getRcuNesting(g, lab->getPos()) > 0) {
+		reportError(lab->getPos(),
+			    {lab->getPos(), VerificationError::VE_InvalidRcu,
+			     "Thread ends in an RCU read-side critical section!"});
+		return {.result = VerificationError::VE_InvalidRcu};
+	}
 	for (auto i = 0; i < g.getNumThreads(); i++) {
 		auto *pLab = genmc::dyn_cast_if_present<JoinBlockLabel>(g.getLastThreadLabel(i));
 		if (pLab && std::cmp_equal(pLab->getChildId(), lab->getThread())) {
@@ -1463,7 +1486,27 @@ auto GenMCDriver::handleLkmmFence(const EventDbgInfo *dbg, Event pos, LkmmFenceK
 							     MemOrdering::Release));
 		return {.result = std::monostate{}, .count = 1U};
 	}
-	return handleFence(LkmmFenceLabel::create(pos, kind, deps));
+	auto &g = getExec().getGraph();
+	auto nesting = getRcuNesting(g, pos);
+	auto res = handleFence(LkmmFenceLabel::create(pos, kind, deps));
+	if (kind == LkmmFenceKind::RcuUnlock && nesting == 0) {
+		reportError(pos, {pos, VerificationError::VE_InvalidRcu,
+				  "rcu_read_unlock() without a matching rcu_read_lock()!"});
+		return {.result = VerificationError::VE_InvalidRcu};
+	}
+	/* The grace period would wait for the critical section it is in (the
+	 * model makes every such execution inconsistent: none would be seen) */
+	if (kind == LkmmFenceKind::SyncRcu && nesting > 0) {
+		reportError(pos, {pos, VerificationError::VE_InvalidRcu,
+				  "synchronize_rcu() in an RCU read-side critical section!"});
+		return {.result = VerificationError::VE_InvalidRcu};
+	}
+	/* rcu_read_unlock() closes a critical section, which orders events
+	 * already in the graph (rcu-rscs): check, as a read that took the
+	 * co-maximal write in the section skipped the check */
+	if (kind == LkmmFenceKind::RcuUnlock && !getConsChecker().isConsistent(g.getEventLabel(pos)))
+		moot();
+	return res;
 }
 
 void GenMCDriver::checkReconsiderFaiSpinloop(const MemAccessLabel *lab)

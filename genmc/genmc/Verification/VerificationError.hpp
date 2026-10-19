@@ -64,6 +64,7 @@ enum class VerificationError : std::uint8_t {
 	VE_InvalidCreate,
 	VE_InvalidJoin,
 	VE_InvalidUnlock,
+	VE_InvalidRcu,
 	VE_InvalidBInit,
 	VE_BarrierWellFormedness,
 	VE_Annotation,
@@ -165,6 +166,7 @@ template <> struct std::formatter<VerificationError> {
 			FORMAT_CASE(VerificationError::VE_InvalidJoin, "Invalid join() operation");
 			FORMAT_CASE(VerificationError::VE_InvalidUnlock,
 				    "Invalid unlock() operation");
+			FORMAT_CASE(VerificationError::VE_InvalidRcu, "Invalid RCU usage");
 			FORMAT_CASE(VerificationError::VE_InvalidBInit,
 				    "Invalid barrier_init() operation");
 			FORMAT_CASE(VerificationError::VE_BarrierWellFormedness,

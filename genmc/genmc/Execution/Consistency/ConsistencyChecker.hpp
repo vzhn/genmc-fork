@@ -58,6 +58,14 @@ public:
 	[[nodiscard]] virtual auto isConsistent(const EventLabel *lab) const -> bool = 0;
 	[[nodiscard]] virtual auto isConsistent(const ExecutionGraph & /*g*/) const -> bool = 0;
 
+	/** Whether RLAB, reading the co-maximal write, keeps its graph consistent
+	 * without a check: it does for a model whose po-based orderings are all
+	 * in ppo, as nothing then leaves the read in a cycle */
+	[[nodiscard]] virtual auto isCoMaxReadConsistent(const ReadLabel * /*rLab*/) const -> bool
+	{
+		return true;
+	}
+
 	/** Returns true if the current graph is coherent.
 	 * Should only be used during Relinche's refinement phase. */
 	[[nodiscard]] virtual auto isCoherentRelinche(const ExecutionGraph & /*g*/) const -> bool

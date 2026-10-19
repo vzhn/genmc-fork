@@ -22,11 +22,11 @@
  *   cumulativity of smp_mb() and of release chains (LKMM's prop) is
  *   missing; a thread's spin_unlock() followed by its spin_lock() orders
  *   nothing (po-unlock-lock-po).
- * RCU is a reader-flag implementation: synchronize_rcu() waits for every
- * reader it sees, its own included, so calling it inside a read-side
- * critical section deadlocks, as in LKMM. The flags are indexed by GenMC's
- * thread id: a program with more than LKMM_MAX_THREADS (16) threads must
- * define it higher.
+ * Under the other models RCU is a reader-flag implementation:
+ * synchronize_rcu() waits for every reader it sees, its own included, so
+ * calling it inside a read-side critical section deadlocks. The flags are
+ * indexed by GenMC's thread id: a program with more than LKMM_MAX_THREADS
+ * (16) threads must define it higher. Under -lkmm RCU is the kernel model's.
  *
  * Not provided: SRCU.
  */
@@ -338,6 +338,13 @@ typedef pthread_mutex_t spinlock_t;
  **                                  RCU
  ******************************************************************************/
 
+#ifdef __GENMC_LKMM__
+/* LKMM's own RCU: read-side critical sections and grace periods are events
+ * that the checker orders by the kernel model's rcu-order */
+#define rcu_read_lock() __VERIFIER_lkmm_fence(GENMC_LKMM_RCU_LOCK)
+#define rcu_read_unlock() __VERIFIER_lkmm_fence(GENMC_LKMM_RCU_UNLOCK)
+#define synchronize_rcu() __VERIFIER_lkmm_fence(GENMC_LKMM_SYNC_RCU)
+#else
 /* A reader announces itself with a full fence after setting its flag and
  * before clearing it; synchronize_rcu() fences and waits for every reader
  * flag it finds set. Each thread uses the slot of its GenMC thread id */
@@ -366,6 +373,7 @@ static int __lkmm_rcu_reader[LKMM_MAX_THREADS];
 		__VERIFIER_await(READ_ONCE(__lkmm_rcu_reader[__lkmm_i]) == 0);	\
 	smp_mb();								\
 } while (0)
+#endif
 #define synchronize_rcu_expedited() synchronize_rcu()
 #define rcu_read_lock_bh() rcu_read_lock()
 #define rcu_read_unlock_bh() rcu_read_unlock()
