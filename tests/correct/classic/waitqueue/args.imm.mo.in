@@ -1,0 +1,2 @@
+-check-liveness |
+-check-liveness | -DWAKE_ALWAYS

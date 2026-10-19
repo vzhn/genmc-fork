@@ -1,0 +1,2 @@
+-check-liveness |
+-check-liveness | -DNCONS=2
