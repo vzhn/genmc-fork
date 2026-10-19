@@ -327,16 +327,19 @@ Results (2026-10-19), herd7 7.58:
 
 | suite | result |
 |---|---|
-| corpus with `rcu_read_lock`/`synchronize_rcu`, no SRCU (1544 files) | 1373 agree, 1 agree-racy, 8 agree-deadlock, 47 skipped (LISA), 109 herd7 timeout, 2 herd7 error, 2 race (plain accesses, phase 4), 2 GenMC timeout at 30 s (below) |
+| corpus with `rcu_read_lock`/`synchronize_rcu`, no SRCU (1544 files) | 1375 agree, 1 agree-racy, 8 agree-deadlock, 47 skipped (LISA), 109 herd7 timeout, 2 herd7 error, 2 race (plain accesses, phase 4) |
 | corpus without RCU (3167 files) | as in phase 2 |
 
-The two GenMC timeouts are 7-thread grace-period tests with 16384
-executions (herd7: 58 s); alone, without `-print-exec-graphs`, they take
-9-13 s depending on the machine's load (20.8 s before three optimisations:
-the evaluation only where an `rb` cycle can close, sparse closures, and
-`prop-int` remembered within one check), over the plan's 10 s. The
-12-thread grace-period tests take about 4 s (herd7: 26 s). Plan phase 6
-(an incremental RCU computation) is the next step for these.
+The slowest RCU tests are 7-thread grace-period tests with 16384
+executions (herd7: 58 s): alone, without `-print-exec-graphs`, they take
+about 5.5 s (20.8 s at first). The RCU check is evaluated only where an
+`rb` cycle can close, skips the generated check for a fence at the end of
+its thread, computes `rcu-link`, `rcu-order` and `rb` only for the rows of
+RCU's events, leaves out the plain accesses that cannot reach `rb` (outside
+`-lkmm-reference`), and remembers `prop-int` within one check. The
+12-thread grace-period tests take about 2 s (herd7: 26 s). In the corpus
+run (8 jobs, graphs printed) none times out at 30 s. The RCU tests of
+`tests/correct/lkmm` run with and without `-lkmm-reference`.
 
 ## Kater and the generated checkers
 

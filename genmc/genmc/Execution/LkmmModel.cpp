@@ -119,13 +119,15 @@ public:
 	/* [d] ; this ; [c] */
 	[[nodiscard]] auto restrict(const Set &d, const Set &c) const -> Rel
 	{
+		std::vector<uint64_t> mask(words_, 0);
+		for (auto j = 0U; j < n_; j++)
+			if (c[j])
+				mask[j / 64] |= uint64_t(1) << (j % 64);
 		Rel r(n_);
 		for (auto i = 0U; i < n_; i++)
 			if (d[i])
-				forEach(i, [&](size_t j) {
-					if (c[j])
-						r.set(i, j);
-				});
+				for (auto w = 0U; w < words_; w++)
+					r.row(i)[w] = row(i)[w] & mask[w];
 		return r;
 	}
 	[[nodiscard]] auto dom(const Set &d) const -> Rel { return restrict(d, all()); }
@@ -162,6 +164,15 @@ public:
 		for (auto i = 0U; i < n_; i++)
 			r.set(i, i);
 		return r;
+	}
+
+	/* Calls F on each j with (i, j) */
+	template <typename F> void forEachSucc(size_t i, F f) const { forEach(i, f); }
+	/* Calls F on each pair */
+	template <typename F> void forAll(F f) const
+	{
+		for (auto i = 0U; i < n_; i++)
+			forEach(i, [&](size_t j) { f(i, j); });
 	}
 
 	[[nodiscard]] auto irreflexive() const -> bool
@@ -232,7 +243,9 @@ auto isRMWAccess(const EventLabel *lab) -> bool
  * end of its thread (a node without a label) */
 class Model {
 public:
-	Model(const ExecutionGraph &g, bool closeOpen) : g(g)
+	/* With PRUNE, the nodes are only those that can matter to rb (see
+	 * mattersToRb()); coherence and the freed-memory ordering need all */
+	Model(const ExecutionGraph &g, bool closeOpen, bool prune = false) : g(g)
 	{
 		/* By thread, in po order: a thread's events are [begin, end) */
 		for (auto t = 0U; t < g.getNumThreads(); t++) {
@@ -240,7 +253,7 @@ public:
 			std::vector<size_t> open;
 			for (auto k = 0; k < g.getThreadSize(t); k++) {
 				const auto *lab = g.getEventLabelIfPresent(Event(t, k));
-				if (!isNode(lab))
+				if (!isNode(lab) || (prune && !mattersToRb(lab)))
 					continue;
 				addNode(lab);
 				/* rcu-rscs: innermost first, as the bell's fixpoint matches */
@@ -448,6 +461,30 @@ private:
 			genmc::isa<ThreadFinishLabel>(lab) || genmc::isa<ThreadJoinLabel>(lab));
 	}
 
+	/* rb relates marked events, by relations whose paths have only marked
+	 * events inside, but for dependencies: a plain access matters only as
+	 * a step of carry-dep (a write read by a read of its own thread, or
+	 * that read) or as the plain write of addr ; [Plain] ; wmb. Allocations
+	 * and frees matter to none */
+	auto mattersToRb(const EventLabel *lab) const -> bool
+	{
+		if (!lab->isNotAtomic())
+			return true;
+		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab))
+			return rLab->getRf() && rLab->readsInt() &&
+			       !genmc::isa<InitLabel>(rLab->getRf());
+		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(lab)) {
+			if (auto rs = g.rfi_succs(wLab); rs.begin() != rs.end())
+				return true;
+			for (const auto &other : g.po_succs(wLab))
+				for (auto e : other.addr())
+					if (e == wLab->getPos())
+						return true;
+			return false;
+		}
+		return !genmc::isa<MemLabel>(lab);
+	}
+
 	std::vector<const EventLabel *> labs;
 	std::vector<size_t> threadBegin;
 	std::vector<size_t> threadEnd;
@@ -457,21 +494,25 @@ private:
 
 /* The model's relations on a graph */
 struct Relations {
-	explicit Relations(const Model &m);
+	/* Unless FULL, the verdict's pb is not decided */
+	Relations(const Model &m, bool full);
 
+	[[nodiscard]] auto rcuEvents() const -> Set;
+	[[nodiscard]] auto reachFrom(const Set &f) const -> Rel;
+	[[nodiscard]] auto rcuOrder(const Rel &reach) const -> Rel;
 	/* rcu-fence */
 	[[nodiscard]] auto rcuFence() const -> Rel;
 
 	const Model &m;
 	Set marked;
 	Rel po, poq, rf, co, fr, rmw, tc, tj;
-	Rel prop, hb, hbStar, pb, pbPlus;
+	Rel prop, hb, hbStar, pb;
 	lkmm::Verdict verdict;
 };
 
-Relations::Relations(const Model &mod)
+Relations::Relations(const Model &mod, bool full)
 	: m(mod), po(m.po()), poq(po.opt()), rf(m.rf()), co(m.co()), fr(m.fr(co)), rmw(m.rmw()),
-	  tc(m.tc()), tj(m.tj()), prop(0), hb(0), hbStar(0), pb(0), pbPlus(0)
+	  tc(m.tc()), tj(m.tj()), prop(0), hb(0), hbStar(0), pb(0)
 {
 	/* Events */
 	auto R = m.set([](auto *l) { return genmc::isa<ReadLabel>(l); });
@@ -573,16 +614,39 @@ Relations::Relations(const Model &mod)
 	verdict.hb = hbPlus.irreflexive();
 	hbStar = hbPlus.opt();
 	pb = prop.seq(strongFence).seq(hbStar).range(marked);
-	pbPlus = pb.plus();
-	verdict.pb = pbPlus.irreflexive();
+	if (full)
+		verdict.pb = pb.acyclic();
 }
 
-auto Relations::rcuFence() const -> Rel
+/* RCU's events: grace periods and the ends of critical sections (the
+ * virtual unlocks included); rcu-order relates them only */
+auto Relations::rcuEvents() const -> Set
 {
-	auto pbStar = pbPlus.opt();
+	auto f = m.set([](auto *l) { return isFence(l, LkmmFenceKind::SyncRcu); });
+	m.rcuRscs().forAll([&](size_t l, size_t u) { f[l] = f[u] = 1; });
+	return f;
+}
+
+/* po? ; hb* ; pb* from the events of F (only their rows) */
+auto Relations::reachFrom(const Set &f) const -> Rel
+{
+	/* pb* on these rows only: the closure of the whole of pb is not needed */
+	auto reach = poq.dom(f).seq(hbStar);
+	for (;;) {
+		auto next = reach | reach.seq(pb);
+		if (next == reach)
+			return reach;
+		reach = std::move(next);
+	}
+}
+
+/* rcu-order, from REACH = reachFrom(rcuEvents()) */
+auto Relations::rcuOrder(const Rel &reach) const -> Rel
+{
 	auto rcuGp = Rel::id(m.set([](auto *l) { return isFence(l, LkmmFenceKind::SyncRcu); }));
 	auto rcuRscsi = m.rcuRscs().inverse();
-	auto link = poq.seq(hbStar).seq(pbStar).seq(prop).seq(po);
+	/* rcu-link, for the rows of RCU's events (the only ones rcu-order uses) */
+	auto link = reach.seq(prop).seq(po);
 	auto gpLink = rcuGp.seq(link);
 	auto csLink = rcuRscsi.seq(link);
 	auto order = rcuGp | gpLink.seq(rcuRscsi) | csLink.seq(rcuGp);
@@ -594,7 +658,14 @@ auto Relations::rcuFence() const -> Rel
 			break;
 		order = std::move(next);
 	}
-	return po.seq(order).seq(poq);
+	return order;
+}
+
+/* rcu-fence = po ; rcu-order ; po? */
+auto Relations::rcuFence() const -> Rel
+{
+	auto f = rcuEvents();
+	return po.seq(rcuOrder(reachFrom(f))).seq(poq);
 }
 
 } // namespace
@@ -607,17 +678,31 @@ auto lkmm::hasGracePeriod(const ExecutionGraph &g) -> bool
 	return false;
 }
 
-auto lkmm::evaluate(const ExecutionGraph &g) -> Verdict
+auto lkmm::evaluate(const ExecutionGraph &g, bool full) -> Verdict
 {
-	Model m(g, false);
-	Relations r(m);
+	Model m(g, false, !full);
+	Relations r(m, full);
 	auto v = r.verdict;
 	if (!v.hb || !v.pb || !hasGracePeriod(g))
 		return v;
 
-	/* RCU */
-	auto rb = r.prop.seq(r.rcuFence()).seq(r.hbStar).seq(r.pbPlus.opt()).range(r.marked);
-	v.rcu = rb.irreflexive();
+	/* RCU: rb = prop ; po ; rcu-order ; po? ; hb* ; pb* ; [Marked] is
+	 * reflexive iff some marked i reaches an RCU event a by prop ; po, and
+	 * comes back from b with rcu-order(a, b) by po? ; hb* ; pb* */
+	auto f = r.rcuEvents();
+	auto reach = r.reachFrom(f);
+	auto order = r.rcuOrder(reach);
+	auto propPo = r.prop.seq(r.po.range(f));
+	for (auto i = 0U; i < m.size() && v.rcu; i++) {
+		if (!r.marked[i])
+			continue;
+		propPo.forEachSucc(i, [&](size_t a) {
+			order.forEachSucc(a, [&](size_t b) {
+				if (reach.get(b, i))
+					v.rcu = false;
+			});
+		});
+	}
 	return v;
 }
 
@@ -625,7 +710,7 @@ auto lkmm::isRcuOrderedBefore(const ExecutionGraph &g, const EventLabel *a, cons
 	-> bool
 {
 	Model m(g, true);
-	Relations r(m);
+	Relations r(m, false);
 	auto order = (r.po | r.rf | r.tc | r.tj | r.rcuFence()).plus();
 	auto i = m.idx(a);
 	auto j = m.idx(b);

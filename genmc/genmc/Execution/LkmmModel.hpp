@@ -42,8 +42,10 @@ struct Verdict {
 /** Whether G has a synchronize_rcu(): without one, rb is empty */
 auto hasGracePeriod(const ExecutionGraph &g) -> bool;
 
-/** Evaluates the model on G */
-auto evaluate(const ExecutionGraph &g) -> Verdict;
+/** Evaluates the model on G. Unless FULL, only rb is decided (the other
+ * axioms may be wrong in the verdict): events that cannot matter to it are
+ * left out */
+auto evaluate(const ExecutionGraph &g, bool full) -> Verdict;
 
 /** Whether A is before B in (po | rf | tc | tj | rcu-fence)+, GenMC's
  * happens-before with RCU's ordering. A critical section still open counts

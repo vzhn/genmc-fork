@@ -28,7 +28,7 @@ auto LKMMRcuChecker::withModel(const ExecutionGraph &g, bool generated) const ->
 	if (!reference && (!generated || !lkmm::hasGracePeriod(g)))
 		return generated;
 
-	auto v = lkmm::evaluate(g);
+	auto v = lkmm::evaluate(g, reference);
 	/* The generated checker decides hb and pb (coherence and atomicity hold
 	 * by construction); the graphs it is asked about were consistent before
 	 * their last event */
@@ -61,10 +61,16 @@ static auto mayCloseRcuCycle(const EventLabel *lab) -> bool
 
 auto LKMMRcuChecker::isConsistent(const EventLabel *lab) const -> bool
 {
-	auto generated = [&] {
-		lkmm::PropIntCache cache;
-		return LKMMChecker::isConsistent(lab);
-	}();
+	/* A fence at the end of its thread has no successor in the regular
+	 * part of the model: only RCU can make it inconsistent (an unlock
+	 * closing a critical section) */
+	const auto &g = *lab->getParent();
+	auto generated = (!getConf()->lkmmReference && genmc::isa<FenceLabel>(lab) &&
+			  g.getLastThreadLabel(lab->getThread()) == lab) ||
+			 [&] {
+				 lkmm::PropIntCache cache;
+				 return LKMMChecker::isConsistent(lab);
+			 }();
 	if (!getConf()->lkmmReference && !mayCloseRcuCycle(lab))
 		return generated;
 	return withModel(*lab->getParent(), generated);
