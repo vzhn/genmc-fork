@@ -10,6 +10,33 @@ released.
 - Merge of MIXER [POPL'25] into mainline GenMC
 
 
+## [0.19.0-vzhn.7] - 2026.10.19
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Added
+
+- `-lkmm`: the kernel model's plain-access rules (#52). Plain accesses are
+  explored like marked ones (a plain read may read any write the model
+  allows), plain-coherence is enforced, and LKMM's data races are reported
+  as `Non-atomic race` errors, on complete executions
+  (`-disable-race-detection` turns that off). Thread creation and join
+  synchronise like release/acquire. Not reported: herd7's
+  `mixed-accesses` warning. Not yet: SRCU.
+- `scripts/svcomp/`: run GenMC on SV-COMP's concurrency tasks (#50).
+- `scripts/lkmm/lkmm-diff.py` compares a racy test's states too.
+- Tests: concurrency bugs from Rust libraries (tokio, crossbeam,
+  parking_lot, std) (#51); v0.9's LKMM plain-access tests with herd7's
+  counts.
+
+### Changed
+
+- `-lkmm`: a faster RCU check; the slowest corpus RCU tests take about
+  5.5 s instead of 9-13 s (#43).
+- Under IMM and LKMM, a write whose location has no read computes no
+  revisit prefix.
+
+
 ## [0.19.0-vzhn.6] - 2026.10.19
 
 Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
