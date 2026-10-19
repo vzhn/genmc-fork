@@ -114,11 +114,7 @@ do
 	then
 	    continue
 	fi
-	# the lkmm category is the only one with expected files for lkmm
-	if [[ ("${model}" == "lkmm" && "${cat}" != "lkmm") || ("${model}" != "lkmm" && "${cat}" == "lkmm") ]]
-	then
-	    continue
-	fi
+	# (under lkmm, a test runs iff it has an expected.lkmm.mo.in: runcorrect.sh)
 
 	check_blocked="" && [[ "${cat}" == "saver" || "${cat}" == "helper" ]] &&
 	    [[ (! "${GENMCFLAGS}" =~ "policy=arbitrary") ]] && [[ "${model}" != "imm" ]] &&
@@ -145,11 +141,7 @@ do
 	then
 	    continue
 	fi
-	# under LKMM, only the lkmm category (programs written with <lkmm.h>)
-	if [[ ("${model}" == "lkmm" && "${cat}" != "lkmm") || ("${model}" != "lkmm" && "${cat}" == "lkmm") ]]
-	then
-	    continue
-	fi
+	# (under LKMM, a test runs iff it has a genmc.lkmm.<coherence>.in: runwrong.sh)
 	if [[ "${cat}" == "liveness" || "${cat}" == "helper" ]]
 	then
 	    coherence="mo"
