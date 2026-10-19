@@ -126,6 +126,12 @@ void ExecutionState::clear()
 
 auto ExecutionState::isAllocated(SAddr addr) const -> bool { return allocInfoMap_.contains(addr); }
 
+auto ExecutionState::isAccessible(SAddr addr) const -> bool
+{
+	auto it = allocInfoMap_.find(addr);
+	return it != allocInfoMap_.end() && it->second.access.size.get() != 0;
+}
+
 auto ExecutionState::isStatic(SAddr addr) const -> bool
 {
 	auto addrRange = std::make_pair(addr, addr);
@@ -406,11 +412,15 @@ static auto getFreshAddr(int tid, ASize size, uint64_t alignment, StorageDuratio
 auto ExecutionState::onAlloc(Event pos, ASize size, uint64_t alignment, StorageDuration sdur,
 			     StorageType styp, AddressSpace spc) -> SAddr
 {
-	auto addr = getFreshAddr(pos.thread, size, alignment, sdur, styp, spc, getAllocator());
+	/* A zero-size block (malloc(0)) still takes a byte of address space,
+	 * so that its address is unique and can be freed; accessing it is
+	 * invalid (see isAccessible()) */
+	auto span = ASize(std::max(size.get(), uint64_t(1)));
+	auto addr = getFreshAddr(pos.thread, span, alignment, sdur, styp, spc, getAllocator());
 	const AAccess access(addr, size);
 
 	VERIFY(!allocInfoMap_.contains(access.addr));
-	allocInfoMap_.add({{access.addr, access.addr + access.size},
+	allocInfoMap_.add({{access.addr, access.addr + span},
 			   {pos, access, static_cast<unsigned int>(alignment)}});
 	return addr;
 }

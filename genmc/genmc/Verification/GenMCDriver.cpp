@@ -796,7 +796,7 @@ auto GenMCDriver::checkAccessValidity(Event pos, const AAccess &access)
 	auto &state = getExec().getGraph().getState();
 	if ((!getConf()->disableStaticValidityChecks && !access.addr.isDynamic() &&
 	     !state.isStatic(access.addr)) ||
-	    (access.addr.isDynamic() && !state.isAllocated(access.addr))) {
+	    (access.addr.isDynamic() && !state.isAccessible(access.addr))) {
 		reportError(pos, {pos, VerificationError::VE_AccessNonMalloc});
 		return {VerificationError::VE_AccessNonMalloc};
 	}
@@ -3546,7 +3546,7 @@ auto GenMCDriver::handleError(const EventDbgInfo *dbg, Event pos, std::string ms
 		return {.result = *err};
 	if (isExecutionDrivenByGraph(pos))
 		return {.result = std::monostate(), .count = 1U};
-	auto result = handleDummy(ErrorLabel::create(pos, std::move(msg)));
+	auto result = handleDummy(ErrorLabel::create(pos, msg));
 	VERIFY(std::holds_alternative<std::monostate>(result.result));
 	reportError(pos, {pos, VerificationError::VE_Safety, std::move(msg)});
 	return {.result = VerificationError::VE_Safety, .count = 1U};

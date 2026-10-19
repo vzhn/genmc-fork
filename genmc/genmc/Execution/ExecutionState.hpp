@@ -86,6 +86,8 @@ public:
 
 	/* Checker methods */
 	[[nodiscard]] auto isAllocated(SAddr addr) const -> bool;
+	/** Whether ADDR is in an allocated block that may be accessed (i.e., not a zero-size one) */
+	[[nodiscard]] auto isAccessible(SAddr addr) const -> bool;
 	[[nodiscard]] auto isStatic(SAddr addr) const -> bool;
 	[[nodiscard]] auto isInitialized(const AAccess &access) const -> bool;
 	[[nodiscard]] auto isAtomicAccessConsistent(const AAccess &access) const -> bool;
@@ -139,7 +141,8 @@ public:
 	 * the whole block counts as initialized by the allocation event */
 	void onZeroedAlloc(Event pos, const AAccess &access, const View &view)
 	{
-		markInitialized(access, pos, view);
+		if (access.size.get() != 0)
+			markInitialized(access, pos, view);
 	}
 	/** Registers a block the graph already placed at ADDR (cf. onAlloc()) */
 	void onAllocAt(Event pos, SAddr addr, ASize size, uint64_t alignment);
