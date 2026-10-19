@@ -974,6 +974,13 @@ auto GenMCDriver::checkLiveness() -> std::optional<VerificationError>
 
 	const auto &g = getExec().getGraph();
 
+	/* A failed assume makes the whole execution infeasible: threads may
+	 * wait forever on the thread it cut off */
+	if (std::ranges::any_of(g.thr_ids(), [&](auto tid) {
+		    return genmc::isa<UserBlockLabel>(g.getLastThreadLabel(tid));
+	    }))
+		return {};
+
 	/* Collect all threads blocked at spinloops or awaits */
 	std::vector<int> spinBlocked;
 	for (auto i = 0; i < g.getNumThreads(); i++) {
