@@ -99,8 +99,9 @@ static inline void go_init(void)
 /*
  * One of 0..n-1; call with go_sched held. The coin reads 0..GO_MAX_CASES-1;
  * taking it modulo n repeats some choices rather than cutting executions
- * off with an assume: under -check-liveness, GenMC reports goroutines
- * waiting for a goroutine that an assume has stopped.
+ * off with an assume. That is no faster, since GenMC still explores the
+ * cut-off executions as blocked ones, and before vzhn/genmc-fork#57 was
+ * fixed, -check-liveness reported goroutines waiting for one it stopped.
  */
 static inline int go_choose(int n)
 {
