@@ -514,6 +514,24 @@ Results (2026-10-19), herd7 7.58:
 | `tests/correct/lkmm`, `tests/wrong` (rc11, imm, lkmm) | pass |
 | feature matrix | 1805 runs, no deviation |
 
+## Phase 6: performance
+
+Measured on the phase 5 build (2026-10-19), against the plan's budget
+(5.7): no corpus test above 10 s, and the RCU-free path no costlier than
+IMM.
+
+- The slowest corpus test, `auto/C-RR-G+RR-R+RR-R+RR-G+RR-G+RR-R+RR-R`
+  (7 threads, 3 grace periods, 16384 executions), takes 5.2 s alone (14.7 s
+  with 10 jobs on a loaded machine). The whole corpus is 636 s of GenMC
+  time over 5254 runs.
+- Its profile: the whole-model evaluation (`LkmmModel.cpp`: rb, rcu-order)
+  23% of the time, the generated checker 9%, the interpreter and LLVM 19%,
+  allocation 10%. An incremental `rcu-order` (the plan's idea) would save
+  at most a fifth there, so it is not done.
+- RCU-free tests: 57 random `auto/` corpus tests without RCU cost the same
+  instructions under `-lkmm` as under `-imm` (ratio 1.002, compilation
+  included; at most 1.022 for one test).
+
 ## Kater and the generated checkers
 
 GenMC's checkers (`genmc/genmc/Execution/Consistency/*Checker.{hpp,cpp}`)

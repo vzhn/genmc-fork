@@ -27,3 +27,5 @@
 - <a id="goloving2025relinche"></a> **[Golovin et al. 2025]** Pavel Golovin, Michalis Kokologiannakis, and Viktor Vafeiadis. RELINCHE: Automatically checking linearizability under relaxed memory consistency. *Proc. ACM Program. Lang.*, 9(POPL), January 2025.
 
 - <a id="kokologiannakis2022trust"></a> **[Kokologiannakis et al. 2022]** Michalis Kokologiannakis, Ori Lahav, Viktor Vafeiadis. Truly Stateless, Optimal, and Sound DPOR. *Proc. ACM Program. Lang.*, 6(POPL), January 2022.
+
+- <a id="alglave2018lkmm"></a> **[Alglave et al. 2018]** Jade Alglave, Luc Maranget, Paul E. McKenney, Andrea Parri, and Alan Stern. Frightening small children and disconcerting grown-ups: Concurrency in the Linux kernel. In *ASPLOS 2018*, pages 405--418. ACM, 2018.

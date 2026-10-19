@@ -7,6 +7,7 @@ A full list of the available command-line options can by viewed by issuing `genm
 - **`-ra`**: Perform the exploration under the RA memory model
 - **`-rc11`**: Perform the exploration under the RC11 memory model (default)
 - **`-imm`**: Perform the exploration under the IMM memory model
+- **`-lkmm`**: Perform the exploration under the Linux-kernel memory model (programs using `<lkmm.h>`; see [the LKMM section](features.md#the-linux-kernel-memory-model-lkmm))
 - **`-nthreads=<N>`**: Perform verification concurrently (using `N` threads)
 - **`-mode=<verify|random|estimate>`**: Choose between exhaustive exploration (default), randomized exploration, and state-space size estimation
 - **`-random-budget=<N>`**: Number of executions to sample in `-mode=random`
