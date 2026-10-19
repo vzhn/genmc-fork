@@ -30,12 +30,13 @@ extern "C"
 #include <stdio.h>
 #include <assert.h>
 #include <genmc_internal.h>
+#include <genmc.h>
 
 typedef __VERIFIER_attr_t pthread_attr_t;
 typedef __VERIFIER_barrier_t pthread_barrier_t;
 typedef __VERIFIER_barrierattr_t pthread_barrierattr_t;
-/* typedef __VERIFIER_cond_t pthread_cond_t; */
-/* typedef __VERIFIER_condattr_t pthread_condattr_t; */
+typedef struct { unsigned int __seq; } pthread_cond_t;
+typedef __VERIFIER_condattr_t pthread_condattr_t;
 /* typedef int pthread_key_t; */
 typedef __VERIFIER_mutex_t pthread_mutex_t;
 typedef __VERIFIER_mutexattr_t pthread_mutexattr_t;
@@ -554,73 +555,80 @@ __attribute__((always_inline)) static inline int pthread_rwlock_unlock(pthread_r
 /* 					  int __pref) ; */
 
 
-/* /\* Functions for handling conditional variables.  *\/ */
+/* Functions for handling condition variables.
 
-/* /\* Initialize condition variable COND using attributes ATTR, or use */
-/*    the default values if later is NULL.  *\/ */
-/* __attribute__ ((always_inline)) static inline */
-/* int pthread_cond_init(pthread_cond_t *__restrict __cond, */
-/* 		      const pthread_condattr_t *__restrict __cond_attr) */
-/* { */
-/* 	__VERIFIER_cond_init(__cond, __cond_attr); */
-/* 	return 0; */
-/* } */
+   A model, not GenMC's __VERIFIER_cond_*: every signal or broadcast bumps
+   a sequence number. A waiter reads the number while it still holds the
+   mutex, and then waits (in __VERIFIER_await()) until the number changes,
+   so a notify cannot be lost between unlocking the mutex and waiting. A
+   signal may wake more than one waiter; POSIX allows that, as it allows
+   spurious wakeups. Under -check-liveness, a waiter that is never woken is
+   reported. pthread_cond_timedwait() is not modelled.  */
 
-/* /\* Destroy condition variable COND.  *\/ */
-/* __attribute__ ((always_inline)) static inline */
-/* int pthread_cond_destroy(pthread_cond_t *__cond) */
-/* { */
-/* 	__VERIFIER_cond_destroy(__cond); */
-/* 	return 0; */
-/* } */
+/* Initialize condition variable COND using attributes ATTR, or use
+   the default values if later is NULL.  */
+__attribute__ ((always_inline)) static inline
+int pthread_cond_init(pthread_cond_t *__restrict __cond,
+		      const pthread_condattr_t *__restrict __cond_attr)
+{
+	__atomic_store_n(&__cond->__seq, 0, __ATOMIC_RELAXED);
+	return 0;
+}
 
-/* /\* Wake up one thread waiting for condition variable COND.  *\/ */
-/* __attribute__ ((always_inline)) static inline */
-/* int pthread_cond_signal(pthread_cond_t *__cond) */
-/* { */
-/* 	__VERIFIER_cond_signal(__cond); */
-/* 	return 0; */
-/* } */
+/* Destroy condition variable COND.  */
+__attribute__ ((always_inline)) static inline
+int pthread_cond_destroy(pthread_cond_t *__cond)
+{
+	return 0;
+}
 
-/* /\* Wake up all threads waiting for condition variables COND.  *\/ */
-/* __attribute__ ((always_inline)) static inline */
-/* int pthread_cond_broadcast (pthread_cond_t *__cond) */
-/* { */
-/* 	__VERIFIER_cond_bcast(__cond); */
-/* 	return 0; */
-/* } */
+/* Wake up one thread waiting for condition variable COND.  */
+__attribute__ ((always_inline)) static inline
+int pthread_cond_signal(pthread_cond_t *__cond)
+{
+	__atomic_fetch_add(&__cond->__seq, 1, __ATOMIC_RELEASE);
+	return 0;
+}
 
-/* /\* Wait for condition variable COND to be signaled or broadcast. */
-/*    MUTEX is assumed to be locked before. *\/ */
-/* __attribute__ ((always_inline)) static inline */
-/* int pthread_cond_wait (pthread_cond_t *__restrict __cond, */
-/* 		       pthread_mutex_t *__restrict __mutex) */
-/* { */
-/* 	pthread_mutex_unlock(__mutex); */
-/* 	int val = __VERIFIER_cond_wait(__cond); */
-/* 	__VERIFIER_assume(val > 0); */
-/* 	pthread_mutex_lock(__mutex); */
-/* 	return 0; */
-/* } */
+/* Wake up all threads waiting for condition variables COND.  */
+__attribute__ ((always_inline)) static inline
+int pthread_cond_broadcast(pthread_cond_t *__cond)
+{
+	__atomic_fetch_add(&__cond->__seq, 1, __ATOMIC_RELEASE);
+	return 0;
+}
 
-/* /\* Wait for condition variable COND to be signaled or broadcast until */
-/*    ABSTIME.  MUTEX is assumed to be locked before.  ABSTIME is an */
-/*    absolute time specification; zero is the beginning of the epoch */
-/*    (00:00:00 GMT, January 1, 1970). *\/ */
-/* extern int pthread_cond_timedwait (pthread_cond_t *__restrict __cond, */
-/* 				   pthread_mutex_t *__restrict __mutex, */
-/* 				   const struct timespec *__restrict __abstime) */
-/*      ; */
+/* Wait for condition variable COND to be signaled or broadcast.
+   MUTEX is assumed to be locked before. */
+__attribute__ ((always_inline)) static inline
+int pthread_cond_wait(pthread_cond_t *__restrict __cond,
+		      pthread_mutex_t *__restrict __mutex)
+{
+	unsigned int __seq = __atomic_load_n(&__cond->__seq, __ATOMIC_ACQUIRE);
+
+	pthread_mutex_unlock(__mutex);
+	__VERIFIER_await_start();
+	__VERIFIER_assume_internal(__atomic_load_n(&__cond->__seq, __ATOMIC_ACQUIRE) != __seq,
+				   GENMC_ASSUME_AWAIT);
+	pthread_mutex_lock(__mutex);
+	return 0;
+}
 
 /* /\* Functions for handling condition variable attributes.  *\/ */
 
-/* /\* Initialize condition variable attribute ATTR.  *\/ */
-/* extern int pthread_condattr_init (pthread_condattr_t *__attr) */
-/*      ; */
+/* Initialize condition variable attribute ATTR.  */
+__attribute__ ((always_inline)) static inline
+int pthread_condattr_init(pthread_condattr_t *__attr)
+{
+	return 0;
+}
 
-/* /\* Destroy condition variable attribute ATTR.  *\/ */
-/* extern int pthread_condattr_destroy (pthread_condattr_t *__attr) */
-/*      ; */
+/* Destroy condition variable attribute ATTR.  */
+__attribute__ ((always_inline)) static inline
+int pthread_condattr_destroy(pthread_condattr_t *__attr)
+{
+	return 0;
+}
 
 /* /\* Get the process-shared flag of the condition variable attribute ATTR.  *\/ */
 /* extern int pthread_condattr_getpshared (const pthread_condattr_t * */
