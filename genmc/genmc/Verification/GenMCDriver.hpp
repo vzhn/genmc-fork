@@ -174,7 +174,8 @@ public:
 	/*** Instruction handling ***/
 
 	/** A thread has just finished execution, nothing for the interpreter */
-	auto handleThreadFinish(const EventDbgInfo *dbg, Event pos, SVal val)
+	auto handleThreadFinish(const EventDbgInfo *dbg, Event pos, SVal val,
+				const EventDeps &deps = EventDeps())
 		-> HandleResult<std::monostate>;
 
 	/** A thread has terminated abnormally */
@@ -258,6 +259,10 @@ public:
 	/** A Linux-kernel memory barrier (__VERIFIER_lkmm_fence()) has been interpreted */
 	auto handleLkmmFence(const EventDbgInfo *dbg, Event pos, LkmmFenceKind kind,
 			     const EventDeps &deps) -> HandleResult<std::monostate>;
+
+	/** A synchronize_srcu() of the srcu_struct at SSP has been interpreted */
+	auto handleSyncSrcu(const EventDbgInfo *dbg, Event pos, SAddr ssp, const EventDeps &deps)
+		-> HandleResult<std::monostate>;
 
 	/** Returns the TID of the newly created thread */
 	auto handleThreadCreate(const EventDbgInfo *dbg, Event pos, const ThreadInfo &info,
@@ -519,6 +524,10 @@ private:
 
 	/** Under LKMM, reports a data race of the complete execution */
 	auto checkLkmmRace() -> std::optional<VerificationError>;
+
+	/** Under LKMM, checks a complete execution for a misuse of SRCU (the
+	 * kernel model's flags) */
+	auto checkLkmmSrcu() -> std::optional<VerificationError>;
 
 	/** Returns true if the exploration is guided by a graph */
 	auto isExecutionDrivenByGraph(Event curr) -> bool;

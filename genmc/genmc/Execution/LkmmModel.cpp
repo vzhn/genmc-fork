@@ -26,17 +26,24 @@
  * RCU, as the cat file has it:
  *
  *   rcu-rscs: the nested rcu_read_lock()/rcu_read_unlock() pairs of a thread
+ *   srcu-rscs = ([Srcu-lock] ; carry-srcu-data ; data ; [Srcu-unlock]) & loc,
+ *       carry-srcu-data = (data ; [~Srcu-unlock] ; rf)*: an srcu_read_unlock()
+ *       matches the srcu_read_lock() whose value it writes back
  *   rcu-link = po? ; hb* ; pb* ; prop ; po
  *   rcu-order = the least fixpoint of
- *       rcu-gp | (rcu-gp ; rcu-link ; rcu-rscsi) | (rcu-rscsi ; rcu-link ; rcu-gp)
+ *       rcu-gp | srcu-gp
+ *     | (rcu-gp ; rcu-link ; rcu-rscsi) | (rcu-rscsi ; rcu-link ; rcu-gp)
  *     | (rcu-gp ; rcu-link ; rcu-order ; rcu-link ; rcu-rscsi)
  *     | (rcu-rscsi ; rcu-link ; rcu-order ; rcu-link ; rcu-gp)
+ *     | the same four with srcu-gp and srcu-rscsi, & loc (one srcu_struct)
  *     | (rcu-order ; rcu-link ; rcu-order)
  *   rcu-fence = po ; rcu-order ; po?
  *   rb = prop ; rcu-fence ; hb* ; pb* ; [Marked]          irreflexive rb
  *
  * fence and strong-fence also gain rcu-fence after rb, but only the
- * plain-access rules use those.
+ * plain-access rules use those. SRCU's events are accesses of their
+ * srcu_struct (a lock reads it, an unlock writes the index back), but for
+ * synchronize_srcu(), a fence with the srcu_struct as its location.
  *
  * Plain accesses, as the cat file has them (xbstar = (hb | pb | rb)*):
  *
@@ -64,6 +71,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace {
@@ -254,24 +262,162 @@ auto isRMWAccess(const EventLabel *lab) -> bool
 	return false;
 }
 
+/* The srcu_struct of an SRCU event (herd7's location of the event) */
+auto srcuAddr(const EventLabel *lab) -> std::optional<SAddr>
+{
+	if (genmc::isa<SrcuLockReadLabel>(lab) || genmc::isa<SrcuUnlockWriteLabel>(lab))
+		return genmc::cast<MemAccessLabel>(lab)->getAddr();
+	if (isFence(lab, LkmmFenceKind::SyncSrcu))
+		return genmc::cast<LkmmFenceLabel>(lab)->getSrcuAddr();
+	return std::nullopt;
+}
+
+/* The y with (y, x) in GenMC's data ; rmw?: the reads whose values X's
+ * value depends on (the write of an RMW has its dependencies on its read) */
+template <typename F> void forEachDataPred(const ExecutionGraph &g, const EventLabel *x, F f)
+{
+	for (auto e : x->getDeps().data)
+		f(e);
+	if (const auto *wLab = genmc::dyn_cast<WriteLabel>(x); wLab && wLab->isRMW())
+		if (const auto *rLab = g.po_imm_pred(wLab))
+			for (auto e : rLab->getDeps().data)
+				f(e);
+}
+
+} // namespace
+
+auto lkmm::srcuLocksOf(const ExecutionGraph &g, const EventLabel *unlock)
+	-> std::vector<const EventLabel *>
+{
+	std::vector<const EventLabel *> locks;
+	const auto *u = genmc::dyn_cast<SrcuUnlockWriteLabel>(unlock);
+	if (!u)
+		return locks;
+	/* Back from U by data ; ([~Srcu-unlock] ; rf ; data)* */
+	std::vector<Event> work;
+	std::unordered_set<Event> seen;
+	auto push = [&](Event e) {
+		if (seen.insert(e).second)
+			work.push_back(e);
+	};
+	forEachDataPred(g, u, push);
+	while (!work.empty()) {
+		const auto *lab = g.getEventLabelIfPresent(work.back());
+		work.pop_back();
+		/* GenMC's thread creation and join pass a value as a write read
+		 * by a read would: a thread's argument depends on its start, the
+		 * create on the argument; a joined value on the join, the
+		 * thread's end on the value it returns */
+		if (const auto *bLab = genmc::dyn_cast_if_present<ThreadStartLabel>(lab)) {
+			if (const auto *cLab = bLab->getCreate())
+				forEachDataPred(g, cLab, push);
+			continue;
+		}
+		if (const auto *jLab = genmc::dyn_cast_if_present<ThreadJoinLabel>(lab)) {
+			if (const auto *eLab = genmc::dyn_cast_if_present<ThreadFinishLabel>(
+				    g.getLastThreadLabel(jLab->getChildId())))
+				forEachDataPred(g, eLab, push);
+			continue;
+		}
+		const auto *r = genmc::dyn_cast_if_present<ReadLabel>(lab);
+		if (!r)
+			continue;
+		if (genmc::isa<SrcuLockReadLabel>(r) && r->getAddr() == u->getAddr())
+			locks.push_back(r);
+		const auto *w = genmc::dyn_cast_if_present<WriteLabel>(r->getRf());
+		if (w && !genmc::isa<SrcuUnlockWriteLabel>(w))
+			forEachDataPred(g, w, push);
+	}
+	return locks;
+}
+
+auto lkmm::srcuRscs(const ExecutionGraph &g)
+	-> std::vector<std::pair<const EventLabel *, const EventLabel *>>
+{
+	std::vector<std::pair<const EventLabel *, const EventLabel *>> pairs;
+	for (const auto &lab : g.labels())
+		for (const auto *l : srcuLocksOf(g, &lab))
+			pairs.emplace_back(l, &lab);
+	return pairs;
+}
+
+auto lkmm::srcuOwnGracePeriod(const ExecutionGraph &g, const EventLabel *unlock)
+	-> const EventLabel *
+{
+	const auto *u = genmc::dyn_cast<SrcuUnlockWriteLabel>(unlock);
+	if (!u)
+		return nullptr;
+	for (const auto *l : srcuLocksOf(g, u)) {
+		if (l->getThread() != u->getThread())
+			continue;
+		for (auto i = l->getIndex() + 1; i < u->getIndex(); i++) {
+			const auto *lab = g.getEventLabelIfPresent(Event(u->getThread(), i));
+			if (isFence(lab, LkmmFenceKind::SyncSrcu) &&
+			    genmc::cast<LkmmFenceLabel>(lab)->getSrcuAddr() == u->getAddr())
+				return lab;
+		}
+	}
+	return nullptr;
+}
+
+auto lkmm::findSrcuMisuse(const ExecutionGraph &g) -> std::optional<SrcuMisuse>
+{
+	auto pairs = srcuRscs(g);
+	std::unordered_map<const EventLabel *, const EventLabel *> unlockOf;
+	std::unordered_set<const EventLabel *> matchedUnlocks;
+	for (auto [l, u] : pairs) {
+		/* multiple-srcu-matches */
+		if (auto [it, fresh] = unlockOf.emplace(l, u); !fresh)
+			return SrcuMisuse{u, it->second,
+					  "srcu_read_lock() matched by more than one "
+					  "srcu_read_unlock()"};
+		matchedUnlocks.insert(u);
+		/* srcu-bad-value-match */
+		if (genmc::cast<ReadLabel>(l)->getReturnValue() !=
+		    genmc::cast<WriteLabel>(u)->getVal())
+			return SrcuMisuse{u, l,
+					  "srcu_read_unlock() of another value than its "
+					  "srcu_read_lock() returned"};
+	}
+	for (const auto &lab : g.labels()) {
+		if (genmc::isa<SrcuUnlockWriteLabel>(&lab) && !matchedUnlocks.contains(&lab))
+			return SrcuMisuse{&lab, nullptr,
+					  "srcu_read_unlock() without a matching srcu_read_lock()"};
+		if (genmc::isa<SrcuLockReadLabel>(&lab) && !unlockOf.contains(&lab))
+			return SrcuMisuse{&lab, nullptr,
+					  "srcu_read_lock() without a matching srcu_read_unlock()"};
+	}
+	return std::nullopt;
+}
+
+namespace {
+
 /* The events and base relations of a graph. With CLOSEOPEN, each
- * rcu_read_lock() still unmatched gets a virtual rcu_read_unlock() at the
- * end of its thread (a node without a label) */
+ * rcu_read_lock() or srcu_read_lock() still unmatched gets a virtual unlock
+ * at the end of its thread (a node without a label) */
 class Model {
 public:
 	/* With PRUNE, the nodes are only those that can matter to rb (see
 	 * mattersToRb()); coherence and the freed-memory ordering need all */
 	Model(const ExecutionGraph &g, bool closeOpen, bool prune = false) : g(g)
 	{
+		auto srcuPairs = lkmm::srcuRscs(g);
+		std::unordered_set<const EventLabel *> srcuMatched;
+		for (auto [l, u] : srcuPairs)
+			srcuMatched.insert(l);
+
 		/* By thread, in po order: a thread's events are [begin, end) */
 		for (auto t = 0U; t < g.getNumThreads(); t++) {
 			auto begin = labs.size();
 			std::vector<size_t> open;
+			std::vector<size_t> openSrcu;
 			for (auto k = 0; k < g.getThreadSize(t); k++) {
 				const auto *lab = g.getEventLabelIfPresent(Event(t, k));
 				if (!isNode(lab) || (prune && !mattersToRb(lab)))
 					continue;
-				addNode(lab);
+				addNode(lab, srcuAddr(lab));
+				if (genmc::isa<SrcuLockReadLabel>(lab) && !srcuMatched.contains(lab))
+					openSrcu.push_back(labs.size() - 1);
 				/* rcu-rscs: innermost first, as the bell's fixpoint matches */
 				if (isFence(lab, LkmmFenceKind::RcuLock)) {
 					open.push_back(labs.size() - 1);
@@ -284,11 +430,18 @@ public:
 				rscs.emplace_back(open.back(), labs.size());
 				addNode(nullptr);
 			}
+			for (; closeOpen && !openSrcu.empty(); openSrcu.pop_back()) {
+				srcuRscsPairs.emplace_back(openSrcu.back(), labs.size());
+				addNode(nullptr, srcuLocs[openSrcu.back()]);
+			}
 			for (auto i = begin; i < labs.size(); i++)
 				threadEnd.push_back(labs.size());
 			for (auto i = begin; i < labs.size(); i++)
 				threadBegin.push_back(begin);
 		}
+		for (auto [l, u] : srcuPairs)
+			if (auto i = idx(l), j = idx(u); i >= 0 && j >= 0)
+				srcuRscsPairs.emplace_back(i, j);
 	}
 
 	[[nodiscard]] auto size() const -> size_t { return labs.size(); }
@@ -456,16 +609,37 @@ public:
 		return r;
 	}
 
+	/* srcu-rscs */
+	[[nodiscard]] auto srcuRscs() const -> Rel
+	{
+		Rel r(size());
+		for (auto [l, u] : srcuRscsPairs)
+			r.set(l, u);
+		return r;
+	}
+
+	/* loc on SRCU's events (the virtual unlocks included) */
+	[[nodiscard]] auto srcuLoc() const -> Rel
+	{
+		Rel r(size());
+		for (auto i = 0U; i < size(); i++)
+			for (auto j = 0U; j < size(); j++)
+				if (srcuLocs[i] && srcuLocs[i] == srcuLocs[j])
+					r.set(i, j);
+		return r;
+	}
+
 	[[nodiscard]] auto label(size_t i) const -> const EventLabel * { return labs[i]; }
 
 	const ExecutionGraph &g;
 
 private:
-	void addNode(const EventLabel *lab)
+	void addNode(const EventLabel *lab, std::optional<SAddr> srcu = std::nullopt)
 	{
 		if (lab)
 			index[lab] = labs.size();
 		labs.push_back(lab);
+		srcuLocs.push_back(srcu);
 	}
 
 	/* The events the model relates: accesses, fences and RCU events, the
@@ -508,6 +682,8 @@ private:
 	std::vector<size_t> threadEnd;
 	std::unordered_map<const EventLabel *, size_t> index;
 	std::vector<std::pair<size_t, size_t>> rscs;
+	std::vector<std::pair<size_t, size_t>> srcuRscsPairs;
+	std::vector<std::optional<SAddr>> srcuLocs;
 };
 
 /* What orders two conflicting accesses, for the plain-access rules, and
@@ -580,6 +756,11 @@ Relations::Relations(const Model &mod, bool full)
 		return genmc::isa<ThreadStartLabel>(l) || genmc::isa<ThreadJoinLabel>(l);
 	});
 	auto syncRcu = kind(LkmmFenceKind::SyncRcu);
+	auto syncSrcu = kind(LkmmFenceKind::SyncSrcu);
+	auto srcuUnlock = m.set([](auto *l) { return genmc::isa<SrcuUnlockWriteLabel>(l); });
+	auto notSrcuUnlock = srcuUnlock;
+	for (auto &b : notSrcuUnlock)
+		b = !b;
 
 	/* Base relations */
 	in = m.sameThread();
@@ -615,14 +796,20 @@ Relations::Relations(const Model &mod, bool full)
 		  fenceAt(LkmmFenceKind::BeforeAtomic).range(excl).seq(poq).restrict(MT, MT) |
 		  poq.range(excl).seq(fenceAt(LkmmFenceKind::AfterAtomic)).restrict(MT, MT) |
 		  poq.range(lkw).seq(fenceAt(LkmmFenceKind::AfterSpinlock)).restrict(MT, MT) |
-		  ulp.range(kind(LkmmFenceKind::AfterUnlockLock)).seq(po).restrict(MT, MT);
-	auto gp = po.range(syncRcu).seq(poq);
+		  ulp.range(kind(LkmmFenceKind::AfterUnlockLock)).seq(po).restrict(MT, MT) |
+		  poq.range(srcuUnlock)
+			  .seq(fenceAt(LkmmFenceKind::AfterSrcuReadUnlock))
+			  .restrict(MT, MT);
+	auto syncAny = syncRcu;
+	for (auto i = 0U; i < syncAny.size(); i++)
+		syncAny[i] = syncAny[i] || syncSrcu[i];
+	auto gp = po.range(syncAny).seq(poq);
 	strongFence = mb | gp;
 	fence = strongFence | poRel | acqPo | wmb | rmb;
 
 	/* Preserved program order (GenMC's dependencies: rmw? after them) */
 	auto rmwq = rmw.opt();
-	auto carryDep = data.seq(rmwq).seq(rfi).star();
+	auto carryDep = data.seq(rmwq).range(notSrcuUnlock).seq(rfi).star();
 	auto dep = carryDep.seq(addr | data);
 	auto cdep = carryDep.seq(ctrl);
 	auto rwdep = (dep | cdep).seq(rmwq).range(W);
@@ -656,8 +843,11 @@ Relations::Relations(const Model &mod, bool full)
  * virtual unlocks included); rcu-order relates them only */
 auto Relations::rcuEvents() const -> Set
 {
-	auto f = m.set([](auto *l) { return isFence(l, LkmmFenceKind::SyncRcu); });
+	auto f = m.set([](auto *l) {
+		return isFence(l, LkmmFenceKind::SyncRcu) || isFence(l, LkmmFenceKind::SyncSrcu);
+	});
 	m.rcuRscs().forAll([&](size_t l, size_t u) { f[l] = f[u] = 1; });
+	m.srcuRscs().forAll([&](size_t l, size_t u) { f[l] = f[u] = 1; });
 	return f;
 }
 
@@ -678,16 +868,24 @@ auto Relations::reachFrom(const Set &f) const -> Rel
 auto Relations::rcuOrder(const Rel &reach) const -> Rel
 {
 	auto rcuGp = Rel::id(m.set([](auto *l) { return isFence(l, LkmmFenceKind::SyncRcu); }));
+	auto srcuGp = Rel::id(m.set([](auto *l) { return isFence(l, LkmmFenceKind::SyncSrcu); }));
 	auto rcuRscsi = m.rcuRscs().inverse();
+	auto srcuRscsi = m.srcuRscs().inverse();
+	auto loc = m.srcuLoc();
 	/* rcu-link, for the rows of RCU's events (the only ones rcu-order uses) */
 	auto link = reach.seq(prop).seq(po);
 	auto gpLink = rcuGp.seq(link);
 	auto csLink = rcuRscsi.seq(link);
-	auto order = rcuGp | gpLink.seq(rcuRscsi) | csLink.seq(rcuGp);
+	auto sgpLink = srcuGp.seq(link);
+	auto scsLink = srcuRscsi.seq(link);
+	auto order = rcuGp | srcuGp | gpLink.seq(rcuRscsi) | csLink.seq(rcuGp) |
+		     (sgpLink.seq(srcuRscsi) & loc) | (scsLink.seq(srcuGp) & loc);
 	for (;;) {
 		auto orderLink = order.seq(link);
 		auto next = order | gpLink.seq(orderLink).seq(rcuRscsi) |
-			    csLink.seq(orderLink).seq(rcuGp) | orderLink.seq(order);
+			    csLink.seq(orderLink).seq(rcuGp) |
+			    (sgpLink.seq(orderLink).seq(srcuRscsi) & loc) |
+			    (scsLink.seq(orderLink).seq(srcuGp) & loc) | orderLink.seq(order);
 		if (next == order)
 			break;
 		order = std::move(next);
@@ -871,7 +1069,7 @@ auto lkmm::hasPreRace(const ExecutionGraph &g) -> bool
 auto lkmm::hasGracePeriod(const ExecutionGraph &g) -> bool
 {
 	for (const auto &lab : g.labels())
-		if (isFence(&lab, LkmmFenceKind::SyncRcu))
+		if (isFence(&lab, LkmmFenceKind::SyncRcu) || isFence(&lab, LkmmFenceKind::SyncSrcu))
 			return true;
 	return false;
 }
@@ -955,10 +1153,37 @@ auto lkmm::findRace(const ExecutionGraph &g) -> std::optional<Race>
 	return race;
 }
 
-auto lkmm::isRcuOrderedBefore(const ExecutionGraph &g, const EventLabel *a, const EventLabel *b)
-	-> bool
+auto lkmm::findUnorderedFree(const ExecutionGraph &g,
+			     const std::function<bool(const EventLabel *, const EventLabel *)> &isHb)
+	-> std::optional<std::pair<const EventLabel *, const EventLabel *>>
 {
-	Model m(g, true);
+	std::optional<Rel> order;
+	std::optional<Model> m;
+	for (const auto &lab : g.labels()) {
+		const auto *a = genmc::dyn_cast<MemAccessLabel>(&lab);
+		auto fPos = a ? g.free_pos(a) : std::nullopt;
+		if (!fPos)
+			continue;
+		const auto *f = g.getEventLabel(*fPos);
+		if (genmc::isa<HpRetireLabel>(f) || isHb(a, f))
+			continue;
+		if (!order) {
+			m.emplace(g, false);
+			Relations r(*m, false);
+			order = (r.po | r.rf | r.tc | r.tj | r.rcuFence()).plus();
+		}
+		auto i = m->idx(a);
+		auto j = m->idx(f);
+		if (i < 0 || j < 0 || !order->get(i, j))
+			return std::make_pair(a, f);
+	}
+	return std::nullopt;
+}
+
+auto lkmm::isRcuOrderedBefore(const ExecutionGraph &g, const EventLabel *a, const EventLabel *b,
+			      bool closeOpen) -> bool
+{
+	Model m(g, closeOpen);
 	Relations r(m, false);
 	auto order = (r.po | r.rf | r.tc | r.tj | r.rcuFence()).plus();
 	auto i = m.idx(a);

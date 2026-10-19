@@ -28,9 +28,11 @@ import sys
 ADDR_BASE = -1000000
 OUTPUT_MARK = "lkmm-state"
 
-UNSUPPORTED_CALLS = [
+UNSUPPORTED_CALLS = ["smp_cond_load"]
+# lkmm.h provides SRCU under -lkmm only
+SRCU_CALLS = [
     "srcu_read_lock", "srcu_read_unlock", "srcu_down_read", "srcu_up_read",
-    "synchronize_srcu", "smp_mb__after_srcu_read_unlock", "smp_cond_load",
+    "synchronize_srcu", "smp_mb__after_srcu_read_unlock",
 ]
 
 SCALAR_TYPES = r"(?:intptr_t|uintptr_t|int|long|short|char|unsigned|signed|bool|u8|u16|u32|u64|s32|s64)"
@@ -103,7 +105,7 @@ def widen_int(s):
     """herd7's int is a machine word, which can hold an address: make every
     int an intptr_t, so a location written with a pointer has one size"""
     s = re.sub(r"(?<!unsigned )(?<!long )\bint\b(?!\s+(?:long|short))", "intptr_t", s)
-    # without SRCU calls (which are not supported), an srcu_struct is a word
+    # an srcu_struct is a word too (lkmm.h's SRCU accesses its first int)
     return re.sub(r"\bstruct\s+srcu_struct\b", "intptr_t", s)
 
 
@@ -158,9 +160,10 @@ def parse_value(v):
 
 
 class Translator:
-    def __init__(self, lt, header):
+    def __init__(self, lt, header, srcu=False):
         self.lt = lt
         self.header = header
+        self.unsupported = UNSUPPORTED_CALLS + ([] if srcu else SRCU_CALLS)
         self.locs = {}        # name -> declared type of the location
         self.loc_init = {}    # name -> ("int", n) | ("addr", name)
         self.regs = {}        # (tid, name) -> type
@@ -231,7 +234,7 @@ class Translator:
     # -- threads ------------------------------------------------------------
 
     def rewrite_body(self, tid, body):
-        for call in UNSUPPORTED_CALLS:
+        for call in self.unsupported:
             if re.search(r"\b" + call + r"\w*\s*\(", body):
                 raise Unsupported("uses " + call)
         if re.search(r"\b(while|for|goto|do)\b", body):
@@ -480,10 +483,12 @@ def main():
     ap.add_argument("--meta")
     ap.add_argument("--header", default="lkmm-c11.h",
                     help="header providing the kernel primitives")
+    ap.add_argument("--srcu", action="store_true",
+                    help="translate SRCU calls (the header provides them: -lkmm)")
     args = ap.parse_args()
     try:
         text = open(args.litmus, errors="replace").read()
-        src, meta = Translator(Litmus(text), args.header).translate()
+        src, meta = Translator(Litmus(text), args.header, args.srcu).translate()
     except Unsupported as e:
         print("unsupported: %s" % e)
         sys.exit(3)

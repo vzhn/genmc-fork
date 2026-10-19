@@ -21,6 +21,9 @@ Each test gets one result:
                          undefined, so not compared)
   agree-deadlock         synchronize_rcu() in a critical section: herd7 has no
                          execution, GenMC reports invalid RCU usage
+  agree-flag             herd7 flags a misuse of SRCU (unmatched or multiple
+                         matches, a bad value), GenMC reports invalid RCU usage
+  flag                   herd7 flags a misuse of SRCU, GenMC reports none
   missing                GenMC lacks some of herd7's states (stronger)
   extra                  GenMC has states herd7 forbids (weaker)
   differ                 both missing and extra states
@@ -55,7 +58,10 @@ import litmus2c  # noqa: E402
 
 CLANG_FLAGS = ["-Wno-int-conversion", "-Wno-incompatible-pointer-types",
                "-Wno-int-to-pointer-cast", "-Wno-pointer-to-int-cast"]
-DISAGREE = ("missing", "extra", "differ", "race", "genmc-error")
+DISAGREE = ("missing", "extra", "differ", "race", "flag", "genmc-error")
+# The bell's flags of SRCU misuse, which GenMC reports as errors
+SRCU_FLAGS = {"unmatched-srcu-lock", "unmatched-srcu-unlock", "multiple-srcu-matches",
+              "srcu-bad-value-match", "invalid-sleep"}
 
 
 def herd_result(path):
@@ -130,7 +136,8 @@ def check(args, path):
     res["herd_flags"] = sorted(hflags)
     try:
         lt = litmus2c.Litmus(open(path, errors="replace").read())
-        src, meta = litmus2c.Translator(lt, args.header).translate()
+        src, meta = litmus2c.Translator(lt, args.header,
+                                        srcu=args.model == "lkmm").translate()
     except litmus2c.Unsupported as e:
         res["result"] = "skipped:" + str(e)
         return res
@@ -153,8 +160,13 @@ def check(args, path):
             # herd7 has no execution, GenMC reports the misuse
             if msg.startswith("Error: Invalid RCU usage") and not hstates:
                 res["result"] = "agree-deadlock"
+            elif msg.startswith("Error: Invalid RCU usage") and hflags & SRCU_FLAGS:
+                res["result"] = "agree-flag"
             else:
                 res["result"] = "genmc-error:" + msg[:80]
+            return res
+        if hflags & SRCU_FLAGS:
+            res["result"] = "flag"
             return res
         racyStates = args.model == "lkmm" and (grace or "data-race" in hflags)
         if racyStates and grace:

@@ -414,6 +414,8 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 	if (getConf()->warnUnfreedMemory)
 		if (const auto err = checkUnfreedMemory())
 			return err;
+	if (const auto err = checkLkmmSrcu())
+		return err;
 	if (const auto err = checkLkmmRace())
 		return err;
 	if (getConf()->printExecGraphs)
@@ -1024,6 +1026,41 @@ auto GenMCDriver::checkLkmmRace() -> std::optional<VerificationError>
 	return {VerificationError::VE_RaceNotAtomic};
 }
 
+auto GenMCDriver::checkLkmmSrcu() -> std::optional<VerificationError>
+{
+	/* The matching of an srcu_read_unlock() (srcu-rscs) can go through
+	 * other threads (srcu_down_read() and srcu_up_read()): decided on a
+	 * whole execution */
+	if (getConf()->model != ModelType::LKMM || inEstimationMode() || isHalting())
+		return {};
+
+	auto &g = getExec().getGraph();
+	if (auto misuse = lkmm::findSrcuMisuse(g)) {
+		auto pos = misuse->lab->getPos();
+		reportError(pos, {pos, VerificationError::VE_InvalidRcu, misuse->what + "!",
+				  misuse->other});
+		return {VerificationError::VE_InvalidRcu};
+	}
+
+	/* An access was checked against a free when added, with a critical
+	 * section still open taken as closed at the end of its thread; one
+	 * that srcu_up_read() closed in another thread may end earlier, so
+	 * check again with every section matched */
+	auto pairs = lkmm::srcuRscs(g);
+	if (std::ranges::none_of(pairs, [](auto &p) {
+		    return p.first->getThread() != p.second->getThread();
+	    }))
+		return {};
+	auto unordered = lkmm::findUnorderedFree(g, [&](auto *a, auto *f) {
+		return g.getConsChecker()->getHbView(f).contains(a->getPos());
+	});
+	if (!unordered)
+		return {};
+	auto [a, fLab] = *unordered;
+	reportError(a->getPos(), {a->getPos(), VerificationError::VE_AccessFreed, "", fLab});
+	return {VerificationError::VE_AccessFreed};
+}
+
 auto GenMCDriver::checkUnfreedMemory() -> std::optional<VerificationError>
 {
 	if (isHalting())
@@ -1469,7 +1506,8 @@ auto GenMCDriver::handleThreadFinish(std::unique_ptr<ThreadFinishLabel> eLab)
 	return {.result = std::monostate(), .count = 1U};
 }
 
-auto GenMCDriver::handleThreadFinish(const EventDbgInfo *dbg, Event pos, SVal val)
+auto GenMCDriver::handleThreadFinish(const EventDbgInfo *dbg, Event pos, SVal val,
+				     const EventDeps &deps)
 	-> HandleResult<std::monostate>
 {
 	++pos;
@@ -1477,7 +1515,7 @@ auto GenMCDriver::handleThreadFinish(const EventDbgInfo *dbg, Event pos, SVal va
 		return {.result = *err};
 	if (isExecutionDrivenByGraph(pos))
 		return {.result = std::monostate(), .count = 1U};
-	return handleThreadFinish(ThreadFinishLabel::create(pos, val));
+	return handleThreadFinish(ThreadFinishLabel::create(pos, val, deps));
 }
 
 auto GenMCDriver::handleFence(std::unique_ptr<FenceLabel> fLab) -> HandleResult<std::monostate>
@@ -1535,6 +1573,28 @@ auto GenMCDriver::handleLkmmFence(const EventDbgInfo *dbg, Event pos, LkmmFenceK
 	 * co-maximal write in the section skipped the check */
 	if (kind == LkmmFenceKind::RcuUnlock && !getConsChecker().isConsistent(g.getEventLabel(pos)))
 		moot();
+	return res;
+}
+
+auto GenMCDriver::handleSyncSrcu(const EventDbgInfo *dbg, Event pos, SAddr ssp,
+				 const EventDeps &deps) -> HandleResult<std::monostate>
+{
+	++pos;
+	if (auto err = updateErrorInfoAndMaybeExit(pos, false, dbg); err)
+		return {.result = *err};
+	if (isExecutionDrivenByGraph(pos)) {
+		if constexpr (!Config::emitNALabels)
+			getExec().getGraph().getState().onFence(pos, true);
+		return {.result = std::monostate{}, .count = 1U};
+	}
+	auto nesting = getRcuNesting(getExec().getGraph(), pos);
+	auto res = handleFence(LkmmFenceLabel::create(pos, LkmmFenceKind::SyncSrcu, ssp, deps));
+	/* The kernel model's invalid-sleep flag */
+	if (nesting > 0) {
+		reportError(pos, {pos, VerificationError::VE_InvalidRcu,
+				  "synchronize_srcu() in an RCU read-side critical section!"});
+		return {.result = VerificationError::VE_InvalidRcu};
+	}
 	return res;
 }
 
@@ -2209,6 +2269,23 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 	if (!co || violatesAtomicity(lab)) {
 		moot();
 		return {.result = Invalid{}, .count = 1U};
+	}
+	/* srcu_read_unlock() closes a critical section, which orders events
+	 * already in the graph (srcu-rscs), as rcu_read_unlock() does. A grace
+	 * period of its srcu_struct inside the section waits for its own
+	 * reader: no execution is consistent, report it as RCU's */
+	if (genmc::isa<SrcuUnlockWriteLabel>(lab)) {
+		if (const auto *gp = lkmm::srcuOwnGracePeriod(g, lab)) {
+			reportError(gp->getPos(),
+				    {gp->getPos(), VerificationError::VE_InvalidRcu,
+				     "synchronize_srcu() in a read-side critical section of its "
+				     "srcu_struct!"});
+			return {.result = VerificationError::VE_InvalidRcu};
+		}
+		if (!getConsChecker().isConsistent(lab)) {
+			moot();
+			return {.result = Invalid{}, .count = 1U};
+		}
 	}
 	if (auto err = checkFinalAnnotations(lab).or_else([&] { return checkForRaces(lab); }); err)
 		return {.result = *err};

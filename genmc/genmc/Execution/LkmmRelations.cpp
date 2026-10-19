@@ -128,7 +128,8 @@ auto unlocksBefore(const ExecutionGraph &g, const EventLabel *lkr) -> Labels
 
 /* The y with (y, x) in mb | gp: the fences, grace periods and fully ordered
  * RMWs that stand between y and x in x's thread, plus the lock handover of
- * smp_mb__after_unlock_lock() */
+ * smp_mb__after_unlock_lock() and the srcu_read_unlock() of
+ * smp_mb__after_srcu_read_unlock() */
 auto mbPreds(const ExecutionGraph &g, const EventLabel *x) -> Labels
 {
 	Labels out;
@@ -140,17 +141,24 @@ auto mbPreds(const ExecutionGraph &g, const EventLabel *x) -> Labels
 		poPredsIf(g, x, isMemOrThread, out);
 
 	/* Scan back from x; the flags say what stood between the current event and x */
-	bool sawMb = false;	    /* [M] ; po ; [Mb | Sync-rcu] ; po ; [M] */
+	bool sawMb = false;	    /* [M] ; po ; [Mb | Sync-rcu | Sync-srcu] ; po ; [M] */
 	bool sawRMW = isRMWAccess(x); /* ... ; [Before-atomic] ; po ; [RMW] ; po? ; [M] */
 	bool sawBa = false;
 	bool sawAa = false;	    /* [M] ; po? ; [RMW] ; po ; [After-atomic] ; po ; [M] */
 	bool sawRMWBeforeAa = false;
 	bool sawAs = false;	    /* [M] ; po? ; [LKW] ; po ; [After-spinlock] ; po ; [M] */
 	bool sawLKWBeforeAs = false;
+	bool sawAsru = false; /* [M] ; po? ; [Srcu-unlock] ; po ; [After-srcu-read-unlock] ; po ; [M] */
+	bool sawSrcuUBeforeAsru = false;
 	for (const auto &pLab : g.po_preds(x)) {
 		const auto *y = &pLab;
-		if (isFence(y, LkmmFenceKind::Mb) || isFence(y, LkmmFenceKind::SyncRcu))
+		if (isFence(y, LkmmFenceKind::Mb) || isFence(y, LkmmFenceKind::SyncRcu) ||
+		    isFence(y, LkmmFenceKind::SyncSrcu))
 			sawMb = true;
+		if (isFence(y, LkmmFenceKind::AfterSrcuReadUnlock))
+			sawAsru = true;
+		if (genmc::isa<SrcuUnlockWriteLabel>(y) && sawAsru)
+			sawSrcuUBeforeAsru = true;
 		if (isFence(y, LkmmFenceKind::BeforeAtomic) && sawRMW)
 			sawBa = true;
 		if (isFence(y, LkmmFenceKind::AfterAtomic))
@@ -173,7 +181,7 @@ auto mbPreds(const ExecutionGraph &g, const EventLabel *x) -> Labels
 		}
 		if (!isMemOrThread(y))
 			continue;
-		if (sawMb || sawBa || sawRMWBeforeAa || sawLKWBeforeAs ||
+		if (sawMb || sawBa || sawRMWBeforeAa || sawLKWBeforeAs || sawSrcuUBeforeAsru ||
 		    (isWrite(y) && y->isLkmmMb())) /* [Mb & W] ; po ; [M] */
 			out.push_back(y);
 	}

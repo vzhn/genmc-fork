@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater 1648f85 (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater 84bc51e (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_LKMM_CHECKER_HPP
@@ -180,27 +180,27 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	void maybeDecreaseCacheCounters(const EventLabel *lab) const override;
 	void maybeIncreaseCacheCounters(const EventLabel *lab) const override;
 
-	mutable NodeStatusVector<uint32_t> visitedCalc118_0;
-	mutable NodeStatusVector<uint32_t> visitedCalc118_1;
-	mutable NodeStatusVector<uint32_t> visitedCalc118_2;
+	mutable NodeStatusVector<uint32_t> visitedCalc122_0;
+	mutable NodeStatusVector<uint32_t> visitedCalc122_1;
+	mutable NodeStatusVector<uint32_t> visitedCalc122_2;
 
-	bool visitCalc118Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
+	bool visitCalc122Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
-	View visitCalc118(const EventLabel *lab) const;
+	View visitCalc122(const EventLabel *lab) const;
 	auto getCohView(const EventLabel *lab) const -> const View & { return lab->view(0); }
 	auto getCohViewIndex() const -> unsigned { return 0; }
 
-	auto checkCalc118(const EventLabel *lab) const;
-	mutable NodeStatusVector<uint32_t> visitedCalc119_0;
-	mutable NodeStatusVector<uint32_t> visitedCalc119_1;
-	mutable NodeStatusVector<uint32_t> visitedCalc119_2;
+	auto checkCalc122(const EventLabel *lab) const;
+	mutable NodeStatusVector<uint32_t> visitedCalc123_0;
+	mutable NodeStatusVector<uint32_t> visitedCalc123_1;
+	mutable NodeStatusVector<uint32_t> visitedCalc123_2;
 
-	bool visitCalc119Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
+	bool visitCalc123Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
-	View visitCalc119(const EventLabel *lab) const;
+	View visitCalc123(const EventLabel *lab) const;
 	auto getHbViewIndex() const -> unsigned { return 1; }
 
-	auto checkCalc119(const EventLabel *lab) const;
+	auto checkCalc123(const EventLabel *lab) const;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_0;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_1;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_2;
@@ -236,6 +236,7 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable NodeVisitStatusVector visitedConsAcyclic1_21;
 	mutable NodeVisitStatusVector visitedConsAcyclic1_22;
 	mutable NodeVisitStatusVector visitedConsAcyclic1_23;
+	mutable NodeVisitStatusVector visitedConsAcyclic1_24;
 	mutable uint32_t visitedConsAcyclic1Accepting;
 
 	bool visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &worklist) const;
@@ -292,6 +293,8 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable NodeVisitStatusVector visitedConsAcyclic2_42;
 	mutable NodeVisitStatusVector visitedConsAcyclic2_43;
 	mutable NodeVisitStatusVector visitedConsAcyclic2_44;
+	mutable NodeVisitStatusVector visitedConsAcyclic2_45;
+	mutable NodeVisitStatusVector visitedConsAcyclic2_46;
 	mutable uint32_t visitedConsAcyclic2Accepting;
 
 	bool visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &worklist) const;
@@ -387,6 +390,7 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	void visitPPoRf26(const EventLabel *lab, DepView &pporf) const;
 	void visitPPoRf27(const EventLabel *lab, DepView &pporf) const;
 	void visitPPoRf28(const EventLabel *lab, DepView &pporf) const;
+	void visitPPoRf29(const EventLabel *lab, DepView &pporf) const;
 
 	DepView calcPPoRfBefore(const EventLabel *lab) const;
 
@@ -419,6 +423,7 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable std::vector<NodeStatus> visitedPPoRf26;
 	mutable std::vector<NodeStatus> visitedPPoRf27;
 	mutable std::vector<NodeStatus> visitedPPoRf28;
+	mutable std::vector<NodeStatus> visitedPPoRf29;
 };
 
 // NOLINTEND

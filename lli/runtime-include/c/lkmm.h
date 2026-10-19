@@ -28,7 +28,11 @@
  * indexed by GenMC's thread id: a program with more than LKMM_MAX_THREADS
  * (16) threads must define it higher. Under -lkmm RCU is the kernel model's.
  *
- * Not provided: SRCU.
+ * SRCU is provided under -lkmm only, as the kernel model has it:
+ * srcu_read_lock() reads its srcu_struct and returns the value read,
+ * srcu_read_unlock() writes the index it gets back to it, and an unlock
+ * matches the lock whose value it writes (srcu_down_read() and
+ * srcu_up_read() may be in different threads).
  */
 
 #ifndef __LKMM_H__
@@ -92,6 +96,10 @@
 #define smp_mb__after_atomic() smp_mb()
 #define smp_mb__after_spinlock() smp_mb()
 #define smp_mb__after_unlock_lock() smp_mb()
+#endif
+#ifdef __GENMC_LKMM__
+#define smp_mb__after_srcu_read_unlock()					\
+	__VERIFIER_lkmm_fence(GENMC_LKMM_FENCE_AFTER_SRCU_READ_UNLOCK)
 #endif
 #define smp_acquire__after_ctrl_dep() smp_rmb()
 #define smp_store_mb(X, V) do { WRITE_ONCE(X, V); smp_mb(); } while (0)
@@ -379,5 +387,24 @@ static int __lkmm_rcu_reader[LKMM_MAX_THREADS];
 #define rcu_read_unlock_bh() rcu_read_unlock()
 #define rcu_read_lock_sched() rcu_read_lock()
 #define rcu_read_unlock_sched() rcu_read_unlock()
+
+#ifdef __GENMC_LKMM__
+/* SRCU; X is a pointer to a struct srcu_struct */
+struct srcu_struct {
+	int __lkmm_srcu;
+};
+#define DEFINE_SRCU(x) struct srcu_struct x
+#define DEFINE_STATIC_SRCU(x) static struct srcu_struct x
+#define init_srcu_struct(X) (WRITE_ONCE((X)->__lkmm_srcu, 0), 0)
+#define cleanup_srcu_struct(X) do { (void) (X); } while (0)
+#define srcu_read_lock(X) __VERIFIER_srcu_read_lock((void *) (X))
+#define srcu_read_unlock(X, Y) __VERIFIER_srcu_read_unlock((void *) (X), (Y))
+#define srcu_down_read(X) srcu_read_lock(X)
+#define srcu_up_read(X, Y) srcu_read_unlock(X, Y)
+#define synchronize_srcu(X) __VERIFIER_synchronize_srcu((void *) (X))
+#define synchronize_srcu_expedited(X) synchronize_srcu(X)
+#define srcu_dereference(X, S) READ_ONCE(X)
+#define srcu_dereference_check(X, S, C) READ_ONCE(X)
+#endif
 
 #endif /* __LKMM_H__ */

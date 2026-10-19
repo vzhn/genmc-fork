@@ -426,6 +426,94 @@ The 23 `auto/C-LB-Lrw*` tests (races through a plain read before a
 release) and the plain tests that were allow-listed as phase 4 agree now,
 racy states included.
 
+## Phase 5: SRCU
+
+herd7 models SRCU with memory events of the `srcu_struct`:
+`srcu_read_lock(s)` reads it and returns the value read,
+`srcu_read_unlock(s, idx)` writes `idx` back, and `synchronize_srcu(s)` is
+a fence whose location is `s`. GenMC does the same under `-lkmm`, with
+three intrinsics (`__VERIFIER_srcu_read_lock`, `_unlock`,
+`__VERIFIER_synchronize_srcu`), two new label kinds (`SrcuLockRead`,
+`SrcuUnlockWrite`, plain reads and writes for the rest of GenMC) and an
+`LkmmFenceLabel` of kind `SyncSrcu` that carries the address. The lock and
+unlock events are marked accesses, so they take part in `rf` and `co` as
+herd7's do: two empty critical sections of one `srcu_struct` already have
+4 executions (each lock may read the other's unlock), and GenMC explores
+the same ones.
+
+- **srcu-rscs**: an unlock matches the locks of its `srcu_struct` whose
+  value reaches its own by `data ; ([~Srcu-unlock] ; rf ; data)*`, so
+  `srcu_down_read()` and `srcu_up_read()` may be in different threads,
+  with the index passed through memory. `lkmm::srcuRscs()` follows GenMC's
+  data dependencies back from each unlock. GenMC's thread creation and
+  join pass a value as a write read by a read would (herd7 has no
+  threads): a thread's argument depends on its start event, the create on
+  the argument passed, a joined value on the join, the thread's end on the
+  value it returns.
+- **rcu-order** gains `srcu-gp` and the four SRCU clauses, each `& loc`
+  (a grace period orders only the critical sections of its
+  `srcu_struct`); `gp` and `strong-fence` gain `Sync-srcu`, `mb` gains
+  `smp_mb__after_srcu_read_unlock()`, and `carry-dep` no longer passes
+  through an unlock (a lock that reads an index back depends on nothing).
+  The kat (Kater 84bc51e) has the regular part, `LkmmModel.cpp` the rest.
+- An unlock closes a critical section, so the driver checks the graph
+  when one is added, as for `rcu_read_unlock()` (a write is otherwise
+  placed co-maximal without a check). A `synchronize_srcu()` inside a
+  section of its own `srcu_struct` (same thread) waits for its own reader:
+  every execution is inconsistent (herd7: none, no flag), and GenMC reports
+  invalid RCU usage there, as for `synchronize_rcu()`.
+- An access of freed memory is checked when added, against the frees in
+  the graph, with a critical section still open taken as closed at the
+  end of its thread. A section that `srcu_up_read()` closes in another
+  thread can end earlier (before accesses after the handoff), so an
+  execution with such a section is checked again when complete, with
+  every section matched.
+- **The bell's flags** are errors (`Invalid RCU usage`), checked on
+  complete executions (the matching may cross threads): an unmatched lock
+  or unlock, a lock with two unlocks (`multiple-srcu-matches`), an unlock
+  of another value than its lock read (`srcu-bad-value-match`), and
+  `synchronize_srcu()` in an RCU critical section (`invalid-sleep`, at the
+  event). `lkmm-diff.py` reports `agree-flag` when herd7 flags SRCU misuse
+  and GenMC reports it, `flag` when only herd7 does.
+
+`<lkmm.h>` provides `struct srcu_struct` (an `int`), `DEFINE_SRCU`,
+`init_srcu_struct()`, the lock, unlock and grace-period calls with their
+`_expedited`/`down`/`up` forms, `srcu_dereference()` and
+`smp_mb__after_srcu_read_unlock()`, under `-lkmm` only. `litmus2c.py
+--srcu` (which `lkmm-diff.py` passes under `-lkmm`) translates the SRCU
+tests. The rest of the plan's phase 5 was in place already:
+`smp_cond_load_{relaxed,acquire}()` (an await), `atomic_add_unless()`,
+`spin_is_locked()`; herd7's model has no `smp_cond_load` (its tests stay
+skipped).
+
+Tests: `tests/correct/lkmm/srcu-gp` (a grace period waits for a reader of
+its `srcu_struct`), `srcu-gp-other` (not for one of another),
+`srcu-down-up` (a section opened and closed in different threads, the
+index through memory, with `smp_cond_load_acquire()`), `srcu-mb-after`
+and `srcu-mb-after-none`, `srcu-sync-free` (call_srcu() emulated, as
+`rcu-sync-free`), all with herd7's counts of litmus twins;
+`srcu-handoff-free` (a section closed in another thread, with the
+dereference before the handoff) and `srcu-thread-handoff` (the index
+through `pthread_create()` and `pthread_join()`);
+`tests/wrong/locking/srcu-invalid-lkmm` (six misuses that herd7 flags,
+and a grace period in its own section) and
+`tests/wrong/memory/srcu-sync-free-bug-lkmm` (no grace period, one of
+another `srcu_struct`, a dereference after the handoff). A review found
+the last three gaps (a missed use after free, which depended on the
+scheduling; a false unmatched lock for an index passed to or returned
+from a thread; no report for a grace period in its own section): each
+test fails without its fix.
+
+Results (2026-10-19), herd7 7.58:
+
+| suite | result |
+|---|---|
+| corpus tests with SRCU (52 files) | 51 agree (states and execution counts, also with `-lkmm-reference`; `C-srcu-nest-4` as `agree-flag`), 1 skipped (LISA) |
+| whole corpus (5571 files, 30 s each, 10 jobs) | 5006 agree, 192 agree-racy, 8 agree-deadlock, 1 agree-flag, 185 skipped, 117 herd7 timeout, 6 herd7 error, 1 count; 55 classified disagreements: 48 missing and 3 race (control dependency past the `if`; 20 of them, `auto/C-LB-LRW+R-Dd*`, were not in phase 4's 4711-file run and are classified now), 4 missing (herd7's symbolic thin-air values); no GenMC timeout |
+| kernel `litmus-tests` (35) | 35 agree (with `--strict-counts`) |
+| `tests/correct/lkmm`, `tests/wrong` (rc11, imm, lkmm) | pass |
+| feature matrix | 1805 runs, no deviation |
+
 ## Kater and the generated checkers
 
 GenMC's checkers (`genmc/genmc/Execution/Consistency/*Checker.{hpp,cpp}`)
