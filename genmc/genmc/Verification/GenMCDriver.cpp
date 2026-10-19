@@ -22,6 +22,7 @@
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionState.hpp"
 #include "genmc/Execution/GraphUtils.hpp"
+#include "genmc/Execution/LkmmModel.hpp"
 #include "genmc/Execution/LoadAnnotation.hpp"
 #include "genmc/Execution/Stamp.hpp"
 #include "genmc/Support/ASize.hpp"
@@ -413,6 +414,8 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 	if (getConf()->warnUnfreedMemory)
 		if (const auto err = checkUnfreedMemory())
 			return err;
+	if (const auto err = checkLkmmRace())
+		return err;
 	if (getConf()->printExecGraphs)
 		printGraph(g, dbgInfo_);
 
@@ -917,6 +920,9 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 		/* Exclude RMW successor for ZNE spinloops */
 		auto rco = g.rco(rLab->getAddr());
 		auto coIt = std::ranges::find_if(rco, [&](auto &sLab) {
+			/* (A write that had nothing to revisit may lack its prefix) */
+			if (!sLab.hasPrefixView())
+				sLab.setPrefixView(g.getConsChecker()->calculatePrefixView(&sLab));
 			return !sLab.getPrefixView().contains(rLab->getPos());
 		});
 		return coIt == std::ranges::end(rco) ? g.getInitLabel()
@@ -993,6 +999,29 @@ auto GenMCDriver::checkLiveness() -> std::optional<VerificationError>
 		return {VerificationError::VE_Liveness};
 	}
 	return {};
+}
+
+auto GenMCDriver::checkLkmmRace() -> std::optional<VerificationError>
+{
+	/* LKMM's races are a property of a whole execution: a pair can be
+	 * ordered by events added after both (pb, rb), unlike hb under C11 */
+	if (getConf()->model != ModelType::LKMM || getConf()->disableRaceDetection ||
+	    inEstimationMode() || isHalting())
+		return {};
+
+	auto race = lkmm::findRace(getExec().getGraph());
+	if (!race)
+		return {};
+	/* Reported at the access added later */
+	const auto *first = race->a;
+	const auto *second = race->b;
+	if (second->getStamp() < first->getStamp())
+		std::swap(first, second);
+	reportError(second->getPos(), {second->getPos(), VerificationError::VE_RaceNotAtomic,
+				       "The accesses are a data race of LKMM (" + race->kind +
+					       ").\n",
+				       first});
+	return {VerificationError::VE_RaceNotAtomic};
 }
 
 auto GenMCDriver::checkUnfreedMemory() -> std::optional<VerificationError>
@@ -1669,11 +1698,15 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 	if (err)
 		return {.result = *err}; /* This execution will be blocked */
 
-	VERIFY(!lab->isNotAtomic());
+	/* Only LKMM's plain reads are explored like atomic ones */
+	VERIFY(!lab->isNotAtomic() || getConf()->model == ModelType::LKMM);
 	/* Runtime sends the NA value lazily when adding next atomic access */
 	if (oldVal)
 		g.updateDeferredValue(lab->getAccess(), *oldVal);
-	frontier.onATLoad(lab->getPos(), lab->getAccess(), getConsChecker().getHbView(lab));
+	if (lab->isNotAtomic())
+		frontier.onNALoad(lab->getPos(), lab->getAccess(), getConsChecker().getHbView(lab));
+	else
+		frontier.onATLoad(lab->getPos(), lab->getAccess(), getConsChecker().getHbView(lab));
 
 	/* Check whether the load forces us to reconsider some existing event */
 	checkReconsiderFaiSpinloop(lab);
@@ -1879,6 +1912,13 @@ auto GenMCDriver::handleNALoad(Event pos, SAddr loc, ASize size, const EventDeps
 {
 	auto &g = getExec().getGraph();
 
+#if EMIT_NA_LABELS
+	/* LKMM has no DRF guarantee for plain accesses: a plain read may read
+	 * any write its model allows, so it is explored like a marked one */
+	if (getConf()->model == ModelType::LKMM)
+		return handleLoad(ReadLabel::create(pos, MemOrdering::NotAtomic, loc, size, deps),
+				  std::nullopt);
+#endif
 	if (!readProbeLab_)
 		readProbeLab_ = std::make_unique<ReadLabel>(pos, MemOrdering::NotAtomic, loc, size);
 	configureProbe(readProbeLab_.get(), pos, loc, size, deps);
@@ -1938,6 +1978,13 @@ auto GenMCDriver::handleNAStore(Event pos, SAddr loc, ASize size, std::optional<
 {
 	auto &g = getExec().getGraph();
 
+#if EMIT_NA_LABELS
+	/* LKMM's plain writes take any place in coherence its model allows */
+	if (getConf()->model == ModelType::LKMM)
+		return handleStore(WriteLabel::create(pos, MemOrdering::NotAtomic, loc, size, *val,
+						      WriteAttr::None, deps),
+				   std::nullopt);
+#endif
 	if (!writeProbeLab_)
 		writeProbeLab_ = std::make_unique<WriteLabel>(pos, MemOrdering::NotAtomic, loc,
 							      size, SVal(0));
@@ -2047,8 +2094,25 @@ static auto getRevisitable(WriteLabel *sLab, const VectorClock &before) -> std::
 	return loads;
 }
 
+/* Whether some read of ADDR is in G */
+static auto hasReads(const ExecutionGraph &g, SAddr addr) -> bool
+{
+	const auto *iLab = g.getInitLabel();
+	if (iLab->hasRfs(addr) && !std::ranges::empty(iLab->rfs(addr)))
+		return true;
+	return std::ranges::any_of(g.co(addr),
+				   [](auto &wLab) { return !std::ranges::empty(wLab.readers()); });
+}
+
 auto GenMCDriver::getRevisitableApproximation(WriteLabel *sLab) -> std::vector<ReadLabel *>
 {
+	/* Without a read of the location, there is nothing to revisit, and the
+	 * prefix, costly under the dependency-tracking models, waits until it
+	 * is needed (the other models' checkers take a read's prefix from its
+	 * write's, so they keep computing it here) */
+	if (getConf()->isDepTrackingModel && !hasReads(getExec().getGraph(), sLab->getAddr()))
+		return {};
+
 	const auto &prefix = getPrefixView(sLab);
 	auto loads = getRevisitable(sLab, prefix);
 	getConsChecker().filterCoherentRevisits(sLab, loads);
@@ -2149,9 +2213,14 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 	if (auto err = checkFinalAnnotations(lab).or_else([&] { return checkForRaces(lab); }); err)
 		return {.result = *err};
 
-	VERIFY(!lab->isNotAtomic());
-	g.getState().onATStore(lab->getPos(), lab->getAccess(), getConsChecker().getHbView(lab),
-			       lab->isEffectful(), lab->isAtLeastRelease());
+	VERIFY(!lab->isNotAtomic() || getConf()->model == ModelType::LKMM);
+	if (lab->isNotAtomic())
+		g.getState().onNAStore(lab->getPos(), lab->getAccess(),
+				       getConsChecker().getHbView(lab), std::nullopt);
+	else
+		g.getState().onATStore(lab->getPos(), lab->getAccess(),
+				       getConsChecker().getHbView(lab), lab->isEffectful(),
+				       lab->isAtLeastRelease());
 	return {.result = lab->wasAddedMax(), .count = 1U};
 }
 

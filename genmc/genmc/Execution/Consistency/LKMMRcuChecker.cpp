@@ -22,10 +22,17 @@
 #include "genmc/Support/Error.hpp"
 #include "genmc/Verification/Config.hpp"
 
+/* Whether G has what the generated checker cannot decide: a grace period
+ * (rb) or a potential race (plain-coherence) */
+static auto needsModel(const ExecutionGraph &g) -> bool
+{
+	return lkmm::hasGracePeriod(g) || lkmm::hasPreRace(g);
+}
+
 auto LKMMRcuChecker::withModel(const ExecutionGraph &g, bool generated) const -> bool
 {
 	const bool reference = getConf()->lkmmReference;
-	if (!reference && (!generated || !lkmm::hasGracePeriod(g)))
+	if (!reference && (!generated || !needsModel(g)))
 		return generated;
 
 	auto v = lkmm::evaluate(g, reference);
@@ -37,15 +44,15 @@ auto LKMMRcuChecker::withModel(const ExecutionGraph &g, bool generated) const ->
 		      "coherence {}, atomicity {}, hb {}, pb {}) on:\n{}\n",
 		      generated ? "consistent" : "inconsistent", v.coherence, v.atomicity,
 		      v.hb, v.pb, g);
-	return generated && v.rcu;
+	return generated && v.rcu && v.plainCoherence;
 }
 
-/* Whether adding LAB can make rb reflexive: not when LAB is the last event
- * of its thread and has no successor (a read of the co-maximal write, a
- * co-maximal write, an event that is neither), as an rb cycle through it
- * has to leave it; but closing a critical section orders the events
- * already in it */
-static auto mayCloseRcuCycle(const EventLabel *lab) -> bool
+/* Whether adding LAB can make rb reflexive or break plain-coherence: not
+ * when LAB is the last event of its thread and has no successor (a read of
+ * the co-maximal write, a co-maximal write, an event that is neither), as
+ * an rb cycle, or a pair a plain-coherence rule forbids, has to leave it;
+ * but closing a critical section orders the events already in it */
+static auto mayBreakModel(const EventLabel *lab) -> bool
 {
 	const auto &g = *lab->getParent();
 	if (g.getLastThreadLabel(lab->getThread()) != lab)
@@ -61,17 +68,27 @@ static auto mayCloseRcuCycle(const EventLabel *lab) -> bool
 
 auto LKMMRcuChecker::isConsistent(const EventLabel *lab) const -> bool
 {
+	const auto &g = *lab->getParent();
+	/* A plain access is no event of hb, pb or rb, and its rf and co edges
+	 * are no steps of them: they relate marked events (prop starts and ends
+	 * in one), and carry-dep reaches a plain read only by an rfi, before
+	 * the read has dependents (whose own checks follow). Of the axioms,
+	 * only coherence, which GenMC's choices of rf and co keep, and
+	 * plain-coherence concern it */
+	if (!getConf()->lkmmReference && genmc::isa<MemAccessLabel>(lab) && lab->isNotAtomic())
+		return !mayBreakModel(lab) || !lkmm::hasPreRace(g) ||
+		       lkmm::evaluate(g, false).plainCoherence;
+
 	/* A fence at the end of its thread has no successor in the regular
 	 * part of the model: only RCU can make it inconsistent (an unlock
 	 * closing a critical section) */
-	const auto &g = *lab->getParent();
 	auto generated = (!getConf()->lkmmReference && genmc::isa<FenceLabel>(lab) &&
 			  g.getLastThreadLabel(lab->getThread()) == lab) ||
 			 [&] {
 				 lkmm::PropIntCache cache;
 				 return LKMMChecker::isConsistent(lab);
 			 }();
-	if (!getConf()->lkmmReference && !mayCloseRcuCycle(lab))
+	if (!getConf()->lkmmReference && !mayBreakModel(lab))
 		return generated;
 	return withModel(*lab->getParent(), generated);
 }
@@ -89,7 +106,7 @@ auto LKMMRcuChecker::isCoMaxReadConsistent(const ReadLabel *rLab) const -> bool
 {
 	const auto &g = *rLab->getParent();
 	return !getConf()->lkmmReference &&
-	       (g.getLastThreadLabel(rLab->getThread()) == rLab || !lkmm::hasGracePeriod(g));
+	       (g.getLastThreadLabel(rLab->getThread()) == rLab || !needsModel(g));
 }
 
 auto LKMMRcuChecker::checkAccessFreed(const EventLabel *lab, const EventLabel *&race) const

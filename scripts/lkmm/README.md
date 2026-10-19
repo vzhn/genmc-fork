@@ -155,7 +155,7 @@ barriers to `__VERIFIER_lkmm_fence()` (an `LkmmFenceLabel` with the kind)
 and the fully ordered RMWs carry the `Mb` attribute; everything else is the
 C11 mapping. The models' `tests/correct/lkmm` category has the kernel-model
 ports (phase 1, now also with `-lkmm` expected counts), v0.9's LKMM litmus
-tests (54 of 82: the RCU ones came in phase 3, the plain-access ones stay in `tests/cooking/lkmm`),
+tests (54 of 82: the RCU ones came in phase 3, the plain-access ones in phase 4),
 the lock-free `llist` (correct under `-lkmm` only: it relies on an address
 dependency into a read) and the regression test of a bug found on the way.
 `driver.sh` runs a correct test under `lkmm` iff it has an
@@ -340,6 +340,91 @@ RCU's events, leaves out the plain accesses that cannot reach `rb` (outside
 12-thread grace-period tests take about 2 s (herd7: 26 s). In the corpus
 run (8 jobs, graphs printed) none times out at 30 s. The RCU tests of
 `tests/correct/lkmm` run with and without `-lkmm-reference`.
+
+## Phase 4: plain accesses and data races
+
+GenMC's plain (non-atomic) accesses are events of the graph, but a plain
+read takes the co-maximal write and is never revisited: under C11's
+DRF guarantee, race detection against the hb view makes that exact. LKMM
+has no such guarantee: plain-coherence constrains what a plain read may
+see by fences and `xbstar` (`(hb | pb | rb)*`), which are not porf. Under
+`-lkmm`, plain loads and stores therefore go through the driver's marked
+path (`handleLoad`/`handleStore`, with the `NotAtomic` ordering): a plain
+read gets every coherent write, a plain write every coherent place in `co`.
+
+The plain-access part of the cat intersects relations, which Kater cannot
+export, so `LkmmModel.cpp` evaluates it: `vis`, the four boundaries
+(`w-pre-bounded`, ...), `ww-vis`, `wr-vis`, `rw-xbstar` and `pre-race`,
+with `rcu-fence` in `fence` and `strong-fence` and `rb` in `xbstar`.
+
+- **plain-coherence** is an axiom: `LKMMRcuChecker` evaluates it when the
+  graph has a potential race and the added event can break it (as for
+  `rb`: not an event at the end of its thread with no successor). For a
+  plain access, the generated check is skipped: it is no event of `hb`,
+  `pb` or `rb`, and its `rf`/`co` edges are no steps of them.
+- **data races** are a flag in herd7 and an error in GenMC (`Non-atomic
+  race`, with the race kind): `lkmm::findRace()` runs on every complete
+  execution. A pair can be ordered by events added after both (`pb`,
+  `rb`, the post-bounds of the other thread), so LKMM's races cannot be
+  checked when an access is added, as the C11 models' are, nor on the
+  prefix where an assertion fails; the kat's C11 race rule is gone.
+  `-disable-race-detection` turns the check off and leaves the racy
+  executions, which plain-coherence still shapes.
+
+GenMC's additions, as for the marked part: thread creation and join count
+as a release write read by an acquire read (the thread events are releases
+and acquires to `po-rel`, `acq-po`, the fences and `cumul-fence`; `tc`, `tj`
+are `rfe` to `vis`), and the accesses they order, `(po | tc | tj)+`, are no
+potential races (GenMC's coherence view orders them already). Without the
+latter a parent's plain read after `pthread_join()` raced with the child's
+plain write in every litmus translation, and the full evaluation ran on
+every check.
+
+The revisit prefix (the kat's `ppo`) no longer orders a plain access before
+the events a fence or a lock handover puts after it: `lkhb` has no plain
+events, so LKMM allows a load-buffering cycle through a plain read that
+precedes a release (in a racy execution, or one plain-coherence forbids).
+With it in the prefix, GenMC missed one racy execution in 23 corpus tests
+(`auto/C-LB-Lrw+R-Oc` and its relatives; `tests/correct/lkmm/plain-lb-racy`,
+3 executions with `-disable-race-detection`, 2 before). A write whose
+location has no read computes no revisit prefix (under IMM and LKMM, whose
+checkers do not take a read's prefix from its write's): the litmus
+translations' register stores made that half of the time.
+
+`lkmm-diff.py` runs a racy test (by either tool) a second time with
+`-disable-race-detection` under `-lkmm` and compares its states too: an
+`agree-racy` result now means the same race verdict and the same states.
+herd7's `mixed-accesses` flag (3 corpus tests) is not reported: it needs
+`barrier()`, which is no event in GenMC.
+
+Tests: v0.9's plain-access tests, with herd7's counts where v0.9's
+differed (`plain-mp+rcuderef`, `plain-S-rcuderef`, `plain-S-rcunoderef2`:
+2, not 3; `plain-strong-vis`: 4, not 5): the race-free ones in
+`tests/correct/lkmm` (11; `plain-nonrace4` was a wrong test, but neither
+tool finds a race), the racy ones as `tests/wrong/racy/*-lkmm` (13);
+`plain-nonrace1`, `plain-lb2` and `plain-wmb-race2` stay in
+`tests/cooking/lkmm` (control dependency past the `if`), with herd7's
+counts. New: `plain-coherence-lb` (a plain read before `smp_mb()` cannot
+see a write after an acquire of the flag it wrote: `wr-incoh`),
+`plain-coherence-ww` (two plain writes ordered by release/acquire keep that
+order in `co`: `ww-incoh`), `plain-thread-sync` (creation and join, also
+through a chain and a join followed by a release, order plain accesses),
+`plain-lb-racy`. Each fails without its rule. The kernel port's
+`refcount-dec-no-acquire-lkmm` stays out of `-lkmm`: its assertion fails
+before an execution completes (the stale read is LKMM's `wr-race`).
+
+Results (2026-10-19), herd7 7.58:
+
+| suite | result |
+|---|---|
+| whole corpus, no SRCU (4711 files, 30 s each, 10 jobs) | 4262 agree, 97 agree-racy (same race verdict and states), 8 agree-deadlock, 184 skipped, 117 herd7 timeout, 6 herd7 error, 1 count; 34 classified disagreements: 27 missing and 3 race (control dependency past the `if`), 4 missing (herd7's symbolic thin-air values); 2 GenMC timeouts under load (the 7-thread grace-period tests, 6.8 s alone) |
+| kernel `litmus-tests` (35) | 35 agree |
+| `tests/correct/lkmm`, `tests/wrong/racy` (rc11, imm, lkmm) | pass |
+| feature matrix | 1594 runs, no deviation |
+
+The 23 `auto/C-LB-Lrw*` tests (races through a plain read before a
+release) and the plain tests that were allow-listed as phase 4 agree now,
+racy states included.
 
 ## Kater and the generated checkers
 
