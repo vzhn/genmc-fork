@@ -267,6 +267,9 @@ protected:
 	/* Maps internal functions to their code. Derived once from internalFunNames */
 	llvm::DenseMap<const llvm::Function *, InternalFunctions> internalFunCache_;
 
+	/* Whether the program contains a seq_cst fence (see visitAtomicRMWInst()) */
+	bool hasSCFence_ = false;
+
 	/* List of thread-local variables, with their initializing values */
 	std::unordered_map<const void *, llvm::GenericValue> threadLocalVars;
 

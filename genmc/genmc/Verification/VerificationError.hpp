@@ -67,6 +67,7 @@ enum class VerificationError : std::uint8_t {
 	VE_InvalidRcu,
 	VE_InvalidBInit,
 	VE_BarrierWellFormedness,
+	VE_BlindRMWWellFormedness,
 	VE_Annotation,
 	VE_MixedSize,
 	VE_LinearizabilityError,
@@ -171,6 +172,8 @@ template <> struct std::formatter<VerificationError> {
 				    "Invalid barrier_init() operation");
 			FORMAT_CASE(VerificationError::VE_BarrierWellFormedness,
 				    "Execution not barrier-well-formed");
+			FORMAT_CASE(VerificationError::VE_BlindRMWWellFormedness,
+				    "Execution not well-formed for --blind-rmw-reduction");
 			FORMAT_CASE(VerificationError::VE_Annotation, "Annotation error");
 			FORMAT_CASE(VerificationError::VE_MixedSize, "Mixed-size accesses");
 			FORMAT_CASE(VerificationError::VE_LinearizabilityError,

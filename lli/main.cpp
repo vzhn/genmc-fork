@@ -162,6 +162,10 @@ static llvm::cl::opt<bool> clDisableRaceDetection("disable-race-detection",
 
 static llvm::cl::opt<bool> clDisableBAM("disable-bam", llvm::cl::cat(clGeneral),
 					llvm::cl::desc("Disable optimized barrier handling (BAM)"));
+static llvm::cl::opt<bool> clBlindRMWReduction(
+	"blind-rmw-reduction", llvm::cl::cat(clGeneral),
+	llvm::cl::desc("Explore one order of identical relaxed RMWs whose results are unused "
+		       "(RC11 only)"));
 static llvm::cl::opt<bool> clDisableIPR("disable-ipr", llvm::cl::cat(clGeneral),
 					llvm::cl::desc("Disable in-place revisiting"));
 static llvm::cl::opt<bool>
@@ -450,6 +454,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 #endif
 	conf.disableRaceDetection = clDisableRaceDetection;
 	conf.disableBAM = clDisableBAM;
+	conf.blindRMWReduction = clBlindRMWReduction;
 	conf.ipr = !clDisableIPR;
 
 	conf.warnUnfreedMemory = !clDisableWarnUnfreedMemory;

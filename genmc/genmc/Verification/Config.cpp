@@ -53,6 +53,11 @@ auto Config::validate(std::vector<std::string> &warnings) -> ValidationStatus
 		symmetryReduction = false;
 		ipr = false;
 	}
+	if (blindRMWReduction && model != ModelType::RC11) {
+		warnings.emplace_back(
+			std::format("--blind-rmw-reduction has no effect under {}", model));
+		blindRMWReduction = false;
+	}
 	if (!emitNALabels && instructionCaching)
 		errors.emplace_back("Instruction caching implies NA-label emission");
 

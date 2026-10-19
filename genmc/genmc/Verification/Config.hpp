@@ -53,6 +53,7 @@ struct Config {
 	bool disableInitializationChecks{};
 	bool disableStaticValidityChecks{};
 	bool disableBAM{};
+	bool blindRMWReduction{};
 	bool ipr{};
 	bool warnUnfreedMemory{};
 	std::optional<std::string> collectLinSpec;
