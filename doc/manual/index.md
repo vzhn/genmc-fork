@@ -5,7 +5,8 @@ SC [\[Lamport 1979\]](references.md#lamport1979sc),
 TSO [\[Owens et al. 2009\]](references.md#owens2009x86-tso),
 RA [\[Lahav et al. 2016\]](references.md#lahav2016taming),
 RC11 [\[Lahav et al. 2017\]](references.md#lahav2017repairing),
-and IMM [\[Podkopaev et al. 2019\]](references.md#podkopaev2019imm) memory models.
+IMM [\[Podkopaev et al. 2019\]](references.md#podkopaev2019imm), and
+Linux-kernel (LKMM) [\[Alglave et al. 2018\]](references.md#alglave2018lkmm) memory models.
 It primarily targets C/C++ and Rust programs, verifying safety properties by analyzing
 their concurrency patterns (e.g., usage of `C11` atomics or Rust's `std::sync`).
 It employs an effective dynamic partial order reduction technique

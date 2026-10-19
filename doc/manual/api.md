@@ -45,6 +45,14 @@ The following functions are supported for I/O:
 
 Note that these functions are not guaranteed to work properly in all scenarios.
 
+### Linux-kernel API
+
+`<lkmm.h>` provides the Linux kernel's concurrency primitives (marked
+accesses, barriers, atomics, spinlocks, RCU and SRCU), for programs
+verified with `-lkmm`; see [the LKMM section](features.md#the-linux-kernel-memory-model-lkmm)
+for the list. (Under the other models it maps them onto C11 atomics, an
+approximation; SRCU is `-lkmm` only.)
+
 ### SV-COMP API
 
 The following functions from the ones defined in SV-COMP [\[SV-COMP 2019\]](references.md#sv-comp) are supported:

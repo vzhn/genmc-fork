@@ -72,6 +72,139 @@ result of the compilation of some program in IMM's language. In other
 words, program correctness is not preserved across compilation for IMM
 inputs.
 
+## The Linux-Kernel Memory Model (LKMM)
+
+With `-lkmm`, GenMC verifies programs written against the Linux kernel's
+concurrency primitives under the kernel's own memory model
+[\[Alglave et al. 2018\]](references.md#alglave2018lkmm), the one in the
+kernel's `tools/memory-model` (`linux-kernel.cat`, variant `lkmmv2`). Such
+programs include `<lkmm.h>` instead of `<stdatomic.h>`:
+
+```c
+/* file: rcu-free.c */
+#include <stdlib.h>
+#include <pthread.h>
+#include <lkmm.h>
+
+struct foo {
+    int a;
+};
+
+struct foo *gp;
+
+void *reader(void *unused)
+{
+    rcu_read_lock();
+    struct foo *p = rcu_dereference(gp);
+    if (p)
+        (void) READ_ONCE(p->a);
+    rcu_read_unlock();
+    return NULL;
+}
+
+void *updater(void *unused)
+{
+    struct foo *p = gp;
+
+    WRITE_ONCE(gp, NULL);
+    synchronize_rcu();
+    free(p);
+    return NULL;
+}
+
+int main()
+{
+    pthread_t t1, t2;
+    struct foo *p = malloc(sizeof(*p));
+
+    p->a = 1;
+    gp = p;
+    if (pthread_create(&t1, NULL, reader, NULL))
+        abort();
+    if (pthread_create(&t2, NULL, updater, NULL))
+        abort();
+
+    return 0;
+}
+```
+
+`genmc -lkmm rcu-free.c` explores 2 executions and reports no error: the
+grace period orders the reader's critical section before the free.
+Without `synchronize_rcu()`, GenMC reports an access of freed memory.
+
+### Primitives
+
+`<lkmm.h>` provides the names of the kernel model's `linux-kernel.def`
+and some that kernel code commonly uses:
+
+- marked accesses: `READ_ONCE()`, `WRITE_ONCE()`, `smp_load_acquire()`,
+  `smp_store_release()`, `rcu_dereference()`, `rcu_assign_pointer()`,
+  `smp_cond_load_relaxed()`/`smp_cond_load_acquire()` (an await);
+- barriers: `smp_mb()`, `smp_rmb()`, `smp_wmb()`,
+  `smp_mb__before_atomic()`, `smp_mb__after_atomic()`,
+  `smp_mb__after_spinlock()`, `smp_mb__after_unlock_lock()`,
+  `smp_store_mb()`; `barrier()` is no event;
+- `xchg()`, `cmpxchg()` and the `atomic_t` operations in all their
+  orderings (fully ordered, `_relaxed`, `_acquire`, `_release`), the
+  non-value-returning ones (`atomic_inc()`, ...), `atomic_add_unless()`,
+  `atomic_inc_not_zero()`;
+- spinlocks: `spin_lock()`, `spin_unlock()`, `spin_trylock()`,
+  `spin_is_locked()` (and the `_bh`, `_irq`, `_irqsave` forms);
+- RCU: `rcu_read_lock()`, `rcu_read_unlock()` (nested),
+  `synchronize_rcu()`;
+- SRCU: `srcu_read_lock()`, `srcu_read_unlock()`, `srcu_down_read()`,
+  `srcu_up_read()`, `synchronize_srcu()`,
+  `smp_mb__after_srcu_read_unlock()`, `DEFINE_SRCU()`,
+  `init_srcu_struct()`.
+
+Accesses outside these primitives are plain (C's non-atomic accesses).
+Threads are created and joined with `pthread_create()` and
+`pthread_join()`, which the kernel model does not have: GenMC treats a
+creation and a join as a release write read by an acquire read.
+
+### What GenMC checks
+
+Under `-lkmm`, GenMC reports:
+
+- assertion failures in the executions the model allows;
+- data races as the model defines them (its `data-race` flag), on
+  complete executions; `-disable-race-detection` turns this off and keeps
+  the racy executions, which the model's plain-coherence still shapes;
+- invalid RCU usage: `rcu_read_unlock()` without a matching lock, a
+  thread that ends inside a critical section, `synchronize_rcu()` inside
+  one, and the misuses of SRCU the model flags (unmatched or multiply
+  matched `srcu_read_lock()`/`srcu_read_unlock()`, an unlock of another
+  index than its lock returned, `synchronize_srcu()` in an RCU critical
+  section or in a critical section of its own `srcu_struct`);
+- the memory errors of the other models; a grace period orders a reader's
+  accesses before a free that follows it.
+
+### Relation to herd7
+
+The kernel model's reference tool is herd7. On C litmus tests, GenMC's
+`-lkmm` explores the executions herd7 allows (its "Positive" and
+"Negative" ones, with the same final states and counts), with these
+exceptions:
+
+- **Control dependencies past the end of an `if`.** In the kernel model, a
+  control dependency orders only the events inside the conditional; a
+  write after the branches join is not ordered after the read the
+  condition tested (a compiler could move it above the `if`). GenMC orders
+  every event after a conditional after that read, so it misses the
+  executions where such a write is reordered: it can miss a bug in code
+  that relies on a control dependency past the `if`.
+- The model's `mixed-accesses` flag is not reported.
+- herd7's symbolic values for thin-air cycles have no counterpart: no
+  execution of the C program has them.
+- Executions with failed `cmpxchg()` reads can be counted differently
+  (one corpus test has the same final states with another count).
+
+Dependencies are those of the LLVM-IR GenMC runs, after `clang`'s
+optimizations, which may remove some that the source has.
+
+`scripts/lkmm` in GenMC's source tree has the tools that compare GenMC
+with herd7 on the litmus-test corpora (`README.md` there has the results).
+
 ## Race Detection and Memory Errors
 
 For memory models that define the notion of a race, GenMC will report
