@@ -1149,34 +1149,72 @@ void GenMCDriver::filterSymmetricStoresSR(const ReadLabel *rLab,
 	std::erase_if(stores, [&](auto &sLab) { return lab->getRf()->getPos() == sLab->getPos(); });
 }
 
-/* Returns LAB as a blind relaxed FAI that may be reordered with identical ones, or null */
-static auto asCommutingBlindFai(const EventLabel *lab) -> const FaiReadLabel *
-{
-	const auto *fLab = genmc::dyn_cast_if_present<FaiReadLabel>(lab);
-	if (!fLab || fLab->getKind() != EventLabel::FaiRead ||
-	    fLab->getAttr() != WriteAttr::Blind || fLab->getOrdering() != MemOrdering::Relaxed)
-		return nullptr;
-
-	/* A release fence before it would make its write a synchronization source */
-	const auto &g = *fLab->getParent();
-	for (auto i = 0; i < fLab->getIndex(); i++) {
-		const auto *pLab =
-			genmc::dyn_cast<FenceLabel>(g.getEventLabel(Event(fLab->getThread(), i)));
-		if (pLab && pLab->isAtLeastRelease())
-			return nullptr;
+namespace {
+/*
+ * Decides which FAIs the blind-RMW reduction may reorder.  An FAI qualifies if
+ * the interpreter marked it blind, it is relaxed, and it cannot be ordered
+ * through synchronization: no release fence precedes it in its thread (which
+ * would make its write a synchronization source) and no SC fence is in its hb
+ * past (an SC fence hb-before one of two RMWs orders them through psc; one that
+ * comes later can only follow both).  Built once per query, since it scans the
+ * graph for SC fences.
+ */
+class BlindRMWFilter {
+public:
+	BlindRMWFilter(const ExecutionGraph &g, const ConsistencyChecker &cc) : g(g), cc(cc)
+	{
+		for (auto t = 0; t < g.getNumThreads(); t++) {
+			auto first = -1;
+			for (auto i = 0; first == -1 && i < g.getThreadSize(t); i++) {
+				const auto *fLab =
+					genmc::dyn_cast<FenceLabel>(g.getEventLabel(Event(t, i)));
+				if (fLab && fLab->isSC())
+					first = i;
+			}
+			firstSCFence.push_back(first);
+		}
 	}
-	return fLab;
-}
 
-/* Whether A and B are distinct blind FAIs that can be reordered with each other */
-static auto areCommutingTwins(const EventLabel *a, const EventLabel *b) -> bool
-{
-	const auto *fA = asCommutingBlindFai(a);
-	const auto *fB = asCommutingBlindFai(b);
-	return fA && fB && fA != fB && fA->getAddr() == fB->getAddr() &&
-	       fA->getSize() == fB->getSize() && fA->getOp() == fB->getOp() &&
-	       fA->getOpVal() == fB->getOpVal();
-}
+	/* Returns LAB as a blind relaxed FAI that may be reordered, or null */
+	auto asCommuting(const EventLabel *lab) const -> const FaiReadLabel *
+	{
+		const auto *fLab = genmc::dyn_cast_if_present<FaiReadLabel>(lab);
+		if (!fLab || fLab->getKind() != EventLabel::FaiRead ||
+		    fLab->getAttr() != WriteAttr::Blind ||
+		    fLab->getOrdering() != MemOrdering::Relaxed)
+			return nullptr;
+
+		for (auto i = 0; i < fLab->getIndex(); i++) {
+			const auto *pLab = genmc::dyn_cast<FenceLabel>(
+				g.getEventLabel(Event(fLab->getThread(), i)));
+			if (pLab && pLab->isAtLeastRelease())
+				return nullptr;
+		}
+		const auto &hb = cc.getHbView(fLab);
+		for (auto t = 0U; t < firstSCFence.size(); t++) {
+			if (firstSCFence[t] != -1 &&
+			    hb.getMax(static_cast<int>(t)) >= firstSCFence[t])
+				return nullptr;
+		}
+		return fLab;
+	}
+
+	/* Whether A and B are distinct blind FAIs that can be reordered with each other */
+	auto areTwins(const EventLabel *a, const EventLabel *b) const -> bool
+	{
+		const auto *fA = asCommuting(a);
+		const auto *fB = asCommuting(b);
+		return fA && fB && fA != fB && fA->getAddr() == fB->getAddr() &&
+		       fA->getSize() == fB->getSize() && fA->getOp() == fB->getOp() &&
+		       fA->getOpVal() == fB->getOpVal();
+	}
+
+private:
+	const ExecutionGraph &g;
+	const ConsistencyChecker &cc;
+	std::vector<int> firstSCFence; /* -1 if the thread has none */
+};
+} // namespace
 
 /* The read part of WLAB if it is an RMW write, or null */
 static auto getRMWRead(const WriteLabel &wLab) -> const ReadLabel *
@@ -1206,17 +1244,18 @@ static auto getRMWRead(const WriteLabel &wLab) -> const ReadLabel *
 void GenMCDriver::filterCommutingBlindRMWs(const ReadLabel *rLab,
 					   std::vector<EventLabel *> &stores) const
 {
-	const auto *fLab = asCommutingBlindFai(rLab);
+	const auto &g = getExec().getGraph();
+	const BlindRMWFilter blind(g, getConsChecker());
+	const auto *fLab = blind.asCommuting(rLab);
 	if (!fLab)
 		return;
 
-	const auto &g = getExec().getGraph();
 	auto addr = fLab->getAddr();
 
 	/* (a): every write to the location so far is an identical blind FAI */
 	if (!std::ranges::all_of(g.co(addr), [&](auto &wLab) {
 		    const auto *pLab = getRMWRead(wLab);
-		    return pLab && areCommutingTwins(pLab, fLab);
+		    return pLab && blind.areTwins(pLab, fLab);
 	    }))
 		return;
 
@@ -1233,14 +1272,14 @@ void GenMCDriver::filterCommutingBlindRMWs(const ReadLabel *rLab,
 			auto from = std::max(ownView.getMax(t), sView ? sView->getMax(t) : -1);
 			for (auto i = std::max(from + 1, 0); i <= maxView.getMax(t); i++) {
 				const auto *lab = g.getEventLabel(Event(t, i));
-				if (genmc::isa<ReadLabel>(lab) && !areCommutingTwins(lab, fLab))
+				if (genmc::isa<ReadLabel>(lab) && !blind.areTwins(lab, fLab))
 					return false;
 			}
 		}
 		return true;
 	};
 	auto isReadByTwin = [&](const EventLabel *sLab) {
-		auto isTwin = [&](auto &oLab) { return areCommutingTwins(&oLab, fLab); };
+		auto isTwin = [&](auto &oLab) { return blind.areTwins(&oLab, fLab); };
 		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(sLab))
 			return std::ranges::any_of(wLab->readers(), isTwin);
 		return std::ranges::any_of(genmc::cast<InitLabel>(sLab)->rfs(addr), isTwin);
@@ -1256,7 +1295,12 @@ void GenMCDriver::filterCommutingBlindRMWs(const ReadLabel *rLab,
 
 auto GenMCDriver::checkBlindRMWWellFormedness(const ReadLabel *rLab) -> bool
 {
-	if (!getConf()->blindRMWReduction || asCommutingBlindFai(rLab))
+	if (!getConf()->blindRMWReduction)
+		return true;
+
+	const auto &g = getExec().getGraph();
+	const BlindRMWFilter blind(g, getConsChecker());
+	if (blind.asCommuting(rLab))
 		return true;
 
 	/*
@@ -1264,17 +1308,15 @@ auto GenMCDriver::checkBlindRMWWellFormedness(const ReadLabel *rLab) -> bool
 	 * observes their order: it may see the first without the second.  The
 	 * reduction may have fixed that order, so such a read is not supported.
 	 */
-	const auto &g = getExec().getGraph();
 	const auto &view = getConsChecker().getHbView(rLab);
 	std::vector<const ReadLabel *> twins;
 	for (const auto &wLab : g.co(rLab->getAddr())) {
-		if (const auto *pLab = getRMWRead(wLab); asCommutingBlindFai(pLab))
+		if (const auto *pLab = getRMWRead(wLab); blind.asCommuting(pLab))
 			twins.push_back(pLab);
 	}
 	auto valid = std::ranges::none_of(twins, [&](auto *aLab) {
 		return view.contains(aLab->getPos()) && std::ranges::any_of(twins, [&](auto *bLab) {
-			       return areCommutingTwins(aLab, bLab) &&
-				      !view.contains(bLab->getPos());
+			       return blind.areTwins(aLab, bLab) && !view.contains(bLab->getPos());
 		       });
 	});
 	if (!valid)
@@ -1299,18 +1341,19 @@ auto GenMCDriver::checkBlindRMWWellFormedness(const WriteLabel *sLab) -> bool
 	 * which creates no hb, as they are relaxed.)
 	 */
 	const auto &g = getExec().getGraph();
+	const BlindRMWFilter blind(g, getConsChecker());
 	const auto *ownRead = getRMWRead(*sLab);
 	const auto &view = getConsChecker().getHbView(sLab);
 	std::vector<const ReadLabel *> twins;
 	for (const auto &wLab : g.co(sLab->getAddr())) {
 		const auto *rLab = getRMWRead(wLab);
-		if (&wLab != sLab && asCommutingBlindFai(rLab) && !areCommutingTwins(rLab, ownRead))
+		if (&wLab != sLab && blind.asCommuting(rLab) && !blind.areTwins(rLab, ownRead))
 			twins.push_back(rLab);
 	}
 	auto valid = std::ranges::none_of(twins, [&](auto *aLab) {
 		return !view.contains(aLab->getPos()) &&
-		       std::ranges::any_of(
-			       twins, [&](auto *bLab) { return areCommutingTwins(aLab, bLab); });
+		       std::ranges::any_of(twins,
+					   [&](auto *bLab) { return blind.areTwins(aLab, bLab); });
 	});
 	if (!valid)
 		reportError(
