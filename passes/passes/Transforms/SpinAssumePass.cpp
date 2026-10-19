@@ -697,22 +697,100 @@ static void addSpinEndCallBeforeTerm(BasicBlock *latch, BasicBlock *header)
 	ci->setMetadata("dbg", term->getMetadata("dbg"));
 }
 
-static void addPotentialSpinEndCallBeforeLastFai(BasicBlock *latch, Instruction *lastEffect)
+/*
+ * Makes V available at POS: V is already, or is a pure computation after POS
+ * in POS's block (e.g., the comparison of a loop's exit branch) whose
+ * operands are, and is moved before POS. Returns whether V is available.
+ */
+static auto hoistAbove(Value *v, Instruction *pos, DominatorTree &DT, unsigned depth = 0) -> bool
 {
-	auto *endFun = latch->getParent()->getParent()->getFunction("__VERIFIER_faiZNE_spin_end");
+	auto *i = dyn_cast<Instruction>(v);
+	if (!i || DT.dominates(i, pos))
+		return true;
+	if (depth > 8 || i->getParent() != pos->getParent() || isa<PHINode>(i) ||
+	    i->mayReadOrWriteMemory() || i->mayHaveSideEffects() || i->isTerminator())
+		return false;
+	if (!std::ranges::all_of(i->operands(),
+				 [&](Use &op) { return hoistAbove(op.get(), pos, DT, depth + 1); }))
+		return false;
+	i->moveBefore(pos->getIterator());
+	return true;
+}
+
+/*
+ * A ZNE spin end blocks the thread before LASTEFFECT (the decrementing FAI, or
+ * the unlock), and must do so only if the iteration goes back to the header:
+ * returns the condition that it does, valid at LASTEFFECT, or nullptr if it
+ * cannot be computed there. The loop may still exit after LASTEFFECT through
+ * one exiting block that post-dominates LASTEFFECT and whose condition is
+ * computed before LASTEFFECT. (A path from LASTEFFECT back to the header
+ * that avoids that block cannot exit; the condition may then say "exits"
+ * and leave the iteration unblocked, which costs exploration, not results.)
+ */
+static auto getZNEContinueCondition(Loop *l, Instruction *lastEffect, ModuleAnalysisManager &MAM)
+	-> Value *
+{
+	auto *header = l->getHeader();
+	auto *start = lastEffect->getParent();
+	auto &FAM = MAM.getResult<FunctionAnalysisManagerModuleProxy>(*start->getParent()->getParent())
+			    .getManager();
+	auto &DT = FAM.getResult<DominatorTreeAnalysis>(*start->getParent());
+	auto &PDT = FAM.getResult<PostDominatorTreeAnalysis>(*start->getParent());
+
+	/* The exiting blocks reachable from LASTEFFECT within the iteration */
+	SmallVector<BasicBlock *, 4> exiting;
+	SmallVector<BasicBlock *, 8> worklist = {start};
+	VSet<BasicBlock *> seen;
+	seen.insert(start);
+	while (!worklist.empty()) {
+		auto *bb = worklist.pop_back_val();
+		for (auto *succ : successors(bb)) {
+			if (!l->contains(succ)) {
+				if (exiting.empty() || exiting.back() != bb)
+					exiting.push_back(bb);
+				continue;
+			}
+			if (succ == header || seen.count(succ))
+				continue;
+			seen.insert(succ);
+			worklist.push_back(succ);
+		}
+	}
+	if (exiting.empty())
+		return ConstantInt::getTrue(lastEffect->getContext());
+	if (exiting.size() != 1)
+		return nullptr;
+
+	auto *bb = exiting[0];
+	auto *bi = dyn_cast<BranchInst>(bb->getTerminator());
+	if (!bi || bi->isUnconditional() || (bb != start && !PDT.dominates(bb, start)))
+		return nullptr;
+	auto *cond = bi->getCondition();
+	if (!hoistAbove(cond, lastEffect, DT))
+		return nullptr;
+	auto staysOn0 = l->contains(bi->getSuccessor(0));
+	if (staysOn0 == l->contains(bi->getSuccessor(1)))
+		return nullptr;
+	return staysOn0 ? cond : BinaryOperator::CreateNot(cond, "", lastEffect->getIterator());
+}
+
+static void addPotentialSpinEndCall(StringRef name, Instruction *lastEffect, Value *cont)
+{
+	auto *endFun = lastEffect->getParent()->getParent()->getParent()->getFunction(name);
 	VERIFY(endFun);
 
-	auto *ci = CallInst::Create(endFun, {}, "", lastEffect->getIterator());
+	auto *ci = CallInst::Create(endFun, {cont}, "", lastEffect->getIterator());
 	ci->setMetadata("dbg", lastEffect->getMetadata("dbg"));
 }
 
-static void addPotentialSpinEndCallBeforeUnlock(BasicBlock *latch, Instruction *lastEffect)
+static void addPotentialSpinEndCallBeforeLastFai(Instruction *lastEffect, Value *cont)
 {
-	auto *endFun = latch->getParent()->getParent()->getFunction("__VERIFIER_lockZNE_spin_end");
-	VERIFY(endFun);
+	addPotentialSpinEndCall("__VERIFIER_faiZNE_spin_end", lastEffect, cont);
+}
 
-	auto *ci = CallInst::Create(endFun, {}, "", lastEffect->getIterator());
-	ci->setMetadata("dbg", lastEffect->getMetadata("dbg"));
+static void addPotentialSpinEndCallBeforeUnlock(Instruction *lastEffect, Value *cont)
+{
+	addPotentialSpinEndCall("__VERIFIER_lockZNE_spin_end", lastEffect, cont);
 }
 
 static void addSpinStartCall(Loop *l)
@@ -839,19 +917,23 @@ static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> b
 	auto modified = false;
 	auto checkDynamically = false;
 	llvm::Instruction *lastZNEEffect = nullptr;
+	llvm::Value *cont = nullptr;
 	for (auto &latch : latches) {
 		/* FAI-ZNE blocks ignore header PHIs (lock-ZNE requires none);
-		 * with PHIs such paths are checked dynamically */
-		if (!hasPHIs && isPathToHeaderFAIZNE(latch, l, MAM, lastZNEEffect)) {
+		 * with PHIs such paths are checked dynamically. A ZNE spin end
+		 * blocks only if the iteration does not exit after it */
+		if (!hasPHIs && isPathToHeaderFAIZNE(latch, l, MAM, lastZNEEffect) &&
+		    (cont = getZNEContinueCondition(l, lastZNEEffect, MAM))) {
 			checkDynamically = true;
 			modified = true;
-			addPotentialSpinEndCallBeforeLastFai(latch, lastZNEEffect);
-		} else if (isPathToHeaderLockZNE(latch, l, MAM, lastZNEEffect)) {
+			addPotentialSpinEndCallBeforeLastFai(lastZNEEffect, cont);
+		} else if (isPathToHeaderLockZNE(latch, l, MAM, lastZNEEffect) &&
+			   (cont = getZNEContinueCondition(l, lastZNEEffect, MAM))) {
 			/* Check for lockZNE before effect-free paths,
 			 * as locks are function calls too...  */
 			checkDynamically = true;
 			modified = true;
-			addPotentialSpinEndCallBeforeUnlock(latch, lastZNEEffect);
+			addPotentialSpinEndCallBeforeUnlock(lastZNEEffect, cont);
 		} else if (isPathToHeaderEffectFree(latch, l, MAM, checkDynamically)) {
 			/* If we have to dynamically validate the loop,
 			 * the above check will return false, but the path

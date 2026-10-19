@@ -2899,6 +2899,10 @@ void Interpreter::callSpinStart(Function *F, const std::vector<GenericValue> &Ar
 void Interpreter::callFaiZNESpinEnd(Function *F, const std::vector<GenericValue> &ArgVals,
 				    const std::unique_ptr<EventDeps> &specialDeps)
 {
+	/* The loop exits after this point: not a spin end */
+	if (!ArgVals[0].IntVal.getBoolValue())
+		return;
+
 	auto ret = CALL_DRIVER(handleFaiZNESpinEnd, currDbgInfo(), currPos());
 	VERIFY(std::holds_alternative<std::monostate>(ret));
 	updateCtrlDeps(getCurThr().id, currPos());
@@ -2907,6 +2911,10 @@ void Interpreter::callFaiZNESpinEnd(Function *F, const std::vector<GenericValue>
 void Interpreter::callLockZNESpinEnd(Function *F, const std::vector<GenericValue> &ArgVals,
 				     const std::unique_ptr<EventDeps> &specialDeps)
 {
+	/* The loop exits after this point: not a spin end */
+	if (!ArgVals[0].IntVal.getBoolValue())
+		return;
+
 	auto ret = CALL_DRIVER(handleLockZNESpinEnd, currDbgInfo(), currPos());
 	VERIFY(std::holds_alternative<std::monostate>(ret));
 	updateCtrlDeps(getCurThr().id, currPos());
