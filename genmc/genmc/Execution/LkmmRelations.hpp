@@ -29,6 +29,20 @@ namespace lkmm {
 /** The events of LAB's thread that LKMM's prop orders before it: (prop \ id) & int */
 auto propIntPreds(const ExecutionGraph &g, const EventLabel *lab) -> std::vector<const EventLabel *>;
 
+/** While one lives, propIntPreds() remembers its results: the graph must
+ * not change meanwhile (a consistency check visits a label once per state
+ * of its automaton). Nested ones share the outermost */
+class PropIntCache {
+public:
+	PropIntCache();
+	~PropIntCache();
+	PropIntCache(const PropIntCache &) = delete;
+	auto operator=(const PropIntCache &) -> PropIntCache & = delete;
+
+private:
+	bool owner; /* not nested in another */
+};
+
 } // namespace lkmm
 
 #endif /* GENMC_LKMM_RELATIONS_HPP */

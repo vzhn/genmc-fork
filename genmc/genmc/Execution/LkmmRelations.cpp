@@ -30,7 +30,10 @@
  *      | [M] ; po? ; [RMW] ; po ; [After-atomic] ; po ; [M]
  *      | [M] ; po? ; [LKW] ; po ; [After-spinlock] ; po ; [M]
  *      | [M] ; po-unlock-lock-po ; [After-unlock-lock] ; po ; [M]
- *   strong-fence = mb                                  (RCU's gp comes later)
+ *   gp = po ; [Sync-rcu] ; po?                       (here [M] ; po ; [Sync-rcu] ; po ; [M])
+ * where, in mb and gp, M also has GenMC's thread events (creation and join
+ * synchronise like a release and an acquire, which a strong fence reaches)
+ *   strong-fence = mb | gp
  *   A-cumul(r) = (rfe ; [Marked])? ; r
  *   rmw-sequence = (rf ; rmw)*
  *   cumul-fence = [Marked] ; (A-cumul(strong-fence | po-rel) | wmb
@@ -58,6 +61,15 @@ using Labels = std::vector<const EventLabel *>;
 auto isMarked(const EventLabel *lab) -> bool { return !lab->isNotAtomic(); }
 auto isMem(const EventLabel *lab) -> bool { return genmc::isa<MemAccessLabel>(lab); }
 auto isWrite(const EventLabel *lab) -> bool { return genmc::isa<WriteLabel>(lab); }
+
+/* An endpoint of a strong fence: an access or a thread event (creation and
+ * join synchronise like a release and an acquire) */
+auto isMemOrThread(const EventLabel *lab) -> bool
+{
+	return isMem(lab) || genmc::isa<ThreadCreateLabel>(lab) ||
+	       genmc::isa<ThreadFinishLabel>(lab) || genmc::isa<ThreadStartLabel>(lab) ||
+	       genmc::isa<ThreadJoinLabel>(lab);
+}
 
 auto isFence(const EventLabel *lab, LkmmFenceKind kind) -> bool
 {
@@ -114,21 +126,21 @@ auto unlocksBefore(const ExecutionGraph &g, const EventLabel *lkr) -> Labels
 	return uls;
 }
 
-/* The y with (y, x) in mb: the fences and fully ordered RMWs that stand
- * between y and x in x's thread, plus the lock handover of
+/* The y with (y, x) in mb | gp: the fences, grace periods and fully ordered
+ * RMWs that stand between y and x in x's thread, plus the lock handover of
  * smp_mb__after_unlock_lock() */
 auto mbPreds(const ExecutionGraph &g, const EventLabel *x) -> Labels
 {
 	Labels out;
-	if (!isMem(x))
+	if (!isMemOrThread(x))
 		return out;
 
 	/* [M] ; po ; [Mb & R] */
 	if (genmc::isa<ReadLabel>(x) && x->isLkmmMb())
-		poPredsIf(g, x, isMem, out);
+		poPredsIf(g, x, isMemOrThread, out);
 
 	/* Scan back from x; the flags say what stood between the current event and x */
-	bool sawMb = false;	    /* [M] ; po ; [Mb] ; po ; [M] */
+	bool sawMb = false;	    /* [M] ; po ; [Mb | Sync-rcu] ; po ; [M] */
 	bool sawRMW = isRMWAccess(x); /* ... ; [Before-atomic] ; po ; [RMW] ; po? ; [M] */
 	bool sawBa = false;
 	bool sawAa = false;	    /* [M] ; po? ; [RMW] ; po ; [After-atomic] ; po ; [M] */
@@ -137,7 +149,7 @@ auto mbPreds(const ExecutionGraph &g, const EventLabel *x) -> Labels
 	bool sawLKWBeforeAs = false;
 	for (const auto &pLab : g.po_preds(x)) {
 		const auto *y = &pLab;
-		if (isFence(y, LkmmFenceKind::Mb))
+		if (isFence(y, LkmmFenceKind::Mb) || isFence(y, LkmmFenceKind::SyncRcu))
 			sawMb = true;
 		if (isFence(y, LkmmFenceKind::BeforeAtomic) && sawRMW)
 			sawBa = true;
@@ -157,9 +169,9 @@ auto mbPreds(const ExecutionGraph &g, const EventLabel *x) -> Labels
 			for (const auto &lLab : g.po_preds(y))
 				if (isLKR(&lLab))
 					for (const auto *ul : unlocksBefore(g, &lLab))
-						poPredsIf(g, ul, isMem, out);
+						poPredsIf(g, ul, isMemOrThread, out);
 		}
-		if (!isMem(y))
+		if (!isMemOrThread(y))
 			continue;
 		if (sawMb || sawBa || sawRMWBeforeAa || sawLKWBeforeAs ||
 		    (isWrite(y) && y->isLkmmMb())) /* [Mb & W] ; po ; [M] */
@@ -249,7 +261,38 @@ auto cumulFenceStepPreds(const ExecutionGraph &g, const EventLabel *x) -> Labels
 
 } // namespace
 
+namespace {
+/* The results of propIntPreds() while a PropIntCache lives, by stamp */
+thread_local std::unordered_map<unsigned, Labels> *propIntCache = nullptr;
+auto computePropIntPreds(const ExecutionGraph &g, const EventLabel *lab) -> Labels;
+} // namespace
+
+lkmm::PropIntCache::PropIntCache() : owner(propIntCache == nullptr)
+{
+	if (owner)
+		propIntCache = new std::unordered_map<unsigned, Labels>();
+}
+
+lkmm::PropIntCache::~PropIntCache()
+{
+	if (owner) {
+		delete propIntCache;
+		propIntCache = nullptr;
+	}
+}
+
 auto lkmm::propIntPreds(const ExecutionGraph &g, const EventLabel *lab) -> Labels
+{
+	if (!propIntCache)
+		return computePropIntPreds(g, lab);
+	auto [it, inserted] = propIntCache->try_emplace(lab->getStamp().get());
+	if (inserted)
+		it->second = computePropIntPreds(g, lab);
+	return it->second;
+}
+
+namespace {
+auto computePropIntPreds(const ExecutionGraph &g, const EventLabel *lab) -> Labels
 {
 	Labels result;
 	if (!isMarked(lab))
@@ -321,6 +364,7 @@ auto lkmm::propIntPreds(const ExecutionGraph &g, const EventLabel *lab) -> Label
 	}
 	return result;
 }
+} // namespace
 
 auto ExecutionGraph::prop_int_preds(const EventLabel *lab) const -> std::vector<const EventLabel *>
 {

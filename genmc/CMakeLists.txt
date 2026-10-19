@@ -15,6 +15,8 @@ set(LIB_SOURCES
   genmc/Execution/Consistency/ContextBoundDecider.cpp
   genmc/Execution/Consistency/IMMChecker.cpp
   genmc/Execution/Consistency/LKMMChecker.cpp
+  genmc/Execution/Consistency/LKMMRcuChecker.cpp
+  genmc/Execution/LkmmModel.cpp
   genmc/Execution/LkmmRelations.cpp
   genmc/Execution/Consistency/RAChecker.cpp
   genmc/Execution/Consistency/RC11Checker.cpp

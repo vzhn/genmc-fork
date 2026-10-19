@@ -175,6 +175,9 @@ extern void __VERIFIER_hazptr_retire(void *p) __attribute__ ((__nothrow__));
 #define GENMC_LKMM_FENCE_AFTER_ATOMIC     4
 #define GENMC_LKMM_FENCE_AFTER_SPINLOCK   5
 #define GENMC_LKMM_FENCE_AFTER_UNLOCK_LOCK 6
+#define GENMC_LKMM_RCU_LOCK   7
+#define GENMC_LKMM_RCU_UNLOCK 8
+#define GENMC_LKMM_SYNC_RCU   9
 extern void __VERIFIER_lkmm_fence(int kind) __attribute__ ((__nothrow__));
 extern void __VERIFIER_rcu_read_lock(void) __attribute__ ((__nothrow__));
 extern void __VERIFIER_rcu_read_unlock(void) __attribute__ ((__nothrow__));

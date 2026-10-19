@@ -1,0 +1,4 @@
+-lkmm-reference |
+-lkmm-reference | -DGP
+-lkmm-reference | -DJOIN
+-lkmm-reference | -DJOIN -DGP

@@ -142,6 +142,11 @@ static llvm::cl::opt<std::string>
 		       llvm::cl::cat(clGeneral),
 		       llvm::cl::desc("Dump an error graph to a file (DOT format)"));
 
+static llvm::cl::opt<bool> clLkmmReference(
+	"lkmm-reference", llvm::cl::cat(clDebugging),
+	llvm::cl::desc("Under -lkmm, check every graph with a direct evaluation of the model "
+		       "too, and stop when it disagrees with the checker (slow)"));
+
 static llvm::cl::opt<bool> clCheckLiveness("check-liveness", llvm::cl::cat(clGeneral),
 					   llvm::cl::desc("Check for liveness violations"));
 
@@ -439,6 +444,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.finalWrite = !clDisableFinalWrite;
 	conf.printErrorTrace = clPrintErrorTrace;
 	conf.checkLiveness = clCheckLiveness;
+	conf.lkmmReference = clLkmmReference;
 #if EMIT_NA_LABELS
 	conf.instructionCaching = clCacheInstructions;
 #endif

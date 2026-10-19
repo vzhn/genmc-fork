@@ -45,6 +45,7 @@ struct Config {
 	bool confirmation{};
 	bool finalWrite{};
 	bool checkLiveness{};
+	bool lkmmReference{};
 	bool printErrorTrace{};
 	std::string dotFile;
 	bool instructionCaching{};

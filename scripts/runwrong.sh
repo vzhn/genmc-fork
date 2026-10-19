@@ -239,8 +239,13 @@ do
 	    "access-freed-hp") continue;;
 	    "destroyed-mutex") continue;;
 	esac
-    # under LKMM only programs written for it (they opt in with a genmc.lkmm.*.in)
+    # under LKMM only programs written for it (they opt in with a genmc.lkmm.*.in);
+    # those named *-lkmm run under another model only with its genmc.<model>.*.in
     if [[ "${model}" == "lkmm" && ! -f "${dir}/genmc.lkmm.${coherence}.in" ]]
+    then
+	continue
+    fi
+    if [[ "${model}" != "lkmm" && "${dir##*/}" == *-lkmm && ! -f "${dir}/genmc.${model}.${coherence}.in" ]]
     then
 	continue
     fi

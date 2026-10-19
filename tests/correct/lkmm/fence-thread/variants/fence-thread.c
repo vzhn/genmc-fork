@@ -1,0 +1,1 @@
+#include "../fence-thread.c"
