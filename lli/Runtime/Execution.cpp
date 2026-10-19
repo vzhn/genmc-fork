@@ -3543,6 +3543,12 @@ void Interpreter::callFunction(Function *F, const std::vector<GenericValue> &Arg
 		return;
 	}
 
+	/* abort() ends the program with an error, not GenMC */
+	if (F->isDeclaration() && F->getName() == "abort") {
+		CALL_DRIVER(handleError, currDbgInfo(), currPos(), "Program aborted");
+		return;
+	}
+
 	assert(!specialDeps);
 	assert((ECStack().empty() || !&ECStack().back().Caller ||
 		ECStack().back().Caller.arg_size() == ArgVals.size()) &&

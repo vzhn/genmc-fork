@@ -47,7 +47,6 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include <cmath>
-#include <csignal>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -373,15 +372,6 @@ static GenericValue lle_X_exit(FunctionType *FT, const std::vector<GenericValue>
 	return GenericValue();
 }
 
-// void abort(void)
-static GenericValue lle_X_abort(FunctionType *FT, const std::vector<GenericValue> &Args)
-{
-	// FIXME: should we report or raise here?
-	// report_fatal_error("Interpreted program raised SIGABRT");
-	raise(SIGABRT);
-	return GenericValue();
-}
-
 // int sprintf(char *, const char *, ...) - a very rough implementation to make
 // output useful.
 static GenericValue lle_X_sprintf(FunctionType *FT, const std::vector<GenericValue> &Args)
@@ -586,7 +576,6 @@ void Interpreter::initializeExternalFunctions()
 	sys::ScopedLock Writer(*FunctionsLock);
 	FuncNames["lle_X_atexit"] = lle_X_atexit;
 	FuncNames["lle_X_exit"] = lle_X_exit;
-	FuncNames["lle_X_abort"] = lle_X_abort;
 
 	FuncNames["lle_X_printf"] = lle_X_printf;
 	FuncNames["lle_X_sprintf"] = lle_X_sprintf;
