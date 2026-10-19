@@ -10,6 +10,42 @@ released.
 - Merge of MIXER [POPL'25] into mainline GenMC
 
 
+## [0.19.0-vzhn.5] - 2026.10.19
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Fixes
+
+- Code condenser: a block was merged into a bisimilar one even when values of
+  the merged ranges were used elsewhere or the surviving range used values
+  the redirected paths never define (e.g. `first = load(x)` before a loop
+  reloading `x` was redefined by every iteration), so assertion violations
+  were missed with default flags (#29).
+- Load annotation / IPR: instructions the annotator cannot model (floating-
+  point compares and conversions, ...) were replaced by `true`, which turned
+  the annotation of e.g. `while (load(x) == 0.0f);` into `assume(false)`; the
+  loop never exited and later assertions were missed. Such annotations are
+  now dropped (#30).
+- Re-executing a thread's kill event (`-unroll` bound) during an error replay
+  that targets the kill, e.g. for the unfreed-memory warning, or with race
+  detection disabled, failed an internal check (#31).
+- Thread begin labels whose create event was cut by a restriction of the
+  graph: under IMM they were kept (hole labels), a non-trailing thread could
+  be erased (shifting thread ids), and threads created by other threads could
+  not be removed at all; all three ended in internal failures or a segfault
+  with symmetry reduction. Such begins are now removed or kept terminated and
+  revived when their create is executed again (#32).
+
+### Added
+
+- Regression tests for the above: `wrong/safety/condenser-reused-value`,
+  `wrong/safety/annot-unmodeled-inst`, `correct/infr/kill-error-replay`,
+  `correct/infr/kill-replay-norace`,
+  `correct/data-structures/mpmc-queue-unroll-kill`,
+  `correct/infr/nested-create-{revisit,erase,symm}`,
+  `correct/infr/pool-protocol-arbitrary`.
+
+
 ## [0.19.0-vzhn.4] - 2026.10.18
 
 Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
