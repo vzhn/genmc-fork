@@ -18,7 +18,8 @@
  * NTHREADS threads take the lock once each; the critical sections never
  * overlap and nobody waits forever.
  *
- * BUG_RELAXED_LINK: the link into the predecessor is a relaxed store, as
+ * One switch per bug, fixed five years apart:
+ * - BUG_RELAXED_LINK: the link into the predecessor is a relaxed store, as
  * in DPDK 20.05. The exchange between the locked = 1 store and the link
  * does not order them: its release covers only its own write. The
  * predecessor can follow the link and clear locked before the locked = 1
@@ -35,6 +36,12 @@
 # define LINK_ORDER memory_order_relaxed
 #else
 # define LINK_ORDER memory_order_release
+#endif
+
+#ifdef BUG_RELAXED_NEXT_LOAD
+# define NEXT_ORDER memory_order_relaxed
+#else
+# define NEXT_ORDER memory_order_acquire
 #endif
 
 struct mcs_node {
@@ -61,7 +68,7 @@ static void mcslock_lock(struct mcs_node *me)
 
 static void mcslock_unlock(struct mcs_node *me)
 {
-	if (atomic_load_explicit(&me->next, memory_order_acquire) == NULL) {
+	if (atomic_load_explicit(&me->next, NEXT_ORDER) == NULL) {
 		struct mcs_node *expected = me;
 
 		if (atomic_compare_exchange_strong_explicit(&tail, &expected, NULL,
@@ -69,9 +76,9 @@ static void mcslock_unlock(struct mcs_node *me)
 							    memory_order_relaxed))
 			return;
 		/* a successor is linking itself in */
-		__VERIFIER_await(atomic_load_explicit(&me->next, memory_order_acquire) != NULL);
+		__VERIFIER_await(atomic_load_explicit(&me->next, NEXT_ORDER) != NULL);
 	}
-	struct mcs_node *next = atomic_load_explicit(&me->next, memory_order_acquire);
+	struct mcs_node *next = atomic_load_explicit(&me->next, NEXT_ORDER);
 
 	atomic_store_explicit(&next->locked, 0, memory_order_release);
 }
