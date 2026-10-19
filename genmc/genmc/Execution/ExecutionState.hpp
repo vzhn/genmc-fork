@@ -141,6 +141,8 @@ public:
 	{
 		markInitialized(access, pos, view);
 	}
+	/** Registers a block the graph already placed at ADDR (cf. onAlloc()) */
+	void onAllocAt(Event pos, SAddr addr, ASize size, uint64_t alignment);
 	void onFree(Event pos, SAddr addr, bool isRetire);
 	void onProtect(SAddr hpAddr, SAddr protAddr);
 

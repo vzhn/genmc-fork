@@ -21,4 +21,6 @@ re-implementations of the bug patterns, not copies of GoBench's Go code.
 
 The correct tests run under RC11 only. The model uses locks and sequentially
 consistent atomics, as Go's runtime and `sync/atomic` do, so IMM explores the
-same behaviours, more slowly. The wrong liveness tests also run under IMM.
+same behaviours, more slowly. The wrong liveness tests also run under IMM, and
+so does `cockroach10790`, where GenMC once gave two stack variables the same
+address under IMM (vzhn/genmc-fork#61).

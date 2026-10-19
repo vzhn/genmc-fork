@@ -231,9 +231,11 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 						       wLab->isAtLeastRelease());
 			}
 		} else if (const auto *aLab = genmc::dyn_cast<MallocLabel>(lab)) {
-			state.onAlloc(aLab->getPos(), aLab->getSize(), aLab->getAlignment(),
-				      aLab->getStorageDuration(), aLab->getStorageType(),
-				      aLab->getAddressSpace());
+			/* Keep the address the graph has: under dependency-tracking
+			 * models, a thread's earlier allocations may have been cut
+			 * from the graph, and are allocated anew after this one */
+			state.onAllocAt(aLab->getPos(), aLab->getAddr(), aLab->getSize(),
+					aLab->getAlignment());
 			if (aLab->isZeroed())
 				state.onZeroedAlloc(aLab->getPos(), aLab->getAccess(),
 						    g.getConsChecker()->getHbView(aLab));

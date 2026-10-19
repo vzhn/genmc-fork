@@ -16,6 +16,15 @@
 
 #include <algorithm>
 
+void SAddrAllocator::reserve(SAddr addr, uint64_t size)
+{
+	VERIFY(addr.isDynamic());
+	auto tid = static_cast<int>((addr.get() & SAddr::threadMask) >> SAddr::threadStartBit);
+	auto end = (addr.get() & SAddr::indexMask) + size;
+	SAddr::Width &pool = dynamicPool_[tid];
+	pool = std::max(pool, end);
+}
+
 void SAddrAllocator::restrict(const VectorClock &view)
 {
 	for (auto &[tid, index] : dynamicPool_) {
