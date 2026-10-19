@@ -3549,6 +3549,15 @@ void Interpreter::callFunction(Function *F, const std::vector<GenericValue> &Arg
 		return;
 	}
 
+	/* A call through an unprototyped declaration can pass too few arguments */
+	if (!F->isDeclaration() && ArgVals.size() < F->arg_size()) {
+		CALL_DRIVER(handleError, currDbgInfo(), currPos(),
+			    "Function " + F->getName().str() + " called with " +
+				    std::to_string(ArgVals.size()) + " arguments, but expects " +
+				    std::to_string(F->arg_size()));
+		return;
+	}
+
 	assert(!specialDeps);
 	assert((ECStack().empty() || !&ECStack().back().Caller ||
 		ECStack().back().Caller.arg_size() == ArgVals.size()) &&
