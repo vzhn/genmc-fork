@@ -43,19 +43,27 @@ inline auto isValidRMWBinOp(Int i) -> bool
 	return static_cast<Int>(RMWBinOp::Xchg) <= i && i <= static_cast<Int>(RMWBinOp::LAST);
 }
 
+/* Values are kept zero-extended to the access size, so arithmetic results
+ * must wrap around at that size (accesses wider than an SVal already wrap
+ * at the SVal's width) */
+inline auto wrapToSize(SVal v, ASize size) -> SVal
+{
+	return size.getBits() < SVal::width ? v.truncate(size.getBits()) : v;
+}
+
 inline auto executeRMWBinOp(SVal oldVal, SVal val, ASize size, RMWBinOp op) -> SVal
 {
 	switch (op) {
 	case RMWBinOp::Xchg:
 		return val;
 	case RMWBinOp::Add:
-		return (oldVal + val);
+		return wrapToSize(oldVal + val, size);
 	case RMWBinOp::Sub:
-		return (oldVal - val);
+		return wrapToSize(oldVal - val, size);
 	case RMWBinOp::And:
 		return oldVal & val;
 	case RMWBinOp::Nand:
-		return ~(oldVal & val);
+		return wrapToSize(~(oldVal & val), size);
 	case RMWBinOp::Or:
 		return oldVal | val;
 	case RMWBinOp::Xor:
