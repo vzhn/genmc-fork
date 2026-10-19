@@ -13,6 +13,7 @@ A full list of the available command-line options can by viewed by issuing `genm
 - **`-random-budget=<N>`**: Number of executions to sample in `-mode=random`
 - **`-cache-instructions`**: Caches instructions to help execution time (sacrifices memory)
 - **`-disable-bam`**: Disables Barrier-Aware Model-checking (BAM)
+- **`-blind-rmw-reduction`**: Explores one order of identical relaxed RMWs whose results are unused (RC11 only; see [Commuting Blind RMWs](features.md#commuting-blind-rmws))
 - **`-check-liveness`**: Check for liveness violations in spinloops
 - **`-unroll=<N>`**: All loops will be executed at most `N` times.
 - **`-dump-error-graph=<file>`**: Outputs an erroneous graph to file `<file>`.

@@ -452,6 +452,58 @@ To make GenMC use symmetry reduction, one can use the primitive
 last argument of which is the thread identifier of the last
 (previously spawned) symmetric predecessor.
 
+## Commuting Blind RMWs
+
+Threads that each apply the same relaxed read-modify-write to a counter
+and ignore its result, such as statistics or progress counters, write
+the same sequence of values in every order. Without help, GenMC still
+explores each of their N! coherence orders. With
+`-blind-rmw-reduction` (RC11 only), it explores one. The following
+program has 6 executions by default and 1 with the flag:
+
+```c
+/* file: blind.c */
+#include <pthread.h>
+#include <stdatomic.h>
+#include <assert.h>
+
+#define N 3
+
+atomic_int hits;
+
+void *worker(void *arg)
+{
+    atomic_fetch_add_explicit(&hits, 1, memory_order_relaxed);
+    return NULL;
+}
+
+int main()
+{
+    pthread_t t[N];
+
+    for (int i = 0; i < N; i++)
+        pthread_create(&t[i], NULL, worker, NULL);
+    for (int i = 0; i < N; i++)
+        pthread_join(t[i], NULL);
+    assert(atomic_load_explicit(&hits, memory_order_relaxed) == N);
+    return 0;
+}
+```
+
+Two RMWs are treated as interchangeable when they access the same
+location with the same size, operation and operand, the program never
+uses their results, they are relaxed, no release fence precedes them in
+their thread, and no SC fence is in their happens-before past.
+
+GenMC keeps the order in which such RMWs are added. That loses no
+behavior only while nothing observes their order, so it applies only
+while every write to the location is one of these RMWs, and only if no
+other read lies in their causal past. If a later write to the location,
+or a load of it that happens after one of the RMWs but not another,
+could observe their order, GenMC reports `Execution not well-formed for
+--blind-rmw-reduction`. Such a program has to be checked without the
+flag.
+
 ## Checking Liveness
 
 GenMC can also check for liveness violations in programs with
