@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater 0919730-dirty (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater 83d2d1c-dirty (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -739,19 +739,37 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		switch (stateId) {
 		case 0: {
 			if (isFinishing) {
+				visitedConsAcyclic1_0.set(lab->getStamp().get(),
+							  visitedConsAcyclic1Accepting,
+							  NodeStatus::left);
 				break;
+			}
+
+			auto status = visitedConsAcyclic1_0.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic1_0.set(lab->getStamp().get(),
+							  visitedConsAcyclic1Accepting,
+							  NodeStatus::entered);
+				worklist.emplace_back(0, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic1Accepting >
+					    visitedConsAcyclic1_0.getCount(lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic1_1.getStatus(
+					auto status = visitedConsAcyclic1_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(1, pLab);
+						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_1.getCount(
+							    visitedConsAcyclic1_2.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -760,13 +778,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -778,21 +796,48 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 1: {
 			if (isFinishing) {
-				visitedConsAcyclic1_1.set(lab->getStamp().get(),
+				break;
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic1_0.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(0, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_0.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 2: {
+			if (isFinishing) {
+				visitedConsAcyclic1_2.set(lab->getStamp().get(),
 							  visitedConsAcyclic1Accepting,
 							  NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic1_1.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic1_2.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_1.set(lab->getStamp().get(),
+				visitedConsAcyclic1_2.set(lab->getStamp().get(),
 							  visitedConsAcyclic1Accepting,
 							  NodeStatus::entered);
-				worklist.emplace_back(1, lab, true /* isFinishing */);
+				worklist.emplace_back(2, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
 				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_1.getCount(lab->getStamp().get()) ||
+					    visitedConsAcyclic1_2.getCount(lab->getStamp().get()) ||
 				    0)) {
 				return false; /* cycle detected */
 			} else if (status == NodeStatus::left) {
@@ -801,95 +846,76 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.rfi_pred(lab); pLab) {
-				worklist.emplace_back(0, pLab);
-			}
-
-			break;
-		}
-		case 2: {
-			if (isFinishing) {
-				break;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic1_1.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(1, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_1.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
+				auto status =
+					visitedConsAcyclic1_0.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(0, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic1Accepting >
+						    visitedConsAcyclic1_0.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
 				}
-			for (auto &tmp : g.data_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic1_1.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(1, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_1.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
+			}
+			if (auto pLab = g.rfi_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					worklist.emplace_back(1, pLab);
 				}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.data_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
-							return false; /* cycle detected */
-						}
-					}
 
 			break;
 		}
 		case 3: {
 			if (isFinishing) {
+				visitedConsAcyclic1_3.set(lab->getStamp().get(),
+							  visitedConsAcyclic1Accepting,
+							  NodeStatus::left);
 				break;
+			}
+
+			auto status = visitedConsAcyclic1_3.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic1_3.set(lab->getStamp().get(),
+							  visitedConsAcyclic1Accepting,
+							  NodeStatus::entered);
+				worklist.emplace_back(3, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic1Accepting >
+					    visitedConsAcyclic1_3.getCount(lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			for (auto &tmp : g.addr_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic1_1.getStatus(
+					auto status = visitedConsAcyclic1_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(1, pLab);
+						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_1.getCount(
+							    visitedConsAcyclic1_2.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic1_2.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(2, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_2.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -898,13 +924,29 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			for (auto &tmp : g.addr_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    1)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic1_23.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(23, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic1Accepting >
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -916,57 +958,25 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 4: {
 			if (isFinishing) {
-				visitedConsAcyclic1_4.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
 				break;
-			}
-
-			auto status = visitedConsAcyclic1_4.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_4.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::entered);
-				worklist.emplace_back(4, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_4.getCount(lab->getStamp().get()) ||
-				    0)) {
-				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isNotAtomic() && genmc::isa<WriteLabel>(pLab)) {
-					worklist.emplace_back(3, pLab);
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic1_4.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(4, pLab);
-				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_4.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
-					return false; /* cycle detected */
-				}
-			}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_20.getStatus(
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic1_3.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
+						worklist.emplace_back(3, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
+							    visitedConsAcyclic1_3.getCount(
 								    pLab->getStamp().get()) ||
-						    1)) {
+						    0)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -975,126 +985,139 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 5: {
 			if (isFinishing) {
-				visitedConsAcyclic1_5.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic1_5.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_5.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::entered);
-				worklist.emplace_back(5, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_5.getCount(lab->getStamp().get()) ||
-				    0)) {
-				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
-			}
-
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::Wmb) {
-					auto status = visitedConsAcyclic1_4.getStatus(
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic1_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(4, pLab);
+						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_4.getCount(
+							    visitedConsAcyclic1_2.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic1_5.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(5, pLab);
-				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_5.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
-					return false; /* cycle detected */
+			for (auto &tmp : g.ctrl_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic1_2.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(2, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_2.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
 				}
-			}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic1_2.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(2, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_2.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic1_23.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(23, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic1Accepting >
+								    visitedConsAcyclic1_23.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    1)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.ctrl_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic1_23.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(23, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic1Accepting >
+								    visitedConsAcyclic1_23.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    1)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic1_23.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(23, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic1Accepting >
+								    visitedConsAcyclic1_23.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    1)) {
+							return false; /* cycle detected */
+						}
+					}
 
 			break;
 		}
 		case 6: {
 			if (isFinishing) {
-				visitedConsAcyclic1_6.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic1_6.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_6.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::entered);
-				worklist.emplace_back(6, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_6.getCount(lab->getStamp().get()) ||
-				    0)) {
-				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
-			}
-
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic1_6.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(6, pLab);
-				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_6.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
-					return false; /* cycle detected */
-				}
-			}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_20.getStatus(
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic1_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
+						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
+							    visitedConsAcyclic1_2.getCount(
 								    pLab->getStamp().get()) ||
-						    1)) {
+						    0)) {
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_20.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
-						return false; /* cycle detected */
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic1_23.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(23, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic1Accepting >
+								    visitedConsAcyclic1_23.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    1)) {
+							return false; /* cycle detected */
+						}
 					}
-				}
 
 			break;
 		}
@@ -1123,20 +1146,8 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::Mb) {
-					auto status = visitedConsAcyclic1_6.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
+				if (true && pLab->isNotAtomic() && genmc::isa<WriteLabel>(pLab)) {
+					worklist.emplace_back(6, pLab);
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
@@ -1152,80 +1163,15 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && ((genmc::isa<ReadLabel>(pLab) &&
-					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-					     (genmc::isa<WriteLabel>(pLab) &&
-					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic1_8.getStatus(
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_23.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
+						worklist.emplace_back(23, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_8.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::AfterAtomic) {
-					auto status = visitedConsAcyclic1_9.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(9, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_9.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::AfterSpinlock) {
-					auto status = visitedConsAcyclic1_10.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(10, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_10.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::AfterUnlockLock) {
-					auto status = visitedConsAcyclic1_13.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(13, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_13.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
-				    !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic1_20.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
+							    visitedConsAcyclic1_23.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -1260,15 +1206,16 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::BeforeAtomic) {
-					auto status = visitedConsAcyclic1_6.getStatus(
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() == LkmmFenceKind::Wmb) {
+					auto status = visitedConsAcyclic1_7.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(7, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
+							    visitedConsAcyclic1_7.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -1314,23 +1261,6 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && ((genmc::isa<ReadLabel>(pLab) &&
-					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-					     (genmc::isa<WriteLabel>(pLab) &&
-					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic1_6.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic1_9.getStatus(pLab->getStamp().get());
@@ -1345,18 +1275,14 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
-				    ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic1_20.getStatus(
+				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_23.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
+						worklist.emplace_back(23, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
+							    visitedConsAcyclic1_23.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -1364,18 +1290,14 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab) &&
-				    ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic1_20.getStatus(
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_23.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
+						worklist.emplace_back(23, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
+							    visitedConsAcyclic1_23.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -1409,15 +1331,17 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-				    genmc::isa<TrylockCasWriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_6.getStatus(
+				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() == LkmmFenceKind::Mb) {
+					auto status = visitedConsAcyclic1_9.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(9, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
+							    visitedConsAcyclic1_9.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -1437,33 +1361,86 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
-					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_20.getStatus(
+				if (true && ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic1_11.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
+						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
+							    visitedConsAcyclic1_11.getCount(
 								    pLab->getStamp().get()) ||
-						    1)) {
+						    0)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
-					    !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_20.getStatus(
+				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
+					    LkmmFenceKind::AfterAtomic) {
+					auto status = visitedConsAcyclic1_12.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
+						worklist.emplace_back(12, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
+							    visitedConsAcyclic1_12.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
+					    LkmmFenceKind::AfterSpinlock) {
+					auto status = visitedConsAcyclic1_13.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(13, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_13.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
+					    LkmmFenceKind::AfterUnlockLock) {
+					auto status = visitedConsAcyclic1_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_16.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
+				    !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic1_23.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(23, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_23.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -1497,14 +1474,18 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_6.getStatus(
+				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
+					    LkmmFenceKind::BeforeAtomic) {
+					auto status = visitedConsAcyclic1_9.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(9, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
+							    visitedConsAcyclic1_9.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -1528,35 +1509,92 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 12: {
 			if (isFinishing) {
+				visitedConsAcyclic1_12.set(lab->getStamp().get(),
+							   visitedConsAcyclic1Accepting,
+							   NodeStatus::left);
 				break;
 			}
 
+			auto status = visitedConsAcyclic1_12.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic1_12.set(lab->getStamp().get(),
+							   visitedConsAcyclic1Accepting,
+							   NodeStatus::entered);
+				worklist.emplace_back(12, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_12.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
+			}
+
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.rfe_pred(lab); pLab)
-				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_6.getStatus(
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic1_9.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(9, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
+							    visitedConsAcyclic1_9.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.rfi_pred(lab); pLab)
-				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_6.getStatus(
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic1_12.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(12, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic1Accepting >
+						    visitedConsAcyclic1_12.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic1_23.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(23, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
+							    visitedConsAcyclic1_23.getCount(
 								    pLab->getStamp().get()) ||
-						    0)) {
+						    1)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic1_23.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(23, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_23.getCount(
+								    pLab->getStamp().get()) ||
+						    1)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -1588,28 +1626,19 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true &&
-				    (genmc::isa<LockCasReadLabel>(pLab) ||
-				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
-					auto status = visitedConsAcyclic1_11.getStatus(
+				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+				    genmc::isa<TrylockCasWriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_9.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(11, pLab);
+						worklist.emplace_back(9, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_11.getCount(
+							    visitedConsAcyclic1_9.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true &&
-				    (genmc::isa<LockCasReadLabel>(pLab) ||
-				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
-					worklist.emplace_back(12, pLab);
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
@@ -1624,6 +1653,39 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					return false; /* cycle detected */
 				}
 			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
+					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_23.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(23, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_23.getCount(
+								    pLab->getStamp().get()) ||
+						    1)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
+					    !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_23.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(23, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_23.getCount(
+								    pLab->getStamp().get()) ||
+						    1)) {
+						return false; /* cycle detected */
+					}
+				}
 
 			break;
 		}
@@ -1651,6 +1713,20 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_9.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(9, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_9.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic1_14.getStatus(pLab->getStamp().get());
@@ -1664,109 +1740,40 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic1_20.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
-						return false; /* cycle detected */
-					}
-				}
 
 			break;
 		}
 		case 15: {
 			if (isFinishing) {
-				visitedConsAcyclic1_15.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic1_15.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_15.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::entered);
-				worklist.emplace_back(15, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_15.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
-				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
-			}
-
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic1_15.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(15, pLab);
-				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_15.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
-					return false; /* cycle detected */
-				}
-			}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true &&
-				    (genmc::isa<LockCasReadLabel>(pLab) ||
-				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
-					auto status = visitedConsAcyclic1_18.getStatus(
+			if (auto pLab = g.rfe_pred(lab); pLab)
+				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_9.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(18, pLab);
+						worklist.emplace_back(9, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_18.getCount(
+							    visitedConsAcyclic1_9.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true &&
-				    (genmc::isa<LockCasReadLabel>(pLab) ||
-				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
-					auto status = visitedConsAcyclic1_19.getStatus(
+			if (auto pLab = g.rfi_pred(lab); pLab)
+				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_9.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(19, pLab);
+						worklist.emplace_back(9, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
+							    visitedConsAcyclic1_9.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    pLab->isAtLeastAcquire() &&
-				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-				    !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic1_20.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -1797,6 +1804,34 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true &&
+				    (genmc::isa<LockCasReadLabel>(pLab) ||
+				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
+					auto status = visitedConsAcyclic1_14.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(14, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_14.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true &&
+				    (genmc::isa<LockCasReadLabel>(pLab) ||
+				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
+					worklist.emplace_back(15, pLab);
+				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic1_16.getStatus(pLab->getStamp().get());
@@ -1810,21 +1845,6 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic1_20.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(20, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_20.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
-						return false; /* cycle detected */
-					}
-				}
 
 			break;
 		}
@@ -1852,22 +1872,6 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::Rmb) {
-					auto status = visitedConsAcyclic1_16.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(16, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_16.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic1_17.getStatus(pLab->getStamp().get());
@@ -1881,6 +1885,20 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					return false; /* cycle detected */
 				}
 			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic1_23.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(23, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_23.getCount(
+								    pLab->getStamp().get()) ||
+						    1)) {
+						return false; /* cycle detected */
+					}
+				}
 
 			break;
 		}
@@ -1908,20 +1926,6 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_14.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(14, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic1_18.getStatus(pLab->getStamp().get());
@@ -1935,6 +1939,64 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					return false; /* cycle detected */
 				}
 			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true &&
+				    (genmc::isa<LockCasReadLabel>(pLab) ||
+				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
+					auto status = visitedConsAcyclic1_21.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(21, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_21.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true &&
+				    (genmc::isa<LockCasReadLabel>(pLab) ||
+				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
+					auto status = visitedConsAcyclic1_22.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(22, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_22.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    pLab->isAtLeastAcquire() &&
+				    (!genmc::isa<CasReadLabel>(pLab) ||
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
+				    !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic1_23.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(23, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_23.getCount(
+								    pLab->getStamp().get()) ||
+						    1)) {
+						return false; /* cycle detected */
+					}
+				}
 
 			break;
 		}
@@ -1962,17 +2024,31 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.rfi_pred(lab); pLab)
-				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic1_14.getStatus(
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic1_19.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(19, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic1Accepting >
+						    visitedConsAcyclic1_19.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic1_23.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(14, pLab);
+						worklist.emplace_back(23, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
+							    visitedConsAcyclic1_23.getCount(
 								    pLab->getStamp().get()) ||
-						    0)) {
+						    1)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -1981,7 +2057,6 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 20: {
 			if (isFinishing) {
-				--visitedConsAcyclic1Accepting;
 				visitedConsAcyclic1_20.set(lab->getStamp().get(),
 							   visitedConsAcyclic1Accepting,
 							   NodeStatus::left);
@@ -1990,13 +2065,166 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 
 			auto status = visitedConsAcyclic1_20.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				++visitedConsAcyclic1Accepting;
-				visitedConsAcyclic1_20.setIncr(lab->getStamp().get(),
-							       visitedConsAcyclic1Accepting,
-							       NodeStatus::entered);
+				visitedConsAcyclic1_20.set(lab->getStamp().get(),
+							   visitedConsAcyclic1Accepting,
+							   NodeStatus::entered);
 				worklist.emplace_back(20, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
 				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_20.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() == LkmmFenceKind::Rmb) {
+					auto status = visitedConsAcyclic1_19.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(19, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_19.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic1_20.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(20, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic1Accepting >
+						    visitedConsAcyclic1_20.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
+				}
+			}
+
+			break;
+		}
+		case 21: {
+			if (isFinishing) {
+				visitedConsAcyclic1_21.set(lab->getStamp().get(),
+							   visitedConsAcyclic1Accepting,
+							   NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedConsAcyclic1_21.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic1_21.set(lab->getStamp().get(),
+							   visitedConsAcyclic1Accepting,
+							   NodeStatus::entered);
+				worklist.emplace_back(21, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_21.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_17.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic1_21.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(21, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic1Accepting >
+						    visitedConsAcyclic1_21.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
+				}
+			}
+
+			break;
+		}
+		case 22: {
+			if (isFinishing) {
+				visitedConsAcyclic1_22.set(lab->getStamp().get(),
+							   visitedConsAcyclic1Accepting,
+							   NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedConsAcyclic1_22.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic1_22.set(lab->getStamp().get(),
+							   visitedConsAcyclic1Accepting,
+							   NodeStatus::entered);
+				worklist.emplace_back(22, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_22.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.rfi_pred(lab); pLab)
+				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic1_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_17.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 23: {
+			if (isFinishing) {
+				--visitedConsAcyclic1Accepting;
+				visitedConsAcyclic1_23.set(lab->getStamp().get(),
+							   visitedConsAcyclic1Accepting,
+							   NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedConsAcyclic1_23.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				++visitedConsAcyclic1Accepting;
+				visitedConsAcyclic1_23.setIncr(lab->getStamp().get(),
+							       visitedConsAcyclic1Accepting,
+							       NodeStatus::entered);
+				worklist.emplace_back(23, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_23.getCount(
 									   lab->getStamp().get()) ||
 				    1)) {
 				return false; /* cycle detected */
@@ -2008,13 +2236,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic1_1.getStatus(
+						auto status = visitedConsAcyclic1_2.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(1, pLab);
+							worklist.emplace_back(2, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_1.getCount(
+								    visitedConsAcyclic1_2.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2024,13 +2252,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic1_1.getStatus(
+						auto status = visitedConsAcyclic1_2.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(1, pLab);
+							worklist.emplace_back(2, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_1.getCount(
+								    visitedConsAcyclic1_2.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2040,13 +2268,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.ctrl_preds(lab))
 					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic1_1.getStatus(
+						auto status = visitedConsAcyclic1_2.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(1, pLab);
+							worklist.emplace_back(2, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_1.getCount(
+								    visitedConsAcyclic1_2.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2056,13 +2284,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.data_preds(lab))
 					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic1_1.getStatus(
+						auto status = visitedConsAcyclic1_2.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(1, pLab);
+							worklist.emplace_back(2, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_1.getCount(
+								    visitedConsAcyclic1_2.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2072,20 +2300,56 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.rfi_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic())) {
-						worklist.emplace_back(2, pLab);
+						auto status = visitedConsAcyclic1_3.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(3, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic1Accepting >
+								    visitedConsAcyclic1_3.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.rfi_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						worklist.emplace_back(4, pLab);
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						worklist.emplace_back(5, pLab);
 					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::Wmb) {
-						auto status = visitedConsAcyclic1_4.getStatus(
+						auto status = visitedConsAcyclic1_7.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(4, pLab);
+							worklist.emplace_back(7, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_4.getCount(
+								    visitedConsAcyclic1_7.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2094,13 +2358,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic1_5.getStatus(
+					auto status = visitedConsAcyclic1_8.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(5, pLab);
+						worklist.emplace_back(8, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_5.getCount(
+							    visitedConsAcyclic1_8.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -2113,15 +2377,17 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::BeforeAtomic) {
-						auto status = visitedConsAcyclic1_6.getStatus(
+						auto status = visitedConsAcyclic1_9.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(6, pLab);
+							worklist.emplace_back(9, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_6.getCount(
+								    visitedConsAcyclic1_9.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2131,15 +2397,16 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-						    LkmmFenceKind::Mb) {
-						auto status = visitedConsAcyclic1_6.getStatus(
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() == LkmmFenceKind::Mb) {
+						auto status = visitedConsAcyclic1_9.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(6, pLab);
+							worklist.emplace_back(9, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_6.getCount(
+								    visitedConsAcyclic1_9.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2153,15 +2420,17 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::BeforeAtomic) {
-						auto status = visitedConsAcyclic1_6.getStatus(
+						auto status = visitedConsAcyclic1_9.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(6, pLab);
+							worklist.emplace_back(9, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_6.getCount(
+								    visitedConsAcyclic1_9.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2171,15 +2440,16 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-						    LkmmFenceKind::Mb) {
-						auto status = visitedConsAcyclic1_6.getStatus(
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() == LkmmFenceKind::Mb) {
+						auto status = visitedConsAcyclic1_9.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(6, pLab);
+							worklist.emplace_back(9, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_6.getCount(
+								    visitedConsAcyclic1_9.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2189,13 +2459,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
 			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic1_6.getStatus(
+					auto status = visitedConsAcyclic1_9.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(9, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
+							    visitedConsAcyclic1_9.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -2203,13 +2473,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic1_7.getStatus(
+					auto status = visitedConsAcyclic1_10.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(7, pLab);
+						worklist.emplace_back(10, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_7.getCount(
+							    visitedConsAcyclic1_10.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -2217,13 +2487,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic1_7.getStatus(
+					auto status = visitedConsAcyclic1_10.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(7, pLab);
+						worklist.emplace_back(10, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_7.getCount(
+							    visitedConsAcyclic1_10.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -2235,13 +2505,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			     (genmc::isa<WriteLabel>(lab) &&
 			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic1_8.getStatus(
+					auto status = visitedConsAcyclic1_11.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
+						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_8.getCount(
+							    visitedConsAcyclic1_11.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -2254,13 +2524,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 					     (genmc::isa<WriteLabel>(pLab) &&
 					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-						auto status = visitedConsAcyclic1_8.getStatus(
+						auto status = visitedConsAcyclic1_11.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(8, pLab);
+							worklist.emplace_back(11, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_8.getCount(
+								    visitedConsAcyclic1_11.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2273,13 +2543,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			     (genmc::isa<WriteLabel>(lab) &&
 			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic1_8.getStatus(
+					auto status = visitedConsAcyclic1_11.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
+						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_8.getCount(
+							    visitedConsAcyclic1_11.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -2292,13 +2562,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 					     (genmc::isa<WriteLabel>(pLab) &&
 					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-						auto status = visitedConsAcyclic1_8.getStatus(
+						auto status = visitedConsAcyclic1_11.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(8, pLab);
+							worklist.emplace_back(11, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_8.getCount(
+								    visitedConsAcyclic1_11.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2308,15 +2578,17 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::AfterAtomic) {
-						auto status = visitedConsAcyclic1_9.getStatus(
+						auto status = visitedConsAcyclic1_12.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(9, pLab);
+							worklist.emplace_back(12, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_9.getCount(
+								    visitedConsAcyclic1_12.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2326,15 +2598,17 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::AfterAtomic) {
-						auto status = visitedConsAcyclic1_9.getStatus(
+						auto status = visitedConsAcyclic1_12.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(9, pLab);
+							worklist.emplace_back(12, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_9.getCount(
+								    visitedConsAcyclic1_12.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -2344,44 +2618,10 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::AfterSpinlock) {
-						auto status = visitedConsAcyclic1_10.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(10, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_10.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-						    LkmmFenceKind::AfterSpinlock) {
-						auto status = visitedConsAcyclic1_10.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(10, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_10.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-						    LkmmFenceKind::AfterUnlockLock) {
 						auto status = visitedConsAcyclic1_13.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -2398,8 +2638,10 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-						    LkmmFenceKind::AfterUnlockLock) {
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
+						    LkmmFenceKind::AfterSpinlock) {
 						auto status = visitedConsAcyclic1_13.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -2413,41 +2655,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
-			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
-			    !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic1_14.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(14, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic1_15.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(15, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_15.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (true && genmc::isa<ReadLabel>(lab) && !lab->isLkmmNoreturn() &&
-			    !(lab->isNotAtomic()))
+			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-						    LkmmFenceKind::Rmb) {
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
+						    LkmmFenceKind::AfterUnlockLock) {
 						auto status = visitedConsAcyclic1_16.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -2461,7 +2675,27 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
-			if (true && genmc::isa<ReadLabel>(lab) && !lab->isLkmmNoreturn() &&
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
+						    LkmmFenceKind::AfterUnlockLock) {
+						auto status = visitedConsAcyclic1_16.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(16, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic1Accepting >
+								    visitedConsAcyclic1_16.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
 			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
 					auto status = visitedConsAcyclic1_17.getStatus(
@@ -2477,30 +2711,27 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true &&
-					    (genmc::isa<LockCasReadLabel>(pLab) ||
-					     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-					    genmc::cast<ReadLabel>(pLab)->isRMW()) {
-						auto status = visitedConsAcyclic1_18.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(18, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_18.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic1_18.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(18, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_18.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
 					}
-			if (true && !(lab->isNotAtomic()))
+				}
+			if (true && genmc::isa<ReadLabel>(lab) && !lab->isLkmmNoreturn() &&
+			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true &&
-					    (genmc::isa<LockCasReadLabel>(pLab) ||
-					     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-					    genmc::cast<ReadLabel>(pLab)->isRMW()) {
+					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
+						    LkmmFenceKind::Rmb) {
 						auto status = visitedConsAcyclic1_19.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -2514,19 +2745,76 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
+			if (true && genmc::isa<ReadLabel>(lab) && !lab->isLkmmNoreturn() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic1_20.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(20, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic1Accepting >
+							    visitedConsAcyclic1_20.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true &&
+					    (genmc::isa<LockCasReadLabel>(pLab) ||
+					     genmc::isa<TrylockCasReadLabel>(pLab)) &&
+					    static_cast<const ReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+						    ->isRMW()) {
+						auto status = visitedConsAcyclic1_21.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(21, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic1Accepting >
+								    visitedConsAcyclic1_21.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true &&
+					    (genmc::isa<LockCasReadLabel>(pLab) ||
+					     genmc::isa<TrylockCasReadLabel>(pLab)) &&
+					    static_cast<const ReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+						    ->isRMW()) {
+						auto status = visitedConsAcyclic1_22.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(22, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic1Accepting >
+								    visitedConsAcyclic1_22.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true)
 						if (true && !(pLab->isNotAtomic())) {
 							auto status =
-								visitedConsAcyclic1_20.getStatus(
+								visitedConsAcyclic1_23.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(20, pLab);
+								worklist.emplace_back(23, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic1Accepting >
-									 visitedConsAcyclic1_20.getCount(
+									 visitedConsAcyclic1_23.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 1)) {
@@ -2537,13 +2825,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2555,14 +2843,14 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (auto *pLab = &tmp; true)
 						if (true && !(pLab->isNotAtomic())) {
 							auto status =
-								visitedConsAcyclic1_20.getStatus(
+								visitedConsAcyclic1_23.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(20, pLab);
+								worklist.emplace_back(23, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic1Accepting >
-									 visitedConsAcyclic1_20.getCount(
+									 visitedConsAcyclic1_23.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 1)) {
@@ -2574,14 +2862,14 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (auto *pLab = &tmp; true)
 						if (true && !(pLab->isNotAtomic())) {
 							auto status =
-								visitedConsAcyclic1_20.getStatus(
+								visitedConsAcyclic1_23.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(20, pLab);
+								worklist.emplace_back(23, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic1Accepting >
-									 visitedConsAcyclic1_20.getCount(
+									 visitedConsAcyclic1_23.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 1)) {
@@ -2593,14 +2881,14 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (auto *pLab = &tmp; true)
 						if (true && !(pLab->isNotAtomic())) {
 							auto status =
-								visitedConsAcyclic1_20.getStatus(
+								visitedConsAcyclic1_23.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(20, pLab);
+								worklist.emplace_back(23, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic1Accepting >
-									 visitedConsAcyclic1_20.getCount(
+									 visitedConsAcyclic1_23.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 1)) {
@@ -2611,13 +2899,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2629,14 +2917,14 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (auto *pLab = &tmp; true)
 						if (true && !(pLab->isNotAtomic())) {
 							auto status =
-								visitedConsAcyclic1_20.getStatus(
+								visitedConsAcyclic1_23.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(20, pLab);
+								worklist.emplace_back(23, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic1Accepting >
-									 visitedConsAcyclic1_20.getCount(
+									 visitedConsAcyclic1_23.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 1)) {
@@ -2648,14 +2936,14 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (auto *pLab = &tmp; true)
 						if (true && !(pLab->isNotAtomic())) {
 							auto status =
-								visitedConsAcyclic1_20.getStatus(
+								visitedConsAcyclic1_23.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(20, pLab);
+								worklist.emplace_back(23, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic1Accepting >
-									 visitedConsAcyclic1_20.getCount(
+									 visitedConsAcyclic1_23.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 1)) {
@@ -2665,13 +2953,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()))
 				for (auto *pLab : g.prop_int_preds(lab))
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2683,15 +2971,17 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
 					    !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2701,13 +2991,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.rfe_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2717,13 +3007,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.tc_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2733,13 +3023,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.tj_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2751,13 +3041,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2769,13 +3059,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2786,13 +3076,13 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic1_20.getStatus(
+						auto status = visitedConsAcyclic1_23.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
+							worklist.emplace_back(23, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_20.getCount(
+								    visitedConsAcyclic1_23.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2814,27 +3104,29 @@ bool LKMMChecker::visitConsAcyclic1(const EventLabel *lab) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedConsAcyclic1Accepting = 0;
-	visitedConsAcyclic1_1.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic1_4.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic1_5.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic1_6.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_0.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_2.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_3.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_7.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_8.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_9.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_10.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_11.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_12.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_13.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_14.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic1_15.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_16.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_17.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_18.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_19.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_20.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_21.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_22.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_23.maybeClearResize(g.getMaxStamp().get() + 1);
 
 	/* States we need to explore from using DFS */
 	std::vector<DFSWorklistEntry> startStates = {
-		{20, lab},
+		{23, lab},
 	};
 
 	return visitConsAcyclic1Iterative(startStates);
@@ -2843,28 +3135,30 @@ bool LKMMChecker::visitConsAcyclic1(const EventLabel *lab) const
 bool LKMMChecker::visitConsAcyclic1Full(const ExecutionGraph &g) const
 {
 	visitedConsAcyclic1Accepting = 0;
-	visitedConsAcyclic1_1.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic1_4.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic1_5.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic1_6.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_0.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_2.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_3.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_7.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_8.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_9.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_10.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_11.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_12.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_13.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_14.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic1_15.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_16.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_17.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_18.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_19.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_20.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_21.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_22.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic1_23.maybeClearResize(g.getMaxStamp().get() + 1);
 
 	auto exploreLab = [&](auto &lab) {
 		/* Explore from all accepting states using DFS */
 		std::vector<DFSWorklistEntry> startStates = {
-			{20, &lab},
+			{23, &lab},
 		};
 
 		return visitConsAcyclic1Iterative(startStates);
@@ -2918,13 +3212,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			for (auto &tmp : g.fre_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_41.getStatus(
+						auto status = visitedConsAcyclic2_44.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(41, pLab);
+							worklist.emplace_back(44, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_41.getCount(
+								    visitedConsAcyclic2_44.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -2934,13 +3228,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			for (auto &tmp : g.moe_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_41.getStatus(
+						auto status = visitedConsAcyclic2_44.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(41, pLab);
+							worklist.emplace_back(44, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_41.getCount(
+								    visitedConsAcyclic2_44.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -3102,13 +3396,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.rfe_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -3405,13 +3699,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -3420,13 +3714,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -3491,8 +3785,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::Mb) {
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() == LkmmFenceKind::Mb) {
 					auto status = visitedConsAcyclic2_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -3605,7 +3900,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
 					    LkmmFenceKind::AfterAtomic) {
 					auto status = visitedConsAcyclic2_5.getStatus(
 						pLab->getStamp().get());
@@ -3621,7 +3918,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
 					    LkmmFenceKind::AfterSpinlock) {
 					auto status = visitedConsAcyclic2_6.getStatus(
 						pLab->getStamp().get());
@@ -3637,7 +3936,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
 					    LkmmFenceKind::AfterUnlockLock) {
 					auto status = visitedConsAcyclic2_9.getStatus(
 						pLab->getStamp().get());
@@ -3719,13 +4020,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
 				    !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -3760,7 +4061,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
 					    LkmmFenceKind::BeforeAtomic) {
 					auto status = visitedConsAcyclic2_2.getStatus(
 						pLab->getStamp().get());
@@ -4151,13 +4454,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -4170,13 +4473,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -4523,13 +4826,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
 					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -4540,13 +4843,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
 					    !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -4674,7 +4977,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true &&
 				    (genmc::isa<LockCasReadLabel>(pLab) ||
 				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
 					auto status = visitedConsAcyclic2_7.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -4691,7 +4996,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true &&
 				    (genmc::isa<LockCasReadLabel>(pLab) ||
 				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
 					worklist.emplace_back(8, pLab);
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
@@ -4921,13 +5228,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -5105,13 +5412,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -5146,8 +5453,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::Wmb) {
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() == LkmmFenceKind::Wmb) {
 					auto status = visitedConsAcyclic2_11.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -5373,13 +5681,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -5507,7 +5815,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true &&
 				    (genmc::isa<LockCasReadLabel>(pLab) ||
 				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
 					auto status = visitedConsAcyclic2_14.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -5524,7 +5834,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true &&
 				    (genmc::isa<LockCasReadLabel>(pLab) ||
 				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
 					worklist.emplace_back(15, pLab);
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
@@ -5986,13 +6298,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_29.getStatus(
+					auto status = visitedConsAcyclic2_30.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(29, pLab);
+						worklist.emplace_back(30, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_29.getCount(
+							    visitedConsAcyclic2_30.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -6000,13 +6312,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -6015,28 +6327,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_32.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(32, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_32.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -6058,9 +6355,12 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
-				    genmc::isa<ReadLabel>(pLab)) {
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					auto status = visitedConsAcyclic2_35.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -6068,36 +6368,6 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
 							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_35.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(35, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_36.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -6106,21 +6376,21 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_36.getStatus(
+					auto status = visitedConsAcyclic2_37.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
+						worklist.emplace_back(37, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
+							    visitedConsAcyclic2_37.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
 				    genmc::isa<ReadLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
@@ -6135,8 +6405,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
@@ -6152,6 +6422,37 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				    genmc::isa<ReadLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_41.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -6159,6 +6460,36 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
 							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_44.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(44, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -6167,13 +6498,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -6303,8 +6634,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::Mb) {
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() == LkmmFenceKind::Mb) {
 					auto status = visitedConsAcyclic2_19.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -6417,7 +6749,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
 					    LkmmFenceKind::AfterAtomic) {
 					auto status = visitedConsAcyclic2_22.getStatus(
 						pLab->getStamp().get());
@@ -6433,7 +6767,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
 					    LkmmFenceKind::AfterSpinlock) {
 					auto status = visitedConsAcyclic2_23.getStatus(
 						pLab->getStamp().get());
@@ -6449,7 +6785,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
 					    LkmmFenceKind::AfterUnlockLock) {
 					auto status = visitedConsAcyclic2_26.getStatus(
 						pLab->getStamp().get());
@@ -6466,13 +6804,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
 				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_29.getStatus(
+					auto status = visitedConsAcyclic2_30.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(29, pLab);
+						worklist.emplace_back(30, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_29.getCount(
+							    visitedConsAcyclic2_30.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -6481,28 +6819,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
 				    !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
-				    !(pLab->isNotAtomic()) && genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_32.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(32, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_32.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -6524,9 +6847,12 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
+				if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
+				    !(pLab->isNotAtomic()) && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					auto status = visitedConsAcyclic2_35.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -6541,22 +6867,22 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
-				    !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_36.getStatus(
+				    !(pLab->isNotAtomic()) && genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_37.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
+						worklist.emplace_back(37, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
+							    visitedConsAcyclic2_37.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && genmc::isa<WriteLabel>(pLab) &&
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && genmc::isa<WriteLabel>(pLab) &&
 				    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
@@ -6573,6 +6899,22 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
 				    !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_41.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -6580,6 +6922,21 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
 							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
+				    !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_44.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(44, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -6614,7 +6971,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() ==
 					    LkmmFenceKind::BeforeAtomic) {
 					auto status = visitedConsAcyclic2_19.getStatus(
 						pLab->getStamp().get());
@@ -7005,13 +7364,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_29.getStatus(
+					auto status = visitedConsAcyclic2_30.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(29, pLab);
+						worklist.emplace_back(30, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_29.getCount(
+							    visitedConsAcyclic2_30.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -7023,13 +7382,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -7042,32 +7401,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab) &&
-				    ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_32.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(32, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_32.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -7093,28 +7433,7 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
-				    genmc::isa<ReadLabel>(pLab) &&
-				    ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_35.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(35, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
+				if (true && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab) &&
 				    ((genmc::isa<ReadLabel>(pLab) &&
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -7127,24 +7446,6 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
 							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
-				    ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_36.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -7157,21 +7458,21 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_36.getStatus(
+					auto status = visitedConsAcyclic2_37.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
+						worklist.emplace_back(37, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
+							    visitedConsAcyclic2_37.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
 				    genmc::isa<ReadLabel>(pLab) &&
 				    ((genmc::isa<ReadLabel>(pLab) &&
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -7190,8 +7491,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab) &&
 				    ((genmc::isa<ReadLabel>(pLab) &&
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -7215,6 +7516,45 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				    genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					auto status = visitedConsAcyclic2_41.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -7222,6 +7562,44 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
 							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_44.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(44, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -7234,13 +7612,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -7587,13 +7965,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
 					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_29.getStatus(
+					auto status = visitedConsAcyclic2_30.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(29, pLab);
+						worklist.emplace_back(30, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_29.getCount(
+							    visitedConsAcyclic2_30.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -7603,13 +7981,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
 					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -7620,30 +7998,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
 					    !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
-					    !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_32.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(32, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_32.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -7669,9 +8030,12 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
+					    !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
-					    genmc::isa<ReadLabel>(pLab)) {
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					auto status = visitedConsAcyclic2_35.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -7679,40 +8043,6 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
 							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
-					    genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_35.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(35, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
-					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_36.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -7723,13 +8053,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
 					    !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_36.getStatus(
+					auto status = visitedConsAcyclic2_37.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
+						worklist.emplace_back(37, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
+							    visitedConsAcyclic2_37.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -7738,8 +8068,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
-					    genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
@@ -7756,8 +8086,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
-					    genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
@@ -7775,6 +8105,41 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
 					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
+					    !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
+					    genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_41.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -7782,6 +8147,40 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
 							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
+					    genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
+					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_44.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(44, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -7792,13 +8191,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				    genmc::isa<TrylockCasWriteLabel>(pLab) &&
 					    !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_41.getStatus(
+					auto status = visitedConsAcyclic2_44.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(41, pLab);
+						worklist.emplace_back(44, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_41.getCount(
+							    visitedConsAcyclic2_44.getCount(
 								    pLab->getStamp().get()) ||
 						    1)) {
 						return false; /* cycle detected */
@@ -7926,7 +8325,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true &&
 				    (genmc::isa<LockCasReadLabel>(pLab) ||
 				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
 					auto status = visitedConsAcyclic2_24.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -7943,7 +8344,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true &&
 				    (genmc::isa<LockCasReadLabel>(pLab) ||
 				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
 					worklist.emplace_back(25, pLab);
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
@@ -7964,7 +8367,25 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 27: {
 			if (isFinishing) {
+				visitedConsAcyclic2_27.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::left);
 				break;
+			}
+
+			auto status = visitedConsAcyclic2_27.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic2_27.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::entered);
+				worklist.emplace_back(27, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_27.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -8025,13 +8446,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_28.getStatus(
+					auto status = visitedConsAcyclic2_29.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(28, pLab);
+						worklist.emplace_back(29, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_28.getCount(
+							    visitedConsAcyclic2_29.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -8041,13 +8462,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -8057,13 +8478,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -8074,39 +8495,6 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto *pLab = &tmp; true)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.data_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.data_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -8120,36 +8508,66 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
 
 			break;
 		}
 		case 28: {
 			if (isFinishing) {
-				visitedConsAcyclic2_28.set(lab->getStamp().get(),
-							   visitedConsAcyclic2Accepting,
-							   NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_28.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_28.set(lab->getStamp().get(),
-							   visitedConsAcyclic2Accepting,
-							   NodeStatus::entered);
-				worklist.emplace_back(28, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_28.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
-				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
-			}
-
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.rfi_pred(lab); pLab) {
-				worklist.emplace_back(27, pLab);
-			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_27.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(27, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_27.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
 
 			break;
 		}
@@ -8177,158 +8595,27 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_19.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(19, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_20.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(20, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_20.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<ReadLabel>(pLab) &&
-					    ((genmc::isa<ReadLabel>(pLab) &&
-					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-					     (genmc::isa<WriteLabel>(pLab) &&
-					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-						auto status = visitedConsAcyclic2_21.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(21, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_21.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_28.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(28, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_28.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
+			if (auto pLab = g.rfi_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_27.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(27, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic2Accepting >
+						    visitedConsAcyclic2_27.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
 				}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_38.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(38, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_38.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
+			}
+			if (auto pLab = g.rfi_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					worklist.emplace_back(28, pLab);
+				}
 
 			break;
 		}
@@ -8373,6 +8660,185 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_20.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(20, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_20.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_21.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(21, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_21.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic2_29.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(29, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_29.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_30.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(30, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_30.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_33.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(33, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_33.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_38.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(38, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_38.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+
+			break;
+		}
+		case 31: {
+			if (isFinishing) {
+				visitedConsAcyclic2_31.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedConsAcyclic2_31.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic2_31.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::entered);
+				worklist.emplace_back(31, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_31.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_19.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(19, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_19.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && genmc::isa<ReadLabel>(pLab) &&
@@ -8468,13 +8934,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			for (auto &tmp : g.addr_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_28.getStatus(
+					auto status = visitedConsAcyclic2_29.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(28, pLab);
+						worklist.emplace_back(29, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_28.getCount(
+							    visitedConsAcyclic2_29.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -8482,13 +8948,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_28.getStatus(
+					auto status = visitedConsAcyclic2_29.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(28, pLab);
+						worklist.emplace_back(29, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_28.getCount(
+							    visitedConsAcyclic2_29.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -8498,13 +8964,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -8515,13 +8981,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -8531,13 +8997,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			for (auto &tmp : g.addr_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -8547,13 +9013,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -8564,72 +9030,6 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto *pLab = &tmp; true)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.data_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.data_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -8645,8 +9045,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -8654,6 +9054,72 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
 								    visitedConsAcyclic2_38.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -8663,22 +9129,67 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 
 			break;
 		}
-		case 31: {
+		case 32: {
 			if (isFinishing) {
-				visitedConsAcyclic2_31.set(lab->getStamp().get(),
+				visitedConsAcyclic2_32.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_31.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic2_32.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_31.set(lab->getStamp().get(),
+				visitedConsAcyclic2_32.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::entered);
-				worklist.emplace_back(31, lab, true /* isFinishing */);
+				worklist.emplace_back(32, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_31.getCount(
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_32.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_31.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(31, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_31.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 33: {
+			if (isFinishing) {
+				visitedConsAcyclic2_33.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedConsAcyclic2_33.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic2_33.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::entered);
+				worklist.emplace_back(33, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_33.getCount(
 									   lab->getStamp().get()) ||
 				    0)) {
 				return false; /* cycle detected */
@@ -8961,13 +9472,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -8976,20 +9487,6 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			for (auto *pLab : g.prop_int_preds(lab))
 				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_29.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(29, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_29.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.rfi_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_30.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -9002,39 +9499,7 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
-			for (auto &tmp : g.fri_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.moi_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto *pLab : g.prop_int_preds(lab))
+			if (auto pLab = g.rfi_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_31.getStatus(
 						pLab->getStamp().get());
@@ -9048,15 +9513,80 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.rfe_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+			if (auto pLab = g.rfi_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_32.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(32, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
+							    visitedConsAcyclic2_32.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.fri_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_33.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(33, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_33.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.moi_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_33.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(33, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_33.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto *pLab : g.prop_int_preds(lab))
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_33.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(33, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_33.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rfe_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_33.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(33, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -9064,13 +9594,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.tc_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -9078,60 +9608,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.tj_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			for (auto &tmp : g.moi_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_32.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(32, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_32.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto *pLab : g.prop_int_preds(lab))
-				if (true && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_32.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(32, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_32.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.rfe_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_32.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(32, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_32.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -9184,27 +9667,14 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
-			for (auto &tmp : g.fri_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
 			for (auto &tmp : g.moi_preds(lab))
 				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						auto status = visitedConsAcyclic2_35.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -9219,8 +9689,12 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 					}
 			for (auto *pLab : g.prop_int_preds(lab))
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					auto status = visitedConsAcyclic2_35.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -9234,8 +9708,12 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.rfe_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					auto status = visitedConsAcyclic2_35.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -9248,62 +9726,17 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.tc_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_35.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(35, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.tj_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_35.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(35, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			for (auto &tmp : g.fri_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
 			for (auto &tmp : g.moi_preds(lab))
 				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_37.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
+							worklist.emplace_back(37, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
+								    visitedConsAcyclic2_37.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -9311,56 +9744,30 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 					}
 			for (auto *pLab : g.prop_int_preds(lab))
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_36.getStatus(
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_37.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
+						worklist.emplace_back(37, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
+							    visitedConsAcyclic2_37.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.rfe_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_36.getStatus(
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_37.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
+						worklist.emplace_back(37, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.tc_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_36.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.tj_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_36.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
+							    visitedConsAcyclic2_37.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -9368,8 +9775,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			for (auto &tmp : g.fri_preds(lab))
 				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -9385,8 +9792,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			for (auto &tmp : g.moi_preds(lab))
 				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -9401,8 +9808,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 					}
 			for (auto *pLab : g.prop_int_preds(lab))
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -9416,8 +9823,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.rfe_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -9431,8 +9838,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.tc_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -9446,8 +9853,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.tj_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -9455,6 +9862,188 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
 							    visitedConsAcyclic2_38.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.fri_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.moi_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto *pLab : g.prop_int_preds(lab))
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rfe_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.tc_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.tj_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.fri_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.moi_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto *pLab : g.prop_int_preds(lab))
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rfe_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.tc_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.tj_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -9463,22 +10052,22 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 
 			break;
 		}
-		case 32: {
+		case 34: {
 			if (isFinishing) {
-				visitedConsAcyclic2_32.set(lab->getStamp().get(),
+				visitedConsAcyclic2_34.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_32.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic2_34.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_32.set(lab->getStamp().get(),
+				visitedConsAcyclic2_34.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::entered);
-				worklist.emplace_back(32, lab, true /* isFinishing */);
+				worklist.emplace_back(34, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_32.getCount(
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_34.getCount(
 									   lab->getStamp().get()) ||
 				    0)) {
 				return false; /* cycle detected */
@@ -9654,13 +10243,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			for (auto &tmp : g.addr_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_28.getStatus(
+					auto status = visitedConsAcyclic2_29.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(28, pLab);
+						worklist.emplace_back(29, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_28.getCount(
+							    visitedConsAcyclic2_29.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -9668,13 +10257,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			for (auto &tmp : g.ctrl_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_28.getStatus(
+					auto status = visitedConsAcyclic2_29.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(28, pLab);
+						worklist.emplace_back(29, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_28.getCount(
+							    visitedConsAcyclic2_29.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -9682,13 +10271,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_28.getStatus(
+					auto status = visitedConsAcyclic2_29.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(28, pLab);
+						worklist.emplace_back(29, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_28.getCount(
+							    visitedConsAcyclic2_29.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -9698,13 +10287,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -9715,13 +10304,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -9732,13 +10321,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -9748,13 +10337,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			for (auto &tmp : g.addr_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -9764,13 +10353,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			for (auto &tmp : g.ctrl_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -9780,13 +10369,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -9797,105 +10386,6 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto *pLab = &tmp; true)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.ctrl_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.data_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.ctrl_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.data_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -9911,8 +10401,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			for (auto &tmp : g.ctrl_preds(lab))
 				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -9928,8 +10418,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -9937,6 +10427,105 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
 								    visitedConsAcyclic2_38.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.ctrl_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.ctrl_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -9946,22 +10535,67 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 
 			break;
 		}
-		case 33: {
+		case 35: {
 			if (isFinishing) {
-				visitedConsAcyclic2_33.set(lab->getStamp().get(),
+				visitedConsAcyclic2_35.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_33.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic2_35.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_33.set(lab->getStamp().get(),
+				visitedConsAcyclic2_35.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::entered);
-				worklist.emplace_back(33, lab, true /* isFinishing */);
+				worklist.emplace_back(35, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_33.getCount(
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_35.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_34.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(34, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_34.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 36: {
+			if (isFinishing) {
+				visitedConsAcyclic2_36.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedConsAcyclic2_36.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic2_36.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::entered);
+				worklist.emplace_back(36, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_36.getCount(
 									   lab->getStamp().get()) ||
 				    0)) {
 				return false; /* cycle detected */
@@ -10021,13 +10655,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && pLab->isNotAtomic() && genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_29.getStatus(
+					auto status = visitedConsAcyclic2_30.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(29, pLab);
+						worklist.emplace_back(30, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_29.getCount(
+							    visitedConsAcyclic2_30.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -10036,46 +10670,18 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_32.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(32, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_32.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_33.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(33, pLab);
-				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic2Accepting >
-						    visitedConsAcyclic2_33.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
-					return false; /* cycle detected */
-				}
-			}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab)) {
@@ -10092,9 +10698,12 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab)) {
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					auto status = visitedConsAcyclic2_35.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -10107,24 +10716,37 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_36.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(36, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic2Accepting >
+						    visitedConsAcyclic2_36.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
+				}
+			}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_36.getStatus(
+					auto status = visitedConsAcyclic2_37.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
+						worklist.emplace_back(37, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
+							    visitedConsAcyclic2_37.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
 				    genmc::isa<WriteLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
@@ -10138,25 +10760,56 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
 
 			break;
 		}
-		case 34: {
+		case 37: {
 			if (isFinishing) {
-				visitedConsAcyclic2_34.set(lab->getStamp().get(),
+				visitedConsAcyclic2_37.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_34.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic2_37.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_34.set(lab->getStamp().get(),
+				visitedConsAcyclic2_37.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::entered);
-				worklist.emplace_back(34, lab, true /* isFinishing */);
+				worklist.emplace_back(37, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_34.getCount(
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_37.getCount(
 									   lab->getStamp().get()) ||
 				    0)) {
 				return false; /* cycle detected */
@@ -10167,15 +10820,16 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::Wmb) {
-					auto status = visitedConsAcyclic2_33.getStatus(
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() == LkmmFenceKind::Wmb) {
+					auto status = visitedConsAcyclic2_36.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(33, pLab);
+						worklist.emplace_back(36, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_33.getCount(
+							    visitedConsAcyclic2_36.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -10183,12 +10837,12 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_34.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_37.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(34, pLab);
+					worklist.emplace_back(37, pLab);
 				} else if (status == NodeStatus::entered &&
 					   (visitedConsAcyclic2Accepting >
-						    visitedConsAcyclic2_34.getCount(
+						    visitedConsAcyclic2_37.getCount(
 							    pLab->getStamp().get()) ||
 					    0)) {
 					return false; /* cycle detected */
@@ -10197,22 +10851,22 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 
 			break;
 		}
-		case 35: {
+		case 38: {
 			if (isFinishing) {
-				visitedConsAcyclic2_35.set(lab->getStamp().get(),
+				visitedConsAcyclic2_38.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_35.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic2_38.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_35.set(lab->getStamp().get(),
+				visitedConsAcyclic2_38.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::entered);
-				worklist.emplace_back(35, lab, true /* isFinishing */);
+				worklist.emplace_back(38, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_35.getCount(
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_38.getCount(
 									   lab->getStamp().get()) ||
 				    0)) {
 				return false; /* cycle detected */
@@ -10304,13 +10958,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_29.getStatus(
+					auto status = visitedConsAcyclic2_30.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(29, pLab);
+						worklist.emplace_back(30, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_29.getCount(
+							    visitedConsAcyclic2_30.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -10318,28 +10972,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_32.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(32, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_32.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -10360,22 +10999,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_35.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(35, pLab);
-				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic2Accepting >
-						    visitedConsAcyclic2_35.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
-					return false; /* cycle detected */
-				}
-			}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					auto status = visitedConsAcyclic2_35.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -10389,22 +11019,36 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_36.getStatus(
+				if (true && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_37.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
+						worklist.emplace_back(37, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
+							    visitedConsAcyclic2_37.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_38.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(38, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic2Accepting >
+						    visitedConsAcyclic2_38.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
+				}
+			}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -10417,25 +11061,54 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
 
 			break;
 		}
-		case 36: {
+		case 39: {
 			if (isFinishing) {
-				visitedConsAcyclic2_36.set(lab->getStamp().get(),
+				visitedConsAcyclic2_39.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_36.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic2_39.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_36.set(lab->getStamp().get(),
+				visitedConsAcyclic2_39.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::entered);
-				worklist.emplace_back(36, lab, true /* isFinishing */);
+				worklist.emplace_back(39, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_36.getCount(
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_39.getCount(
 									   lab->getStamp().get()) ||
 				    0)) {
 				return false; /* cycle detected */
@@ -10448,7 +11121,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
 				    genmc::isa<ReadLabel>(pLab) && pLab->isLkmmMb() &&
 				    !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_19.getStatus(
@@ -10467,7 +11142,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
 				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_20.getStatus(
 						pLab->getStamp().get());
@@ -10485,7 +11162,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
 				    !(pLab->isNotAtomic()) && genmc::isa<WriteLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_20.getStatus(
 						pLab->getStamp().get());
@@ -10503,7 +11182,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
 				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
 				    ((genmc::isa<ReadLabel>(pLab) &&
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -10525,7 +11206,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
 				    !(pLab->isNotAtomic()) && genmc::isa<WriteLabel>(pLab) &&
 				    ((genmc::isa<ReadLabel>(pLab) &&
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -10547,15 +11230,17 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
 				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_29.getStatus(
+					auto status = visitedConsAcyclic2_30.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(29, pLab);
+						worklist.emplace_back(30, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_29.getCount(
+							    visitedConsAcyclic2_30.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -10565,15 +11250,17 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
 				    !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -10583,25 +11270,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-				    !(pLab->isNotAtomic()) && genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_32.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(32, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_32.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    pLab->isAtLeastAcquire() &&
-				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
 				    !(pLab->isNotAtomic()) && genmc::isa<WriteLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_34.getStatus(
 						pLab->getStamp().get());
@@ -10616,12 +11287,17 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && genmc::isa<ReadLabel>(pLab) &&
+				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-				    !(pLab->isNotAtomic())) {
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
+				    !(pLab->isNotAtomic()) && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					auto status = visitedConsAcyclic2_35.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -10634,43 +11310,34 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_36.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(36, pLab);
-				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic2Accepting >
-						    visitedConsAcyclic2_36.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
-					return false; /* cycle detected */
-				}
-			}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-				    !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_36.getStatus(
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
+				    !(pLab->isNotAtomic()) && genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_37.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
+						worklist.emplace_back(37, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
+							    visitedConsAcyclic2_37.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && genmc::isa<ReadLabel>(pLab) &&
 				    pLab->isAtLeastAcquire() &&
 				    (!genmc::isa<CasReadLabel>(pLab) ||
-				     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-				    genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn() &&
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
 				    !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
@@ -10684,11 +11351,27 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_39.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(39, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic2Accepting >
+						    visitedConsAcyclic2_39.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
+				}
+			}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true &&
-				    (genmc::isa<LockCasReadLabel>(pLab) ||
-				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    pLab->isAtLeastAcquire() &&
+				    (!genmc::isa<CasReadLabel>(pLab) ||
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
+				    !(pLab->isNotAtomic())) {
 					auto status = visitedConsAcyclic2_39.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -10702,17 +11385,59 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    pLab->isAtLeastAcquire() &&
+				    (!genmc::isa<CasReadLabel>(pLab) ||
+				     static_cast<const ReadLabel *>(
+					     static_cast<const EventLabel *>(pLab))
+					     ->isRMW()) &&
+				    genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn() &&
+				    !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true &&
 				    (genmc::isa<LockCasReadLabel>(pLab) ||
 				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-				    genmc::cast<ReadLabel>(pLab)->isRMW()) {
-					auto status = visitedConsAcyclic2_40.getStatus(
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
+					auto status = visitedConsAcyclic2_42.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(40, pLab);
+						worklist.emplace_back(42, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_40.getCount(
+							    visitedConsAcyclic2_42.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true &&
+				    (genmc::isa<LockCasReadLabel>(pLab) ||
+				     genmc::isa<TrylockCasReadLabel>(pLab)) &&
+				    static_cast<const ReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+					    ->isRMW()) {
+					auto status = visitedConsAcyclic2_43.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(43, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_43.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -10721,22 +11446,22 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 
 			break;
 		}
-		case 37: {
+		case 40: {
 			if (isFinishing) {
-				visitedConsAcyclic2_37.set(lab->getStamp().get(),
+				visitedConsAcyclic2_40.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_37.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic2_40.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_37.set(lab->getStamp().get(),
+				visitedConsAcyclic2_40.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::entered);
-				worklist.emplace_back(37, lab, true /* isFinishing */);
+				worklist.emplace_back(40, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_37.getCount(
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_40.getCount(
 									   lab->getStamp().get()) ||
 				    0)) {
 				return false; /* cycle detected */
@@ -10837,13 +11562,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
 				    genmc::isa<ReadLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_29.getStatus(
+					auto status = visitedConsAcyclic2_30.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(29, pLab);
+						worklist.emplace_back(30, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_29.getCount(
+							    visitedConsAcyclic2_30.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -10852,29 +11577,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_31.getStatus(
+					auto status = visitedConsAcyclic2_33.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(31, pLab);
+						worklist.emplace_back(33, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_31.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_32.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(32, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_32.getCount(
+							    visitedConsAcyclic2_33.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -10897,9 +11606,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    pLab->isAtLeastRelease() && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					auto status = visitedConsAcyclic2_35.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -10914,14 +11627,46 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
-					auto status = visitedConsAcyclic2_36.getStatus(
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_37.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
+						worklist.emplace_back(37, pLab);
 					} else if (status == NodeStatus::entered &&
 						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
+							    visitedConsAcyclic2_37.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    pLab->isAtLeastRelease() && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_38.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(38, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_38.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
 								    pLab->getStamp().get()) ||
 						    0)) {
 						return false; /* cycle detected */
@@ -10929,12 +11674,12 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_37.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_40.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(37, pLab);
+					worklist.emplace_back(40, pLab);
 				} else if (status == NodeStatus::entered &&
 					   (visitedConsAcyclic2Accepting >
-						    visitedConsAcyclic2_37.getCount(
+						    visitedConsAcyclic2_40.getCount(
 							    pLab->getStamp().get()) ||
 					    0)) {
 					return false; /* cycle detected */
@@ -10943,6 +11688,158 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 41: {
+			if (isFinishing) {
+				visitedConsAcyclic2_41.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedConsAcyclic2_41.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic2_41.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::entered);
+				worklist.emplace_back(41, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_41.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+				    static_cast<const LkmmFenceLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getFenceKind() == LkmmFenceKind::Rmb) {
+					auto status = visitedConsAcyclic2_40.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(40, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_40.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_41.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(41, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic2Accepting >
+						    visitedConsAcyclic2_41.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
+				}
+			}
+
+			break;
+		}
+		case 42: {
+			if (isFinishing) {
+				visitedConsAcyclic2_42.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedConsAcyclic2_42.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic2_42.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::entered);
+				worklist.emplace_back(42, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_42.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_38.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(38, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_38.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_42.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(42, pLab);
+				} else if (status == NodeStatus::entered &&
+					   (visitedConsAcyclic2Accepting >
+						    visitedConsAcyclic2_42.getCount(
+							    pLab->getStamp().get()) ||
+					    0)) {
+					return false; /* cycle detected */
+				}
+			}
+
+			break;
+		}
+		case 43: {
+			if (isFinishing) {
+				visitedConsAcyclic2_43.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedConsAcyclic2_43.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic2_43.set(lab->getStamp().get(),
+							   visitedConsAcyclic2Accepting,
+							   NodeStatus::entered);
+				worklist.emplace_back(43, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_43.getCount(
+									   lab->getStamp().get()) ||
+				    0)) {
+				return false; /* cycle detected */
+			} else if (status == NodeStatus::left) {
+				break; /* already explored*/
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.rfi_pred(lab); pLab)
+				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_38.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -10958,175 +11855,24 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 
 			break;
 		}
-		case 38: {
-			if (isFinishing) {
-				visitedConsAcyclic2_38.set(lab->getStamp().get(),
-							   visitedConsAcyclic2Accepting,
-							   NodeStatus::left);
-				break;
-			}
-
-			auto status = visitedConsAcyclic2_38.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_38.set(lab->getStamp().get(),
-							   visitedConsAcyclic2Accepting,
-							   NodeStatus::entered);
-				worklist.emplace_back(38, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_38.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
-				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-				    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-					    LkmmFenceKind::Rmb) {
-					auto status = visitedConsAcyclic2_37.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(37, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_37.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_38.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(38, pLab);
-				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic2Accepting >
-						    visitedConsAcyclic2_38.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
-					return false; /* cycle detected */
-				}
-			}
-
-			break;
-		}
-		case 39: {
-			if (isFinishing) {
-				visitedConsAcyclic2_39.set(lab->getStamp().get(),
-							   visitedConsAcyclic2Accepting,
-							   NodeStatus::left);
-				break;
-			}
-
-			auto status = visitedConsAcyclic2_39.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_39.set(lab->getStamp().get(),
-							   visitedConsAcyclic2Accepting,
-							   NodeStatus::entered);
-				worklist.emplace_back(39, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_39.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
-				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_35.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(35, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_39.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(39, pLab);
-				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic2Accepting >
-						    visitedConsAcyclic2_39.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
-					return false; /* cycle detected */
-				}
-			}
-
-			break;
-		}
-		case 40: {
-			if (isFinishing) {
-				visitedConsAcyclic2_40.set(lab->getStamp().get(),
-							   visitedConsAcyclic2Accepting,
-							   NodeStatus::left);
-				break;
-			}
-
-			auto status = visitedConsAcyclic2_40.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2_40.set(lab->getStamp().get(),
-							   visitedConsAcyclic2Accepting,
-							   NodeStatus::entered);
-				worklist.emplace_back(40, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_40.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
-				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.rfi_pred(lab); pLab)
-				if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_35.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(35, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-
-			break;
-		}
-		case 41: {
+		case 44: {
 			if (isFinishing) {
 				--visitedConsAcyclic2Accepting;
-				visitedConsAcyclic2_41.set(lab->getStamp().get(),
+				visitedConsAcyclic2_44.set(lab->getStamp().get(),
 							   visitedConsAcyclic2Accepting,
 							   NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_41.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic2_44.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
 				++visitedConsAcyclic2Accepting;
-				visitedConsAcyclic2_41.setIncr(lab->getStamp().get(),
+				visitedConsAcyclic2_44.setIncr(lab->getStamp().get(),
 							       visitedConsAcyclic2Accepting,
 							       NodeStatus::entered);
-				worklist.emplace_back(41, lab, true /* isFinishing */);
+				worklist.emplace_back(44, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_41.getCount(
+				   (visitedConsAcyclic2Accepting > visitedConsAcyclic2_44.getCount(
 									   lab->getStamp().get()) ||
 				    1)) {
 				return false; /* cycle detected */
@@ -11548,7 +12294,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::BeforeAtomic) {
 						auto status = visitedConsAcyclic2_19.getStatus(
 							pLab->getStamp().get());
@@ -11586,8 +12334,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-						    LkmmFenceKind::Mb) {
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() == LkmmFenceKind::Mb) {
 						auto status = visitedConsAcyclic2_19.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -11608,7 +12357,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::BeforeAtomic) {
 						auto status = visitedConsAcyclic2_19.getStatus(
 							pLab->getStamp().get());
@@ -11686,8 +12437,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-						    LkmmFenceKind::Mb) {
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() == LkmmFenceKind::Mb) {
 						auto status = visitedConsAcyclic2_19.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -11763,7 +12515,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
 					    genmc::isa<ReadLabel>(pLab) && pLab->isLkmmMb() &&
 					    !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_19.getStatus(
@@ -12160,7 +12914,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
 					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
 						auto status = visitedConsAcyclic2_20.getStatus(
 							pLab->getStamp().get());
@@ -12180,7 +12936,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
 					    !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
 						auto status = visitedConsAcyclic2_20.getStatus(
@@ -12646,7 +13404,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
 					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
 					    ((genmc::isa<ReadLabel>(pLab) &&
 					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -12670,7 +13430,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
 					    !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab) &&
 					    ((genmc::isa<ReadLabel>(pLab) &&
@@ -12802,7 +13564,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::AfterAtomic) {
 						auto status = visitedConsAcyclic2_22.getStatus(
 							pLab->getStamp().get());
@@ -12820,7 +13584,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::AfterAtomic) {
 						auto status = visitedConsAcyclic2_22.getStatus(
 							pLab->getStamp().get());
@@ -12838,7 +13604,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::AfterSpinlock) {
 						auto status = visitedConsAcyclic2_23.getStatus(
 							pLab->getStamp().get());
@@ -12856,7 +13624,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::AfterSpinlock) {
 						auto status = visitedConsAcyclic2_23.getStatus(
 							pLab->getStamp().get());
@@ -12874,7 +13644,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::AfterUnlockLock) {
 						auto status = visitedConsAcyclic2_26.getStatus(
 							pLab->getStamp().get());
@@ -12892,7 +13664,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
 						    LkmmFenceKind::AfterUnlockLock) {
 						auto status = visitedConsAcyclic2_26.getStatus(
 							pLab->getStamp().get());
@@ -12910,13 +13684,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic2_28.getStatus(
+						auto status = visitedConsAcyclic2_29.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(28, pLab);
+							worklist.emplace_back(29, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_28.getCount(
+								    visitedConsAcyclic2_29.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -12926,13 +13700,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic2_28.getStatus(
+						auto status = visitedConsAcyclic2_29.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(28, pLab);
+							worklist.emplace_back(29, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_28.getCount(
+								    visitedConsAcyclic2_29.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -12942,13 +13716,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.ctrl_preds(lab))
 					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic2_28.getStatus(
+						auto status = visitedConsAcyclic2_29.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(28, pLab);
+							worklist.emplace_back(29, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_28.getCount(
+								    visitedConsAcyclic2_29.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -12958,13 +13732,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.data_preds(lab))
 					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic2_28.getStatus(
+						auto status = visitedConsAcyclic2_29.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(28, pLab);
+							worklist.emplace_back(29, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_28.getCount(
+								    visitedConsAcyclic2_29.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -12977,14 +13751,14 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						if (true && !(pLab->isNotAtomic()) &&
 						    genmc::isa<ReadLabel>(pLab)) {
 							auto status =
-								visitedConsAcyclic2_29.getStatus(
+								visitedConsAcyclic2_30.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(29, pLab);
+								worklist.emplace_back(30, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_29.getCount(
+									 visitedConsAcyclic2_30.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 0)) {
@@ -12996,193 +13770,6 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.addr_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic()) &&
-						    genmc::isa<ReadLabel>(pLab)) {
-							auto status =
-								visitedConsAcyclic2_29.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(29, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_29.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.ctrl_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic()) &&
-						    genmc::isa<ReadLabel>(pLab)) {
-							auto status =
-								visitedConsAcyclic2_29.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(29, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_29.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.data_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic()) &&
-						    genmc::isa<ReadLabel>(pLab)) {
-							auto status =
-								visitedConsAcyclic2_29.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(29, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_29.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
-					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				for (auto &tmp : g.fri_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic()) &&
-						    genmc::isa<ReadLabel>(pLab)) {
-							auto status =
-								visitedConsAcyclic2_29.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(29, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_29.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()))
-				for (auto *pLab : g.prop_int_preds(lab))
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    pLab->isAtLeastAcquire() &&
-					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
-			    !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
-			    !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_29.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(29, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_29.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.rfi_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -13196,55 +13783,20 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
-				for (auto &tmp : g.addr_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_31.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(31, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_31.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
+						if (true && !(pLab->isNotAtomic()) &&
+						    genmc::isa<ReadLabel>(pLab)) {
 							auto status =
-								visitedConsAcyclic2_31.getStatus(
+								visitedConsAcyclic2_30.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(31, pLab);
+								worklist.emplace_back(30, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_31.getCount(
+									 visitedConsAcyclic2_30.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 0)) {
@@ -13254,16 +13806,17 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.ctrl_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
+						if (true && !(pLab->isNotAtomic()) &&
+						    genmc::isa<ReadLabel>(pLab)) {
 							auto status =
-								visitedConsAcyclic2_31.getStatus(
+								visitedConsAcyclic2_30.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(31, pLab);
+								worklist.emplace_back(30, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_31.getCount(
+									 visitedConsAcyclic2_30.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 0)) {
@@ -13273,16 +13826,17 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.data_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
+						if (true && !(pLab->isNotAtomic()) &&
+						    genmc::isa<ReadLabel>(pLab)) {
 							auto status =
-								visitedConsAcyclic2_31.getStatus(
+								visitedConsAcyclic2_30.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(31, pLab);
+								worklist.emplace_back(30, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_31.getCount(
+									 visitedConsAcyclic2_30.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 0)) {
@@ -13292,14 +13846,15 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -13309,35 +13864,17 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()))
 				for (auto &tmp : g.fri_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
+						if (true && !(pLab->isNotAtomic()) &&
+						    genmc::isa<ReadLabel>(pLab)) {
 							auto status =
-								visitedConsAcyclic2_31.getStatus(
+								visitedConsAcyclic2_30.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(31, pLab);
+								worklist.emplace_back(30, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_31.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()))
-				for (auto &tmp : g.moi_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_31.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(31, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_31.getCount(
+									 visitedConsAcyclic2_30.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 0)) {
@@ -13346,14 +13883,15 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 			if (true && !(lab->isNotAtomic()))
 				for (auto *pLab : g.prop_int_preds(lab))
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -13365,63 +13903,17 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-					    !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
+					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.rfe_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.tc_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.tj_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_31.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -13433,31 +13925,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_31.getStatus(
+						auto status = visitedConsAcyclic2_30.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
+							worklist.emplace_back(30, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
-			    !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_31.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(31, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_31.getCount(
+								    visitedConsAcyclic2_30.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -13467,6 +13941,23 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
 			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_30.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(30, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_30.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.rfi_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_31.getStatus(
 							pLab->getStamp().get());
@@ -13481,11 +13972,14 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.rfi_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						auto status = visitedConsAcyclic2_32.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -13493,6 +13987,42 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
 								    visitedConsAcyclic2_32.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
+				for (auto &tmp : g.addr_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_33.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(33, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_33.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_33.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(33, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -13500,17 +14030,73 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.addr_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_33.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(33, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_33.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.ctrl_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_33.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(33, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_33.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.data_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_33.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(33, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_33.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_32.getStatus(
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(32, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_32.getCount(
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -13518,19 +14104,37 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 					}
 			if (true && !(lab->isNotAtomic()))
-				for (auto &tmp : g.moi_preds(lab))
+				for (auto &tmp : g.fri_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic()) &&
-						    genmc::isa<WriteLabel>(pLab)) {
+						if (true && !(pLab->isNotAtomic())) {
 							auto status =
-								visitedConsAcyclic2_32.getStatus(
+								visitedConsAcyclic2_33.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(32, pLab);
+								worklist.emplace_back(33, pLab);
 							} else if (
 								status == NodeStatus::entered &&
 								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_32.getCount(
+									 visitedConsAcyclic2_33.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()))
+				for (auto &tmp : g.moi_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_33.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(33, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_33.getCount(
 										 pLab->getStamp()
 											 .get()) ||
 								 0)) {
@@ -13539,15 +14143,14 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 			if (true && !(lab->isNotAtomic()))
 				for (auto *pLab : g.prop_int_preds(lab))
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_32.getStatus(
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(32, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_32.getCount(
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -13559,16 +14162,17 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-					    !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_32.getStatus(
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
+					    !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(32, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_32.getCount(
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -13577,15 +14181,64 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.rfe_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_32.getStatus(
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(32, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_32.getCount(
+								    visitedConsAcyclic2_33.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.tc_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_33.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(33, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_33.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.tj_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_33.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(33, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_33.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_33.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(33, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -13597,13 +14250,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_32.getStatus(
+						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(32, pLab);
+							worklist.emplace_back(33, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_32.getCount(
+								    visitedConsAcyclic2_33.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -13613,26 +14266,7 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
 			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_32.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(32, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_32.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-						    LkmmFenceKind::Wmb) {
+					if (true && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_33.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -13664,20 +14298,30 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_34.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(34, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_34.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_34.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(34, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_34.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
 					}
-				}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
@@ -13738,7 +14382,9 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
 					    !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
 						auto status = visitedConsAcyclic2_34.getStatus(
@@ -13808,32 +14454,14 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
-				for (auto &tmp : g.addr_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<WriteLabel>(pLab) &&
-						    pLab->isAtLeastRelease() &&
-						    !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_35.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(35, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_35.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() &&
-					    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
-					    !(pLab->isNotAtomic())) {
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						auto status = visitedConsAcyclic2_35.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -13848,74 +14476,14 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.addr_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<WriteLabel>(pLab) &&
-						    pLab->isAtLeastRelease() &&
-						    !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_35.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(35, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_35.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.ctrl_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<WriteLabel>(pLab) &&
-						    pLab->isAtLeastRelease() &&
-						    !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_35.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(35, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_35.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.data_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<WriteLabel>(pLab) &&
-						    pLab->isAtLeastRelease() &&
-						    !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_35.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(35, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_35.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() &&
-					    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
-					    !(pLab->isNotAtomic())) {
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						auto status = visitedConsAcyclic2_35.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -13929,33 +14497,16 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
-			if (true && !(lab->isNotAtomic()))
-				for (auto &tmp : g.fri_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<WriteLabel>(pLab) &&
-						    pLab->isAtLeastRelease() &&
-						    !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_35.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(35, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_35.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
 			if (true && !(lab->isNotAtomic()))
 				for (auto &tmp : g.moi_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<WriteLabel>(pLab) &&
-						    pLab->isAtLeastRelease() &&
-						    !(pLab->isNotAtomic())) {
+						if (true && !(pLab->isNotAtomic()) &&
+						    genmc::isa<WriteLabel>(pLab) &&
+						    ((genmc::isa<ReadLabel>(pLab) &&
+						      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+						     (genmc::isa<WriteLabel>(pLab) &&
+						      genmc::dyn_cast<WriteLabel>(pLab)
+							      ->isRMW()))) {
 							auto status =
 								visitedConsAcyclic2_35.getStatus(
 									pLab->getStamp().get());
@@ -13973,8 +14524,12 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 			if (true && !(lab->isNotAtomic()))
 				for (auto *pLab : g.prop_int_preds(lab))
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						auto status = visitedConsAcyclic2_35.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -13988,342 +14543,27 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() &&
-					    genmc::isa<ReadLabel>(pLab) &&
-					    pLab->isAtLeastAcquire() &&
-					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-					    !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.rfe_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.tc_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.tj_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
-			    !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
-					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
-			    !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
-					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
-			    !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_35.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(35, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_35.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
-			    !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_35.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(35, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_35.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
-				for (auto &tmp : g.addr_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_36.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(36, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_36.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.addr_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_36.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(36, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_36.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.ctrl_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_36.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(36, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_36.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.data_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_36.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(36, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_36.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				for (auto &tmp : g.fri_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_36.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(36, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_36.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()))
-				for (auto &tmp : g.moi_preds(lab))
-					if (auto *pLab = &tmp; true)
-						if (true && !(pLab->isNotAtomic())) {
-							auto status =
-								visitedConsAcyclic2_36.getStatus(
-									pLab->getStamp().get());
-							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(36, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic2Accepting >
-									 visitedConsAcyclic2_36.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 0)) {
-								return false; /* cycle detected */
-							}
-						}
-			if (true && !(lab->isNotAtomic()))
-				for (auto *pLab : g.prop_int_preds(lab))
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_36.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(36, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_36.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-					    !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
+					    !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_35.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
+							worklist.emplace_back(35, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
+								    visitedConsAcyclic2_35.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -14332,46 +14572,19 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.rfe_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_35.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
+							worklist.emplace_back(35, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.tc_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && !(lab->isNotAtomic()))
-				if (auto pLab = g.tj_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
+								    visitedConsAcyclic2_35.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -14382,7 +14595,53 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic()) &&
-					    genmc::isa<ReadLabel>(pLab)) {
+					    genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_35.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(35, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_35.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_35.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(35, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_35.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
+						    LkmmFenceKind::Wmb) {
 						auto status = visitedConsAcyclic2_36.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14390,6 +14649,133 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
 								    visitedConsAcyclic2_36.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_37.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(37, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_37.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic2_37.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(37, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_37.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_37.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(37, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_37.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				for (auto &tmp : g.moi_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic()) &&
+						    genmc::isa<WriteLabel>(pLab)) {
+							auto status =
+								visitedConsAcyclic2_37.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(37, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_37.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()))
+				for (auto *pLab : g.prop_int_preds(lab))
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_37.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(37, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_37.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    pLab->isAtLeastAcquire() &&
+					    (!genmc::isa<CasReadLabel>(pLab) ||
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
+					    !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_37.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(37, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_37.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.rfe_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_37.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(37, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_37.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -14401,13 +14787,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_36.getStatus(
+						auto status = visitedConsAcyclic2_37.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
+							worklist.emplace_back(37, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
+								    visitedConsAcyclic2_37.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    0)) {
@@ -14417,26 +14803,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
 			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_36.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(36, pLab);
-						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_36.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<ReadLabel>(lab) && !lab->isLkmmNoreturn() &&
-			    !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-					    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-						    LkmmFenceKind::Rmb) {
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
 						auto status = visitedConsAcyclic2_37.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14453,8 +14821,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<ReadLabel>(pLab) &&
-						    !pLab->isLkmmNoreturn() &&
+						if (true && genmc::isa<WriteLabel>(pLab) &&
+						    pLab->isAtLeastRelease() &&
 						    !(pLab->isNotAtomic())) {
 							auto status =
 								visitedConsAcyclic2_38.getStatus(
@@ -14473,8 +14841,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() &&
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() &&
 					    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
 					    !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
@@ -14493,8 +14861,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<ReadLabel>(pLab) &&
-						    !pLab->isLkmmNoreturn() &&
+						if (true && genmc::isa<WriteLabel>(pLab) &&
+						    pLab->isAtLeastRelease() &&
 						    !(pLab->isNotAtomic())) {
 							auto status =
 								visitedConsAcyclic2_38.getStatus(
@@ -14514,8 +14882,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.ctrl_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<ReadLabel>(pLab) &&
-						    !pLab->isLkmmNoreturn() &&
+						if (true && genmc::isa<WriteLabel>(pLab) &&
+						    pLab->isAtLeastRelease() &&
 						    !(pLab->isNotAtomic())) {
 							auto status =
 								visitedConsAcyclic2_38.getStatus(
@@ -14535,8 +14903,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.data_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<ReadLabel>(pLab) &&
-						    !pLab->isLkmmNoreturn() &&
+						if (true && genmc::isa<WriteLabel>(pLab) &&
+						    pLab->isAtLeastRelease() &&
 						    !(pLab->isNotAtomic())) {
 							auto status =
 								visitedConsAcyclic2_38.getStatus(
@@ -14555,8 +14923,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() &&
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() &&
 					    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
 					    !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
@@ -14575,8 +14943,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()))
 				for (auto &tmp : g.fri_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<ReadLabel>(pLab) &&
-						    !pLab->isLkmmNoreturn() &&
+						if (true && genmc::isa<WriteLabel>(pLab) &&
+						    pLab->isAtLeastRelease() &&
 						    !(pLab->isNotAtomic())) {
 							auto status =
 								visitedConsAcyclic2_38.getStatus(
@@ -14596,8 +14964,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && !(lab->isNotAtomic()))
 				for (auto &tmp : g.moi_preds(lab))
 					if (auto *pLab = &tmp; true)
-						if (true && genmc::isa<ReadLabel>(pLab) &&
-						    !pLab->isLkmmNoreturn() &&
+						if (true && genmc::isa<WriteLabel>(pLab) &&
+						    pLab->isAtLeastRelease() &&
 						    !(pLab->isNotAtomic())) {
 							auto status =
 								visitedConsAcyclic2_38.getStatus(
@@ -14616,8 +14984,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 			if (true && !(lab->isNotAtomic()))
 				for (auto *pLab : g.prop_int_preds(lab))
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14633,12 +15001,15 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() &&
+					    genmc::isa<ReadLabel>(pLab) &&
 					    pLab->isAtLeastAcquire() &&
 					    (!genmc::isa<CasReadLabel>(pLab) ||
-					     genmc::cast<ReadLabel>(pLab)->isRMW()) &&
-					    genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
+					    !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14654,8 +15025,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.rfe_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14671,8 +15042,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.tc_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14688,8 +15059,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.tj_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14703,26 +15074,11 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
-			if (true && genmc::isa<ReadLabel>(lab) && !lab->isLkmmNoreturn() &&
-			    !(lab->isNotAtomic()))
-				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_38.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(38, pLab);
-					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic2Accepting >
-							    visitedConsAcyclic2_38.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
-						return false; /* cycle detected */
-					}
-				}
 			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
 			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
@@ -14740,8 +15096,8 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
 			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
@@ -14758,9 +15114,24 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					}
 			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
 			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic2_38.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(38, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_38.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
+			    !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_38.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14774,12 +15145,103 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
-			if (true && !(lab->isNotAtomic()))
+			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
+				for (auto &tmp : g.addr_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_39.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(39, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_39.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true &&
-					    (genmc::isa<LockCasReadLabel>(pLab) ||
-					     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-					    genmc::cast<ReadLabel>(pLab)->isRMW()) {
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.addr_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_39.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(39, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_39.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.ctrl_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_39.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(39, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_39.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.data_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_39.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(39, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_39.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_39.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14794,11 +15256,204 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 					}
 			if (true && !(lab->isNotAtomic()))
+				for (auto &tmp : g.fri_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_39.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(39, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_39.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()))
+				for (auto &tmp : g.moi_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_39.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(39, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_39.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()))
+				for (auto *pLab : g.prop_int_preds(lab))
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic2_39.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(39, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_39.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && !(lab->isNotAtomic()))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true &&
-					    (genmc::isa<LockCasReadLabel>(pLab) ||
-					     genmc::isa<TrylockCasReadLabel>(pLab)) &&
-					    genmc::cast<ReadLabel>(pLab)->isRMW()) {
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    pLab->isAtLeastAcquire() &&
+					    (!genmc::isa<CasReadLabel>(pLab) ||
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
+					    !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.rfe_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.tc_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.tj_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_39.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(39, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_39.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<ReadLabel>(lab) && !lab->isLkmmNoreturn() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+					    static_cast<const LkmmFenceLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getFenceKind() ==
+						    LkmmFenceKind::Rmb) {
 						auto status = visitedConsAcyclic2_40.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14813,9 +15468,32 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						}
 					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
+				for (auto &tmp : g.addr_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && genmc::isa<ReadLabel>(pLab) &&
+						    !pLab->isLkmmNoreturn() &&
+						    !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_41.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(41, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_41.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<WriteLabel>(pLab) &&
-					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() &&
+					    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
+					    !(pLab->isNotAtomic())) {
 						auto status = visitedConsAcyclic2_41.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -14823,6 +15501,351 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
 								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.addr_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && genmc::isa<ReadLabel>(pLab) &&
+						    !pLab->isLkmmNoreturn() &&
+						    !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_41.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(41, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_41.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.ctrl_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && genmc::isa<ReadLabel>(pLab) &&
+						    !pLab->isLkmmNoreturn() &&
+						    !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_41.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(41, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_41.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.data_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && genmc::isa<ReadLabel>(pLab) &&
+						    !pLab->isLkmmNoreturn() &&
+						    !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_41.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(41, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_41.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() &&
+					    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
+					    !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				for (auto &tmp : g.fri_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && genmc::isa<ReadLabel>(pLab) &&
+						    !pLab->isLkmmNoreturn() &&
+						    !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_41.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(41, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_41.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()))
+				for (auto &tmp : g.moi_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && genmc::isa<ReadLabel>(pLab) &&
+						    !pLab->isLkmmNoreturn() &&
+						    !(pLab->isNotAtomic())) {
+							auto status =
+								visitedConsAcyclic2_41.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(41, pLab);
+							} else if (
+								status == NodeStatus::entered &&
+								(visitedConsAcyclic2Accepting >
+									 visitedConsAcyclic2_41.getCount(
+										 pLab->getStamp()
+											 .get()) ||
+								 0)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && !(lab->isNotAtomic()))
+				for (auto *pLab : g.prop_int_preds(lab))
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    pLab->isAtLeastAcquire() &&
+					    (!genmc::isa<CasReadLabel>(pLab) ||
+					     static_cast<const ReadLabel *>(
+						     static_cast<const EventLabel *>(pLab))
+						     ->isRMW()) &&
+					    genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.rfe_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.tc_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.tj_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<ReadLabel>(lab) && !lab->isLkmmNoreturn() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   (visitedConsAcyclic2Accepting >
+							    visitedConsAcyclic2_41.getCount(
+								    pLab->getStamp().get()) ||
+						    0)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<WriteLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease() &&
+			    !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_41.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true &&
+					    (genmc::isa<LockCasReadLabel>(pLab) ||
+					     genmc::isa<TrylockCasReadLabel>(pLab)) &&
+					    static_cast<const ReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+						    ->isRMW()) {
+						auto status = visitedConsAcyclic2_42.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(42, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_42.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true &&
+					    (genmc::isa<LockCasReadLabel>(pLab) ||
+					     genmc::isa<TrylockCasReadLabel>(pLab)) &&
+					    static_cast<const ReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+						    ->isRMW()) {
+						auto status = visitedConsAcyclic2_43.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(43, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_43.getCount(
+									    pLab->getStamp()
+										    .get()) ||
+							    0)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<ReadLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_44.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(44, pLab);
+						} else if (status == NodeStatus::entered &&
+							   (visitedConsAcyclic2Accepting >
+								    visitedConsAcyclic2_44.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -14833,13 +15856,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
-						auto status = visitedConsAcyclic2_41.getStatus(
+						auto status = visitedConsAcyclic2_44.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(41, pLab);
+							worklist.emplace_back(44, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_41.getCount(
+								    visitedConsAcyclic2_44.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -14851,13 +15874,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_41.getStatus(
+						auto status = visitedConsAcyclic2_44.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(41, pLab);
+							worklist.emplace_back(44, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_41.getCount(
+								    visitedConsAcyclic2_44.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -14869,13 +15892,13 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_41.getStatus(
+						auto status = visitedConsAcyclic2_44.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(41, pLab);
+							worklist.emplace_back(44, pLab);
 						} else if (status == NodeStatus::entered &&
 							   (visitedConsAcyclic2Accepting >
-								    visitedConsAcyclic2_41.getCount(
+								    visitedConsAcyclic2_44.getCount(
 									    pLab->getStamp()
 										    .get()) ||
 							    1)) {
@@ -14920,7 +15943,7 @@ bool LKMMChecker::visitConsAcyclic2(const EventLabel *lab) const
 	visitedConsAcyclic2_23.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_24.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_26.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic2_28.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_27.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_29.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_30.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_31.maybeClearResize(g.getMaxStamp().get() + 1);
@@ -14934,10 +15957,13 @@ bool LKMMChecker::visitConsAcyclic2(const EventLabel *lab) const
 	visitedConsAcyclic2_39.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_40.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_41.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_42.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_43.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_44.maybeClearResize(g.getMaxStamp().get() + 1);
 
 	/* States we need to explore from using DFS */
 	std::vector<DFSWorklistEntry> startStates = {
-		{41, lab}, {38, lab}, {36, lab}, {35, lab}, {31, lab}, {19, lab},
+		{44, lab}, {41, lab}, {39, lab}, {38, lab}, {33, lab}, {19, lab},
 	};
 
 	return visitConsAcyclic2Iterative(startStates);
@@ -14969,7 +15995,7 @@ bool LKMMChecker::visitConsAcyclic2Full(const ExecutionGraph &g) const
 	visitedConsAcyclic2_23.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_24.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_26.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic2_28.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_27.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_29.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_30.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_31.maybeClearResize(g.getMaxStamp().get() + 1);
@@ -14983,11 +16009,14 @@ bool LKMMChecker::visitConsAcyclic2Full(const ExecutionGraph &g) const
 	visitedConsAcyclic2_39.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_40.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_41.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_42.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_43.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_44.maybeClearResize(g.getMaxStamp().get() + 1);
 
 	auto exploreLab = [&](auto &lab) {
 		/* Explore from all accepting states using DFS */
 		std::vector<DFSWorklistEntry> startStates = {
-			{41, &lab},
+			{44, &lab},
 		};
 
 		return visitConsAcyclic2Iterative(startStates);
@@ -15783,6 +16812,81 @@ void LKMMChecker::visitPPoRf0(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf0[lab->getStamp().get()] = NodeStatus::entered;
 	pporf.updateIdx(lab->getPos());
+	for (auto &tmp : g.ctrl_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	for (auto &tmp : g.addr_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	for (auto &tmp : g.data_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	for (auto &tmp : g.ctrl_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	for (auto &tmp : g.addr_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	for (auto &tmp : g.data_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	for (auto &tmp : g.ctrl_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf10[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf10(pLab, pporf);
+		}
+	for (auto &tmp : g.addr_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf10[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf10(pLab, pporf);
+		}
+	for (auto &tmp : g.data_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf10[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf10(pLab, pporf);
+		}
+	for (auto &tmp : g.ctrl_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
+		}
+	for (auto &tmp : g.addr_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
+		}
+	for (auto &tmp : g.data_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
+		}
 	visitedPPoRf0[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -15791,93 +16895,6 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf1[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.tc_pred(lab); pLab)
-		if (pporf.updateIdx(pLab->getPos()); true) {
-			auto status = visitedPPoRf0[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf0(pLab, pporf);
-		}
-	if (auto pLab = g.tj_pred(lab); pLab)
-		if (pporf.updateIdx(pLab->getPos()); true) {
-			auto status = visitedPPoRf0[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf0(pLab, pporf);
-		}
-	for (auto &tmp : g.lin_preds(lab))
-		if (auto *pLab = &tmp; true)
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.rfe_pred(lab); pLab)
-		if (pporf.updateIdx(pLab->getPos()); true) {
-			auto status = visitedPPoRf0[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf0(pLab, pporf);
-		}
-	if (true && genmc::isa<WriteLabel>(lab))
-		for (auto &tmp : g.ctrl_preds(lab))
-			if (auto *pLab = &tmp; true)
-				if (pporf.updateIdx(pLab->getPos()); true) {
-					auto status = visitedPPoRf0[pLab->getStamp().get()];
-					if (status == NodeStatus::unseen)
-						visitPPoRf0(pLab, pporf);
-				}
-	if (true && genmc::isa<WriteLabel>(lab))
-		for (auto &tmp : g.addr_preds(lab))
-			if (auto *pLab = &tmp; true)
-				if (pporf.updateIdx(pLab->getPos()); true) {
-					auto status = visitedPPoRf0[pLab->getStamp().get()];
-					if (status == NodeStatus::unseen)
-						visitPPoRf0(pLab, pporf);
-				}
-	if (true && genmc::isa<WriteLabel>(lab))
-		for (auto &tmp : g.data_preds(lab))
-			if (auto *pLab = &tmp; true)
-				if (pporf.updateIdx(pLab->getPos()); true) {
-					auto status = visitedPPoRf0[pLab->getStamp().get()];
-					if (status == NodeStatus::unseen)
-						visitPPoRf0(pLab, pporf);
-				}
-	for (auto &tmp : g.moi_preds(lab))
-		if (auto *pLab = &tmp; true)
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	for (auto &tmp : g.fri_preds(lab))
-		if (auto *pLab = &tmp; true)
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab))
-				if (pporf.updateIdx(pLab->getPos()); true) {
-					auto status = visitedPPoRf0[pLab->getStamp().get()];
-					if (status == NodeStatus::unseen)
-						visitPPoRf0(pLab, pporf);
-				}
-	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ReadLabel>(pLab))
-				if (pporf.updateIdx(pLab->getPos()); true) {
-					auto status = visitedPPoRf0[pLab->getStamp().get()];
-					if (status == NodeStatus::unseen)
-						visitPPoRf0(pLab, pporf);
-				}
-	if (true && genmc::isa<WriteLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
-				if (pporf.updateIdx(pLab->getPos()); true) {
-					auto status = visitedPPoRf0[pLab->getStamp().get()];
-					if (status == NodeStatus::unseen)
-						visitPPoRf0(pLab, pporf);
-				}
 	if (true && genmc::isa<WriteLabel>(lab) &&
 	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
 	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
@@ -15887,14 +16904,6 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 			     (genmc::isa<WriteLabel>(pLab) &&
 			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
-				if (pporf.updateIdx(pLab->getPos()); true) {
-					auto status = visitedPPoRf0[pLab->getStamp().get()];
-					if (status == NodeStatus::unseen)
-						visitPPoRf0(pLab, pporf);
-				}
-	if (true && genmc::isa<ReadLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
 				if (pporf.updateIdx(pLab->getPos()); true) {
 					auto status = visitedPPoRf0[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
@@ -16018,163 +17027,175 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 				}
 	if (auto pLab = g.rfi_pred(lab); pLab)
 		if (true && !(pLab->isNotAtomic())) {
-			auto status = visitedPPoRf4[pLab->getStamp().get()];
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf4(pLab, pporf);
+				visitPPoRf5(pLab, pporf);
+		}
+	if (auto pLab = g.rfi_pred(lab); pLab)
+		if (true && !(pLab->isNotAtomic()) && genmc::isa<WriteLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf6[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf6(pLab, pporf);
+		}
+	if (auto pLab = g.tc_pred(lab); pLab)
+		if (pporf.updateIdx(pLab->getPos()); true) {
+			auto status = visitedPPoRf7[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf7(pLab, pporf);
+		}
+	if (auto pLab = g.tj_pred(lab); pLab)
+		if (pporf.updateIdx(pLab->getPos()); true) {
+			auto status = visitedPPoRf7[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf7(pLab, pporf);
+		}
+	for (auto &tmp : g.lin_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.rfe_pred(lab); pLab)
+		if (pporf.updateIdx(pLab->getPos()); true) {
+			auto status = visitedPPoRf7[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf7(pLab, pporf);
 		}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.ctrl_preds(lab))
-			if (auto *pLab = &tmp; true) {
-				auto status = visitedPPoRf6[pLab->getStamp().get()];
+			if (auto *pLab = &tmp; true)
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedPPoRf7[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitPPoRf7(pLab, pporf);
+				}
+	if (true && genmc::isa<WriteLabel>(lab))
+		for (auto &tmp : g.addr_preds(lab))
+			if (auto *pLab = &tmp; true)
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedPPoRf7[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitPPoRf7(pLab, pporf);
+				}
+	if (true && genmc::isa<WriteLabel>(lab))
+		for (auto &tmp : g.data_preds(lab))
+			if (auto *pLab = &tmp; true)
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedPPoRf7[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitPPoRf7(pLab, pporf);
+				}
+	for (auto &tmp : g.moi_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf6(pLab, pporf);
+					visitPPoRf7(pLab, pporf);
+			}
+	for (auto &tmp : g.fri_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<WriteLabel>(pLab))
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedPPoRf7[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitPPoRf7(pLab, pporf);
+				}
+	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<ReadLabel>(pLab))
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedPPoRf7[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitPPoRf7(pLab, pporf);
+				}
+	if (true && genmc::isa<WriteLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedPPoRf7[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitPPoRf7(pLab, pporf);
+				}
+	if (true && genmc::isa<ReadLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedPPoRf7[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitPPoRf7(pLab, pporf);
+				}
+	if (true && genmc::isa<WriteLabel>(lab))
+		for (auto &tmp : g.ctrl_preds(lab))
+			if (auto *pLab = &tmp; true) {
+				auto status = visitedPPoRf10[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf10(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.addr_preds(lab))
 			if (auto *pLab = &tmp; true) {
-				auto status = visitedPPoRf6[pLab->getStamp().get()];
+				auto status = visitedPPoRf10[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf6(pLab, pporf);
+					visitPPoRf10(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.data_preds(lab))
 			if (auto *pLab = &tmp; true) {
-				auto status = visitedPPoRf6[pLab->getStamp().get()];
+				auto status = visitedPPoRf10[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf6(pLab, pporf);
+					visitPPoRf10(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::Wmb) {
-				auto status = visitedPPoRf8[pLab->getStamp().get()];
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::Wmb) {
+				auto status = visitedPPoRf12[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf8(pLab, pporf);
+					visitPPoRf12(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf9[pLab->getStamp().get()];
+			auto status = visitedPPoRf13[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf9(pLab, pporf);
+				visitPPoRf13(pLab, pporf);
 		}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf10[pLab->getStamp().get()];
+			auto status = visitedPPoRf14[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf10(pLab, pporf);
+				visitPPoRf14(pLab, pporf);
 		}
 	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::Mb) {
-				auto status = visitedPPoRf10[pLab->getStamp().get()];
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::Mb) {
+				auto status = visitedPPoRf14[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf10(pLab, pporf);
+					visitPPoRf14(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab) &&
 	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
 	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::BeforeAtomic) {
-				auto status = visitedPPoRf10[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf10(pLab, pporf);
-			}
-	if (true && genmc::isa<ReadLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::Mb) {
-				auto status = visitedPPoRf10[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf10(pLab, pporf);
-			}
-	if (true && genmc::isa<ReadLabel>(lab) &&
-	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
-	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::BeforeAtomic) {
-				auto status = visitedPPoRf10[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf10(pLab, pporf);
-			}
-	if (true && genmc::isa<WriteLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf11[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf11(pLab, pporf);
-		}
-	if (true && genmc::isa<ReadLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf11[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf11(pLab, pporf);
-		}
-	if (true && genmc::isa<WriteLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-				auto status = visitedPPoRf12[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf12(pLab, pporf);
-			}
-	if (true && genmc::isa<WriteLabel>(lab) &&
-	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
-	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
-		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf12[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf12(pLab, pporf);
-		}
-	if (true && genmc::isa<ReadLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-				auto status = visitedPPoRf12[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf12(pLab, pporf);
-			}
-	if (true && genmc::isa<ReadLabel>(lab) &&
-	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
-	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
-		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf12[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf12(pLab, pporf);
-		}
-	if (true && genmc::isa<WriteLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::AfterAtomic) {
-				auto status = visitedPPoRf13[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf13(pLab, pporf);
-			}
-	if (true && genmc::isa<ReadLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::AfterAtomic) {
-				auto status = visitedPPoRf13[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf13(pLab, pporf);
-			}
-	if (true && genmc::isa<WriteLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::AfterSpinlock) {
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::BeforeAtomic) {
 				auto status = visitedPPoRf14[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf14(pLab, pporf);
@@ -16182,17 +17203,79 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 	if (true && genmc::isa<ReadLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::AfterSpinlock) {
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::Mb) {
+				auto status = visitedPPoRf14[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf14(pLab, pporf);
+			}
+	if (true && genmc::isa<ReadLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::BeforeAtomic) {
 				auto status = visitedPPoRf14[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf14(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab) {
+			auto status = visitedPPoRf15[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf15(pLab, pporf);
+		}
+	if (true && genmc::isa<ReadLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab) {
+			auto status = visitedPPoRf15[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf15(pLab, pporf);
+		}
+	if (true && genmc::isa<WriteLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+				auto status = visitedPPoRf16[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf16(pLab, pporf);
+			}
+	if (true && genmc::isa<WriteLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab) {
+			auto status = visitedPPoRf16[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf16(pLab, pporf);
+		}
+	if (true && genmc::isa<ReadLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+				auto status = visitedPPoRf16[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf16(pLab, pporf);
+			}
+	if (true && genmc::isa<ReadLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab) {
+			auto status = visitedPPoRf16[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf16(pLab, pporf);
+		}
+	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::AfterUnlockLock) {
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::AfterAtomic) {
 				auto status = visitedPPoRf17[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf17(pLab, pporf);
@@ -16200,106 +17283,147 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 	if (true && genmc::isa<ReadLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::AfterUnlockLock) {
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::AfterAtomic) {
 				auto status = visitedPPoRf17[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf17(pLab, pporf);
 			}
-	if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease())
+	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (pporf.updateIdx(pLab->getPos()); true) {
+			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::AfterSpinlock) {
 				auto status = visitedPPoRf18[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf18(pLab, pporf);
 			}
+	if (true && genmc::isa<ReadLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::AfterSpinlock) {
+				auto status = visitedPPoRf18[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf18(pLab, pporf);
+			}
+	if (true && genmc::isa<WriteLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::AfterUnlockLock) {
+				auto status = visitedPPoRf21[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf21(pLab, pporf);
+			}
+	if (true && genmc::isa<ReadLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::AfterUnlockLock) {
+				auto status = visitedPPoRf21[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf21(pLab, pporf);
+			}
+	if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease())
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf22[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf22(pLab, pporf);
+			}
 	if (auto pLab = g.tc_pred(lab); pLab) {
-		auto status = visitedPPoRf19[pLab->getStamp().get()];
+		auto status = visitedPPoRf23[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf19(pLab, pporf);
+			visitPPoRf23(pLab, pporf);
 	}
 	if (auto pLab = g.tj_pred(lab); pLab) {
-		auto status = visitedPPoRf19[pLab->getStamp().get()];
+		auto status = visitedPPoRf23[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf19(pLab, pporf);
+			visitPPoRf23(pLab, pporf);
 	}
 	for (auto &tmp : g.lin_preds(lab))
 		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.rfe_pred(lab); pLab) {
-		auto status = visitedPPoRf19[pLab->getStamp().get()];
+		auto status = visitedPPoRf23[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf19(pLab, pporf);
+			visitPPoRf23(pLab, pporf);
 	}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.ctrl_preds(lab))
 			if (auto *pLab = &tmp; true) {
-				auto status = visitedPPoRf19[pLab->getStamp().get()];
+				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf19(pLab, pporf);
+					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.addr_preds(lab))
 			if (auto *pLab = &tmp; true) {
-				auto status = visitedPPoRf19[pLab->getStamp().get()];
+				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf19(pLab, pporf);
+					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab))
 		for (auto &tmp : g.addr_preds(lab))
 			if (auto *pLab = &tmp; true) {
-				auto status = visitedPPoRf19[pLab->getStamp().get()];
+				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf19(pLab, pporf);
+					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.data_preds(lab))
 			if (auto *pLab = &tmp; true) {
-				auto status = visitedPPoRf19[pLab->getStamp().get()];
+				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf19(pLab, pporf);
+					visitPPoRf23(pLab, pporf);
 			}
 	for (auto &tmp : g.moi_preds(lab))
 		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
 	for (auto &tmp : g.fri_preds(lab))
 		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
 	if (true && genmc::isa<WriteLabel>(lab) && lab->isAtLeastRelease())
 		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<WriteLabel>(pLab)) {
-				auto status = visitedPPoRf19[pLab->getStamp().get()];
+				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf19(pLab, pporf);
+					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && lab->isLkmmMb())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<ReadLabel>(pLab)) {
-				auto status = visitedPPoRf19[pLab->getStamp().get()];
+				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf19(pLab, pporf);
+					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
-				auto status = visitedPPoRf19[pLab->getStamp().get()];
+				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf19(pLab, pporf);
+					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<WriteLabel>(lab) &&
 	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
@@ -16310,31 +17434,32 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 			     (genmc::isa<WriteLabel>(pLab) &&
 			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-				auto status = visitedPPoRf19[pLab->getStamp().get()];
+				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf19(pLab, pporf);
+					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
-				auto status = visitedPPoRf19[pLab->getStamp().get()];
+				auto status = visitedPPoRf23[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf19(pLab, pporf);
+					visitPPoRf23(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && !lab->isLkmmNoreturn())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-			    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-				    LkmmFenceKind::Rmb) {
-				auto status = visitedPPoRf20[pLab->getStamp().get()];
+			    static_cast<const LkmmFenceLabel *>(
+				    static_cast<const EventLabel *>(pLab))
+					    ->getFenceKind() == LkmmFenceKind::Rmb) {
+				auto status = visitedPPoRf24[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf20(pLab, pporf);
+					visitPPoRf24(pLab, pporf);
 			}
 	if (true && genmc::isa<ReadLabel>(lab) && !lab->isLkmmNoreturn())
 		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf21[pLab->getStamp().get()];
+			auto status = visitedPPoRf25[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf21(pLab, pporf);
+				visitPPoRf25(pLab, pporf);
 		}
 	visitedPPoRf1[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -16350,6 +17475,15 @@ void LKMMChecker::visitPPoRf2(const EventLabel *lab, DepView &pporf) const
 		if (status == NodeStatus::unseen)
 			visitPPoRf3(pLab, pporf);
 	}
+	if (auto pLab = g.rfi_pred(lab); pLab)
+		if (true && genmc::isa<WriteLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf4[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf4(pLab, pporf);
+		}
 	visitedPPoRf2[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -16373,9 +17507,9 @@ void LKMMChecker::visitPPoRf3(const EventLabel *lab, DepView &pporf) const
 			}
 	for (auto &tmp : g.data_preds(lab))
 		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
 	visitedPPoRf3[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -16385,43 +17519,14 @@ void LKMMChecker::visitPPoRf4(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf4[lab->getStamp().get()] = NodeStatus::entered;
-	for (auto &tmp : g.addr_preds(lab))
-		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
-		}
-	for (auto &tmp : g.data_preds(lab))
-		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
-		}
-	for (auto &tmp : g.addr_preds(lab))
-		if (auto *pLab = &tmp; true)
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf2[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf2(pLab, pporf);
-			}
-	for (auto &tmp : g.data_preds(lab))
-		if (auto *pLab = &tmp; true)
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf2[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf2(pLab, pporf);
-			}
-	for (auto &tmp : g.addr_preds(lab))
-		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
-		}
-	for (auto &tmp : g.data_preds(lab))
-		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf3(pLab, pporf);
 		}
 	visitedPPoRf4[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -16431,53 +17536,13 @@ void LKMMChecker::visitPPoRf5(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf5[lab->getStamp().get()] = NodeStatus::entered;
-	for (auto &tmp : g.data_preds(lab))
-		if (auto *pLab = &tmp; true)
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	for (auto &tmp : g.data_preds(lab))
+	for (auto &tmp : g.addr_preds(lab))
 		if (auto *pLab = &tmp; true) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	for (auto &tmp : g.data_preds(lab))
-		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf6[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf6(pLab, pporf);
-		}
-	for (auto &tmp : g.data_preds(lab))
-		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
-		}
-	visitedPPoRf5[lab->getStamp().get()] = NodeStatus::left;
-}
-
-void LKMMChecker::visitPPoRf6(const EventLabel *lab, DepView &pporf) const
-{
-	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedPPoRf6[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.rfi_pred(lab); pLab) {
-		auto status = visitedPPoRf5[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf5(pLab, pporf);
-	}
-	visitedPPoRf6[lab->getStamp().get()] = NodeStatus::left;
-}
-
-void LKMMChecker::visitPPoRf7(const EventLabel *lab, DepView &pporf) const
-{
-	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedPPoRf7[lab->getStamp().get()] = NodeStatus::entered;
-	for (auto &tmp : g.addr_preds(lab))
 		if (auto *pLab = &tmp; true) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
@@ -16490,12 +17555,51 @@ void LKMMChecker::visitPPoRf7(const EventLabel *lab, DepView &pporf) const
 				if (status == NodeStatus::unseen)
 					visitPPoRf2(pLab, pporf);
 			}
+	for (auto &tmp : g.data_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf2[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf2(pLab, pporf);
+			}
 	for (auto &tmp : g.addr_preds(lab))
 		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
+	for (auto &tmp : g.data_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
+		}
+	visitedPPoRf5[lab->getStamp().get()] = NodeStatus::left;
+}
+
+void LKMMChecker::visitPPoRf6(const EventLabel *lab, DepView &pporf) const
+{
+	[[maybe_unused]] auto &g = *lab->getParent();
+
+	visitedPPoRf6[lab->getStamp().get()] = NodeStatus::entered;
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf5(pLab, pporf);
+		}
+	visitedPPoRf6[lab->getStamp().get()] = NodeStatus::left;
+}
+
+void LKMMChecker::visitPPoRf7(const EventLabel *lab, DepView &pporf) const
+{
+	[[maybe_unused]] auto &g = *lab->getParent();
+
+	visitedPPoRf7[lab->getStamp().get()] = NodeStatus::entered;
+	pporf.updateIdx(lab->getPos());
 	visitedPPoRf7[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -16504,35 +17608,30 @@ void LKMMChecker::visitPPoRf8(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf8[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab))
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab)) {
+	for (auto &tmp : g.data_preds(lab))
+		if (auto *pLab = &tmp; true) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && pLab->isNotAtomic() && genmc::isa<WriteLabel>(pLab)) {
-			auto status = visitedPPoRf7[pLab->getStamp().get()];
+	for (auto &tmp : g.data_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	for (auto &tmp : g.data_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf10[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf7(pLab, pporf);
+				visitPPoRf10(pLab, pporf);
 		}
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf8[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf8(pLab, pporf);
-	}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab)) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
+	for (auto &tmp : g.data_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
 	visitedPPoRf8[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -16543,17 +17642,14 @@ void LKMMChecker::visitPPoRf9(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf9[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-		    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() == LkmmFenceKind::Wmb) {
+		if (true && genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 			auto status = visitedPPoRf8[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf8(pLab, pporf);
 		}
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf9[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf9(pLab, pporf);
-	}
 	visitedPPoRf9[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -16562,48 +17658,19 @@ void LKMMChecker::visitPPoRf10(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf10[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab))
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab))
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab)) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab)) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf10[pLab->getStamp().get()];
+	if (auto pLab = g.rfi_pred(lab); pLab) {
+		auto status = visitedPPoRf8[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf10(pLab, pporf);
+			visitPPoRf8(pLab, pporf);
 	}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab)) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
+	if (auto pLab = g.rfi_pred(lab); pLab)
+		if (true && genmc::isa<WriteLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf9[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab)) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf9(pLab, pporf);
 		}
 	visitedPPoRf10[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -16613,69 +17680,24 @@ void LKMMChecker::visitPPoRf11(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf11[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+	for (auto &tmp : g.addr_preds(lab))
+		if (auto *pLab = &tmp; true) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-		    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() == LkmmFenceKind::Mb) {
-			auto status = visitedPPoRf10[pLab->getStamp().get()];
+	for (auto &tmp : g.addr_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf2[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf2(pLab, pporf);
+			}
+	for (auto &tmp : g.addr_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf10(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf11[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf11(pLab, pporf);
-	}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
-		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-		     (genmc::isa<WriteLabel>(pLab) &&
-		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-			auto status = visitedPPoRf12[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf12(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-		    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-			    LkmmFenceKind::AfterAtomic) {
-			auto status = visitedPPoRf13[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf13(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-		    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-			    LkmmFenceKind::AfterSpinlock) {
-			auto status = visitedPPoRf14[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf14(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-		    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-			    LkmmFenceKind::AfterUnlockLock) {
-			auto status = visitedPPoRf17[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf17(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
 	visitedPPoRf11[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -16686,18 +17708,35 @@ void LKMMChecker::visitPPoRf12(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf12[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-		    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() ==
-			    LkmmFenceKind::BeforeAtomic) {
-			auto status = visitedPPoRf10[pLab->getStamp().get()];
+		if (true && genmc::isa<WriteLabel>(pLab)) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf10(pLab, pporf);
+				visitPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<WriteLabel>(pLab))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && pLab->isNotAtomic() && genmc::isa<WriteLabel>(pLab)) {
+			auto status = visitedPPoRf11[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf11(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
 		auto status = visitedPPoRf12[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
 			visitPPoRf12(pLab, pporf);
 	}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<WriteLabel>(pLab)) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
+		}
 	visitedPPoRf12[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -16707,73 +17746,18 @@ void LKMMChecker::visitPPoRf13(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf13[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) &&
-		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) &&
-		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) &&
-		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-		     (genmc::isa<WriteLabel>(pLab) &&
-		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
+		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+		    static_cast<const LkmmFenceLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getFenceKind() == LkmmFenceKind::Wmb) {
+			auto status = visitedPPoRf12[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) &&
-		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-		     (genmc::isa<WriteLabel>(pLab) &&
-		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
-		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-		     (genmc::isa<WriteLabel>(pLab) &&
-		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-			auto status = visitedPPoRf10[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf10(pLab, pporf);
+				visitPPoRf12(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
 		auto status = visitedPPoRf13[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
 			visitPPoRf13(pLab, pporf);
 	}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<WriteLabel>(pLab) &&
-		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-		     (genmc::isa<WriteLabel>(pLab) &&
-		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) &&
-		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-		     (genmc::isa<WriteLabel>(pLab) &&
-		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
-		}
 	visitedPPoRf13[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -16783,60 +17767,47 @@ void LKMMChecker::visitPPoRf14(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf14[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<WriteLabel>(pLab))
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ReadLabel>(pLab))
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<WriteLabel>(pLab)) {
+		if (true && genmc::isa<WriteLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ReadLabel>(pLab)) {
+		if (true && genmc::isa<ReadLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-		    genmc::isa<TrylockCasWriteLabel>(pLab)) {
-			auto status = visitedPPoRf10[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf10(pLab, pporf);
-		}
+		if (true && genmc::isa<WriteLabel>(pLab))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ReadLabel>(pLab))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
 		auto status = visitedPPoRf14[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
 			visitPPoRf14(pLab, pporf);
 	}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<WriteLabel>(pLab)) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
+		if (true && genmc::isa<WriteLabel>(pLab)) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
-		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ReadLabel>(pLab)) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
+		if (true && genmc::isa<ReadLabel>(pLab)) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
 		}
 	visitedPPoRf14[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -16847,16 +17818,70 @@ void LKMMChecker::visitPPoRf15(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf15[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-			auto status = visitedPPoRf10[pLab->getStamp().get()];
+		if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf10(pLab, pporf);
+				visitPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb())
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+		    static_cast<const LkmmFenceLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getFenceKind() == LkmmFenceKind::Mb) {
+			auto status = visitedPPoRf14[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf14(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
 		auto status = visitedPPoRf15[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
 			visitPPoRf15(pLab, pporf);
 	}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf16[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf16(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+		    static_cast<const LkmmFenceLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getFenceKind() == LkmmFenceKind::AfterAtomic) {
+			auto status = visitedPPoRf17[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf17(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+		    static_cast<const LkmmFenceLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getFenceKind() == LkmmFenceKind::AfterSpinlock) {
+			auto status = visitedPPoRf18[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf18(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+		    static_cast<const LkmmFenceLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getFenceKind() == LkmmFenceKind::AfterUnlockLock) {
+			auto status = visitedPPoRf21[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf21(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb()) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
+		}
 	visitedPPoRf15[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -16865,12 +17890,19 @@ void LKMMChecker::visitPPoRf16(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf16[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.rfi_pred(lab); pLab)
-		if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-			auto status = visitedPPoRf10[pLab->getStamp().get()];
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+		    static_cast<const LkmmFenceLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getFenceKind() == LkmmFenceKind::BeforeAtomic) {
+			auto status = visitedPPoRf14[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf10(pLab, pporf);
+				visitPPoRf14(pLab, pporf);
 		}
+	if (auto pLab = g.po_imm_pred(lab); pLab) {
+		auto status = visitedPPoRf16[pLab->getStamp().get()];
+		if (status == NodeStatus::unseen)
+			visitPPoRf16(pLab, pporf);
+	}
 	visitedPPoRf16[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -16880,26 +17912,73 @@ void LKMMChecker::visitPPoRf17(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf17[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
-		    (genmc::isa<LockCasReadLabel>(pLab) || genmc::isa<TrylockCasReadLabel>(pLab)) &&
-		    genmc::cast<ReadLabel>(pLab)->isRMW()) {
-			auto status = visitedPPoRf15[pLab->getStamp().get()];
+		if (true && genmc::isa<WriteLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf15(pLab, pporf);
+				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
-		    (genmc::isa<LockCasReadLabel>(pLab) || genmc::isa<TrylockCasReadLabel>(pLab)) &&
-		    genmc::cast<ReadLabel>(pLab)->isRMW()) {
-			auto status = visitedPPoRf16[pLab->getStamp().get()];
+		if (true && genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf16(pLab, pporf);
+				visitPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<WriteLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf14[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf14(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
 		auto status = visitedPPoRf17[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
 			visitPPoRf17(pLab, pporf);
 	}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<WriteLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
+		}
 	visitedPPoRf17[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -16908,17 +17987,61 @@ void LKMMChecker::visitPPoRf18(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf18[lab->getStamp().get()] = NodeStatus::entered;
-	pporf.updateIdx(lab->getPos());
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<WriteLabel>(pLab)) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ReadLabel>(pLab)) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<WriteLabel>(pLab))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ReadLabel>(pLab))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		    genmc::isa<TrylockCasWriteLabel>(pLab)) {
+			auto status = visitedPPoRf14[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf14(pLab, pporf);
+		}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf1[pLab->getStamp().get()];
+		auto status = visitedPPoRf18[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf1(pLab, pporf);
+			visitPPoRf18(pLab, pporf);
 	}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (pporf.updateIdx(pLab->getPos()); true) {
-			auto status = visitedPPoRf18[pLab->getStamp().get()];
+		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<WriteLabel>(pLab)) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf18(pLab, pporf);
+				visitPPoRf23(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LockCasWriteLabel>(pLab) ||
+		    genmc::isa<TrylockCasWriteLabel>(pLab) && genmc::isa<ReadLabel>(pLab)) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
 		}
 	visitedPPoRf18[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -16929,48 +18052,16 @@ void LKMMChecker::visitPPoRf19(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf19[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
-		    (!genmc::isa<CasReadLabel>(pLab) || genmc::cast<ReadLabel>(pLab)->isRMW()))
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
-		    (!genmc::isa<CasReadLabel>(pLab) || genmc::cast<ReadLabel>(pLab)->isRMW())) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
+		if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
+			auto status = visitedPPoRf14[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
+				visitPPoRf14(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
 		auto status = visitedPPoRf19[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
 			visitPPoRf19(pLab, pporf);
 	}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
-		    (!genmc::isa<CasReadLabel>(pLab) || genmc::cast<ReadLabel>(pLab)->isRMW())) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
-		    (genmc::isa<LockCasReadLabel>(pLab) || genmc::isa<TrylockCasReadLabel>(pLab)) &&
-		    genmc::cast<ReadLabel>(pLab)->isRMW()) {
-			auto status = visitedPPoRf23[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf23(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true &&
-		    (genmc::isa<LockCasReadLabel>(pLab) || genmc::isa<TrylockCasReadLabel>(pLab)) &&
-		    genmc::cast<ReadLabel>(pLab)->isRMW()) {
-			auto status = visitedPPoRf24[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf24(pLab, pporf);
-		}
 	visitedPPoRf19[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -16979,30 +18070,12 @@ void LKMMChecker::visitPPoRf20(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf20[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn())
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf0[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf0(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn()) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
+	if (auto pLab = g.rfi_pred(lab); pLab)
+		if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
+			auto status = visitedPPoRf14[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
+				visitPPoRf14(pLab, pporf);
 		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn()) {
-			auto status = visitedPPoRf19[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf19(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf20[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf20(pLab, pporf);
-	}
 	visitedPPoRf20[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -17012,8 +18085,19 @@ void LKMMChecker::visitPPoRf21(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf21[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
-		    genmc::cast<LkmmFenceLabel>(pLab)->getFenceKind() == LkmmFenceKind::Rmb) {
+		if (true &&
+		    (genmc::isa<LockCasReadLabel>(pLab) || genmc::isa<TrylockCasReadLabel>(pLab)) &&
+		    static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
+			    ->isRMW()) {
+			auto status = visitedPPoRf19[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf19(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true &&
+		    (genmc::isa<LockCasReadLabel>(pLab) || genmc::isa<TrylockCasReadLabel>(pLab)) &&
+		    static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
+			    ->isRMW()) {
 			auto status = visitedPPoRf20[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf20(pLab, pporf);
@@ -17031,27 +18115,18 @@ void LKMMChecker::visitPPoRf22(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf22[lab->getStamp().get()] = NodeStatus::entered;
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (pporf.updateIdx(pLab->getPos()); true) {
-			auto status = visitedPPoRf0[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf0(pLab, pporf);
-		}
+	pporf.updateIdx(lab->getPos());
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
 		auto status = visitedPPoRf1[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
 			visitPPoRf1(pLab, pporf);
 	}
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf19[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf19(pLab, pporf);
-	}
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf22[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf22(pLab, pporf);
-	}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (pporf.updateIdx(pLab->getPos()); true) {
+			auto status = visitedPPoRf22[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf22(pLab, pporf);
+		}
 	visitedPPoRf22[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -17061,16 +18136,56 @@ void LKMMChecker::visitPPoRf23(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf23[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-			auto status = visitedPPoRf22[pLab->getStamp().get()];
+		if (true && genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
+		    (!genmc::isa<CasReadLabel>(pLab) ||
+		     static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
+			     ->isRMW())) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf22(pLab, pporf);
+				visitPPoRf1(pLab, pporf);
 		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
+		    (!genmc::isa<CasReadLabel>(pLab) ||
+		     static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
+			     ->isRMW()))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
 		auto status = visitedPPoRf23[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
 			visitPPoRf23(pLab, pporf);
 	}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ReadLabel>(pLab) && pLab->isAtLeastAcquire() &&
+		    (!genmc::isa<CasReadLabel>(pLab) ||
+		     static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
+			     ->isRMW())) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true &&
+		    (genmc::isa<LockCasReadLabel>(pLab) || genmc::isa<TrylockCasReadLabel>(pLab)) &&
+		    static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
+			    ->isRMW()) {
+			auto status = visitedPPoRf27[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf27(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true &&
+		    (genmc::isa<LockCasReadLabel>(pLab) || genmc::isa<TrylockCasReadLabel>(pLab)) &&
+		    static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
+			    ->isRMW()) {
+			auto status = visitedPPoRf28[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf28(pLab, pporf);
+		}
 	visitedPPoRf23[lab->getStamp().get()] = NodeStatus::left;
 }
 
@@ -17079,13 +18194,114 @@ void LKMMChecker::visitPPoRf24(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf24[lab->getStamp().get()] = NodeStatus::entered;
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn()) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn())
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn()) {
+			auto status = visitedPPoRf23[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf23(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab) {
+		auto status = visitedPPoRf24[pLab->getStamp().get()];
+		if (status == NodeStatus::unseen)
+			visitPPoRf24(pLab, pporf);
+	}
+	visitedPPoRf24[lab->getStamp().get()] = NodeStatus::left;
+}
+
+void LKMMChecker::visitPPoRf25(const EventLabel *lab, DepView &pporf) const
+{
+	[[maybe_unused]] auto &g = *lab->getParent();
+
+	visitedPPoRf25[lab->getStamp().get()] = NodeStatus::entered;
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
+		    static_cast<const LkmmFenceLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getFenceKind() == LkmmFenceKind::Rmb) {
+			auto status = visitedPPoRf24[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf24(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab) {
+		auto status = visitedPPoRf25[pLab->getStamp().get()];
+		if (status == NodeStatus::unseen)
+			visitPPoRf25(pLab, pporf);
+	}
+	visitedPPoRf25[lab->getStamp().get()] = NodeStatus::left;
+}
+
+void LKMMChecker::visitPPoRf26(const EventLabel *lab, DepView &pporf) const
+{
+	[[maybe_unused]] auto &g = *lab->getParent();
+
+	visitedPPoRf26[lab->getStamp().get()] = NodeStatus::entered;
+	if (auto pLab = g.po_imm_pred(lab); pLab) {
+		auto status = visitedPPoRf1[pLab->getStamp().get()];
+		if (status == NodeStatus::unseen)
+			visitPPoRf1(pLab, pporf);
+	}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (pporf.updateIdx(pLab->getPos()); true) {
+			auto status = visitedPPoRf7[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf7(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab) {
+		auto status = visitedPPoRf23[pLab->getStamp().get()];
+		if (status == NodeStatus::unseen)
+			visitPPoRf23(pLab, pporf);
+	}
+	if (auto pLab = g.po_imm_pred(lab); pLab) {
+		auto status = visitedPPoRf26[pLab->getStamp().get()];
+		if (status == NodeStatus::unseen)
+			visitPPoRf26(pLab, pporf);
+	}
+	visitedPPoRf26[lab->getStamp().get()] = NodeStatus::left;
+}
+
+void LKMMChecker::visitPPoRf27(const EventLabel *lab, DepView &pporf) const
+{
+	[[maybe_unused]] auto &g = *lab->getParent();
+
+	visitedPPoRf27[lab->getStamp().get()] = NodeStatus::entered;
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
+			auto status = visitedPPoRf26[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf26(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab) {
+		auto status = visitedPPoRf27[pLab->getStamp().get()];
+		if (status == NodeStatus::unseen)
+			visitPPoRf27(pLab, pporf);
+	}
+	visitedPPoRf27[lab->getStamp().get()] = NodeStatus::left;
+}
+
+void LKMMChecker::visitPPoRf28(const EventLabel *lab, DepView &pporf) const
+{
+	[[maybe_unused]] auto &g = *lab->getParent();
+
+	visitedPPoRf28[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.rfi_pred(lab); pLab)
 		if (true && genmc::isa<UnlockWriteLabel>(pLab)) {
-			auto status = visitedPPoRf22[pLab->getStamp().get()];
+			auto status = visitedPPoRf26[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf22(pLab, pporf);
+				visitPPoRf26(pLab, pporf);
 		}
-	visitedPPoRf24[lab->getStamp().get()] = NodeStatus::left;
+	visitedPPoRf28[lab->getStamp().get()] = NodeStatus::left;
 }
 
 DepView LKMMChecker::calcPPoRfBefore(const EventLabel *lab) const
@@ -17143,9 +18359,17 @@ DepView LKMMChecker::calcPPoRfBefore(const EventLabel *lab) const
 	visitedPPoRf23.resize(g.getMaxStamp().get() + 1, NodeStatus::unseen);
 	visitedPPoRf24.clear();
 	visitedPPoRf24.resize(g.getMaxStamp().get() + 1, NodeStatus::unseen);
+	visitedPPoRf25.clear();
+	visitedPPoRf25.resize(g.getMaxStamp().get() + 1, NodeStatus::unseen);
+	visitedPPoRf26.clear();
+	visitedPPoRf26.resize(g.getMaxStamp().get() + 1, NodeStatus::unseen);
+	visitedPPoRf27.clear();
+	visitedPPoRf27.resize(g.getMaxStamp().get() + 1, NodeStatus::unseen);
+	visitedPPoRf28.clear();
+	visitedPPoRf28.resize(g.getMaxStamp().get() + 1, NodeStatus::unseen);
 
 	visitPPoRf1(lab, pporf);
-	visitPPoRf19(lab, pporf);
+	visitPPoRf23(lab, pporf);
 	return pporf;
 }
 

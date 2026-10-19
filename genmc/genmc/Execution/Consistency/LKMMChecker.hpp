@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater 0919730-dirty (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater 83d2d1c-dirty (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_LKMM_CHECKER_HPP
@@ -233,6 +233,9 @@ private:
 	mutable NodeVisitStatusVector visitedConsAcyclic1_18;
 	mutable NodeVisitStatusVector visitedConsAcyclic1_19;
 	mutable NodeVisitStatusVector visitedConsAcyclic1_20;
+	mutable NodeVisitStatusVector visitedConsAcyclic1_21;
+	mutable NodeVisitStatusVector visitedConsAcyclic1_22;
+	mutable NodeVisitStatusVector visitedConsAcyclic1_23;
 	mutable uint32_t visitedConsAcyclic1Accepting;
 
 	bool visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &worklist) const;
@@ -286,6 +289,9 @@ private:
 	mutable NodeVisitStatusVector visitedConsAcyclic2_39;
 	mutable NodeVisitStatusVector visitedConsAcyclic2_40;
 	mutable NodeVisitStatusVector visitedConsAcyclic2_41;
+	mutable NodeVisitStatusVector visitedConsAcyclic2_42;
+	mutable NodeVisitStatusVector visitedConsAcyclic2_43;
+	mutable NodeVisitStatusVector visitedConsAcyclic2_44;
 	mutable uint32_t visitedConsAcyclic2Accepting;
 
 	bool visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &worklist) const;
@@ -409,6 +415,10 @@ private:
 	void visitPPoRf22(const EventLabel *lab, DepView &pporf) const;
 	void visitPPoRf23(const EventLabel *lab, DepView &pporf) const;
 	void visitPPoRf24(const EventLabel *lab, DepView &pporf) const;
+	void visitPPoRf25(const EventLabel *lab, DepView &pporf) const;
+	void visitPPoRf26(const EventLabel *lab, DepView &pporf) const;
+	void visitPPoRf27(const EventLabel *lab, DepView &pporf) const;
+	void visitPPoRf28(const EventLabel *lab, DepView &pporf) const;
 
 	DepView calcPPoRfBefore(const EventLabel *lab) const;
 
@@ -437,6 +447,10 @@ private:
 	mutable std::vector<NodeStatus> visitedPPoRf22;
 	mutable std::vector<NodeStatus> visitedPPoRf23;
 	mutable std::vector<NodeStatus> visitedPPoRf24;
+	mutable std::vector<NodeStatus> visitedPPoRf25;
+	mutable std::vector<NodeStatus> visitedPPoRf26;
+	mutable std::vector<NodeStatus> visitedPPoRf27;
+	mutable std::vector<NodeStatus> visitedPPoRf28;
 };
 
 // NOLINTEND
