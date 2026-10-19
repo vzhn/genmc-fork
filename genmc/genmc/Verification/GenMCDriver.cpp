@@ -1208,7 +1208,10 @@ auto GenMCDriver::handleThreadKill(const EventDbgInfo *dbg, Event pos)
 	if (auto err = updateErrorInfoAndMaybeExit(pos, false, dbg); err)
 		return {.result = *err};
 	if (isExecutionDrivenByGraph(pos)) {
-		VERIFY(getScheduler().inErrorReplay());
+		/* The kill can be reached while driven by the graph: by an error replay
+		 * that targets it (updateErrorInfoAndMaybeExit() may have just ended the
+		 * replay), or by a replay with race detection disabled */
+		VERIFY(genmc::isa<ThreadKillLabel>(getExec().getGraph().getEventLabel(pos)));
 		return {.result = std::monostate{}, .count = 1U};
 	}
 	return handleThreadKill(ThreadKillLabel::create(pos));
