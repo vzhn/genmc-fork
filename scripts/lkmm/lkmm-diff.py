@@ -189,7 +189,8 @@ def load_allowlist(path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("paths", nargs="+")
+    ap.add_argument("paths", nargs="*")
+    ap.add_argument("--list", help="a file with one litmus test path per line (in addition to paths)")
     ap.add_argument("--herd-out", required=True)
     ap.add_argument("--litmus-root", required=True)
     ap.add_argument("--genmc", default=os.path.join(HERE, "../../build/bin/genmc"))
@@ -209,6 +210,8 @@ def main():
     args.header = os.path.realpath(args.header)
 
     files = []
+    if args.list:
+        files += [l.strip() for l in open(args.list) if l.strip() and not l.startswith("#")]
     for p in args.paths:
         if os.path.isdir(p):
             for d, _, fs in os.walk(p):

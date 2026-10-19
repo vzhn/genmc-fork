@@ -2,11 +2,16 @@
 """Sort the disagreements of an lkmm-diff.py run (its --json output) by
 likely cause, from the primitives a test uses.
 
-The rules describe what a run under -imm with lkmm-c11.h is expected to
-show (the C11 mapping is not LKMM); for a run of a real LKMM model every
-disagreement is a bug until shown otherwise, and the rules are only hints.
+The default rules describe what a run under -imm with lkmm-c11.h is
+expected to show (the C11 mapping is not LKMM). --model lkmm selects the
+rules for a run of the -lkmm model: what the model does not cover yet
+(plain accesses before phase 4, RCU before phase 3) and its one permanent
+gap (control dependencies past the if); every other disagreement is a bug.
+--allowlist writes the classified disagreements in lkmm-diff.py's
+--allowlist format, so that a rerun fails only on new ones.
 
-Usage: classify.py <results.jsonl> <litmus-root> [--examples N]
+Usage: classify.py <results.jsonl> <litmus-root> [--model lkmm] [--examples N]
+                   [--allowlist FILE]
 """
 
 import argparse
@@ -23,6 +28,30 @@ def same_location_writes(src):
             return True
     return False
 
+
+def plain_accesses(src):
+    """Whether a test has plain (non-READ_ONCE/WRITE_ONCE) accesses"""
+    body = "\n".join(re.findall(r"P\d+\s*\([^)]*\)\s*\{(.*?)\n\}", src, re.S))
+    body = re.sub(r"\b(?:READ_ONCE|WRITE_ONCE|smp_load_acquire|smp_store_release|rcu_dereference"
+                  r"|rcu_assign_pointer|xchg\w*|cmpxchg\w*|atomic_\w+)\s*\([^;]*;", "", body)
+    return re.search(r"(^|[^\w)])\*\s*\w+\s*(=[^=]|;)|=\s*\*\s*\w+", body, re.M) is not None
+
+
+LKMM_RULES = [
+    (("missing",), "control dependency past the end of the if: GenMC keeps every later "
+     "event dependent on the branch (its revisit prefixes need it; plan 3.6), LKMM does not",
+     lambda s, r: re.search(r"\bif\s*\(", s) is not None),
+    (("race", "extra", "differ", "missing"), "plain accesses: LKMM's plain-access rules "
+     "(races, plain-coherence, their fences) are phase 4",
+     lambda s, r: plain_accesses(s)),
+    (("count",), "locks: GenMC's mutex events, not herd7's lock events (same states)",
+     lambda s, r: "spin_lock" in s),
+    (("count",), "same states, other execution count (failed cmpxchg reads); not a "
+     "disagreement without --strict-counts",
+     lambda s, r: True),
+    (("herd-error",), "herd7 rejects the test (unknown macro or annotation)",
+     lambda s, r: True),
+]
 
 RULES = [
     # (result kinds, cause, predicate on (source, result))
@@ -64,7 +93,11 @@ def main():
     ap.add_argument("results")
     ap.add_argument("litmus_root")
     ap.add_argument("--examples", type=int, default=3)
+    ap.add_argument("--model", default="imm", choices=("imm", "lkmm"))
+    ap.add_argument("--allowlist", help="write the classified disagreements here, in "
+                    "lkmm-diff.py's --allowlist format")
     args = ap.parse_args()
+    rules = LKMM_RULES if args.model == "lkmm" else RULES
 
     causes = collections.defaultdict(list)
     kinds = collections.Counter()
@@ -75,7 +108,7 @@ def main():
         if kind in ("agree", "agree-racy", "skipped", "herd-timeout"):
             continue
         src = open(os.path.join(args.litmus_root, r["test"]), errors="replace").read()
-        for ks, cause, pred in RULES:
+        for ks, cause, pred in rules:
             if kind in ks and pred(src, r):
                 causes[(kind, cause)].append(r["test"])
                 break
@@ -89,6 +122,15 @@ def main():
     for (kind, cause), tests in sorted(causes.items(), key=lambda kv: (kv[0][0], -len(kv[1]))):
         print("| %s | %s | %d | %s |" % (kind, cause, len(tests),
                                          ", ".join("`%s`" % t for t in tests[:args.examples])))
+    if args.allowlist:
+        with open(args.allowlist, "w") as f:
+            f.write("# Classified disagreements of lkmm-diff.py --model %s (classify.py --allowlist)\n"
+                    "# <test> <result> <cause>\n" % args.model)
+            for (kind, cause), tests in sorted(causes.items()):
+                if cause == "unclassified":
+                    continue
+                for t in sorted(tests):
+                    f.write("%s %s %s\n" % (t, kind, cause))
 
 
 if __name__ == "__main__":
