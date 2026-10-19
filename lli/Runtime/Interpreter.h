@@ -138,6 +138,12 @@ struct ExecutionContext {
 	std::vector<GenericValue> VarArgs;	      // Values passed through an ellipsis
 	AllocaHolder Allocas;			      // Track memory allocated by alloca
 
+	// With -check-replay-keys (see EventKey): how many times each
+	// instruction of this frame has run (calls, and instructions that
+	// call the driver), and the caller's call instance that made the frame
+	llvm::DenseMap<const Instruction *, std::uint32_t> KeyCounts;
+	EventKey::Step KeyCall{0, 0};
+
 	ExecutionContext() : CurFunction(nullptr), CurBB(nullptr), CurInst(nullptr) {}
 };
 
@@ -179,6 +185,15 @@ public:
 	BlockageType blocked{};
 	MyRNG rng;
 	GenMCDriver::EventDbgInfo currDbgInfo;
+
+	/* With -check-replay-keys: the instruction instance whose events are
+	 * being added (see Interpreter::prepareEventKey()) */
+	std::uint64_t visitNo = 0;
+	std::optional<std::uint64_t> keyVisit;
+	const llvm::Instruction *keyInst{};
+	std::size_t keyDepth{};
+	std::shared_ptr<const EventKey> key;
+	Event keyBase;
 
 	bool isMain() const { return id == 0; }
 
@@ -260,6 +275,10 @@ protected:
 	llvm::DenseMap<const Function *, void *> funToCanon_;
 	llvm::DenseMap<const void *, Function *> canonToFun_;
 
+	/* With -check-replay-keys: each instruction's number in module order,
+	 * the same in every worker's copy of the module (see EventKey) */
+	llvm::DenseMap<const Instruction *, std::uint32_t> keyInstIds_;
+
 	/* Registers (and their Values) mentioned by each load annotation; filled
 	 * lazily by getCurrentAnnotConcretized() */
 	std::unordered_map<AnnotID, std::vector<std::pair<AnnotID, const Value *>>> annotRegs_;
@@ -333,13 +352,37 @@ public:
 
 #define CALL_DRIVER(method, ...)                                                                   \
 	({                                                                                         \
+		if (checkReplayKeys())                                                             \
+			prepareEventKey();                                                         \
 		auto res = driver->method(__VA_ARGS__);                                            \
+		if (checkReplayKeys())                                                             \
+			driver->clearEventKey();                                                   \
 		if (std::holds_alternative<GenMCDriver::Reset>(res.result)) {                      \
 			--ECStack().back().CurInst;                                                \
+			if (checkReplayKeys())                                                     \
+				undoEventKey();                                                    \
 		}                                                                                  \
 		incPos(res.count);                                                                 \
 		res.result;                                                                        \
 	})
+
+	/* Whether events get keys and replay checks them (see EventKey) */
+	bool checkReplayKeys() const { return driver->checksReplayKeys(); }
+
+	/* An instruction's number in keys (0 for none) */
+	std::uint32_t keyInstId(const Instruction *I) const
+	{
+		return I ? keyInstIds_.lookup(I) : 0;
+	}
+
+	/* Tells the driver which instruction instance the current thread is
+	 * about to call it for: a new one unless the same visit of the same
+	 * instruction already did (e.g. a CAS's read, then its write) */
+	void prepareEventKey();
+
+	/* The instruction will be visited again (the driver reset it): it
+	 * does not count as a run */
+	void undoEventKey();
 
 	/* Blocks the current execution */
 	void block(BlockageType t = BlockageType::Error)

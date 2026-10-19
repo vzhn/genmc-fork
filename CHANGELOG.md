@@ -8,6 +8,10 @@ released.
 ## [Unreleased]
 
 - Merge of MIXER [POPL'25] into mainline GenMC
+- `-check-replay-keys` (debugging): when GenMC re-runs a thread and reuses
+  an event of the graph, check that the same instance of the same
+  instruction produced it (an internal error otherwise). Always on under
+  `-lkmm`.
 
 
 ## [0.19.0-vzhn.8] - 2026.10.19

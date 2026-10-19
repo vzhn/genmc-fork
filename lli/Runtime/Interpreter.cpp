@@ -36,6 +36,7 @@
 #include "passes/LLVMUtils.hpp"
 #include <llvm/CodeGen/IntrinsicLowering.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/InstIterator.h>
 #include <llvm/IR/Module.h>
 
 #include <cstring>
@@ -73,6 +74,8 @@ void Interpreter::resetThread(unsigned int id)
 	thr.blocked = BlockageType::NotBlocked;
 	thr.rng.seed(Thread::seed);
 	thr.currDbgInfo = {};
+	thr.keyVisit.reset();
+	thr.key = nullptr;
 
 	clearDeps(id);
 	setThreadArgDeps(id);
@@ -404,6 +407,15 @@ Interpreter::Interpreter(std::unique_ptr<Module> M, std::unique_ptr<ModuleInfo> 
 		if (auto it = internalFunNames.find(F.getName().str());
 		    it != internalFunNames.end())
 			internalFunCache_.try_emplace(&F, it->second);
+	}
+
+	/* Number the instructions for event keys (the order survives the
+	 * copies of the module that the workers of a thread pool get) */
+	if (driver->checksReplayKeys()) {
+		std::uint32_t id = 0;
+		for (auto &F : *mod)
+			for (auto &I : instructions(F))
+				keyInstIds_[&I] = ++id;
 	}
 
 	/* Set up a dependency tracker if the model requires it */

@@ -601,7 +601,30 @@ auto GenMCDriver::isExecutionDrivenByGraph(Event curr) -> bool
 	/* Compare positions and not sizes: pruning skews the event count */
 	const auto &g = getExec().getGraph();
 	const auto *lab = g.getEventLabelIfPresent(curr);
-	return lab != nullptr && !genmc::isa<EmptyLabel>(lab);
+	if (lab == nullptr || genmc::isa<EmptyLabel>(lab))
+		return false;
+	if (currKey && curr.thread == currKeyBase.thread && curr.index > currKeyBase.index)
+		checkReplayKey(lab, curr.index - currKeyBase.index);
+	return true;
+}
+
+void GenMCDriver::assignEventKey(EventLabel *lab) const
+{
+	if (currKey && lab->getThread() == currKeyBase.thread &&
+	    lab->getIndex() > currKeyBase.index)
+		lab->setKey(currKey, lab->getIndex() - currKeyBase.index);
+	else
+		lab->setKey(nullptr, 0);
+}
+
+void GenMCDriver::checkReplayKey(const EventLabel *lab, std::uint32_t sub) const
+{
+	if (lab->getKey() && *lab->getKey() == *currKey && lab->getKeySub() == sub)
+		return;
+	ERROR("Internal error: replaying {} reuses the label of another instruction instance "
+	      "({} #{}, now {} #{}): {}\nPlease submit a bug report to {}\n",
+	      lab->getPos(), lab->getKey() ? lab->getKey()->toString() : "none",
+	      lab->getKeySub(), currKey->toString(), sub, *lab, PACKAGE_BUGREPORT);
 }
 
 auto GenMCDriver::executionExceedsBound(BoundCalculationStrategy strategy) const -> bool
@@ -633,6 +656,10 @@ auto GenMCDriver::addLabelToGraph(std::unique_ptr<EventLabel> lab) -> EventLabel
 	/* Prune the graph when it exceeds the window */
 	if (inRandomMode() && getConf()->maxGraphSize.has_value())
 		maybeCutGraph(&*lab);
+
+	/* (A label may come with its key: a cached one, an RMW's write) */
+	if (!lab->getKey())
+		assignEventKey(&*lab);
 
 	/* Add and update views */
 	auto *addedLab = g.add(std::move(lab));
@@ -685,6 +712,7 @@ void GenMCDriver::configureProbe(MemLabel *rLab, Event pos, SAddr addr, ASize si
 	rLab->reset();
 
 	rLab->setPos(pos);
+	assignEventKey(rLab);
 	rLab->setAddr(addr);
 	rLab->setSize(size);
 	rLab->setDeps(deps);
@@ -1625,8 +1653,12 @@ void GenMCDriver::checkReconsiderFaiSpinloop(const MemAccessLabel *lab)
 		/* If it does, and also breaks the assumptions, unblock thread */
 		if (!getConsChecker().getHbView(faiLab).contains(lab->getPos())) {
 			auto pos = eLab->getPos();
+			auto key = eLab->getSharedKey();
+			auto keySub = eLab->getKeySub();
 			unblockThread(g, pos);
-			addLabelToGraph(FaiZNESpinEndLabel::create(pos));
+			auto zLab = FaiZNESpinEndLabel::create(pos);
+			zLab->setKey(std::move(key), keySub);
+			addLabelToGraph(std::move(zLab));
 		}
 	}
 }
@@ -3099,6 +3131,9 @@ auto GenMCDriver::completeRevisitedRMW(const ReadLabel *rLab) -> WriteLabel *
 	if (!wLab)
 		return nullptr;
 
+	/* Added for the read's instruction, as its next event */
+	if (rLab->getKey())
+		wLab->setKey(rLab->getSharedKey(), rLab->getKeySub() + 1);
 	auto *lab = genmc::dyn_cast<WriteLabel>(addLabelToGraph(std::move(wLab)));
 	VERIFY(rLab->getRf());
 	lab->addCo(rLab->getRf());

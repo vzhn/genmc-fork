@@ -1,3 +1,4 @@
 -nthreads=2 |
 -nthreads=4 |
 -nthreads=8 |
+-check-replay-keys -nthreads=4 |

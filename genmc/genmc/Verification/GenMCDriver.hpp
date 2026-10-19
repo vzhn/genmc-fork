@@ -140,6 +140,18 @@ public:
 	/** Returns to the interpreter the next thread to run (nullopt if none) */
 	auto scheduleNext(std::span<Action> runnable) -> ScheduleResult;
 
+	/** With -check-replay-keys: the instruction instance the interpreter is
+	 * about to execute in the thread of @p base, whose events will follow
+	 * @p base. Labels added after it get the key; labels reused on replay
+	 * must have it. Cleared after the instruction's call to the driver. */
+	void setEventKey(std::shared_ptr<const EventKey> key, Event base)
+	{
+		currKey = std::move(key);
+		currKeyBase = base;
+	}
+	void clearEventKey() { currKey = nullptr; }
+	auto checksReplayKeys() const -> bool { return getConf()->checkReplayKeys; }
+
 	/** Attemps to complete the execution by inspecting the cache.
 	 * Returns whether it succeeded. */
 	auto runFromCache() -> bool;
@@ -532,6 +544,14 @@ private:
 	/** Returns true if the exploration is guided by a graph */
 	auto isExecutionDrivenByGraph(Event curr) -> bool;
 
+	/** Stops with an internal error unless @p lab, reused on replay, comes
+	 * from the instruction instance being executed (as its @p sub-th event) */
+	void checkReplayKey(const EventLabel *lab, std::uint32_t sub) const;
+
+	/** Gives @p lab the key of the instruction instance being executed, if
+	 * it is one of its events (probe labels are reused: clears it otherwise) */
+	void assignEventKey(EventLabel *lab) const;
+
 	/** Error reporting: initiates an exploration to collect metadata */
 	void initiateErrorReplay(const ErrorDetails &details);
 
@@ -794,6 +814,10 @@ private:
 
 	/** Linearizability checker */
 	std::unique_ptr<LinearizabilityChecker> relinche;
+
+	/** The instruction instance being executed (see setEventKey()) */
+	std::shared_ptr<const EventKey> currKey;
+	Event currKeyBase;
 
 	/** Opt: Whether this execution is moot (locking) */
 	bool isMootExecution = false;

@@ -21,6 +21,7 @@
 #include "genmc/Execution/DepInfo.hpp"
 #include "genmc/Execution/Event.hpp"
 #include "genmc/Execution/EventAttr.hpp"
+#include "genmc/Execution/EventKey.hpp"
 #include "genmc/Execution/LoadAnnotation.hpp"
 #include "genmc/Execution/Stamp.hpp"
 #include "genmc/Support/ActionEnums.hpp"
@@ -35,6 +36,7 @@
 
 #include <cstdint>
 #include <format>
+#include <memory>
 #include <optional>
 #include <ranges>
 #include <utility>
@@ -241,6 +243,21 @@ public:
 	/** Necessary for multiple inheritance + LLVM-style RTTI to work */
 	static auto classofKind(EventLabelKind /*K*/) -> bool { return true; }
 
+	/** The instruction instance that produced this label (see EventKey);
+	 * null when keys are not computed or the label does not come from an
+	 * instruction (e.g. a thread's start) */
+	auto getKey() const -> const EventKey * { return key.get(); }
+	auto getSharedKey() const -> const std::shared_ptr<const EventKey> & { return key; }
+
+	/** The label's index among the labels of its instruction instance */
+	auto getKeySub() const -> std::uint32_t { return keySub; }
+
+	void setKey(std::shared_ptr<const EventKey> k, std::uint32_t sub)
+	{
+		key = std::move(k);
+		keySub = sub;
+	}
+
 	/** Returns a clone object (virtual to allow deep copying from base) */
 	virtual auto clone() const -> std::unique_ptr<EventLabel> = 0;
 
@@ -293,6 +310,10 @@ private:
 
 	/** Revisitability status */
 	bool revisitable = true;
+
+	/** The producing instruction instance (kept by clone() and reset()) */
+	std::shared_ptr<const EventKey> key;
+	std::uint32_t keySub = 0;
 };
 
 #define DEFINE_CREATE_CLONE(name)                                                                  \

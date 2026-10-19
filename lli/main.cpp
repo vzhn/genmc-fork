@@ -147,6 +147,11 @@ static llvm::cl::opt<bool> clLkmmReference(
 	llvm::cl::desc("Under -lkmm, check every graph with a direct evaluation of the model "
 		       "too, and stop when it disagrees with the checker (slow)"));
 
+static llvm::cl::opt<bool> clCheckReplayKeys(
+	"check-replay-keys", llvm::cl::cat(clDebugging),
+	llvm::cl::desc("Check that every event reused when re-running a thread was produced by "
+		       "the same instruction instance (always on under -lkmm)"));
+
 static llvm::cl::opt<bool> clCheckLiveness("check-liveness", llvm::cl::cat(clGeneral),
 					   llvm::cl::desc("Check for liveness violations"));
 
@@ -445,6 +450,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.printErrorTrace = clPrintErrorTrace;
 	conf.checkLiveness = clCheckLiveness;
 	conf.lkmmReference = clLkmmReference;
+	conf.checkReplayKeys = clCheckReplayKeys || clModelType == ModelType::LKMM;
 #if EMIT_NA_LABELS
 	conf.instructionCaching = clCacheInstructions;
 #endif

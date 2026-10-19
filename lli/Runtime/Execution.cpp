@@ -3553,6 +3553,14 @@ void Interpreter::callFunction(Function *F, const std::vector<GenericValue> &Arg
 	ExecutionContext &StackFrame = ECStack().back();
 	StackFrame.CurFunction = F;
 
+	// The frame's place in the thread's key context: the caller's call
+	// instance (the thread's first frame has none)
+	if (checkReplayKeys() && ECStack().size() > 1) {
+		auto &CallerSF = ECStack()[ECStack().size() - 2];
+		const Instruction *CI = &CallerSF.Caller;
+		StackFrame.KeyCall = {keyInstId(CI), CallerSF.KeyCounts[CI]++};
+	}
+
 	// Special handling for external functions.
 	if (F->isDeclaration()) {
 		auto translated = translateExternalCallArgs(F, ArgVals);
@@ -3593,6 +3601,7 @@ void Interpreter::runAtExitHandlers()
 		auto size = ECStack().size();
 		while (ECStack().size() >= size) {
 			llvm::ExecutionContext &SF = ECStack().back();
+			++getCurThr().visitNo;
 			llvm::Instruction &I = *SF.CurInst++;
 			visit(I);
 			if (!ECStack().empty()) {
@@ -3605,12 +3614,43 @@ void Interpreter::runAtExitHandlers()
 	setProgramState(oldState);
 }
 
+void Interpreter::prepareEventKey()
+{
+	auto &thr = getCurThr();
+	auto depth = thr.ECStack.size();
+	const Instruction *inst = depth ? &*std::prev(thr.ECStack.back().CurInst) : nullptr;
+	if (thr.keyVisit != thr.visitNo || thr.keyInst != inst || thr.keyDepth != depth) {
+		std::vector<EventKey::Step> path;
+		path.reserve(depth ? depth : 1);
+		for (auto i = 1U; i < depth; i++)
+			path.push_back(thr.ECStack[i].KeyCall);
+		path.emplace_back(keyInstId(inst), depth ? thr.ECStack.back().KeyCounts[inst]++ : 0);
+		thr.key = std::make_shared<const EventKey>(std::move(path));
+		thr.keyBase = currPos();
+		thr.keyVisit = thr.visitNo;
+		thr.keyInst = inst;
+		thr.keyDepth = depth;
+	}
+	driver->setEventKey(thr.key, thr.keyBase);
+}
+
+void Interpreter::undoEventKey()
+{
+	auto &thr = getCurThr();
+	if (thr.keyVisit != thr.visitNo)
+		return;
+	if (thr.keyDepth > 0 && thr.keyDepth == thr.ECStack.size())
+		--thr.ECStack.back().KeyCounts[thr.keyInst];
+	thr.keyVisit.reset();
+}
+
 void Interpreter::run()
 {
 	auto tid = driver->scheduleNext(dynState.globalInstructions);
 	while (std::holds_alternative<int>(tid)) {
 		scheduleThread(std::get<int>(tid));
 		llvm::ExecutionContext &SF = ECStack().back();
+		++getCurThr().visitNo;
 		llvm::Instruction &I = *SF.CurInst++;
 		visit(I);
 		if (!ECStack().empty()) {

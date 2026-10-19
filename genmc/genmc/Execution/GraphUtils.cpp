@@ -201,8 +201,13 @@ void blockThread(ExecutionGraph &g, std::unique_ptr<BlockLabel> bLab)
 	 *   2) If addLabelToGraph() does extra stuff (e.g., event caching) we absolutely
 	 *      don't want to do that here. blockThread() should be safe to call from
 	 *      anywhere in the code, with no unexpected side-effects */
-	if (bLab->getPos() == g.getLastThreadLabel(bLab->getThread())->getPos())
+	if (const auto *lLab = g.getLastThreadLabel(bLab->getThread());
+	    bLab->getPos() == lLab->getPos()) {
+		/* The block stands for the replaced label's instruction (see EventKey) */
+		if (!bLab->getKey())
+			bLab->setKey(lLab->getSharedKey(), lLab->getKeySub());
 		g.removeLast(bLab->getThread());
+	}
 	g.add(std::move(bLab));
 }
 
