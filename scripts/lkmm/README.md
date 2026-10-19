@@ -167,7 +167,8 @@ Results (2026-10-19), all with herd7 7.58 as the oracle:
 |---|---|
 | kernel `litmus-tests` (35 C tests) | 35 agree |
 | corpus without RCU/SRCU (3167 tests, 30 s each) | 2886 agree, 70 agree-racy, 137 skipped, 12 herd7 timeout/error, 1 count; 62 classified disagreements (below) |
-| `tests/correct/lkmm` (63 variants under their models) | pass |
+| `tests/correct/lkmm` (63 tests under their models) | pass |
+| feature matrix (735 runs, below) | no deviation |
 | v0.9's expected counts (52 tests) | identical; `R+fencembonceonces` 3 and `C-MPrelseq+o-r+rmwinc+a-o` 9 are herd7's (v0.9 had 4 and 10) |
 | fast suite with the phase-2 binary (rc11, imm, lkmm) | passes |
 
@@ -185,7 +186,7 @@ taken, so the forward-closed `ctrl` must stay in the prefix relation (plan
 after the reads the condition depends on; it can miss an execution LKMM
 allows when a compiler would hoist a store out of both arms.
 
-Two things found and fixed on the way, each with a regression test:
+Three bugs found and fixed on the way, each with a regression test:
 
 - an RMW whose `genmc.attr` annotation carries only attribute bits (LKMM's
   fully ordered RMWs) hit an `UNREACHABLE` in `getFaiKinds()`
@@ -194,7 +195,35 @@ Two things found and fixed on the way, each with a regression test:
   own, so a kat dependency into an RMW must reach the write through `rmw`;
   without that, a lock taken under a condition between two critical sections
   of another thread was never explored (`tests/correct/lkmm/lock-ctrl-between`:
-  4 executions, the `waitqueue` port lost 2 of its 6).
+  4 executions, the `waitqueue` port lost 2 of its 6; `lb-dep-xchg` and the
+  address and data variants pin the other dependencies);
+- LKMM has no thread creation, and the kat put only `tc` and `tj` into its
+  happens-before and prefix relation: a parent's read could read a value
+  that depends on a thread it creates later, and a revisit prefix could hold
+  a thread's events without its create, which failed an internal check (with
+  `-schedule-policy=arbitrary`, half of the lkmm tests crashed). `thread-po`,
+  IMM's release/acquire thread events, joins both
+  (`tests/correct/lkmm/create-after-read`: 3 executions, as under RC11 and IMM).
+
+Known gap: a `cmpxchg()`'s expected value orders nothing in LKMM, but GenMC
+never builds the load-buffering cycle through it (the compare operand's
+dependencies are recorded and read by no checker), so it misses that
+outcome under `-lkmm` and `-imm` (`tests/cooking/lkmm/LB+casexp`: herd7 3
+executions, GenMC 2).
+
+Feature matrix (plan 5.6): `feature-matrix.py` runs every `tests/correct/lkmm`
+test under `-nthreads=4`, `-schedule-policy=arbitrary` with three seeds,
+`ltr` and `wfr`, `-disable-spin-assume`, `-check-liveness` and
+`-mode=estimate`, and every wrong test that opts into `-lkmm` under the same
+options with `-print-error-trace` and `-dump-error-graph`. Correct runs must
+give the expected count, wrong runs the base run's error. Result
+(2026-10-19): 735 runs, no deviation, with the liveness fix of
+`fix-liveness-lock-block` (without it, `-check-liveness` crashes on
+`2LU+LUL`, whose second thread ends holding the mutex; with it, that run
+reports the liveness violation, which the matrix accepts for tests with
+blocked executions).
+The LKMM fence kinds print as `Fmb`, `Fwmb`, `Frmb`, `Faa`, ... in error
+traces and as `F` with the kind in the dumped graphs.
 
 How the kat maps onto GenMC's checker interface: Kater's reserved `ppo` is
 the preserved program order of the revisit prefixes and must stay within
