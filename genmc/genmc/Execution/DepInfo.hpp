@@ -51,6 +51,15 @@ public:
 	/** Returns true if there are no dependencies */
 	[[nodiscard]] auto empty() const -> bool { return set_.empty(); }
 
+	/** Replaces each event e by f(e) */
+	template <typename F> void remap(F f)
+	{
+		Set moved;
+		for (const auto &e : set_)
+			moved.insert(f(e));
+		set_ = std::move(moved);
+	}
+
 	/** Iterators */
 	using const_iterator = typename Set::const_iterator;
 
@@ -92,6 +101,12 @@ struct EventDeps {
 	DepInfo ctrl;
 	DepInfo addrPo;
 	DepInfo cas;
+
+	template <typename F> void remap(F f)
+	{
+		for (auto *d : {&addr, &data, &ctrl, &addrPo, &cas})
+			d->remap(f);
+	}
 };
 
 #endif /* GENMC_DEP_INFO_HPP */

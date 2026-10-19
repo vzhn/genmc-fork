@@ -10,6 +10,13 @@
  * cannot happen for P1()'s smp_store_release(), so if P0() executes
  * its then-clause, that of P1() muse already have completed.  Therefore,
  * there is no data race, but the "exists" clause can be satisfied.
+ *
+ * GenMC: 3 executions of herd7's 4. In the one it misses, P1's read of y
+ * reads P0's plain write in the then-clause: reading y's initial value
+ * instead breaks plain-coherence (the write is visible to it, through
+ * smp_wmb(), z and smp_rmb()). That makes a cycle of po-rel, rfe, ctrl and
+ * rfe that LKMM allows (a plain write is in no hb), but that is in GenMC's
+ * prefix relation, whose cycles GenMC cannot build. In cooking until then.
  */
 
 int x;

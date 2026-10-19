@@ -237,6 +237,13 @@ public:
 	/** Sets the maximum index seen in E.THREAD to E.INDEX */
 	void setMax(Event e) override;
 
+	void relocateThread(int thread, int from, int delta) override
+	{
+		auto max = getMax(thread);
+		if (auto nmax = relocatedIndex(max, from, delta); nmax != max)
+			setMax(Event(thread, nmax));
+	}
+
 	/** Updates the view based on another vector clock. We can
 	 * only update the current view given another View (and not
 	 * some other subclass of VectorClock) */

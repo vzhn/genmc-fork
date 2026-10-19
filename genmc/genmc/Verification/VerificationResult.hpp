@@ -18,6 +18,8 @@ struct VerificationResult {
 	unsigned exploredBlocked{};		 /**< Number of blocked executions explored */
 	unsigned spinBlocked{};	   /**< Blocked executions with a thread in a spinloop or await */
 	unsigned boundExceeding{}; /**< Number of bound-exceeding executions explored */
+	unsigned relocationReruns{}; /**< Runs repeated after moving a thread's kept events */
+	unsigned relocationsLost{};  /**< Runs dropped: a kept event would be skipped */
 	long double estimationMean{};	  /**< The mean of estimations */
 	long double estimationVariance{}; /**< The (biased) variance of the estimations */
 #ifdef ENABLE_GENMC_DEBUG
@@ -44,6 +46,8 @@ struct VerificationResult {
 		exploredBlocked += other.exploredBlocked;
 		spinBlocked += other.spinBlocked;
 		boundExceeding += other.boundExceeding;
+		relocationReruns += other.relocationReruns;
+		relocationsLost += other.relocationsLost;
 		estimationMean += other.estimationMean;
 		estimationVariance += other.estimationVariance;
 #ifdef ENABLE_GENMC_DEBUG

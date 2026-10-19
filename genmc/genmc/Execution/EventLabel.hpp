@@ -377,6 +377,7 @@ public:
 	auto getCreate() -> ThreadCreateLabel * { return createLab_; }
 	auto setCreate(ThreadCreateLabel *lab) { createLab_ = lab; }
 	auto getCreateId() const -> Event { return createId_; }
+	void setCreateId(Event e) { createId_ = e; }
 
 	/** Getters for the thread's info */
 	auto getThreadInfo() const -> const ThreadInfo & { return threadInfo; }
@@ -467,6 +468,14 @@ public:
 		views[i] = v;
 	}
 
+	/* Follows a move of THREAD's events (see VectorClock::relocateThread()) */
+	void relocateLocViews(int thread, int from, int delta)
+	{
+		for (auto &[addr, views] : initLocViews_)
+			for (auto &v : views)
+				v.relocateThread(thread, from, delta);
+	}
+
 	DEFINE_STANDARD_MEMBERS(Init)
 
 private:
@@ -522,7 +531,15 @@ protected:
 public:
 	static auto createAssumeBlock(Event pos, AssumeType type) -> std::unique_ptr<BlockLabel>;
 
+	/** Whether the thread stopped before events a revisit kept, and the
+	 * block went after them (see blockThread()) */
+	[[nodiscard]] auto isAfterKept() const -> bool { return afterKept_; }
+	void setAfterKept() { afterKept_ = true; }
+
 	DEFINE_CLASSOF_RANGE(Block)
+
+private:
+	bool afterKept_ = false;
 };
 
 #define BLOCK_PURE_SUBCLASS(name)                                                                  \

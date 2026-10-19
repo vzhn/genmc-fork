@@ -101,6 +101,10 @@ public:
 			removeHolesInRange(e, old + 1);
 	}
 
+	/** A plain view would include the slots DELTA > 0 opens; here they
+	 * are holes */
+	void relocateThread(int thread, int from, int delta) override;
+
 	/** Returns true if there's a hole in E's position */
 	[[nodiscard]] auto hasHole(const Event e) const -> bool
 	{

@@ -196,6 +196,23 @@ auto violatesAtomicity(const WriteLabel *sLab) -> bool
 
 void blockThread(ExecutionGraph &g, std::unique_ptr<BlockLabel> bLab)
 {
+	/* The thread stops before events that a revisit kept after its position
+	 * (see GenMCDriver::alignKeptEvents()). A block is the thread's last
+	 * label, so it goes after them; when the thread is unblocked, it carries
+	 * on from its position. A block that would replace an event there
+	 * cannot be placed: those events are unreachable in this run. */
+	if (auto tid = bLab->getThread(); g.hasEventsAfter(tid, bLab->getIndex())) {
+		const auto *lab = g.getEventLabelIfPresent(bLab->getPos());
+		if (lab && !genmc::isa<EmptyLabel>(lab)) {
+			g.setKeptEventsUnreachable(true);
+			return;
+		}
+		bLab->setPos(Event(tid, g.getThreadSize(tid)));
+		bLab->setAfterKept();
+		g.add(std::move(bLab));
+		return;
+	}
+
 	/* There are a couple of reasons we don't call Driver::addLabelToGraph() here:
 	 *   1) It's redundant to update the views of the block label
 	 *   2) If addLabelToGraph() does extra stuff (e.g., event caching) we absolutely

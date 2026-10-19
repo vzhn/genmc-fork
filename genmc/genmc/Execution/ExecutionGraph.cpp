@@ -506,6 +506,53 @@ auto ExecutionGraph::cutToView(const View &v) -> unsigned
 	return removed;
 }
 
+void ExecutionGraph::relocateThread(int thread, int from, int delta)
+{
+	auto &thr = events[thread];
+	VERIFY(delta != 0 && from + std::min(delta, 0) > 0 && std::cmp_less(from, thr.size()));
+
+	if (delta > 0) {
+		auto &next = *thr[from];
+		for (auto k = 0; k < delta; k++) {
+			auto hole = createHoleLabel(Event(thread, from + k));
+			hole->setParent(this);
+			hole->setStamp(nextStamp());
+			insertionOrder.push_back(*hole);
+			poLists[thread].insert(po_iterator(next), *hole);
+			thr.insert(thr.begin() + from + k, std::move(hole));
+		}
+	} else {
+		for (auto j = from + delta; j < from; j++) {
+			auto &lab = *thr[j];
+			VERIFY(genmc::isa<EmptyLabel>(&lab));
+			poLists[thread].remove(lab);
+			insertionOrder.remove(lab);
+		}
+		thr.erase(thr.begin() + from + delta, thr.begin() + from);
+	}
+	for (auto j = from + std::min(delta, 0); std::cmp_less(j, thr.size()); j++)
+		thr[j]->setPos(Event(thread, j));
+
+	auto remap = [&](Event e) {
+		return e.thread == thread ? Event(thread, relocatedIndex(e.index, from, delta)) : e;
+	};
+	for (auto &lab : labels()) {
+		for (auto &view : lab.calculatedViews)
+			view.relocateThread(thread, from, delta);
+		for (auto &rel : lab.calculatedRels) {
+			VSet<Event> moved;
+			for (const auto &e : rel)
+				moved.insert(remap(e));
+			rel = std::move(moved);
+		}
+		lab.prefixView = nullptr;
+		lab.deps.remap(remap);
+		if (auto *tsLab = genmc::dyn_cast<ThreadStartLabel>(&lab))
+			tsLab->setCreateId(remap(tsLab->getCreateId()));
+	}
+	getInitLabel()->relocateLocViews(thread, from, delta);
+}
+
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void ExecutionGraph::copyGraphUpTo(ExecutionGraph &other, const VectorClock &v) const
 {

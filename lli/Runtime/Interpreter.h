@@ -47,6 +47,7 @@
 
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/IntervalMap.h>
+#include <llvm/Analysis/PostDominators.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/IR/DataLayout.h>
@@ -128,6 +129,54 @@ public:
 // ExecutionContext struct - This struct represents one stack frame currently
 // executing.
 //
+// What the code of a branch (all its paths, up to the join) can order before
+// the events after its join in GenMC's prefix (the kat's ppo): see
+// Interpreter::updateBranchCtrlDeps()
+//
+// Only the branch's writes (and fences) matter: they carry the branch's
+// condition in their prefix (ctrl ; [W]), and a revisit that keeps an event
+// after the join is blocked on the path that puts one into its prefix but
+// not on the other, while the branch's read is deleted by it there
+struct BranchRegion {
+	bool ordersAll = false;	   // a fence, a call that may order...
+	bool anyLoc = false;	   // a write whose address is not known at the branch
+	SmallPtrSet<Value *, 4> ptrs; // the addresses of the writes (known at the branch)
+	bool markedWrites = false; // marked writes, for wmb, mb, po-rel
+
+	bool hasWrites() const { return anyLoc || !ptrs.empty(); }
+	void merge(const BranchRegion &o)
+	{
+		ordersAll |= o.ordersAll;
+		anyLoc |= o.anyLoc;
+		ptrs.insert(o.ptrs.begin(), o.ptrs.end());
+		markedWrites |= o.markedWrites;
+	}
+};
+
+// A branch's dependencies, the addresses its code may write and what it
+// can order (see BranchRegion)
+struct CtrlShadow {
+	DepInfo deps;
+	bool anyLoc = false;
+	bool markedWrites = false;
+	SmallVector<void *, 4> addrs;
+
+	void merge(const CtrlShadow &o)
+	{
+		deps.update(o.deps);
+		anyLoc |= o.anyLoc;
+		markedWrites |= o.markedWrites;
+		addrs.append(o.addrs.begin(), o.addrs.end());
+	}
+};
+
+// An open branch: its control dependencies hold until its join
+struct CtrlScope {
+	const BasicBlock *join;
+	bool ordersAll;
+	CtrlShadow shadow;
+};
+
 struct ExecutionContext {
 	Function *CurFunction;			      // The currently executing function
 	BasicBlock *CurBB;			      // The currently executing BB
@@ -143,6 +192,13 @@ struct ExecutionContext {
 	// call the driver), and the caller's call instance that made the frame
 	llvm::DenseMap<const Instruction *, std::uint32_t> KeyCounts;
 	EventKey::Step KeyCall{0, 0};
+
+	// Under LKMM (scopesCtrlDeps()): the control dependencies of the open
+	// branches of this frame, each until its join (the branch's immediate
+	// post-dominator) is entered, and those of the whole frame (an indirect
+	// call's function pointer)
+	llvm::SmallVector<CtrlScope, 2> CtrlScopes;
+	DepInfo FrameCtrl;
 
 	ExecutionContext() : CurFunction(nullptr), CurBB(nullptr), CurInst(nullptr) {}
 };
@@ -194,6 +250,14 @@ public:
 	std::size_t keyDepth{};
 	std::shared_ptr<const EventKey> key;
 	Event keyBase;
+
+	/* The thread's control dependencies, with those of the open branches */
+	DepInfo ctrlScratch;
+
+	/* Branches joined whose code accessed memory: the writes after the join
+	 * to a location the branch may access get their dependencies (moi, fri),
+	 * and so does all after an ordering event (fences, releases...) */
+	std::vector<llvm::CtrlShadow> ctrlShadows;
 
 	bool isMain() const { return id == 0; }
 
@@ -278,6 +342,13 @@ protected:
 	/* With -check-replay-keys: each instruction's number in module order,
 	 * the same in every worker's copy of the module (see EventKey) */
 	llvm::DenseMap<const Instruction *, std::uint32_t> keyInstIds_;
+
+	/* Summaries of branch regions (by branch block) and of functions */
+	llvm::DenseMap<const BasicBlock *, BranchRegion> branchRegions_;
+	llvm::DenseMap<const Function *, std::optional<BranchRegion>> funRegions_;
+
+	/* Post-dominator trees, per function (see getBranchJoin()) */
+	llvm::DenseMap<const Function *, std::unique_ptr<llvm::PostDominatorTree>> postDoms_;
 
 	/* Registers (and their Values) mentioned by each load annotation; filled
 	 * lazily by getCurrentAnnotConcretized() */
@@ -694,10 +765,28 @@ private: // Helper functions
 	{
 		return getDepTracker() ? getDepTracker()->getAddrPoDeps(tid) : nullptr;
 	}
-	const DepInfo *getCtrlDeps(unsigned int tid)
-	{
-		return getDepTracker() ? getDepTracker()->getCtrlDeps(tid) : nullptr;
-	}
+	const DepInfo *getCtrlDeps(unsigned int tid);
+
+	/* Whether control dependencies end at the join of their branch */
+	bool scopesCtrlDeps() const { return driver->scopesCtrlDeps(); }
+
+	/* A conditional branch (or switch) at the end of BB on COND */
+	void updateBranchCtrlDeps(BasicBlock *BB, Value *Cond);
+
+	/* After the read of the CAS I (see the definition) */
+	void updateCasCtrlDeps(AtomicCmpXchgInst &I);
+
+	/* The join of the branch ending BB (nullptr: the function's exit) */
+	const BasicBlock *getBranchJoin(BasicBlock *BB);
+
+	/* What the code between the branch ending BB and JOIN can order */
+	const BranchRegion &getBranchRegion(BasicBlock *BB, const BasicBlock *join);
+	const BranchRegion &getFunctionRegion(Function *F);
+	void summarizeInst(Instruction &I, BranchRegion &R,
+			   const SmallPtrSetImpl<BasicBlock *> *region);
+
+	/* The branches joined in thread TID, as the current instruction sees them */
+	void applyCtrlShadows(Thread &thr, DepInfo &ctrl);
 
 	void updateDataDeps(unsigned int tid, Value *dst, Value *src)
 	{

@@ -31,6 +31,21 @@ public:
 	/** Returns whether this worklist is empty */
 	[[nodiscard]] auto empty() const -> bool { return wlist_.empty(); }
 
+	/** The number of items, and dropping the items added after there were N */
+	[[nodiscard]] auto size() const -> size_t { return wlist_.size(); }
+	void truncate(size_t n)
+	{
+		if (n < wlist_.size())
+			wlist_.resize(n);
+	}
+
+	/** Follows a move of THREAD's events (see ExecutionGraph::relocateThread()) */
+	void relocateThread(int thread, int from, int delta)
+	{
+		for (auto &item : wlist_)
+			item->relocateThread(thread, from, delta);
+	}
+
 	/** Adds an item to the worklist */
 	void add(auto &&item) { wlist_.emplace_back(std::move(item)); }
 

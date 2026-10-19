@@ -1066,6 +1066,14 @@ auto lkmm::hasPreRace(const ExecutionGraph &g) -> bool
 	return false;
 }
 
+auto lkmm::hasThreadBlockedBeforeKept(const ExecutionGraph &g) -> bool
+{
+	return std::ranges::any_of(g.thr_ids(), [&](auto tid) {
+		const auto *bLab = genmc::dyn_cast_if_present<BlockLabel>(g.getLastThreadLabel(tid));
+		return bLab && bLab->isAfterKept();
+	});
+}
+
 auto lkmm::hasGracePeriod(const ExecutionGraph &g) -> bool
 {
 	for (const auto &lab : g.labels())

@@ -186,13 +186,22 @@ The kernel model's reference tool is herd7. On C litmus tests, GenMC's
 "Negative" ones, with the same final states and counts), with these
 exceptions:
 
-- **Control dependencies past the end of an `if`.** In the kernel model, a
-  control dependency orders only the events inside the conditional; a
-  write after the branches join is not ordered after the read the
-  condition tested (a compiler could move it above the `if`). GenMC orders
-  every event after a conditional after that read, so it misses the
-  executions where such a write is reordered: it can miss a bug in code
-  that relies on a control dependency past the `if`.
+- **Control dependencies.** As in the kernel model, a control dependency
+  orders only the events inside the conditional: a write after the
+  branches join is not ordered after the read the condition tested (a
+  compiler could move it above the `if`), and GenMC finds the bugs of code
+  that relies on such an order. GenMC has a few dependencies that herd7,
+  whose dependencies are syntactic, does not: a value chosen by the branch
+  taken (`p = r ? &a : &b`, or a variable set in a branch) depends on the
+  condition; so do the events of a function called through a pointer the
+  read chose; a branch that leaves its function (an early `return`)
+  orders the rest of the function; and so do, for the exploration, a
+  marked write after the `if` to a location a marked write in the branch
+  writes, and the events after a later fence, release or lock operation
+  when the branch has a marked write or a fence. GenMC can also miss an
+  execution with a cycle of control dependencies and reads from plain
+  writes in branches, which the model allows (a plain write is in no
+  happens-before) but GenMC's exploration cannot build.
 - The model's `mixed-accesses` flag is not reported.
 - herd7's symbolic values for thin-air cycles have no counterpart: no
   execution of the C program has them.
@@ -200,7 +209,9 @@ exceptions:
   (one corpus test has the same final states with another count).
 
 Dependencies are those of the LLVM-IR GenMC runs, after `clang`'s
-optimizations, which may remove some that the source has.
+optimizations, which may remove some that the source has. (GenMC's own
+merging of the branches' common code is off under `-lkmm`: it would move
+their events out of the conditional.)
 
 `scripts/lkmm` in GenMC's source tree has the tools that compare GenMC
 with herd7 on the litmus-test corpora (`README.md` there has the results).

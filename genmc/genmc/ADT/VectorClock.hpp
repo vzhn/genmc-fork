@@ -34,6 +34,18 @@ class EventLabel;
  * or dependency tracking ones) should have. Vector clocks are supposed
  * to work with events.
  */
+/** The index that IDX of a thread becomes when the thread's events from
+ * index FROM on move by DELTA. A negative DELTA removes the slots
+ * [FROM + DELTA, FROM), which become the slot before them. */
+inline auto relocatedIndex(int idx, int from, int delta) -> int
+{
+	if (idx >= from)
+		return idx + delta;
+	if (delta < 0 && idx >= from + delta)
+		return from + delta - 1;
+	return idx;
+}
+
 class VectorClock {
 
 public:
@@ -82,6 +94,10 @@ public:
 	[[nodiscard]] auto getMax(Event e) const -> int;
 
 	virtual void setMax(Event e) = 0;
+
+	/** Follows a move of THREAD's events from index FROM on by DELTA (see
+	 * relocatedIndex()) */
+	virtual void relocateThread(int thread, int from, int delta) = 0;
 
 	/** Clones a VectorClock */
 	[[nodiscard]] auto clone() const -> std::unique_ptr<VectorClock>;

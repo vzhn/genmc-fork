@@ -23,6 +23,12 @@
 
 class ReadRevisit;
 
+/** E after THREAD's events from FROM on moved by DELTA (see relocatedIndex()) */
+inline auto relocatedEvent(Event e, int thread, int from, int delta) -> Event
+{
+	return e.thread == thread ? Event(thread, relocatedIndex(e.index, from, delta)) : e;
+}
+
 /** Abstract class representing a revisit operation */
 class Revisit { // NOLINT(cppcoreguidelines-special-member-functions)
 
@@ -55,6 +61,13 @@ public:
 	[[nodiscard]] auto getPos() const -> Event { return pos; }
 
 	static auto classofKind(Kind /*K*/) -> bool { return true; }
+
+	/** Follows a move of THREAD's events (see ExecutionGraph::relocateThread()) */
+	virtual void relocateThread(int thread, int from, int delta)
+	{
+		pos = relocatedEvent(pos, thread, from, delta);
+	}
+
 	static auto castToReadRevisit(const Revisit * /*r*/) -> ReadRevisit *;
 	static auto castFromReadRevisit(const ReadRevisit * /*r*/) -> Revisit *;
 
@@ -76,6 +89,12 @@ public:
 	[[nodiscard]] auto getRev() const -> Event { return rev; }
 
 	[[nodiscard]] auto getRevisitKind() const -> Revisit::Kind { return revisitKind; }
+
+	void relocateRev(int thread, int from, int delta)
+	{
+		rev = relocatedEvent(rev, thread, from, delta);
+	}
+
 	static auto classof(const Revisit *r) -> bool
 	{
 		return r->getKind() == Revisit::RV_FRevRead ||
@@ -115,6 +134,12 @@ public:
 
 	[[nodiscard]] auto isMaximal() const -> bool { return maximal; }
 
+	void relocateThread(int thread, int from, int delta) override
+	{
+		ForwardRevisit::relocateThread(thread, from, delta);
+		relocateRev(thread, from, delta);
+	}
+
 	static auto classof(const Revisit *item) -> bool { return item->getKind() == RV_FRevRead; }
 	static auto castToReadRevisit(const ReadForwardRevisit *r) -> ReadRevisit *
 	{
@@ -146,6 +171,12 @@ public:
 	/** Returns the new MO predecessor of the event for which
 	 * we are exploring alternative exploration options */
 	[[nodiscard]] auto getPred() const -> Event { return moPred; }
+
+	void relocateThread(int thread, int from, int delta) override
+	{
+		ForwardRevisit::relocateThread(thread, from, delta);
+		moPred = relocatedEvent(moPred, thread, from, delta);
+	}
 
 	static auto classof(const Revisit *item) -> bool { return item->getKind() == RV_FRevMO; }
 
@@ -181,6 +212,13 @@ public:
 
 	[[nodiscard]] auto getDetails() const -> const ErrorDetails & { return details_; }
 
+	void relocateThread(int thread, int from, int delta) override
+	{
+		ForwardRevisit::relocateThread(thread, from, delta);
+		if (details_.pos)
+			details_.pos = relocatedEvent(*details_.pos, thread, from, delta);
+	}
+
 	static auto classof(const Revisit *item) -> bool
 	{
 		return item->getKind() == RV_FRevReplay;
@@ -201,6 +239,12 @@ public:
 
 	/** The store the spuriously-failing CAS reads from */
 	[[nodiscard]] auto getRev() const -> Event { return rev; }
+
+	void relocateThread(int thread, int from, int delta) override
+	{
+		ForwardRevisit::relocateThread(thread, from, delta);
+		rev = relocatedEvent(rev, thread, from, delta);
+	}
 
 	static auto classof(const Revisit *item) -> bool
 	{
@@ -230,6 +274,14 @@ public:
 
 	/** Returns (releases) the prefix of the revisiting event */
 	auto getViewRel() -> std::unique_ptr<VectorClock> { return std::move(view); }
+
+	void relocateThread(int thread, int from, int delta) override
+	{
+		Revisit::relocateThread(thread, from, delta);
+		relocateRev(thread, from, delta);
+		if (view)
+			view->relocateThread(thread, from, delta);
+	}
 
 	/** Returns (but does not release) the prefix of the revisiting event */
 	[[nodiscard]] auto getViewNoRel() const -> const std::unique_ptr<VectorClock> &

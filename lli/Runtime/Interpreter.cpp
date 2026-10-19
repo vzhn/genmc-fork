@@ -76,6 +76,7 @@ void Interpreter::resetThread(unsigned int id)
 	thr.currDbgInfo = {};
 	thr.keyVisit.reset();
 	thr.key = nullptr;
+	thr.ctrlShadows.clear();
 
 	clearDeps(id);
 	setThreadArgDeps(id);

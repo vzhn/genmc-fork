@@ -1,0 +1,143 @@
+#include <memory>
+
+#include <gtest/gtest.h>
+
+#include "StubChecker.hpp"
+#include "genmc/ADT/DepView.hpp"
+#include "genmc/ADT/View.hpp"
+#include "genmc/Execution/EventLabel.hpp"
+#include "genmc/Execution/ExecutionGraph.hpp"
+
+/* Moving a thread's events (ExecutionGraph::relocateThread()): positions,
+ * the dependencies and views that name them, and the holes opened or closed */
+
+namespace {
+
+struct TestGraph {
+	StubChecker checker;
+	ExecutionGraph graph{ExecutionGraph::Config{.consChecker = &checker}};
+
+	/* Appends a fence to thread 0, with DEPS and a view seeing VIEWMAX of
+	 * the thread */
+	auto addFence(EventDeps deps = {}, int viewMax = 0) -> EventLabel *
+	{
+		auto pos = Event(0, graph.getThreadSize(0));
+		auto lab = FenceLabel::create(pos, MemOrdering::SequentiallyConsistent);
+		lab->setDeps(std::move(deps));
+		View v;
+		if (viewMax > 0)
+			v.setMax(Event(0, viewMax));
+		lab->setViews({v});
+		return graph.add(std::move(lab));
+	}
+};
+
+auto ctrlOn(std::initializer_list<int> idxs) -> EventDeps
+{
+	EventDeps deps;
+	for (auto i : idxs)
+		deps.ctrl.update(DepInfo(Event(0, i)));
+	return deps;
+}
+
+} // namespace
+
+TEST(RelocateTest, IndexMapping)
+{
+	/* Opening 2 slots at 3 */
+	EXPECT_EQ(relocatedIndex(2, 3, 2), 2);
+	EXPECT_EQ(relocatedIndex(3, 3, 2), 5);
+	EXPECT_EQ(relocatedIndex(7, 3, 2), 9);
+	/* Removing the slots [3, 5) */
+	EXPECT_EQ(relocatedIndex(2, 5, -2), 2);
+	EXPECT_EQ(relocatedIndex(3, 5, -2), 2);
+	EXPECT_EQ(relocatedIndex(4, 5, -2), 2);
+	EXPECT_EQ(relocatedIndex(5, 5, -2), 3);
+}
+
+TEST(RelocateTest, OpenThenCloseRestoresTheGraph)
+{
+	TestGraph g;
+	g.addFence();			  /* (0, 1) */
+	g.addFence(ctrlOn({1}), 1);	  /* (0, 2) */
+	g.addFence(ctrlOn({2}), 2);	  /* (0, 3) */
+	auto *last = g.addFence(ctrlOn({1, 3}), 3); /* (0, 4) */
+	last->setPrefixView(std::make_unique<View>());
+
+	g.graph.relocateThread(0, 2, 2);
+
+	ASSERT_EQ(g.graph.getThreadSize(0), 7);
+	for (auto i = 0; i < 7; i++)
+		EXPECT_EQ(g.graph.getEventLabel(Event(0, i))->getPos(), Event(0, i));
+	EXPECT_TRUE(genmc::isa<EmptyLabel>(g.graph.getEventLabel(Event(0, 2))));
+	EXPECT_TRUE(genmc::isa<EmptyLabel>(g.graph.getEventLabel(Event(0, 3))));
+	EXPECT_EQ(g.graph.getEventLabel(Event(0, 6)), last);
+	EXPECT_TRUE(last->getDeps().ctrl.contains(Event(0, 1)));
+	EXPECT_TRUE(last->getDeps().ctrl.contains(Event(0, 5)));
+	EXPECT_FALSE(last->getDeps().ctrl.contains(Event(0, 3)));
+	EXPECT_EQ(last->view(0).getMax(0), 5);
+	EXPECT_FALSE(last->hasPrefixView()); /* dropped, to be recalculated */
+	/* Below the move, nothing changes */
+	EXPECT_EQ(g.graph.getEventLabel(Event(0, 4))->view(0).getMax(0), 1);
+	EXPECT_TRUE(g.graph.getEventLabel(Event(0, 4))->getDeps().ctrl.contains(Event(0, 1)));
+	/* po follows the positions, holes included */
+	EXPECT_EQ(g.graph.po_imm_pred(last)->getPos(), Event(0, 5));
+	EXPECT_EQ(g.graph.po_imm_succ(g.graph.getEventLabel(Event(0, 1)))->getPos(),
+		  Event(0, 2));
+
+	g.graph.relocateThread(0, 4, -2);
+
+	ASSERT_EQ(g.graph.getThreadSize(0), 5);
+	for (auto i = 0; i < 5; i++) {
+		const auto *lab = g.graph.getEventLabel(Event(0, i));
+		EXPECT_EQ(lab->getPos(), Event(0, i));
+		EXPECT_FALSE(genmc::isa<EmptyLabel>(lab));
+	}
+	EXPECT_EQ(g.graph.getEventLabel(Event(0, 4)), last);
+	EXPECT_TRUE(last->getDeps().ctrl.contains(Event(0, 3)));
+	EXPECT_EQ(last->view(0).getMax(0), 3);
+	EXPECT_EQ(g.graph.po_imm_pred(last)->getPos(), Event(0, 3));
+}
+
+TEST(RelocateTest, DepViewOpensHolesAndDropsRemovedOnes)
+{
+	/* Thread 0 seen up to 5, but for 3 */
+	DepView v;
+	v.setMax(Event(0, 5)); /* the indices it skips are holes */
+	for (auto i : {1, 2, 4})
+		v.removeHole(Event(0, i));
+	v.setMax(Event(1, 2));
+	v.removeAllHoles(1);
+	ASSERT_FALSE(v.contains(Event(0, 3)));
+	ASSERT_TRUE(v.contains(Event(0, 4)));
+
+	/* The opened slots are not seen: they will hold events the view
+	 * did not know of */
+	v.relocateThread(0, 2, 2);
+	EXPECT_EQ(v.getMax(0), 7);
+	EXPECT_TRUE(v.contains(Event(0, 1)));
+	EXPECT_FALSE(v.contains(Event(0, 2)));
+	EXPECT_FALSE(v.contains(Event(0, 3)));
+	EXPECT_TRUE(v.contains(Event(0, 4)));
+	EXPECT_FALSE(v.contains(Event(0, 5)));
+	EXPECT_TRUE(v.contains(Event(0, 7)));
+	EXPECT_EQ(v.getMax(1), 2);
+
+	v.relocateThread(0, 4, -2);
+	EXPECT_EQ(v.getMax(0), 5);
+	EXPECT_TRUE(v.contains(Event(0, 2)));
+	EXPECT_FALSE(v.contains(Event(0, 3)));
+	EXPECT_TRUE(v.contains(Event(0, 4)));
+	EXPECT_TRUE(v.contains(Event(0, 5)));
+}
+
+TEST(RelocateTest, ViewBelowTheMoveIsUnchanged)
+{
+	View v;
+	v.setMax(Event(0, 1));
+	v.setMax(Event(2, 4));
+	v.relocateThread(0, 2, 3);
+	EXPECT_EQ(v.getMax(0), 1);
+	v.relocateThread(2, 3, 1);
+	EXPECT_EQ(v.getMax(2), 5);
+}

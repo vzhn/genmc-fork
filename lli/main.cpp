@@ -400,7 +400,9 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	lliConfig.castElimination = !clDisableCastElimination;
 	lliConfig.inlineFunctions = !clDisableFunctionInliner;
 	lliConfig.spinAssume = !clDisableSpinAssume;
-	lliConfig.codeCondenser = !clDisableCodeCondenser;
+	/* Under LKMM, a control dependency ends at the join of its branch: merging
+	 * the branches' common code moves their events out of the branch */
+	lliConfig.codeCondenser = !clDisableCodeCondenser && clModelType != ModelType::LKMM;
 	lliConfig.loadAnnot = !clDisableLoadAnnot;
 	lliConfig.assumePropagation = !clDisableAssumePropagation;
 	/* The detector suggests a model from the orderings used; kernel code is
@@ -808,6 +810,13 @@ static void printVerificationResults(const std::shared_ptr<const Config> &conf,
 	if (res.exploredBlocked != 0U) {
 		PRINT(VerbosityLevel::Error, "\nNumber of blocked executions seen: {}",
 		      res.exploredBlocked);
+	}
+	/* -lkmm: runs whose thread took a branch of another length before events
+	 * that a revisit kept (see GenMCDriver::alignKeptEvents()) */
+	if (res.relocationReruns != 0U || res.relocationsLost != 0U) {
+		PRINT(VerbosityLevel::Error,
+		      "\nRuns repeated to move kept events: {} (dropped as unreachable: {})",
+		      res.relocationReruns, res.relocationsLost);
 	}
 	/* A wait that never finishes is otherwise silent. (Keep "blocked" and
 	 * "explored" out of this line: the test drivers grep for them.) */
