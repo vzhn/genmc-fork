@@ -24,12 +24,17 @@
  *
  * Main spawns two threads, joins the first and detaches the second.
  *
- * BUG_DETACH_ACQUIRE: detaching swapped with acquire and the child's final
- * swap was release only, as before commit 6ad83834515912c5 ("kmc-solid: Fix
- * memory ordering in thread operations", Rust PR #105590, 2022). When the
- * parent detaches first, nothing orders the parent's swap, an access to
- * ThreadInner, before the child frees it. The fix made the swaps acq_rel;
- * the switch undoes the parent's side, which alone brings the bug back.
+ * Two bugs, fixed in commit 6ad83834515912c5 ("kmc-solid: Fix memory
+ * ordering in thread operations", Rust PR #105590, 2022):
+ * - BUG_DETACH_ACQUIRE: detaching swapped with acquire and the child's
+ *   final swap was release only. When the parent detaches first, nothing
+ *   orders the parent's swap, an access to ThreadInner, before the child
+ *   frees it.
+ * - BUG_JOIN_ACQUIRE: joining swapped the parent's task ID in with acquire
+ *   only, and the child's swap reading it was release only, so the child
+ *   can use the ID without seeing the parent's setup of the task it names.
+ * The fix made all three swaps acq_rel. Each switch undoes the parent's
+ * side, which alone brings its bug back; the child's swap stays acq_rel.
  */
 
 #define LIFECYCLE_INIT			0UL
@@ -39,6 +44,11 @@
 # define DETACH_ORDER memory_order_acquire
 #else
 # define DETACH_ORDER memory_order_acq_rel
+#endif
+#ifdef BUG_JOIN_ACQUIRE
+# define JOIN_ORDER memory_order_acquire
+#else
+# define JOIN_ORDER memory_order_acq_rel
 #endif
 
 struct task {
@@ -117,7 +127,7 @@ static void thread_join(struct thread t)
 {
 	struct task *me = current_task();
 	unsigned long old = atomic_exchange_explicit(&t.inner->lifecycle, (unsigned long) me,
-						     memory_order_acq_rel);
+						     JOIN_ORDER);
 
 	if (old == LIFECYCLE_INIT) {
 		/* [INIT -> JOINING]: sleep until the child finalizes the join */
