@@ -65,9 +65,11 @@ auto DeclareInternalsPass::run(Module &M, ModuleAnalysisManager & /*AM*/) -> Pre
 	modified |= declareInternal(M, "__VERIFIER_spin_end", Type::getVoidTy(M.getContext()),
 				    {Type::getInt1Ty(M.getContext())});
 	modified |= declareInternal(M, "__VERIFIER_faiZNE_spin_end",
-				    Type::getVoidTy(M.getContext()), {});
+				    Type::getVoidTy(M.getContext()),
+				    {Type::getInt1Ty(M.getContext())});
 	modified |= declareInternal(M, "__VERIFIER_lockZNE_spin_end",
-				    Type::getVoidTy(M.getContext()), {});
+				    Type::getVoidTy(M.getContext()),
+				    {Type::getInt1Ty(M.getContext())});
 	return modified ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
