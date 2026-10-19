@@ -257,6 +257,8 @@ EventLabel::EventLabelKind getReadKind(LoadInst &I)
 	VERIFY(op);
 
 	auto flags = dyn_cast<ConstantInt>(op->getValue())->getZExtValue();
+	if (!GENMC_KIND(flags)) /* attributes only */
+		return Kind::Read;
 	if (GENMC_KIND(flags) == GENMC_KIND_SPECUL)
 		return Kind::SpeculativeRead;
 	else if (GENMC_KIND(flags) == GENMC_KIND_CONFIRM)
@@ -346,6 +348,8 @@ std::pair<EventLabel::EventLabelKind, EventLabel::EventLabelKind> getFaiKinds(At
 	VERIFY(op);
 
 	auto flags = dyn_cast<ConstantInt>(op->getValue())->getZExtValue();
+	if (!GENMC_KIND(flags)) /* attributes only (e.g. LKMM's fully ordered RMWs) */
+		return std::make_pair(Kind::FaiRead, Kind::FaiWrite);
 	if (GENMC_KIND(flags) == GENMC_KIND_NONVR)
 		return std::make_pair(Kind::NoRetFaiRead, Kind::NoRetFaiWrite);
 	else if (GENMC_KIND(flags) == GENMC_KIND_BARRIER)
