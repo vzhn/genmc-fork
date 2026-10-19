@@ -10,6 +10,29 @@ released.
 - Merge of MIXER [POPL'25] into mainline GenMC
 
 
+## [0.19.0-vzhn.8] - 2026.10.19
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Added
+
+- `-lkmm`: SRCU, as the kernel model has it (#58): `srcu_read_lock()`,
+  `srcu_read_unlock()`, `srcu_down_read()`/`srcu_up_read()` (also across
+  threads), `synchronize_srcu()`, `smp_mb__after_srcu_read_unlock()` in
+  `<lkmm.h>`. Misuse (unmatched or multiply matched locks and unlocks, a
+  bad index, a grace period in an RCU section or in a section of its own
+  `srcu_struct`) is reported as invalid RCU usage. All of the litmus
+  corpus's SRCU tests agree with herd7, execution counts included.
+- The manual describes `-lkmm` (#59): `<lkmm.h>`'s primitives, what GenMC
+  checks, and how it relates to herd7, with the known differences.
+
+### Fixed
+
+- The results of atomic add, sub and nand are wrapped to the access width
+  (#55): `fetch_add(&int_var, -1)` on 1 stored 2^32, which gave false
+  safety and liveness violations.
+
+
 ## [0.19.0-vzhn.7] - 2026.10.19
 
 Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
