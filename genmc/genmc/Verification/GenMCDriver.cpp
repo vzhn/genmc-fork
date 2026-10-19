@@ -1256,12 +1256,16 @@ auto GenMCDriver::getSymmetricTidSR(const ThreadCreateLabel *tcLab,
 	if (!getConf()->symmetryReduction)
 		return -1;
 
-	/* Has the user provided any info? */
+	const auto &g = getExec().getGraph();
+	auto isOrphan = [&g](int tid) { return !g.getFirstThreadLabel(tid)->getCreate(); };
+
+	/* Has the user provided any info? (A thread whose create was cut has a
+	 * stale begin and cannot be a symmetric predecessor) */
 	if (childInfo.symmId != -1)
-		return childInfo.symmId;
+		return isOrphan(childInfo.symmId) ? -1 : childInfo.symmId;
 
 	for (auto i = childInfo.id - 1; i > 0; i--)
-		if (isSymmetricToSR(i, tcLab->getPos(), childInfo))
+		if (!isOrphan(i) && isSymmetricToSR(i, tcLab->getPos(), childInfo))
 			return i;
 	return -1;
 }
@@ -1270,7 +1274,9 @@ auto GenMCDriver::handleThreadCreate(std::unique_ptr<ThreadCreateLabel> tcLab) -
 {
 	auto &g = getExec().getGraph();
 
-	/* First, check if the thread to be created already exists */
+	/* First, check if the thread to be created already exists: a restriction
+	 * may have cut the create but kept the (terminated) begin of a thread
+	 * that could not be removed (see ExecutionGraph::copyGraphUpTo()) */
 	int cid = 0;
 	while (std::cmp_less(cid, g.getNumThreads())) {
 		if (!g.isThreadEmpty(cid)) {
@@ -1286,9 +1292,19 @@ auto GenMCDriver::handleThreadCreate(std::unique_ptr<ThreadCreateLabel> tcLab) -
 	tcLab->setChildId(cid);
 	auto *lab = genmc::dyn_cast<ThreadCreateLabel>(addLabelToGraph(std::move(tcLab)));
 
-	/* This tid should not already exist in the graph */
-	VERIFY(std::cmp_equal(cid, g.getNumThreads()));
-	g.addNewThread();
+	if (std::cmp_less(cid, g.getNumThreads())) {
+		/* Revive the thread: replace its stale begin (the thread info may differ) */
+		auto *bLab = g.getFirstThreadLabel(cid);
+		VERIFY(g.getThreadSize(cid) == 1 && !bLab->getCreate() && bLab->isTerminated());
+		if (auto *predLab = bLab->getSymmPredTid() != -1
+					    ? g.getFirstThreadLabel(bLab->getSymmPredTid())
+					    : nullptr;
+		    predLab && predLab->getSymmSuccTid() == cid)
+			predLab->setSymmSuccTid(-1);
+		g.removeLast(cid);
+	} else {
+		g.addNewThread();
+	}
 
 	/* Create a label and add it to the graph; is the thread symmetric to another one? */
 	auto symm = getSymmetricTidSR(lab, lab->getChildInfo());

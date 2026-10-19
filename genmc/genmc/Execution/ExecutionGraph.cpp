@@ -348,29 +348,41 @@ void ExecutionGraph::cutToStamp(Stamp stamp)
 		thr.erase(thr.begin() + preds->getMax(i) + 1, thr.end());
 	}
 
-	/* Remove begins as well */
-	for (auto i : std::views::reverse(thr_ids()) | std::views::take_while([this](auto i) {
-			      return getThreadSize(i) == 1 &&
-				     !genmc::isa<InitLabel>(getFirstThreadLabel(i));
-		      })) {
-		auto *bLab = getFirstThreadLabel(i);
-		VERIFY(bLab);
-		if (!bLab->getCreate()) {
-			if (bLab->getSymmPredTid() != -1) {
-				auto *symmLab = getFirstThreadLabel(bLab->getSymmPredTid());
-				symmLab->setSymmSuccTid(-1);
-			}
-			insertionOrder.remove(*bLab);
-			poLists[i].remove(*bLab);
-			events.erase(events.begin() + i);
-			poLists.erase(poLists.begin() + i);
-		}
-	}
+	/* Remove trailing begins whose create was cut, and terminate the others
+	 * (see copyGraphUpTo()) */
+	removeOrphanBegins();
 
 	/* Fix stamps */
 	resetStamp(0U);
 	for (auto &lab : labels())
 		lab.setStamp(nextStamp());
+}
+
+void ExecutionGraph::removeOrphanBegins()
+{
+	for (auto i = getNumThreads() - 1; i > 0; i--) {
+		auto *bLab = getFirstThreadLabel(i);
+		VERIFY(bLab);
+		if (getThreadSize(i) != 1 || bLab->getCreate())
+			break;
+		if (bLab->getSymmPredTid() != -1) {
+			auto *symmLab = getFirstThreadLabel(bLab->getSymmPredTid());
+			if (symmLab->getSymmSuccTid() == i)
+				symmLab->setSymmSuccTid(-1);
+		}
+		insertionOrder.remove(*bLab);
+		poLists[i].remove(*bLab);
+		events.erase(events.begin() + i);
+		poLists.erase(poLists.begin() + i);
+		VERIFY(i == getNumThreads());
+	}
+	for (auto i = 1; i < getNumThreads(); i++) {
+		auto *bLab = getFirstThreadLabel(i);
+		if (!bLab->getCreate()) {
+			VERIFY(getThreadSize(i) == 1);
+			bLab->setTerminated();
+		}
+	}
 }
 
 void ExecutionGraph::cutLocToView(SAddr addr, const View &v)
@@ -522,25 +534,38 @@ void ExecutionGraph::copyGraphUpTo(ExecutionGraph &other, const VectorClock &v) 
 		}
 	}
 
-	/* Clean up begins */
-	for (auto i :
-	     std::views::reverse(other.thr_ids()) | std::views::take_while([&other](auto i) {
-		     return other.getThreadSize(i) == 1 &&
-			    !genmc::isa<InitLabel>(other.getFirstThreadLabel(i));
-	     })) {
+	/* Clean up begins whose create was not copied (a hole is not a copy; the
+	 * create pointers still refer to this graph, hence the position check).
+	 * Only trailing threads can be removed, as positions embed thread ids;
+	 * the begins of the others are kept around as terminated and are revived
+	 * when their create is re-added (see GenMCDriver::handleThreadCreate()) */
+	auto isCreateCopied = [&other](const ThreadStartLabel *bLab) {
+		return bLab->getCreate() && other.containsPosNonEmpty(bLab->getCreate()->getPos());
+	};
+	for (auto i = other.getNumThreads() - 1; i > 0; i--) {
 		auto *bLab = other.getFirstThreadLabel(i);
 		VERIFY(bLab);
-		/* Have to use containsPos() below due to trailing begins */
-		if (!bLab->getCreate() || !other.containsPos(bLab->getCreate()->getPos())) {
-			if (bLab->getSymmPredTid() != -1) {
-				auto *symmLab = other.getFirstThreadLabel(bLab->getSymmPredTid());
+		if (other.getThreadSize(i) != 1 || isCreateCopied(bLab))
+			break;
+		if (bLab->getSymmPredTid() != -1) {
+			auto *symmLab = other.getFirstThreadLabel(bLab->getSymmPredTid());
+			if (symmLab->getSymmSuccTid() == i)
 				symmLab->setSymmSuccTid(-1);
-			}
-			other.insertionOrder.remove(*bLab);
-			other.poLists[i].remove(*bLab);
-			other.events.erase(other.events.begin() + i);
-			other.poLists.erase(other.poLists.begin() + i);
-			VERIFY(i >= other.getNumThreads() - 1 || other.getThreadSize(i + 1) <= 0);
+		}
+		other.insertionOrder.remove(*bLab);
+		other.poLists[i].remove(*bLab);
+		other.events.erase(other.events.begin() + i);
+		other.poLists.erase(other.poLists.begin() + i);
+		VERIFY(i == other.getNumThreads());
+	}
+	for (auto i = 1; i < other.getNumThreads(); i++) {
+		auto *bLab = other.getFirstThreadLabel(i);
+		if (!isCreateCopied(bLab)) {
+			/* A thread's events are only copied along with its create
+			 * (cutToView() nulls creates of non-empty threads, but only
+			 * in random mode, where graphs are not copied) */
+			VERIFY(other.getThreadSize(i) == 1);
+			bLab->setTerminated();
 		}
 	}
 
