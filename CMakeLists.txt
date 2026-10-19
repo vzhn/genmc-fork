@@ -14,7 +14,7 @@ set(PACKAGE_URL "https://plv.mpi-sws.org/genmc")
 # Releases of this fork are numbered on top of the upstream version they are
 # based on: <upstream>-vzhn.<n>. project(VERSION) must stay numeric, so the
 # suffix only goes into the version that GenMC prints.
-set(GENMC_FORK_RELEASE "vzhn.7")
+set(GENMC_FORK_RELEASE "vzhn.8")
 set(PACKAGE_VERSION "${CMAKE_PROJECT_VERSION}-${GENMC_FORK_RELEASE}")
 set(INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/${PKG_INCLUDE_DIR}")
 set(SRC_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lli/runtime-include/c")
