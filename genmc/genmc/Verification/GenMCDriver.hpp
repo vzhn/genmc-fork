@@ -736,6 +736,11 @@ private:
 	 * and if so moots the current execution */
 	void mootExecutionIfFullyBlocked(EventLabel *bLab);
 
+	/* Checks the whole graph if an event went before kept ones during the
+	 * run; if it is inconsistent, moots the run and has it repeated with
+	 * eager checks. Returns whether the run stands */
+	bool checkPendingKept();
+
 	/** Helper: Wake up any threads blocked on a helping CAS */
 	void unblockWaitingHelping(const WriteLabel *lab);
 
@@ -878,8 +883,14 @@ private:
 
 	/* An event went before kept events: the incremental checks assume an
 	 * event to be added after its thread's others, so the whole graph is
-	 * checked (before the next step, see scheduleNext()) */
+	 * checked. Once, when the run ends (keptCheckPending_): a graph that is
+	 * inconsistent stays so. If it is, the run is repeated with the check
+	 * after each such event (eagerKeptChecks_), so that it adds the work it
+	 * would have added (see scheduleNext() and done()) */
 	bool addedBeforeKept_ = false;
+	bool keptCheckPending_ = false;
+	bool eagerKeptChecks_ = false;
+	bool rerunEagerly_ = false;
 
 	/** Opt: Whether this execution is moot (locking) */
 	bool isMootExecution = false;

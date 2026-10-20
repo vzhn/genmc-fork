@@ -283,6 +283,7 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	/* Set various exploration options for this execution */
 	unmoot();
 	addedBeforeKept_ = false;
+	keptCheckPending_ = false;
 	g.setKeptEventsUnreachable(false);
 	runStartStamp_ = g.getMaxStamp();
 	runStartWork_ = getExec().getWorkqueue().size();
@@ -398,7 +399,7 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		return details.shouldHalt ? std::optional(details.type) : std::nullopt;
 	}
 
-	if (isMoot()) {
+	if (isMoot() || !checkPendingKept()) {
 		GENMC_DEBUG(++result.exploredMoot;);
 		return {};
 	}
@@ -530,7 +531,20 @@ auto GenMCDriver::done() -> bool
 		repairDanglingReads(getExec().getGraph());
 		return false;
 	}
+	/* Repeat a run that was inconsistent after an event went before kept
+	 * ones, checking after each such event (the work it added is cut) */
+	if (rerunEagerly_ && !isHalting()) {
+		rerunEagerly_ = false;
+		eagerKeptChecks_ = true;
+		++result.keptCheckReruns;
+		getExec().getWorkqueue().truncate(runStartWork_);
+		getExec().restrict(runStartStamp_);
+		getConsChecker().recomputeCacheCounters(getExec().getGraph());
+		repairDanglingReads(getExec().getGraph());
+		return false;
+	}
 	relocationsInRun_ = 0;
+	eagerKeptChecks_ = false;
 
 	auto validExecution = false;
 	while (!isHalting() && !validExecution) {
@@ -585,12 +599,26 @@ void GenMCDriver::blockThreadTryMoot(std::unique_ptr<BlockLabel> bLab)
 	mootExecutionIfFullyBlocked(lab);
 }
 
+auto GenMCDriver::checkPendingKept() -> bool
+{
+	if (!keptCheckPending_)
+		return true;
+	keptCheckPending_ = false;
+	if (getConsChecker().isConsistent(getExec().getGraph()))
+		return true;
+	rerunEagerly_ = true;
+	moot();
+	return false;
+}
+
 auto GenMCDriver::scheduleNext(std::span<Action> runnable) -> ScheduleResult
 {
 	auto &g = getExec().getGraph();
 	if (addedBeforeKept_ && !isMoot()) {
 		addedBeforeKept_ = false;
-		if (!getConsChecker().isConsistent(g))
+		if (!eagerKeptChecks_)
+			keptCheckPending_ = true;
+		else if (!getConsChecker().isConsistent(g))
 			moot();
 	}
 	if (g.keptEventsUnreachable()) {
@@ -3124,6 +3152,8 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 				return;
 			}
 		}
+		if (!checkPendingKept())
+			return;
 	}
 
 	/* If under estimation, ignore soft errors; they're gonna be reported later on
@@ -3502,13 +3532,18 @@ auto GenMCDriver::constructBackwardRevisit(const ReadLabel *rLab, const WriteLab
 	return std::make_unique<BackwardRevisit>(rLab, sLab, getRevisitView(rLab, sLab));
 }
 
-/* Find a po-later, same address load, if any, and return where it reads from */
+/* Find a po-later, same address load, if any, and return where it reads from.
+ * A same address store in between (kept or not) ends the search: the later load
+ * may read from it, which RLAB cannot (under LKMM, whose prefix has no rfi, the
+ * load can be kept and the store not) */
 static auto getFixedPlacement(const ExecutionGraph &g, const ReadLabel *rLab, const DepView &v)
 	-> EventLabel *
 {
 	auto tid = rLab->getThread();
 	for (auto j = rLab->getIndex(); j <= v.getMax(tid); j++) {
 		auto pos = Event(tid, j);
+		if (const auto *wLab = g.getWriteLabel(pos); wLab && wLab->getAddr() == rLab->getAddr())
+			return nullptr;
 		if (!v.contains(pos))
 			continue;
 		if (const auto *mLab = g.getReadLabel(pos))

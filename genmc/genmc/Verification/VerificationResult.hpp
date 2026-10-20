@@ -20,6 +20,7 @@ struct VerificationResult {
 	unsigned boundExceeding{}; /**< Number of bound-exceeding executions explored */
 	unsigned relocationReruns{}; /**< Runs repeated after moving a thread's kept events */
 	unsigned relocationsLost{};  /**< Runs dropped: a kept event would be skipped */
+	unsigned keptCheckReruns{};  /**< Runs repeated with eager checks of events before kept ones */
 	long double estimationMean{};	  /**< The mean of estimations */
 	long double estimationVariance{}; /**< The (biased) variance of the estimations */
 	bool inferredSymmetryError{}; /**< Whether the error is unordered writes, an error
@@ -55,6 +56,7 @@ struct VerificationResult {
 		boundExceeding += other.boundExceeding;
 		relocationReruns += other.relocationReruns;
 		relocationsLost += other.relocationsLost;
+		keptCheckReruns += other.keptCheckReruns;
 		estimationMean += other.estimationMean;
 		estimationVariance += other.estimationVariance;
 #ifdef ENABLE_GENMC_DEBUG
