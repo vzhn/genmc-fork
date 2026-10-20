@@ -8,16 +8,50 @@ released.
 ## [Unreleased]
 
 - Merge of MIXER [POPL'25] into mainline GenMC
+
+
+## [0.19.0-vzhn.9] - 2026.10.20
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Added
+
 - `-lkmm`: a control dependency ends at the join of its branch, as in the
-  kernel model: GenMC finds the executions (and bugs) where a write after an
-  `if` is reordered before the read the condition tested. A revisit may now
-  keep events after a branch that the re-run thread takes with another
-  length; GenMC moves them to where their instruction runs. 45 of the 51
-  corpus tests that disagreed with herd7 for this agree now.
-- `-check-replay-keys` (debugging): when GenMC re-runs a thread and reuses
-  an event of the graph, check that the same instance of the same
+  kernel model (#73): GenMC finds the executions (and bugs) where a write
+  after an `if` is reordered before the read the condition tested. A
+  revisit may now keep events after a branch that the re-run thread takes
+  with another length; GenMC moves them to where their instruction runs.
+  45 of the 51 corpus tests that disagreed with herd7 for this agree now;
+  the manual lists the remaining differences.
+- `-check-replay-keys` (debugging, #73): when GenMC re-runs a thread and
+  reuses an event of the graph, check that the same instance of the same
   instruction produced it (an internal error otherwise). Always on under
   `-lkmm`.
+- `--blind-rmw-reduction` (RC11, #69, #72): explores one coherence order of
+  identical relaxed RMWs whose results are unused, instead of all of them;
+  executions that could observe their order are reported as not
+  well-formed.
+- pthread condition variables, modelled on `__VERIFIER_await()` (#67).
+- `tests/lib/go.h`, a model of Go's runtime, and 59 GoBench kernels as
+  tests (#62).
+- `scripts/lkmm/fuzz-ctrl.py`: random litmus tests with branches (#73).
+
+### Fixed
+
+- `-lkmm`: a crash on an indirect call whose target depends on a read, and
+  on a failed `cmpxchg()` that a revisit makes succeed (#73).
+- `-check-liveness` no longer reports a wait in an execution that a failed
+  `__VERIFIER_assume()` cut off (#63).
+- Await, spin-loop and assume conditions are evaluated at their
+  expressions' widths, with their casts (#65): narrow arithmetic gave false
+  liveness violations.
+- Under dependency-tracking models (IMM, LKMM), two allocations of a thread
+  could get overlapping addresses after a revisit (#66): false
+  non-allocated-memory and double-free reports.
+- From the SV-COMP pilot (#67): the message of a failed assertion is
+  printed again; `abort()` is reported as an error instead of killing
+  GenMC; a call with too few arguments is reported instead of crashing;
+  `malloc(0)` and `calloc(0, n)` return a unique pointer that can be freed.
 
 
 ## [0.19.0-vzhn.8] - 2026.10.19
