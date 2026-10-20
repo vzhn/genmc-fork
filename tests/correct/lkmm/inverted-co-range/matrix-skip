@@ -1,0 +1,4 @@
+arb1  # the count depends on the exploration order (issue #77: lost executions)
+arb2  # idem
+arb3  # idem
+wfr   # idem (with -nthreads=2)

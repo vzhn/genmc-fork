@@ -2656,12 +2656,9 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 	unblockWaitingHelping(lab);
 	checkReconsiderReadOpts(lab);
 
-	/* Find all possible placings in coherence for this store, and
-	 * print a WW-race warning if appropriate (if this moots,
-	 * exploration will anyway be cut) */
+	/* Find all possible placings in coherence for this store */
 	auto cos = getConsChecker().getCoherentPlacings(lab);
-	if (cos.size() > 1)
-		reportWarningOnce(lab->getPos(), VerificationError::VE_WWRace, cos[0]);
+	const auto *racyLab = cos.size() > 1 ? cos[0] : nullptr;
 
 	const EventLabel *co = nullptr;
 	if (inEstimationMode() || inRandomMode()) {
@@ -2672,6 +2669,12 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 		co = findConsistentCo(lab, cos);
 		calcCoOrderings(lab, cos);
 	}
+
+	/* Print a WW-race warning if appropriate (if this moots, exploration
+	 * will anyway be cut), once the store is in coherence: reporting may
+	 * check the whole graph (see reportError()) */
+	if (racyLab)
+		reportWarningOnce(lab->getPos(), VerificationError::VE_WWRace, racyLab);
 
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug2, "--- Added store {}\n{}", lab->getPos(),
 			getExec().getGraph()););
