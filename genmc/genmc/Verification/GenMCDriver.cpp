@@ -3399,6 +3399,42 @@ auto GenMCDriver::isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLab
 	});
 }
 
+/* Whether LAB, a write to the location of the revisiting write, follows in
+ * coherence a write that the revisit keeps although that write was added after
+ * LAB and is no RMW (it was placed non-maximally). Under LKMM, whose prefix keeps
+ * a write po-before the revisiting one to the same location (moi), the revisit
+ * deletes LAB and hides that placement; the same graph then follows from the
+ * revisit of the kept write itself (tests/correct/lkmm/dup-revisit-nested-if).
+ * Only when that other path exists: the read is no RMW and could read from the
+ * kept write (which follows the read's write in coherence). Otherwise, the
+ * graph where the kept write is placed maximally is rejected too, by
+ * isCoBeforeSavedPrefix(), and this one is the only path */
+auto GenMCDriver::isCoAfterLaterSavedWrite(const BackwardRevisit &r, const EventLabel *lab) -> bool
+{
+	const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
+	if (!wLab)
+		return false;
+
+	auto &g = getExec().getGraph();
+	const auto *rLab = g.getReadLabel(r.getPos());
+	if (rLab->isRMW() || wLab->getAddr() != g.getWriteLabel(r.getRev())->getAddr())
+		return false;
+
+	/* The kept write could have been read instead of the read's write */
+	const auto *rfLab = genmc::dyn_cast<WriteLabel>(rLab->getRf());
+	auto readable = [&](auto &pLab) {
+		return !rfLab || rfLab == &pLab ||
+		       std::ranges::any_of(g.co_succs(rfLab),
+					   [&](auto &sLab) { return &sLab == &pLab; });
+	};
+	const auto &v = r.getViewNoRel();
+	return std::ranges::any_of(g.co_preds(wLab), [&](auto &pLab) {
+		return pLab.getPos() != r.getRev() && !pLab.isRMW() && !pLab.wasAddedMax() &&
+		       v->contains(pLab.getPos()) && pLab.getStamp() > wLab->getStamp() &&
+		       readable(pLab);
+	});
+}
+
 auto GenMCDriver::coherenceSuccRemainInGraph(const BackwardRevisit &r) -> bool
 {
 	auto &g = getExec().getGraph();
@@ -3453,6 +3489,8 @@ auto GenMCDriver::isMaximalExtension(const BackwardRevisit &r) -> bool
 		if (!wasAddedMaximally(&lab))
 			return false;
 		if (isCoBeforeSavedPrefix(r, &lab))
+			return false;
+		if (isCoAfterLaterSavedWrite(r, &lab))
 			return false;
 	}
 	return true;

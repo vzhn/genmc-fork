@@ -639,6 +639,10 @@ private:
 
 	auto isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLabel *lab) -> bool;
 
+	/** Whether LAB is a write that a write of the saved prefix, added after LAB
+	 * and to the same location, precedes in coherence */
+	auto isCoAfterLaterSavedWrite(const BackwardRevisit &r, const EventLabel *lab) -> bool;
+
 	auto coherenceSuccRemainInGraph(const BackwardRevisit &r) -> bool;
 
 	/** Returns true if all events to be removed by the revisit
