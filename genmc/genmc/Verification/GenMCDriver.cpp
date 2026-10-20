@@ -3502,13 +3502,18 @@ auto GenMCDriver::constructBackwardRevisit(const ReadLabel *rLab, const WriteLab
 	return std::make_unique<BackwardRevisit>(rLab, sLab, getRevisitView(rLab, sLab));
 }
 
-/* Find a po-later, same address load, if any, and return where it reads from */
+/* Find a po-later, same address load, if any, and return where it reads from.
+ * A same address store in between (kept or not) ends the search: the later load
+ * may read from it, which RLAB cannot (under LKMM, whose prefix has no rfi, the
+ * load can be kept and the store not) */
 static auto getFixedPlacement(const ExecutionGraph &g, const ReadLabel *rLab, const DepView &v)
 	-> EventLabel *
 {
 	auto tid = rLab->getThread();
 	for (auto j = rLab->getIndex(); j <= v.getMax(tid); j++) {
 		auto pos = Event(tid, j);
+		if (const auto *wLab = g.getWriteLabel(pos); wLab && wLab->getAddr() == rLab->getAddr())
+			return nullptr;
 		if (!v.contains(pos))
 			continue;
 		if (const auto *mLab = g.getReadLabel(pos))
