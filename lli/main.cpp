@@ -1034,24 +1034,51 @@ auto main(int argc, char **argv) -> int
 		printRandomResults(conf, res);
 		break;
 	}
-	case ExplorationMode::verify:
+	case ExplorationMode::verify: {
+		/* Unordered writes are an error under SR. If GenMC inferred all
+		 * symmetries itself, they are not the user's: start over without SR */
+		auto retryWithoutSR = [&](const VerificationResult &r) {
+			if (!r.status.has_value() || !r.inferredSymmetryError)
+				return false;
+			LOG(VerbosityLevel::Tip,
+			    "Symmetry reduction does not support the unordered writes found. "
+			    "Starting over without it (-disable-sr avoids the first attempt).");
+			conf->symmetryReduction = false;
+			return true;
+		};
+
 		/* Estimate the state space anyway */
 		if (conf->estimate) {
 			LOG(VerbosityLevel::Tip,
 			    "Estimating state-space size before verification. For better "
 			    "performance, you can use --disable-estimation.");
 			res = estimate(lliConfig, conf, moduleUP, modInfo);
+			if (retryWithoutSR(res))
+				res = estimate(lliConfig, conf, moduleUP, modInfo);
 			printEstimationResults(conf, begin, res);
 			if (res.status.has_value())
 				return EVERIFY;
 		}
+
+		/* Keep a copy of the module in case verification is repeated */
+		std::unique_ptr<llvm::LLVMContext> spareCtx;
+		std::unique_ptr<llvm::Module> spareMod;
+		std::unique_ptr<ModuleInfo> spareMI;
+		if (conf->symmetryReduction) {
+			spareCtx = std::make_unique<llvm::LLVMContext>();
+			spareMod = LLVMModule::cloneModule(moduleUP, spareCtx);
+			spareMI = modInfo->clone(*spareMod);
+		}
 		res = verify(lliConfig, conf, std::move(moduleUP), std::move(modInfo));
+		if (retryWithoutSR(res))
+			res = verify(lliConfig, conf, std::move(spareMod), std::move(spareMI));
 		printVerificationResults(conf, res);
 
 		/* Serialize spec if in analysis mode */
 		if (conf->collectLinSpec)
 			calculateHintsAndSaveSpec(conf, res);
 		break;
+	}
 	}
 
 	PRINT(VerbosityLevel::Error, "\nTotal wall-clock time: {:.2f}s\n", getElapsedSecs(begin));

@@ -1686,20 +1686,46 @@ auto GenMCDriver::isSymmetricToSR(int candidate, Event parent, const ThreadInfo 
 			 cInfo.id, info.id);
 	};
 
-	/* First, check that the two threads are actually similar */
+	/* First, check that the two threads are actually similar (the arguments
+	 * only matter if the thread body reads its argument) */
 	if (cInfo.id == info.id || cInfo.parentId != info.parentId || cInfo.funId != info.funId ||
-	    cInfo.arg != info.arg) {
+	    (info.argUsed && cInfo.arg != info.arg)) {
 		if (cInfo.funId == info.funId && cInfo.parentId == info.parentId)
 			tipSymmetry();
 		return false;
 	}
 
-	/* Then make sure that there is no memory access in between the spawn events */
+	/* Then make sure that there is no memory access in between the spawn
+	 * events, other than to memory only the parent can access (e.g.,
+	 * storing the first thread's handle into a local array) */
 	auto bounds = std::minmax(parent.index, cParent.index);
 	auto lastMemAccess = g.getState().getLastMemAccess(parent.thread);
-	if (lastMemAccess > bounds.first && lastMemAccess <= bounds.second) {
+	if (lastMemAccess > bounds.first && lastMemAccess <= bounds.second &&
+	    !areThreadPrivateAccesses(parent.thread, bounds.first + 1, lastMemAccess)) {
 		tipSymmetry();
 		return false;
+	}
+	return true;
+}
+
+auto GenMCDriver::areThreadPrivateAccesses(int tid, int from, int to) const -> bool
+{
+	/* Without labels for non-atomic accesses, they cannot be told apart */
+	if constexpr (!Config::emitNALabels)
+		return false;
+
+	const auto &g = getExec().getGraph();
+	const auto &state = g.getState();
+	for (auto i = from; i <= to; i++) {
+		const auto *mLab = genmc::dyn_cast<MemAccessLabel>(g.getEventLabel(Event(tid, i)));
+		if (!mLab)
+			continue;
+		if (!state.isAllocated(mLab->getAddr()))
+			return false;
+		const auto *aLab = genmc::dyn_cast_if_present<MallocLabel>(
+			g.getEventLabel(state.getAllocPos(mLab->getAddr())));
+		if (!aLab || !aLab->isThreadPrivate() || aLab->getThread() != tid)
+			return false;
 	}
 	return true;
 }
@@ -2691,8 +2717,8 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 
 auto GenMCDriver::handleMalloc(Event pos, ASize size, uint64_t alignment, StorageDuration sdur,
 			       StorageType styp, AddressSpace spc, const NameInfo *info,
-			       const std::string &name, const EventDeps &deps, bool zeroed)
-	-> HandleResult<SVal>
+			       const std::string &name, const EventDeps &deps, bool zeroed,
+			       bool threadPrivate) -> HandleResult<SVal>
 {
 	auto &g = getExec().getGraph();
 
@@ -2703,6 +2729,7 @@ auto GenMCDriver::handleMalloc(Event pos, ASize size, uint64_t alignment, Storag
 	auto addr = g.getState().onAlloc(pos, size, alignment, sdur, styp, spc);
 	configureProbe(mallocProbeLab_.get(), pos, addr, size, deps);
 	mallocProbeLab_->setZeroed(zeroed);
+	mallocProbeLab_->setThreadPrivate(threadPrivate);
 
 	auto guard = g.addScoped(mallocProbeLab_);
 	auto *lab = guard.get();
@@ -2725,7 +2752,7 @@ auto GenMCDriver::handleMalloc(Event pos, ASize size, uint64_t alignment, Storag
 auto GenMCDriver::handleMalloc(const EventDbgInfo *dbg, Event pos, ASize size, uint64_t alignment,
 			       StorageDuration sdur, StorageType styp, AddressSpace spc,
 			       const NameInfo *info, const std::string &name, const EventDeps &deps,
-			       bool zeroed) -> HandleResult<SVal>
+			       bool zeroed, bool threadPrivate) -> HandleResult<SVal>
 {
 	auto &g = getExec().getGraph();
 
@@ -2751,7 +2778,8 @@ auto GenMCDriver::handleMalloc(const EventDbgInfo *dbg, Event pos, ASize size, u
 		return {.result = SVal(addr.get()), .count = Config::emitNALabels ? 1U : 0U};
 	}
 
-	return handleMalloc(pos, size, alignment, sdur, styp, spc, info, name, deps, zeroed);
+	return handleMalloc(pos, size, alignment, sdur, styp, spc, info, name, deps, zeroed,
+			    threadPrivate);
 }
 
 auto GenMCDriver::handleRetire(Event pos, SAddr loc, const EventDeps &deps)
@@ -3058,21 +3086,31 @@ auto GenMCDriver::reportWarningOnce(Event pos, VerificationError wcode,
 
 		auto &g = getExec().getGraph();
 		auto *lab = g.getEventLabel(pos);
-		auto upgrade =
-			(getConf()->symmetryReduction &&
-			 std::ranges::any_of(
-				 g.thr_ids(),
-				 [&](auto tid) {
-					 return g.getFirstThreadLabel(tid)->getSymmPredTid() != -1;
-				 })) ||
-			(getConf()->ipr && std::ranges::any_of(g.samelocs(lab), [&](auto &oLab) {
-				 auto *rLab = genmc::dyn_cast<ReadLabel>(&oLab);
-				 return rLab && rLab->getAnnot();
-			 }));
+		auto isSymmetric = [&](auto tid) {
+			return g.getFirstThreadLabel(tid)->getSymmPredTid() != -1;
+		};
+		auto srUpgrade = getConf()->symmetryReduction &&
+				 std::ranges::any_of(g.thr_ids(), isSymmetric);
+		auto iprUpgrade =
+			getConf()->ipr && std::ranges::any_of(g.samelocs(lab), [&](auto &oLab) {
+				auto *rLab = genmc::dyn_cast<ReadLabel>(&oLab);
+				return rLab && rLab->getAnnot();
+			});
+		auto upgrade = srUpgrade || iprUpgrade;
+
+		/* Without the symmetries GenMC inferred itself (rather than the user
+		 * declared), this would only be a warning: verification may be
+		 * repeated without SR */
+		if (upgrade)
+			getResult().inferredSymmetryError =
+				!iprUpgrade && std::ranges::none_of(g.thr_ids(), [&](auto tid) {
+					return isSymmetric(tid) &&
+					       g.getFirstThreadLabel(tid)->getThreadInfo().symmId !=
+						       -1;
+				});
 		auto [cause, cli] =
-			getConf()->ipr
-				? std::make_pair("in-place revisiting (IPR)"s, "-disable-ipr"s)
-				: std::make_pair("symmetry reduction (SR)"s, "-disable-sr"s);
+			iprUpgrade ? std::make_pair("in-place revisiting (IPR)"s, "-disable-ipr"s)
+				   : std::make_pair("symmetry reduction (SR)"s, "-disable-sr"s);
 		auto msg = "Unordered writes do not constitute a bug per se, though they often "
 			   "indicate faulty design.\n" +
 			   (upgrade ? ("This warning is treated as an error due to " + cause +

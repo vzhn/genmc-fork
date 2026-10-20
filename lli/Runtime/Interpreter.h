@@ -350,6 +350,10 @@ protected:
 	/* Post-dominator trees, per function (see getBranchJoin()) */
 	llvm::DenseMap<const Function *, std::unique_ptr<llvm::PostDominatorTree>> postDoms_;
 
+	/* Whether an alloca's address never leaves its function (see
+	 * isThreadPrivateAlloca()), per alloca */
+	llvm::DenseMap<const AllocaInst *, bool> privateAllocas_;
+
 	/* Registers (and their Values) mentioned by each load annotation; filled
 	 * lazily by getCurrentAnnotConcretized() */
 	std::unordered_map<AnnotID, std::vector<std::pair<AnnotID, const Value *>>> annotRegs_;
@@ -775,6 +779,10 @@ private: // Helper functions
 
 	/* After the read of the CAS I (see the definition) */
 	void updateCasCtrlDeps(AtomicCmpXchgInst &I);
+
+	/* Whether the address of AI's memory never leaves AI's function, so only
+	 * the thread running the function can access the memory */
+	bool isThreadPrivateAlloca(const AllocaInst *AI);
 
 	/* The join of the branch ending BB (nullptr: the function's exit) */
 	const BasicBlock *getBranchJoin(BasicBlock *BB);

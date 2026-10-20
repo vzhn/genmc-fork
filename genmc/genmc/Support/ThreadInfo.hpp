@@ -24,6 +24,7 @@ struct ThreadInfo {
 	SVal arg;	      /**< Argument to pthread_create */
 	std::string name;     /**< Thread name */
 	int symmId = -1;      /**< ID of previous symmetric thread if any, -1 otherwise */
+	bool argUsed = true;  /**< Whether the thread body reads its argument at all */
 
 	ThreadInfo() = default;
 	ThreadInfo(int id, int parentId, unsigned funId, SVal arg, std::string name, int symm = -1)

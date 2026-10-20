@@ -455,8 +455,24 @@ int main()
 
 In order for symmetry reduction to actually take place, the spawned
 threads need to share exactly the same code, have exactly the same
-arguments, and also there must not be any memory access (at the
-LLVM-IR level) between the spawn instructions.
+arguments (unless the thread function never reads its argument), and
+also there must not be any memory access (at the LLVM-IR level) between
+the spawn instructions. Accesses to local
+variables whose address never leaves their function are exempt, as no
+other thread can see them. Threads spawned in a loop into a local
+`pthread_t` array are therefore symmetric too:
+
+```c
+    pthread_t t[3];
+
+    for (int i = 0; i < 3; i++)
+        pthread_create(&t[i], NULL, thread_n, NULL);
+```
+
+Symmetry reduction treats unordered writes (two writes to the same
+location that no synchronization orders) as an error. If GenMC inferred
+all the symmetries itself, it instead starts verification over without
+symmetry reduction; `-disable-sr` avoids the first attempt.
 
 To make GenMC use symmetry reduction, one can use the primitive
 `__VERIFIER_spawn_symmetric(fun, tid)` (defined in `genmc.h`), the
@@ -468,9 +484,11 @@ last argument of which is the thread identifier of the last
 Threads that each apply the same relaxed read-modify-write to a counter
 and ignore its result, such as statistics or progress counters, write
 the same sequence of values in every order. Without help, GenMC still
-explores each of their N! coherence orders. With
-`-blind-rmw-reduction` (RC11 only), it explores one. The following
-program has 6 executions by default and 1 with the flag:
+explores each of their N! coherence orders, unless symmetry reduction
+applies. With `-blind-rmw-reduction` (RC11 only), it explores one. In
+the following program, each worker gets its own index, so the workers
+are not symmetric. The program has 6 executions by default and 1 with
+the flag:
 
 ```c
 /* file: blind.c */
@@ -481,9 +499,11 @@ program has 6 executions by default and 1 with the flag:
 #define N 3
 
 atomic_int hits;
+atomic_int seen[N];
 
 void *worker(void *arg)
 {
+    atomic_store_explicit(&seen[(long)arg], 1, memory_order_relaxed);
     atomic_fetch_add_explicit(&hits, 1, memory_order_relaxed);
     return NULL;
 }
@@ -492,8 +512,8 @@ int main()
 {
     pthread_t t[N];
 
-    for (int i = 0; i < N; i++)
-        pthread_create(&t[i], NULL, worker, NULL);
+    for (long i = 0; i < N; i++)
+        pthread_create(&t[i], NULL, worker, (void *)i);
     for (int i = 0; i < N; i++)
         pthread_join(t[i], NULL);
     assert(atomic_load_explicit(&hits, memory_order_relaxed) == N);
