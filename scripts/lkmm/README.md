@@ -611,7 +611,7 @@ Results (2026-10-20):
 | kernel `litmus-tests` (35) | 35 agree (with `--strict-counts`) |
 | `tests/correct/lkmm` (new: `ctrl-*`, `cas-fail-then-write`, `plain-lb2` from cooking) | pass, also with `-lkmm-reference` |
 | fast suite (rc11, imm, lkmm), also with `-check-replay-keys` | pass |
-| feature matrix | 1925 runs, no deviation |
+| feature matrix | 1944 runs, no deviation |
 | unit tests (`BUILD_TESTS=ON`, incl. `RelocateTest`) | pass |
 
 ## Kater and the generated checkers
