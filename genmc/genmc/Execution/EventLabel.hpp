@@ -1573,6 +1573,11 @@ public:
 	auto isZeroed() const -> bool { return zeroed; }
 	void setZeroed(bool z) { zeroed = z; }
 
+	/** Whether only the allocating thread can access the block: a local
+	 * variable whose address never leaves its function */
+	auto isThreadPrivate() const -> bool { return threadPrivate; }
+	void setThreadPrivate(bool p) { threadPrivate = p; }
+
 	void reset() override
 	{
 		MemLifecycleLabel::reset();
@@ -1605,6 +1610,9 @@ private:
 
 	/** Whether the block is zero-initialized by the allocation */
 	bool zeroed{};
+
+	/** Whether only the allocating thread can access the block */
+	bool threadPrivate{};
 };
 
 /*******************************************************************************

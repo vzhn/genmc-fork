@@ -1,2 +1,2 @@
--blind-rmw-reduction |
-|
+-disable-sr -blind-rmw-reduction |
+-disable-sr |

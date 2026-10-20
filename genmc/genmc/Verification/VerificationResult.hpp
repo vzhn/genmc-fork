@@ -22,6 +22,8 @@ struct VerificationResult {
 	unsigned relocationsLost{};  /**< Runs dropped: a kept event would be skipped */
 	long double estimationMean{};	  /**< The mean of estimations */
 	long double estimationVariance{}; /**< The (biased) variance of the estimations */
+	bool inferredSymmetryError{}; /**< Whether the error is unordered writes, an error
+					only because of symmetries GenMC inferred */
 #ifdef ENABLE_GENMC_DEBUG
 	unsigned exploredMoot{};	       /**< Number of moot executions _encountered_ */
 	unsigned duplicates{};		       /**< Number of duplicate executions explored */
@@ -39,8 +41,10 @@ struct VerificationResult {
 	auto operator+=(VerificationResult &&other) -> VerificationResult &
 	{
 		/* Propagate latest error */
-		if (other.status.has_value())
+		if (other.status.has_value()) {
 			status = other.status;
+			inferredSymmetryError = other.inferredSymmetryError;
+		}
 		message += other.message;
 		explored += other.explored;
 		exploredBlocked += other.exploredBlocked;

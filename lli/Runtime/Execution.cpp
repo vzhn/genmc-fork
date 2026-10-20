@@ -35,6 +35,7 @@
 #include "passes/LLVMUtils.hpp"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/CaptureTracking.h"
 #include "llvm/CodeGen/IntrinsicLowering.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -1475,7 +1476,8 @@ void Interpreter::visitAllocaInst(AllocaInst &I)
 	auto ret = CALL_DRIVER(handleMalloc, currDbgInfo(), currPos(), MemToAlloc,
 			       I.getAlign().value(), StorageDuration::SD_Automatic,
 			       StorageType::ST_Volatile, AddressSpace::AS_User, info,
-			       I.getName().str(), GET_DEPS(deps));
+			       I.getName().str(), GET_DEPS(deps), /* zeroed */ false,
+			       isThreadPrivateAlloca(&I));
 	auto retVal = std::get_if<SVal>(&ret);
 	if (!retVal)
 		return;
@@ -3870,6 +3872,22 @@ void Interpreter::updateCasCtrlDeps(AtomicCmpXchgInst &I)
 	 * every later event, unless they all depend on the CAS */
 	if (scopesCtrlDeps() && I.getSuccessOrdering() != I.getFailureOrdering())
 		updateCtrlDeps(getCurThr().id, currPos());
+}
+
+bool Interpreter::isThreadPrivateAlloca(const AllocaInst *AI)
+{
+	if (auto it = privateAllocas_.find(AI); it != privateAllocas_.end())
+		return it->second;
+#if LLVM_VERSION_MAJOR >= 21
+	/* Comparisons capture only the address, which gives no other thread a
+	 * pointer it may access the memory through (arrays initialized in a loop
+	 * compare pointers) */
+	auto captured = capturesAnyProvenance(PointerMayBeCaptured(
+		AI, /* ReturnCaptures */ true, CaptureComponents::Provenance));
+#else
+	auto captured = PointerMayBeCaptured(AI, /* ReturnCaptures */ true, /* StoreCaptures */ true);
+#endif
+	return privateAllocas_[AI] = !captured;
 }
 
 const BasicBlock *Interpreter::getBranchJoin(BasicBlock *BB)

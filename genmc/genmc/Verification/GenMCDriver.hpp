@@ -259,7 +259,7 @@ public:
 	auto handleMalloc(const EventDbgInfo *dbg, Event pos, ASize size, uint64_t alignment,
 			  StorageDuration sdur, StorageType styp, AddressSpace spc,
 			  const NameInfo *info, const std::string &name, const EventDeps &deps,
-			  bool zeroed = false) -> HandleResult<SVal>;
+			  bool zeroed = false, bool threadPrivate = false) -> HandleResult<SVal>;
 
 	/** A call to free() has been interpreted, nothing for the intepreter */
 	auto handleFree(const EventDbgInfo *dbg, Event pos, SAddr loc, const EventDeps &deps)
@@ -478,8 +478,8 @@ private:
 			   const EventDeps &deps) -> NAStoreResult;
 	auto handleMalloc(Event pos, ASize size, uint64_t alignment, StorageDuration sdur,
 			  StorageType styp, AddressSpace spc, const NameInfo *info,
-			  const std::string &name, const EventDeps &deps, bool zeroed = false)
-		-> HandleResult<SVal>;
+			  const std::string &name, const EventDeps &deps, bool zeroed = false,
+			  bool threadPrivate = false) -> HandleResult<SVal>;
 	auto handleFree(Event pos, SAddr loc, const EventDeps &deps)
 		-> HandleResult<std::monostate>;
 	auto handleRetire(Event pos, SAddr loc, const EventDeps &deps)
@@ -748,6 +748,10 @@ private:
 
 	/** SR: Checks whether CANDIDATE is symmetric to PARENT/INFO */
 	auto isSymmetricToSR(int candidate, Event parent, const ThreadInfo &info) const -> bool;
+
+	/* Whether TID's memory accesses in [FROM, TO] only touch memory no other
+	 * thread can access */
+	auto areThreadPrivateAccesses(int tid, int from, int to) const -> bool;
 
 	/** SR: Returns the (greatest) ID of a thread that is symmetric to PARENT/INFO */
 	auto getSymmetricTidSR(const ThreadCreateLabel *tcLab, const ThreadInfo &info) const -> int;
