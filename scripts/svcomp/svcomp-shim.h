@@ -12,11 +12,9 @@
  * -D flags through the shell unquoted. Nondeterminism, atomic sections and
  * main are handled in svcomp-shim-core.h.
  *
- * - pthread_cond_*: GenMC's pthread.h leaves condition variables out. Here a
- *   condvar is a sequence number: wait() unlocks the mutex, waits until the
- *   number changes and locks the mutex again; signal() and broadcast() both
- *   bump it, so a signal may wake every waiter, which POSIX allows. A wait
- *   may also return without any signal (see svcomp-shim-core.h).
+ * - pthread_cond_wait: GenMC's pthread.h models condition variables, but its
+ *   wait only returns after a signal or broadcast. Here a wait may also
+ *   return without any signal (see svcomp-shim-core.h).
  * - pthread_once: a three-state word (0 not run, 1 running, 2 done).
  * - Recursive mutexes: with SVC_RECURSIVE_MUTEX=1 (svcomp-run.py sets it
  *   when the task mentions PTHREAD_MUTEX_RECURSIVE), a mutex initialised
@@ -128,44 +126,20 @@ static int __svc_mutex_unlock(pthread_mutex_t *m)
 }
 #endif
 
-/* condition variables */
-typedef struct { atomic_int __seq; } pthread_cond_t;
-typedef long pthread_condattr_t;
-
-int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a)
+/* condition variables: GenMC's pthread.h models them, but its wait only
+ * returns after a signal or broadcast. SV-COMP also allows spurious wakeups */
+static int __svc_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
 {
-	atomic_init(&c->__seq, 0);
-	return 0;
-}
-
-int pthread_cond_destroy(pthread_cond_t *c) { return 0; }
-
-int pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
-{
-	int seq = atomic_load_explicit(&c->__seq, memory_order_acquire);
+	unsigned int seq = __atomic_load_n(&c->__seq, __ATOMIC_ACQUIRE);
 	int spurious = __svc_spurious_wakeup();
 
 	pthread_mutex_unlock(m);
 	if (!spurious)
-		__VERIFIER_await(atomic_load_explicit(&c->__seq, memory_order_acquire) != seq);
+		__VERIFIER_await(__atomic_load_n(&c->__seq, __ATOMIC_ACQUIRE) != seq);
 	pthread_mutex_lock(m);
 	return 0;
 }
-
-int pthread_cond_signal(pthread_cond_t *c)
-{
-	atomic_fetch_add_explicit(&c->__seq, 1, memory_order_release);
-	return 0;
-}
-
-int pthread_cond_broadcast(pthread_cond_t *c)
-{
-	atomic_fetch_add_explicit(&c->__seq, 1, memory_order_release);
-	return 0;
-}
-
-int pthread_condattr_init(pthread_condattr_t *a) { return 0; }
-int pthread_condattr_destroy(pthread_condattr_t *a) { return 0; }
+#define pthread_cond_wait(c, m) __svc_cond_wait(c, m)
 
 /* pthread_once */
 typedef atomic_int pthread_once_t;
