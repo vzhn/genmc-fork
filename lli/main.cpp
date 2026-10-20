@@ -20,7 +20,9 @@
 #include "genmc/lli_config.h"
 #include "passes/LLIConfig.hpp"
 #include "passes/LLVMModule.hpp"
+#include "passes/LLVMUtils.hpp"
 
+#include <llvm/IR/InstIterator.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/DynamicLibrary.h>
 
@@ -493,8 +495,21 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 #endif
 }
 
-static void adjustConfig(const ModuleInfo &modInfo, Config &conf)
+static auto hasFinalWrites(llvm::Module &mod) -> bool
 {
+	for (auto &F : mod)
+		for (auto &I : llvm::instructions(F))
+			if (!!(getWriteAttr(I) & WriteAttr::Final))
+				return true;
+	return false;
+}
+
+static void adjustConfig(llvm::Module &mod, const ModuleInfo &modInfo, Config &conf)
+{
+	/* Without final writes, there are no final-write annotations to check */
+	if (conf.finalWrite && !hasFinalWrites(mod))
+		conf.finalWrite = false;
+
 	/* Warn if BAM is enabled and barrier results might be used */
 	if (!conf.disableBAM && modInfo.barrierResultsUsed.has_value() &&
 	    *modInfo.barrierResultsUsed == BarrierRetResult::Used) {
@@ -1019,7 +1034,7 @@ auto main(int argc, char **argv) -> int
 	/* Perform the necessary transformations */
 	auto modInfo = std::make_unique<ModuleInfo>(*moduleUP);
 	transformInput(lliConfig, *moduleUP, *modInfo);
-	adjustConfig(*modInfo, *conf);
+	adjustConfig(*moduleUP, *modInfo, *conf);
 	PRINT(VerbosityLevel::Error, "*** Transformation complete.\n");
 
 	VerificationResult res;

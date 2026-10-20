@@ -32372,9 +32372,6 @@ bool LKMMChecker::visitUnlessError3(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError3Accepting.clear();
-	visitedLHSUnlessError3Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	auto &v = lab->view(1);
 
 	/* Explore from all accepting states in LHS using DFS */
@@ -32454,11 +32451,6 @@ bool LKMMChecker::visitUnlessError4(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError4Accepting.clear();
-	visitedLHSUnlessError4Accepting.resize(g.getMaxStamp().get() + 1, false);
-	visitedRHSUnlessError4Accepting.clear();
-	visitedRHSUnlessError4Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
 		{1, lab},
@@ -32467,13 +32459,6 @@ bool LKMMChecker::visitUnlessError4(const EventLabel *lab) const
 	if (!visitLHSUnlessError4Iterative(startStatesLHS))
 		return false;
 
-	for (auto i = 0u; i < visitedLHSUnlessError4Accepting.size(); i++) {
-		if (visitedLHSUnlessError4Accepting[i] && !visitedRHSUnlessError4Accepting[i]) {
-			cexLab = &*std::find_if(g.label_begin(), g.label_end(),
-						[&](auto &lab) { return lab.getStamp() == i; });
-			return false;
-		}
-	}
 	return true;
 }
 
@@ -32536,9 +32521,6 @@ bool LKMMChecker::visitLHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &w
 bool LKMMChecker::visitUnlessError5(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedLHSUnlessError5Accepting.clear();
-	visitedLHSUnlessError5Accepting.resize(g.getMaxStamp().get() + 1, false);
 
 	auto &v = lab->view(1);
 
@@ -32618,11 +32600,6 @@ bool LKMMChecker::visitUnlessError6(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError6Accepting.clear();
-	visitedLHSUnlessError6Accepting.resize(g.getMaxStamp().get() + 1, false);
-	visitedRHSUnlessError6Accepting.clear();
-	visitedRHSUnlessError6Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
 		{1, lab},
@@ -32631,13 +32608,6 @@ bool LKMMChecker::visitUnlessError6(const EventLabel *lab) const
 	if (!visitLHSUnlessError6Iterative(startStatesLHS))
 		return false;
 
-	for (auto i = 0u; i < visitedLHSUnlessError6Accepting.size(); i++) {
-		if (visitedLHSUnlessError6Accepting[i] && !visitedRHSUnlessError6Accepting[i]) {
-			cexLab = &*std::find_if(g.label_begin(), g.label_end(),
-						[&](auto &lab) { return lab.getStamp() == i; });
-			return false;
-		}
-	}
 	return true;
 }
 
@@ -32700,9 +32670,6 @@ bool LKMMChecker::visitLHSUnlessWarning7Iterative(std::vector<DFSWorklistEntry> 
 bool LKMMChecker::visitUnlessWarning7(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedLHSUnlessWarning7Accepting.clear();
-	visitedLHSUnlessWarning7Accepting.resize(g.getMaxStamp().get() + 1, false);
 
 	auto &v = lab->view(1);
 

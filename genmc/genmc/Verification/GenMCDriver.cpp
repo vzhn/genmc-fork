@@ -1042,8 +1042,10 @@ auto GenMCDriver::checkIPRValidity(const ReadLabel *rLab) -> std::optional<Verif
 		return {};
 
 	auto &g = getExec().getGraph();
-	auto racyIt = std::ranges::find_if(
-		g.co(rLab->getAddr()), [&](auto &wLab) { return wLab.hasAttr(WriteAttr::WWRacy); });
+	if (!g.mayHaveWWRacyWrites())
+		return {};
+	auto racyIt = std::ranges::find_if(g.co(rLab->getAddr()),
+					   [&](auto &wLab) { return wLab.isWWRacy(); });
 	if (racyIt == std::ranges::end(g.co(rLab->getAddr())))
 		return {};
 
@@ -1864,33 +1866,26 @@ auto GenMCDriver::checkSymmetricJoinOrder(const ThreadJoinLabel *jLab)
 	if (cid < 0 || long(g.getNumThreads()) <= cid)
 		return std::nullopt;
 
-	auto joined = [&](int tid) {
-		for (auto i = 1; i < jLab->getIndex(); i++) {
-			const auto *oLab = genmc::dyn_cast<ThreadJoinLabel>(
-				g.getEventLabel(Event(jLab->getThread(), i)));
-			if (oLab && oLab->getChildId() == tid)
-				return true;
-		}
-		return false;
-	};
-	auto inferred = true;
-	auto ok = true;
 	/* The return value is another way to tell symmetric threads apart */
 	const auto *cLab = g.getFirstThreadLabel(cid);
-	auto symmetric = cLab->getSymmPredTid() != -1 || cLab->getSymmSuccTid() != -1;
+	auto pred = cLab->getSymmPredTid();
+	auto symmetric = pred != -1 || cLab->getSymmSuccTid() != -1;
 	auto resultUsed = symmetric && jLab->isResultUsed();
-	ok = !resultUsed;
-	for (auto tid = cid; tid != -1;) {
-		const auto *bLab = g.getFirstThreadLabel(tid);
-		inferred &= bLab->getThreadInfo().symmId == -1;
-		auto pred = bLab->getSymmPredTid();
-		if (pred != -1 && !joined(pred))
-			ok = false;
-		tid = pred;
-	}
-	if (ok)
+
+	/* Checking the immediate predecessor suffices: its own join was checked
+	 * against its predecessor when it was added */
+	auto predJoined = [&] {
+		const auto *eLab =
+			genmc::dyn_cast_if_present<ThreadFinishLabel>(g.getLastThreadLabel(pred));
+		return eLab && eLab->getParentJoin() &&
+		       eLab->getParentJoin()->getThread() == jLab->getThread();
+	};
+	if (!resultUsed && (pred == -1 || predJoined()))
 		return std::nullopt;
 
+	auto inferred = true;
+	for (auto tid = cid; tid != -1; tid = g.getFirstThreadLabel(tid)->getSymmPredTid())
+		inferred &= g.getFirstThreadLabel(tid)->getThreadInfo().symmId == -1;
 	/* (The successors of a symmetric thread may have inferred symmetry) */
 	for (auto tid = cLab->getSymmSuccTid(); tid != -1;
 	     tid = g.getFirstThreadLabel(tid)->getSymmSuccTid())
@@ -3250,7 +3245,7 @@ auto GenMCDriver::reportWarningOnce(Event pos, VerificationError wcode,
 	if (!knownWarnings.contains(wcode))
 		knownWarnings.insert(wcode);
 	if (wcode == VerificationError::VE_WWRace)
-		getExec().getGraph().getWriteLabel(pos)->setAttr(WriteAttr::WWRacy);
+		getExec().getGraph().markWWRacy(getExec().getGraph().getWriteLabel(pos));
 	return upgradeWarning;
 }
 
