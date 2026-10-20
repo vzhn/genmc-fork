@@ -3,6 +3,7 @@ set(PASSES_SOURCES
   passes/LLVMModule.cpp
   passes/LLVMUtils.cpp
   passes/ModuleInfo.cpp
+  passes/PassChecker.cpp
   passes/Transforms/BisimilarityCheckerPass.cpp
   passes/Transforms/CallInfoCollectionPass.cpp
   passes/Transforms/CodeCondenserPass.cpp

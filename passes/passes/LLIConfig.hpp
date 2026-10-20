@@ -53,6 +53,8 @@ struct LLIConfig {
 	/*** Debugging options ***/
 	std::string outputLlvmBefore;
 	std::string outputLlvmAfter;
+	std::string outputLlvmPasses;
+	bool verifyPassAnalyses{};
 	bool skipGenmcStdBuild{};
 	VSet<std::string> extraInput;
 	std::string programEntryFun;

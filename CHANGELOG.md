@@ -9,6 +9,15 @@ released.
 
 - Merge of MIXER [POPL'25] into mainline GenMC
 
+### Added
+
+- Debugging options for the transformation passes: `-output-llvm-passes=<dir>`
+  writes the module before and after each pass that changes it, in a form
+  Alive2 can check (and, for spin-assume and the load annotations, with
+  what they claim), and `-verify-pass-analyses` checks the dominator trees
+  passes declare preserved. `scripts/check-passes.sh` runs both over test
+  programs and checks every pass with Alive2's `alive-tv`.
+
 
 ## [0.19.0-vzhn.12] - 2026.10.20
 

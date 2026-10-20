@@ -272,6 +272,14 @@ static llvm::cl::opt<std::string> clOutputLlvmAfter(
 	"output-llvm-after", llvm::cl::init(""), llvm::cl::value_desc("file"),
 	llvm::cl::cat(clDebugging),
 	llvm::cl::desc("Output the LLVM code to file after applying transformations"));
+static llvm::cl::opt<std::string> clOutputLlvmPasses(
+	"output-llvm-passes", llvm::cl::init(""), llvm::cl::value_desc("dir"),
+	llvm::cl::cat(clDebugging),
+	llvm::cl::desc("Output the LLVM code before and after each transformation pass "
+		       "that changes it to dir, for checking the passes with Alive2"));
+static llvm::cl::opt<bool> clVerifyPassAnalyses(
+	"verify-pass-analyses", llvm::cl::cat(clDebugging),
+	llvm::cl::desc("Check the dominator trees the transformation passes declare preserved"));
 
 static llvm::cl::opt<bool> clSkipGenmcStdBuild(
 	"skip-genmc-std-build", llvm::cl::cat(clDebugging),
@@ -424,6 +432,8 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 
 	lliConfig.outputLlvmBefore = std::move(clOutputLlvmBefore);
 	lliConfig.outputLlvmAfter = std::move(clOutputLlvmAfter);
+	lliConfig.outputLlvmPasses = std::move(clOutputLlvmPasses);
+	lliConfig.verifyPassAnalyses = clVerifyPassAnalyses;
 	lliConfig.skipGenmcStdBuild = clSkipGenmcStdBuild;
 	for (const auto extraInput : clExtraInput) {
 		auto extraLang = determineLang(extraInput);
