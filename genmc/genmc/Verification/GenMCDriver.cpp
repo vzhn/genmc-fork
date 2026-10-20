@@ -1686,9 +1686,10 @@ auto GenMCDriver::isSymmetricToSR(int candidate, Event parent, const ThreadInfo 
 			 cInfo.id, info.id);
 	};
 
-	/* First, check that the two threads are actually similar */
+	/* First, check that the two threads are actually similar (the arguments
+	 * only matter if the thread body reads its argument) */
 	if (cInfo.id == info.id || cInfo.parentId != info.parentId || cInfo.funId != info.funId ||
-	    cInfo.arg != info.arg) {
+	    (info.argUsed && cInfo.arg != info.arg)) {
 		if (cInfo.funId == info.funId && cInfo.parentId == info.parentId)
 			tipSymmetry();
 		return false;

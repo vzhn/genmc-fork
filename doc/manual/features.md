@@ -455,8 +455,9 @@ int main()
 
 In order for symmetry reduction to actually take place, the spawned
 threads need to share exactly the same code, have exactly the same
-arguments, and also there must not be any memory access (at the
-LLVM-IR level) between the spawn instructions. Accesses to local
+arguments (unless the thread function never reads its argument), and
+also there must not be any memory access (at the LLVM-IR level) between
+the spawn instructions. Accesses to local
 variables whose address never leaves their function are exempt, as no
 other thread can see them. Threads spawned in a loop into a local
 `pthread_t` array are therefore symmetric too:
