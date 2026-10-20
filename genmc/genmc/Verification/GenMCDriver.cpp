@@ -2792,9 +2792,13 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 	unblockWaitingHelping(lab);
 	checkReconsiderReadOpts(lab);
 
-	/* Find all possible placings in coherence for this store */
+	/* Find all possible placings in coherence for this store. More than one
+	 * means a write-write race where the placings respect hb; under LKMM
+	 * they do not (the checker rejects the placings that break its axioms),
+	 * and the kat's own warning rule decides (see checkForRaces()) */
 	auto cos = getConsChecker().getCoherentPlacings(lab);
-	const auto *racyLab = cos.size() > 1 ? cos[0] : nullptr;
+	const auto *racyLab =
+		cos.size() > 1 && getConf()->model != ModelType::LKMM ? cos[0] : nullptr;
 
 	const EventLabel *co = nullptr;
 	if (inEstimationMode() || inRandomMode()) {
