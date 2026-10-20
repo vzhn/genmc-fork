@@ -137,7 +137,8 @@ def check(args, path):
     try:
         lt = litmus2c.Litmus(open(path, errors="replace").read())
         src, meta = litmus2c.Translator(lt, args.header,
-                                        srcu=args.model == "lkmm").translate()
+                                        srcu=args.model == "lkmm",
+                                        local_regs=args.local_regs).translate()
     except litmus2c.Unsupported as e:
         res["result"] = "skipped:" + str(e)
         return res
@@ -241,6 +242,8 @@ def main():
     ap.add_argument("--allowlist")
     ap.add_argument("--json", help="write one JSON result per line here")
     ap.add_argument("--tmp", default=None)
+    ap.add_argument("--local-regs", action="store_true",
+                    help="translate registers as locals (litmus2c --local-regs)")
     ap.add_argument("--strict-counts", action="store_true",
                     help="treat a different number of executions as a disagreement")
     args = ap.parse_args()

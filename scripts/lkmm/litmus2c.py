@@ -5,7 +5,9 @@ memory model) into a C program that GenMC can run.
 Shared locations become globals named __lk_<name>; each thread P<i> becomes a
 pthread whose pointer parameters point at those globals; registers become
 per-thread globals __P<i>_<name>, so that main can read them after joining the
-threads. main then marks the end of the execution with __VERIFIER_output() and
+threads (with --local-regs, locals that a thread copies from and back to those
+globals: a register a branch sets is then a value, not memory, see issue #78).
+main then marks the end of the execution with __VERIFIER_output() and
 writes the value of every observable (the locations and registers of the
 final condition and of `locations [...]`) to one volatile variable, in a fixed
 order. With -print-exec-graphs, those writes give the final state of every
@@ -160,7 +162,8 @@ def parse_value(v):
 
 
 class Translator:
-    def __init__(self, lt, header, srcu=False):
+    def __init__(self, lt, header, srcu=False, local_regs=False):
+        self.local_regs = local_regs
         self.lt = lt
         self.header = header
         self.unsupported = UNSUPPORTED_CALLS + ([] if srcu else SRCU_CALLS)
@@ -422,17 +425,25 @@ class Translator:
         out.append("")
         for tid, body in bodies:
             regs = sorted(r for (t, r) in self.regs if t == tid)
-            for r in regs:
-                out.append("#define %s __P%d_%s" % (r, tid, r))
+            if not self.local_regs:
+                for r in regs:
+                    out.append("#define %s __P%d_%s" % (r, tid, r))
             out.append("void *P%d(void *__lk_arg)" % tid)
             out.append("{")
+            if self.local_regs:
+                for r in regs:
+                    out.append("\t%s %s = __P%d_%s;" % (self.regs[(tid, r)], r, tid, r))
             for name, base in self.thread_params[tid]:
                 out.append("\t%s *%s = (%s *) &__lk_%s;" % (base, name, base, name))
             out.append(body.rstrip())
+            if self.local_regs:
+                for r in regs:
+                    out.append("\t__P%d_%s = %s;" % (tid, r, r))
             out.append("\treturn NULL;")
             out.append("}")
-            for r in regs:
-                out.append("#undef %s" % r)
+            if not self.local_regs:
+                for r in regs:
+                    out.append("#undef %s" % r)
             out.append("")
 
         # encode a value: an address of a location becomes its sentinel
@@ -483,12 +494,14 @@ def main():
     ap.add_argument("--meta")
     ap.add_argument("--header", default="lkmm-c11.h",
                     help="header providing the kernel primitives")
+    ap.add_argument("--local-regs", action="store_true",
+                    help="registers as locals, copied to their globals at the end")
     ap.add_argument("--srcu", action="store_true",
                     help="translate SRCU calls (the header provides them: -lkmm)")
     args = ap.parse_args()
     try:
         text = open(args.litmus, errors="replace").read()
-        src, meta = Translator(Litmus(text), args.header, args.srcu).translate()
+        src, meta = Translator(Litmus(text), args.header, args.srcu, args.local_regs).translate()
     except Unsupported as e:
         print("unsupported: %s" % e)
         sys.exit(3)
