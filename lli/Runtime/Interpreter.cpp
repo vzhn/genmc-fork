@@ -69,6 +69,7 @@ std::unique_ptr<Interpreter> Interpreter::create(std::unique_ptr<Module> M,
 void Interpreter::resetThread(unsigned int id)
 {
 	auto &thr = getThrById(id);
+	thr.thaw();
 	thr.ECStack = {};
 	thr.tls = threadLocalVars;
 	thr.blocked = BlockageType::NotBlocked;
@@ -101,6 +102,89 @@ void Interpreter::setThreadArgDeps(unsigned int id)
 	auto *F = thr.initEC.back().CurFunction;
 	if (F && !F->arg_empty())
 		updateDataDeps(id, &*F->arg_begin(), Event(id, 0));
+}
+
+/* The dynamic state of the interpreter at an event (see ResumePoint):
+ * everything but the naming information, which error replays rebuild. The
+ * threads that did not run since an earlier resume point share its copies */
+struct InterpreterResumePoint : public ResumePoint {
+	std::vector<std::shared_ptr<const Thread>> threads;
+	std::vector<Action> globalInstructions;
+	int currentThread{};
+	value_ptr<DepTracker, DepTrackerCloner> depTracker = nullptr;
+	ProgramState programState{};
+	GenericValue exitValue;
+	std::vector<Function *> atExitHandlers;
+};
+
+auto Interpreter::saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>
+{
+	/* The current thread must be adding the event from within an
+	 * instruction. The state saved is the one before the instruction, which
+	 * runs again on resume: it adds its events (an RMW adds two, with a
+	 * driver call each) at their positions again, driven by the graph */
+	if (!callingDriver_ || pos.thread != dynState.currentThread ||
+	    pos.index <= visitStartPos_.index || pos.index > visitStartPos_.index + 2 ||
+	    ECStack().empty())
+		return nullptr;
+
+	auto rp = std::make_shared<InterpreterResumePoint>();
+	rp->threads.reserve(dynState.threads.size());
+	for (auto &thr : dynState.threads) {
+		if (thr.id == dynState.currentThread) {
+			/* Mid-instruction: the instruction runs again on resume */
+			auto copy = std::make_shared<Thread>(thr);
+			copy->frozen = nullptr;
+			--copy->ECStack.back().CurInst;
+			rp->threads.push_back(std::move(copy));
+			continue;
+		}
+		if (!thr.frozen) {
+			auto copy = std::make_shared<Thread>(thr);
+			copy->frozen = nullptr;
+			thr.frozen = std::move(copy);
+		}
+		rp->threads.push_back(thr.frozen);
+	}
+	rp->globalInstructions = dynState.globalInstructions;
+	rp->globalInstructions[dynState.currentThread].event = visitStartPos_;
+	rp->currentThread = dynState.currentThread;
+	rp->depTracker = dynState.depTracker;
+	rp->programState = dynState.programState;
+	rp->exitValue = dynState.ExitValue;
+	rp->atExitHandlers = dynState.AtExitHandlers;
+	return rp;
+}
+
+auto Interpreter::resumeFrom(const ResumePoint &rp, const std::vector<ThreadInfo> &tis,
+			     const std::vector<int> &lastIdx) -> bool
+{
+	const auto &irp = static_cast<const InterpreterResumePoint &>(rp);
+	if (irp.threads.size() > lastIdx.size())
+		return false;
+	for (std::size_t i = 0; i < irp.threads.size(); i++)
+		if (irp.globalInstructions[i].event.index > lastIdx[i])
+			return false;
+
+	dynState.threads.resize(irp.threads.size());
+	for (std::size_t i = 0; i < irp.threads.size(); i++) {
+		dynState.threads[i] = *irp.threads[i];
+		/* Until it runs, the thread's state is still the saved one */
+		dynState.threads[i].frozen = irp.threads[i];
+	}
+	dynState.globalInstructions = irp.globalInstructions;
+	dynState.currentThread = irp.currentThread;
+	dynState.depTracker = irp.depTracker;
+	dynState.programState = irp.programState;
+	dynState.ExitValue = irp.exitValue;
+	dynState.AtExitHandlers = irp.atExitHandlers;
+	dynState.collectDbgInfo = false;
+	dynState.nameInfo.clear();
+	for (const auto &ti : tis)
+		if (ti.id >= getNumThreads())
+			constructAddThreadFromInfo(ti);
+	run();
+	return true;
 }
 
 void Interpreter::reset()

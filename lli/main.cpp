@@ -175,6 +175,10 @@ static llvm::cl::opt<bool> clBlindRMWReduction(
 		       "(RC11 only)"));
 static llvm::cl::opt<bool> clDisableIPR("disable-ipr", llvm::cl::cat(clGeneral),
 					llvm::cl::desc("Disable in-place revisiting"));
+static llvm::cl::opt<unsigned int> clResumePoints(
+	"resume-points", llvm::cl::cat(clGeneral), llvm::cl::init(256),
+	llvm::cl::desc("How many saved program states forward revisits may resume from, "
+		       "instead of re-executing the graph (default: 256; 0 disables)"));
 static llvm::cl::opt<bool>
 	clDisableStopOnSystemError("disable-stop-on-system-error", llvm::cl::cat(clGeneral),
 				   llvm::cl::desc("Do not stop verification on system errors"));
@@ -466,6 +470,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.disableBAM = clDisableBAM;
 	conf.blindRMWReduction = clBlindRMWReduction;
 	conf.ipr = !clDisableIPR;
+	conf.resumePoints = clResumePoints;
 
 	conf.warnUnfreedMemory = !clDisableWarnUnfreedMemory;
 	conf.collectLinSpec = lliConfig.collectLinSpec;
@@ -910,6 +915,15 @@ static void calculateHintsAndSaveSpec(const std::shared_ptr<const Config> &conf,
 	serialize(specFile, spec);
 }
 
+/* Each thread's last event in G (see Interpreter::resumeFrom()) */
+static auto lastIndices(const ExecutionGraph &g) -> std::vector<int>
+{
+	std::vector<int> v;
+	for (auto i = 0U; i < g.getNumThreads(); i++)
+		v.push_back(g.getThreadSize(i) - 1);
+	return v;
+}
+
 static auto createExecutionContext(const ExecutionGraph &g) -> std::vector<ThreadInfo>
 {
 	std::vector<ThreadInfo> tis;
@@ -923,15 +937,22 @@ static auto createExecutionContext(const ExecutionGraph &g) -> std::vector<Threa
 
 void run(GenMCDriver *driver, llvm::Interpreter *EE)
 {
+	driver->setResumeHook([EE](Event pos) { return EE->saveResumePoint(pos); });
 	do {
 		auto errorReplay = driver->handleExecutionStart();
+		const auto &g = driver->getExec().getGraph();
 		if (!errorReplay && driver->runFromCache()) {
 			driver->handleExecutionEnd();
 			continue;
 		}
-		EE->reset();
-		EE->setExecutionContext(createExecutionContext(driver->getExec().getGraph()));
-		EE->runMain(errorReplay);
+		auto rp = driver->takePendingResumePoint();
+		auto resumed = rp && !errorReplay &&
+			       EE->resumeFrom(*rp, createExecutionContext(g), lastIndices(g));
+		if (!resumed) {
+			EE->reset();
+			EE->setExecutionContext(createExecutionContext(g));
+			EE->runMain(errorReplay);
+		}
 		driver->handleExecutionEnd();
 	} while (!driver->done());
 }

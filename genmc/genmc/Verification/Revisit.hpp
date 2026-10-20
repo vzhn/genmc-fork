@@ -15,10 +15,12 @@
 #define GENMC_REVISIT_HPP
 
 #include "genmc/Execution/EventLabel.hpp"
+#include "genmc/Verification/ResumePoint.hpp"
 #include "genmc/Verification/VerificationError.hpp"
 
 #include <cstdint>
 #include <format>
+#include <memory>
 #include <utility>
 
 class ReadRevisit;
@@ -120,6 +122,16 @@ public:
 	{
 		return item->getKind() >= RV_FRev && item->getKind() <= RV_FRevLast;
 	}
+
+	/** The runtime state the revisit resumes from, if still kept (see ResumePoint) */
+	[[nodiscard]] auto getResumePoint() const -> std::shared_ptr<ResumePoint>
+	{
+		return resume_.lock();
+	}
+	void setResumePoint(const std::shared_ptr<ResumePoint> &rp) { resume_ = rp; }
+
+private:
+	std::weak_ptr<ResumePoint> resume_;
 };
 
 /** Forward revisit a read */

@@ -51,6 +51,7 @@
 #include "genmc/config.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <chrono>
 #include <climits>
 #include <cstdint>
@@ -181,6 +182,7 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 	getScheduler().setErrorReplayEvent(std::nullopt);
 	bufferedError_ = std::nullopt;
 	dbgInfo_.clear();
+	pendingResume_ = nullptr;
 
 	execStack.clear();
 	execStack.emplace_back(std::move(exec->graph), LocalQueueT(), std::move(exec->choices));
@@ -502,6 +504,7 @@ void GenMCDriver::maybeCutGraph(const EventLabel *lab)
 
 void GenMCDriver::restartExecution()
 {
+	pendingResume_ = nullptr;
 	auto cfg = ExecutionGraph::Config{.execState = &execState_,
 					  .consChecker = &*consChecker,
 					  .emitNALabels = Config::emitNALabels};
@@ -2343,9 +2346,15 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 	} else {
 		rf = findConsistentRf(lab, stores);
 		/* Push all the other alternatives choices to the Stack */
+		auto rp = stores.empty() ? nullptr : saveResumePoint(lab->getPos());
 		for (const auto &sLab : stores) {
-			getExec().getWorkqueue().add(std::make_unique<ReadForwardRevisit>(
-				lab->getPos(), sLab->getPos(), sLab == g.co_max(lab->getAddr())));
+			auto fr = std::make_unique<ReadForwardRevisit>(
+				lab->getPos(), sLab->getPos(), sLab == g.co_max(lab->getAddr()));
+			if (rp) {
+				fr->setResumePoint(rp);
+				++rp->pending;
+			}
+			getExec().getWorkqueue().add(std::move(fr));
 		}
 	}
 
@@ -2762,10 +2771,42 @@ auto GenMCDriver::pickRandomCo(WriteLabel *sLab, std::vector<EventLabel *> &cos)
 
 void GenMCDriver::calcCoOrderings(WriteLabel *lab, const std::vector<EventLabel *> &cos)
 {
+	auto rp = cos.empty() ? nullptr : saveResumePoint(lab->getPos());
 	for (const auto &predLab : cos) {
-		getExec().getWorkqueue().add(
-			std::make_unique<WriteForwardRevisit>(lab->getPos(), predLab->getPos()));
+		auto fr = std::make_unique<WriteForwardRevisit>(lab->getPos(), predLab->getPos());
+		if (rp) {
+			fr->setResumePoint(rp);
+			++rp->pending;
+		}
+		getExec().getWorkqueue().add(std::move(fr));
 	}
+}
+
+auto GenMCDriver::saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>
+{
+	/* Only a verification run resumes: estimation and random runs do not
+	 * revisit, an error replay collects its metadata from the start,
+	 * relocated kept events (LKMM) move within a run, replay keys count
+	 * from the start, and labels added from the instruction cache have no
+	 * runtime state behind them */
+	if (!resumeHook_ || getConf()->resumePoints == 0 || !inVerificationMode() ||
+	    getScheduler().inErrorReplay() || relocatesKeptEvents() || checksReplayKeys() ||
+	    getConf()->instructionCaching)
+		return nullptr;
+	/* The revisit restricts the graph to the event's stamp. A label of an
+	 * event the runtime already passed may have been re-added since (e.g.,
+	 * a spinloop's end reconsidered), with a later stamp: the restriction
+	 * would remove it, leaving the saved state past the graph */
+	const auto &g = getExec().getGraph();
+	if (g.getMaxStamp() != g.getEventLabel(pos)->getStamp())
+		return nullptr;
+	auto rp = resumeHook_(pos);
+	if (!rp)
+		return nullptr;
+	resumePoints_.push_back(rp);
+	if (resumePoints_.size() > getConf()->resumePoints)
+		resumePoints_.pop_front();
+	return rp;
 }
 
 auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SVal> oldVal)
@@ -3909,8 +3950,15 @@ auto GenMCDriver::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 	getConsChecker().recomputeCacheCounters(getExec().getGraph());
 	repairDanglingReads(g);
 
-	if (auto *fr = genmc::dyn_cast<ForwardRevisit>(&*item))
+	pendingResume_ = nullptr;
+	if (auto *fr = genmc::dyn_cast<ForwardRevisit>(&*item)) {
+		/* The graph is now what it was when the event was added: its
+		 * runtime state, if kept, is where the next execution resumes */
+		pendingResume_ = fr->getResumePoint();
+		if (pendingResume_ && --pendingResume_->pending == 0)
+			std::erase(resumePoints_, pendingResume_); /* its last revisit */
 		return forwardRevisit(*fr);
+	}
 	if (auto *br = genmc::dyn_cast<BackwardRevisit>(&*item)) {
 		return backwardRevisit(*br);
 	}

@@ -3667,6 +3667,7 @@ void Interpreter::runAtExitHandlers()
 		while (ECStack().size() >= size) {
 			llvm::ExecutionContext &SF = ECStack().back();
 			++getCurThr().visitNo;
+			visitStartPos_ = currPos();
 			llvm::Instruction &I = *SF.CurInst++;
 			visit(I);
 			if (!ECStack().empty()) {
@@ -3979,6 +3980,7 @@ void Interpreter::run()
 		scheduleThread(std::get<int>(tid));
 		llvm::ExecutionContext &SF = ECStack().back();
 		++getCurThr().visitNo;
+		visitStartPos_ = currPos();
 		llvm::Instruction &I = *SF.CurInst++;
 		visit(I);
 		if (!ECStack().empty()) {

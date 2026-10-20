@@ -40,11 +40,13 @@
 #include "genmc/Support/SVal.hpp"
 #include "genmc/Support/ThreadInfo.hpp"
 #include "genmc/Verification/GenMCDriver.hpp"
+#include "genmc/Verification/ResumePoint.hpp"
 #include "genmc/Verification/VerificationError.hpp"
 #include "passes/InternalFunctions.hpp"
 #include "passes/LLVMUtils.hpp"
 #include "passes/ModuleInfo.hpp"
 
+#include <functional>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/IntervalMap.h>
 #include <llvm/Analysis/PostDominators.h>
@@ -262,10 +264,24 @@ public:
 	 * and so does all after an ordering event (fences, releases...) */
 	std::vector<llvm::CtrlShadow> ctrlShadows;
 
+	/* A copy of this thread's state shared by the resume points saved
+	 * since it last ran (see Interpreter::saveResumePoint()); dropped
+	 * whenever the thread is about to change */
+	mutable std::shared_ptr<const Thread> frozen;
+	void thaw() { frozen.reset(); }
+
 	bool isMain() const { return id == 0; }
 
-	void block(BlockageType t) { blocked = t; }
-	void unblock() { blocked = BlockageType::NotBlocked; }
+	void block(BlockageType t)
+	{
+		blocked = t;
+		thaw();
+	}
+	void unblock()
+	{
+		blocked = BlockageType::NotBlocked;
+		thaw();
+	}
 	bool isBlocked() const { return blocked != BlockageType::NotBlocked; }
 	BlockageType getBlockageType() const { return blocked; }
 
@@ -399,11 +415,32 @@ protected:
 
 	DynamicComponents dynState;
 
+	/* Whether an instruction is in a call to the driver (see CALL_DRIVER),
+	 * and the current thread's event position before the instruction (an
+	 * instruction may add two events, with a driver call each) */
+	bool callingDriver_ = false;
+	Event visitStartPos_;
+
 public:
 	explicit Interpreter(std::unique_ptr<Module> M, std::unique_ptr<ModuleInfo> MI,
 			     GenMCDriver *driver, const LLIConfig *userConf,
 			     const Module *canonicalMod = nullptr);
 	virtual ~Interpreter();
+
+	/* Saves the dynamic state at the event at POS, which the current thread
+	 * is adding (see ResumePoint); null if the runtime is not inside the
+	 * instruction that adds it */
+	auto saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>;
+
+	/* Restores a saved state and runs on from it, instead of runMain(),
+	 * unless a thread of the state is past the graph (an event of its that
+	 * the restriction removed had been re-added after the saved event, see
+	 * GenMCDriver::saveResumePoint()): then nothing is restored and the
+	 * graph has to be replayed. TIS describes the graph's threads (the
+	 * restriction may have kept the begin of a thread the state does not
+	 * have, which is added as new) and LASTIDX each thread's last event */
+	auto resumeFrom(const ResumePoint &rp, const std::vector<ThreadInfo> &tis,
+			const std::vector<int> &lastIdx) -> bool;
 
 	Thread &constructAddThreadFromInfo(const ThreadInfo &ti)
 	{
@@ -432,7 +469,9 @@ public:
 	({                                                                                         \
 		if (checkReplayKeys())                                                             \
 			prepareEventKey();                                                         \
+		callingDriver_ = true;                                                             \
 		auto res = driver->method(__VA_ARGS__);                                            \
+		callingDriver_ = false;                                                            \
 		if (checkReplayKeys())                                                             \
 			driver->clearEventKey();                                                   \
 		if (std::holds_alternative<GenMCDriver::Reset>(res.result)) {                      \
@@ -746,7 +785,11 @@ private: // Helper functions
 	void setupErrorPolicy(Module *M, const LLIConfig *userConf);
 
 	/* Sets-up the specified thread for execution */
-	void scheduleThread(int tid) { dynState.currentThread = tid; }
+	void scheduleThread(int tid)
+	{
+		dynState.currentThread = tid;
+		dynState.threads[tid].thaw();
+	}
 
 	/* Adds the specified thread to the list */
 	Thread &addNewThread(Thread &&thread);
