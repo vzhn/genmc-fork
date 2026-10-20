@@ -179,13 +179,57 @@ struct CtrlScope {
 	CtrlShadow shadow;
 };
 
+/* The values of a frame. A copy shares the map with its original until one
+ * of them writes to it: the resume points (see Interpreter::saveResumePoint())
+ * copy whole threads, and a frame's values rarely change afterwards, except
+ * the top frame's */
+class FrameValues {
+	using Map = llvm::DenseMap<Value *, GenericValue>;
+
+public:
+	auto operator[](Value *v) -> GenericValue &
+	{
+		own();
+		return (*map_)[v];
+	}
+	[[nodiscard]] auto lookup(Value *v) const -> GenericValue
+	{
+		return map_ ? map_->lookup(v) : GenericValue();
+	}
+	[[nodiscard]] auto find(Value *v) const -> Map::const_iterator
+	{
+		return map_ ? map_->find(v) : end();
+	}
+	[[nodiscard]] auto end() const -> Map::const_iterator
+	{
+		return map_ ? map_->end() : emptyMap().end();
+	}
+
+private:
+	void own()
+	{
+		if (!map_)
+			map_ = std::make_shared<Map>();
+		else if (map_.use_count() > 1)
+			map_ = std::make_shared<Map>(*map_);
+	}
+
+	static auto emptyMap() -> const Map &
+	{
+		static const Map empty;
+		return empty;
+	}
+
+	std::shared_ptr<Map> map_;
+};
+
 struct ExecutionContext {
 	Function *CurFunction;			      // The currently executing function
 	BasicBlock *CurBB;			      // The currently executing BB
 	BasicBlock::iterator CurInst;		      // The next instruction to execute
 	CallInstWrapper Caller;			      // Holds the call that called subframes.
 						      // NULL if main func or debugger invoked fn
-	llvm::DenseMap<Value *, GenericValue> Values; // LLVM values used in this invocation
+	FrameValues Values;			      // LLVM values used in this invocation
 	std::vector<GenericValue> VarArgs;	      // Values passed through an ellipsis
 	AllocaHolder Allocas;			      // Track memory allocated by alloca
 

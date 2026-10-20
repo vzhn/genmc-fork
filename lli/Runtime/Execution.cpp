@@ -2912,7 +2912,7 @@ GenericValue Interpreter::getOperandValue(Value *V, ExecutionContext &SF)
 	} else if (GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
 		return PTOGV(getPointerToGlobal(GV));
 	} else {
-		return SF.Values[V];
+		return SF.Values.lookup(V);
 	}
 }
 
