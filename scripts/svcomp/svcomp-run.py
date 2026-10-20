@@ -110,6 +110,21 @@ TAIL = {
 }
 
 
+def with_local_includes(code, d, seen=None):
+    """CODE followed by the headers it includes with quotes from directory D
+    (recursively): some tasks define main in such a header."""
+    seen = set() if seen is None else seen
+    out = [code]
+    for h in re.findall(r'^\s*#\s*include\s*"([^"]+)"', code, re.M):
+        path = os.path.normpath(os.path.join(d, h))
+        if path in seen or not os.path.isfile(path):
+            continue
+        seen.add(path)
+        out.append(with_local_includes(open(path, errors="replace").read(),
+                                       os.path.dirname(path), seen))
+    return "\n".join(out)
+
+
 def classify(out):
     if "Safety violation" in out:
         return "unreach-call"
@@ -205,7 +220,7 @@ def run_task(args, d, yml):
             f.write(code + "\n\n/* ---- svcomp-run tail ---- */\n" + "\n\n".join(tail) + "\n")
     t0 = time.time()
     try:
-        main_argc = 1 if re.search(r"\bmain\s*\(\s*int\b", code) else 0
+        main_argc = 1 if re.search(r"\bmain\s*\(\s*int\b", with_local_includes(code, d)) else 0
         recursive = 1 if "PTHREAD_MUTEX_RECURSIVE" in code else 0
         p = subprocess.run([args.genmc, f"-{args.model}", "-disable-estimation", "--",
                             "-I", os.path.abspath(d), f"-DSVC_MAIN_ARGC={main_argc}",
