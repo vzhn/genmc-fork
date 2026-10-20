@@ -10,6 +10,36 @@ released.
 - Merge of MIXER [POPL'25] into mainline GenMC
 
 
+## [0.19.0-vzhn.12] - 2026.10.20
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Fixed
+
+- `-lkmm` lost executions, and could miss bugs, when a backward revisit
+  deletes a read of a location that the revisiting thread writes again
+  before a later, kept read of it, e.g. after `if (x) x = 0;` (#88, #94).
+  The revisit was rejected as non-maximal, so a program whose assertion
+  fails in every model passed, and an await-based client explored no
+  complete execution at all. This affected 0.19.0-vzhn.9 to vzhn.11.
+
+### Performance
+
+- `-lkmm`: the whole-graph check after events added before kept ones runs
+  once per run instead of after each such event (#94); a run that fails it
+  is repeated with the check after each event ("Runs repeated with eager
+  consistency checks"). An await-based client went from 20 minutes to 53s.
+- Cheaper per-event checks in the consistency checkers, symmetric joins and
+  annotation scans, which made lock-heavy programs with many threads
+  superquadratic (#89).
+
+### Tests
+
+- `tests/correct/lkmm/PropGpPulp`: a grace period ending at a
+  `synchronize_rcu()` and a lock handover from it, GenMC's narrower `gp`
+  (#93).
+
+
 ## [0.19.0-vzhn.11] - 2026.10.20
 
 Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
