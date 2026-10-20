@@ -1052,6 +1052,7 @@ auto GenMCDriver::checkIPRValidity(const ReadLabel *rLab) -> std::optional<Verif
 		"indicate faulty design.\n"
 		"This warning is treated as an error due to in-place revisiting (IPR).\n"
 		"You can use -disable-ipr to disable this feature."s; // NOLINT(misc-include-cleaner)
+	getResult().iprError = true;
 	reportError(racyIt->getPos(),
 		    {racyIt->getPos(), VerificationError::VE_WWRace, msg, nullptr, true});
 	return {VerificationError::VE_WWRace};
@@ -1850,6 +1851,63 @@ auto GenMCDriver::handleThreadCreate(const EventDbgInfo *dbg, Event pos, const T
 	return handleThreadCreate(ThreadCreateLabel::create(pos, info, deps));
 }
 
+auto GenMCDriver::checkSymmetricJoinOrder(const ThreadJoinLabel *jLab)
+	-> std::optional<VerificationError>
+{
+	/* Symmetry reduction explores symmetric threads as if each one ran no
+	 * later than its symmetric successors. A thread that joins a symmetric
+	 * thread before its symmetric predecessors can tell them apart: the
+	 * predecessors may still be running, which the reduced exploration
+	 * misses (e.g., a race with an unjoined predecessor) */
+	const auto &g = getExec().getGraph();
+	auto cid = jLab->getChildId();
+	if (cid < 0 || long(g.getNumThreads()) <= cid)
+		return std::nullopt;
+
+	auto joined = [&](int tid) {
+		for (auto i = 1; i < jLab->getIndex(); i++) {
+			const auto *oLab = genmc::dyn_cast<ThreadJoinLabel>(
+				g.getEventLabel(Event(jLab->getThread(), i)));
+			if (oLab && oLab->getChildId() == tid)
+				return true;
+		}
+		return false;
+	};
+	auto inferred = true;
+	auto ok = true;
+	/* The return value is another way to tell symmetric threads apart */
+	const auto *cLab = g.getFirstThreadLabel(cid);
+	auto symmetric = cLab->getSymmPredTid() != -1 || cLab->getSymmSuccTid() != -1;
+	auto resultUsed = symmetric && jLab->isResultUsed();
+	ok = !resultUsed;
+	for (auto tid = cid; tid != -1;) {
+		const auto *bLab = g.getFirstThreadLabel(tid);
+		inferred &= bLab->getThreadInfo().symmId == -1;
+		auto pred = bLab->getSymmPredTid();
+		if (pred != -1 && !joined(pred))
+			ok = false;
+		tid = pred;
+	}
+	if (ok)
+		return std::nullopt;
+
+	/* (The successors of a symmetric thread may have inferred symmetry) */
+	for (auto tid = cLab->getSymmSuccTid(); tid != -1;
+	     tid = g.getFirstThreadLabel(tid)->getSymmSuccTid())
+		inferred &= g.getFirstThreadLabel(tid)->getThreadInfo().symmId == -1;
+	getResult().inferredSymmetryError = inferred;
+	auto msg = std::format(
+		"{}\nSymmetry reduction requires joining symmetric threads in the order they were "
+		"spawned, without using their return values. You can use -disable-sr to "
+		"disable it.\n",
+		resultUsed ? std::format("The return value of symmetric thread {} is used.", cid)
+			   : std::format("Thread {} is joined before its symmetric predecessors.",
+					 cid));
+	reportError(jLab->getPos(),
+		    {jLab->getPos(), VerificationError::VE_SymmetryWellFormedness, msg});
+	return VerificationError::VE_SymmetryWellFormedness;
+}
+
 auto GenMCDriver::handleThreadJoin(std::unique_ptr<ThreadJoinLabel> lab) -> HandleResult<SVal>
 {
 	auto &g = getExec().getGraph();
@@ -1861,6 +1919,9 @@ auto GenMCDriver::handleThreadJoin(std::unique_ptr<ThreadJoinLabel> lab) -> Hand
 
 	auto *jLab = genmc::dyn_cast<ThreadJoinLabel>(addLabelToGraph(std::move(lab)));
 	auto cid = jLab->getChildId();
+
+	if (auto err = checkSymmetricJoinOrder(jLab); err)
+		return {.result = *err};
 
 	auto *eLab = genmc::dyn_cast<ThreadFinishLabel>(g.getLastThreadLabel(cid));
 	VERIFY(eLab);
@@ -1884,7 +1945,7 @@ auto GenMCDriver::handleThreadJoin(std::unique_ptr<ThreadJoinLabel> lab) -> Hand
 }
 
 auto GenMCDriver::handleThreadJoin(const EventDbgInfo *dbg, Event pos, int childTid,
-				   const EventDeps &deps) -> HandleResult<SVal>
+				   const EventDeps &deps, bool resultUsed) -> HandleResult<SVal>
 {
 	auto &g = getExec().getGraph();
 
@@ -1893,7 +1954,9 @@ auto GenMCDriver::handleThreadJoin(const EventDbgInfo *dbg, Event pos, int child
 		return {.result = *err};
 	if (isExecutionDrivenByGraph(pos))
 		return {.result = g.getEventLabel(pos)->getReturnValue(), .count = 1U};
-	return handleThreadJoin(ThreadJoinLabel::create(pos, childTid, deps));
+	auto lab = ThreadJoinLabel::create(pos, childTid, deps);
+	lab->setResultUsed(resultUsed);
+	return handleThreadJoin(std::move(lab));
 }
 
 /* The depth of the RCU read-side critical sections open in POS's thread
@@ -3154,13 +3217,17 @@ auto GenMCDriver::reportWarningOnce(Event pos, VerificationError wcode,
 		/* Without the symmetries GenMC inferred itself (rather than the user
 		 * declared), this would only be a warning: verification may be
 		 * repeated without SR */
-		if (upgrade)
+		if (upgrade) {
+			/* IPR is GenMC's own optimization: verification may also be
+			 * repeated without it */
+			getResult().iprError = iprUpgrade;
 			getResult().inferredSymmetryError =
 				!iprUpgrade && std::ranges::none_of(g.thr_ids(), [&](auto tid) {
 					return isSymmetric(tid) &&
 					       g.getFirstThreadLabel(tid)->getThreadInfo().symmId !=
 						       -1;
 				});
+		}
 		auto [cause, cli] =
 			iprUpgrade ? std::make_pair("in-place revisiting (IPR)"s, "-disable-ipr"s)
 				   : std::make_pair("symmetry reduction (SR)"s, "-disable-sr"s);

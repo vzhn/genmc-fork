@@ -285,7 +285,7 @@ public:
 
 	/** Returns an appropriate result for pthread_join() */
 	auto handleThreadJoin(const EventDbgInfo *dbg, Event pos, int childTid,
-			      const EventDeps &deps) -> HandleResult<SVal>;
+			      const EventDeps &deps, bool resultUsed = true) -> HandleResult<SVal>;
 
 	/** A helping CAS operation has been interpreter.
 	 * Returns whether the helped CAS is present. */
@@ -752,6 +752,10 @@ private:
 
 	/** SR: Checks whether CANDIDATE is symmetric to PARENT/INFO */
 	auto isSymmetricToSR(int candidate, Event parent, const ThreadInfo &info) const -> bool;
+
+	/* Whether the joiner of JLAB has joined the symmetric predecessors of the
+	 * thread it joins (see the definition) */
+	auto checkSymmetricJoinOrder(const ThreadJoinLabel *jLab) -> std::optional<VerificationError>;
 
 	/* Whether TID's memory accesses in [FROM, TO] only touch memory no other
 	 * thread can access */

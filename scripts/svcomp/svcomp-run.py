@@ -141,6 +141,9 @@ def classify(out):
         return "compile-error"
     if re.search(r"^Error", out, re.M):
         return "other-error"
+    # e.g. "Warning: Unordered writes!" treated as an error: no verdict
+    if "Verification unsuccesful" in out or "Estimation unsuccessful" in out:
+        return "other-error"
     if "Number of complete executions explored" in out:
         return "ok"
     return "unknown"

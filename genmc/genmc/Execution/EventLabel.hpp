@@ -1805,11 +1805,19 @@ public:
 	/** Returns the identifier of the thread this join() is waiting on */
 	auto getChildId() const -> int { return childId; }
 
+	/** Whether the program uses the value the join returns (the thread's
+	 * return value). Symmetry reduction needs it unused */
+	auto isResultUsed() const -> bool { return resultUsed; }
+	void setResultUsed(bool used) { resultUsed = used; }
+
 	DEFINE_STANDARD_MEMBERS(ThreadJoin)
 
 private:
 	/** The identifier of the child */
 	const int childId{}; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+
+	/** Whether the returned value is used */
+	bool resultUsed = true;
 };
 
 /*******************************************************************************
