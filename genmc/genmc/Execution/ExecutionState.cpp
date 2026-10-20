@@ -458,8 +458,21 @@ void ExecutionState::onAllocAt(Event pos, SAddr addr, ASize size, uint64_t align
 	getAllocator().reserve(addr, size.get());
 }
 
+void ExecutionState::onThreadCreate(Event pos)
+{
+	/* Spinloop detection only tracks memory accesses: a new thread is a
+	 * side effect too (a loop that spawns threads makes progress) */
+	if (isInLoop(pos.thread))
+		updateSideEffects(pos);
+}
+
 void ExecutionState::onFree(Event pos, SAddr addr, bool isRetire)
 {
+	/* Freeing is a side effect of the loop iteration (e.g., a second free
+	 * of the same block is an error) */
+	if (isInLoop(pos.thread))
+		updateSideEffects(pos);
+
 	auto it = allocInfoMap_.find(addr);
 	VERIFY(it != allocInfoMap_.end());
 	auto newVal = it->second;
