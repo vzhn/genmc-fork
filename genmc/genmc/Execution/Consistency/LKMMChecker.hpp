@@ -315,7 +315,6 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	bool visitLHSUnlessError3Iterative(std::vector<DFSWorklistEntry> &worklist,
 					   const View &v) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError3Accepting;
 	bool visitUnlessError3(const EventLabel *lab) const;
 	bool checkError3(const EventLabel *lab) const;
 	bool visitError4(const EventLabel *lab) const;
@@ -326,8 +325,6 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 
 	bool visitRHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError4Accepting;
-	mutable std::vector<bool> visitedRHSUnlessError4Accepting;
 	bool visitUnlessError4(const EventLabel *lab) const;
 	bool checkError4(const EventLabel *lab) const;
 	bool visitError5(const EventLabel *lab) const;
@@ -337,7 +334,6 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	bool visitLHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &worklist,
 					   const View &v) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError5Accepting;
 	bool visitUnlessError5(const EventLabel *lab) const;
 	bool checkError5(const EventLabel *lab) const;
 	bool visitError6(const EventLabel *lab) const;
@@ -348,8 +344,6 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 
 	bool visitRHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError6Accepting;
-	mutable std::vector<bool> visitedRHSUnlessError6Accepting;
 	bool visitUnlessError6(const EventLabel *lab) const;
 	bool checkError6(const EventLabel *lab) const;
 	bool visitWarning7(const EventLabel *lab) const;
@@ -359,7 +353,6 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	bool visitLHSUnlessWarning7Iterative(std::vector<DFSWorklistEntry> &worklist,
 					     const View &v) const;
 
-	mutable std::vector<bool> visitedLHSUnlessWarning7Accepting;
 	bool visitUnlessWarning7(const EventLabel *lab) const;
 	bool checkWarning7(const EventLabel *lab) const;
 

@@ -1276,9 +1276,6 @@ bool SCChecker::visitUnlessError2(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError2Accepting.clear();
-	visitedLHSUnlessError2Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	auto &v = lab->view(1);
 
 	/* Explore from all accepting states in LHS using DFS */
@@ -1358,11 +1355,6 @@ bool SCChecker::visitUnlessError3(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError3Accepting.clear();
-	visitedLHSUnlessError3Accepting.resize(g.getMaxStamp().get() + 1, false);
-	visitedRHSUnlessError3Accepting.clear();
-	visitedRHSUnlessError3Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
 		{1, lab},
@@ -1371,13 +1363,6 @@ bool SCChecker::visitUnlessError3(const EventLabel *lab) const
 	if (!visitLHSUnlessError3Iterative(startStatesLHS))
 		return false;
 
-	for (auto i = 0u; i < visitedLHSUnlessError3Accepting.size(); i++) {
-		if (visitedLHSUnlessError3Accepting[i] && !visitedRHSUnlessError3Accepting[i]) {
-			cexLab = &*std::find_if(g.label_begin(), g.label_end(),
-						[&](auto &lab) { return lab.getStamp() == i; });
-			return false;
-		}
-	}
 	return true;
 }
 
@@ -1462,9 +1447,6 @@ bool SCChecker::visitUnlessError4(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError4Accepting.clear();
-	visitedLHSUnlessError4Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	auto &v = lab->view(1);
 
 	/* Explore from all accepting states in LHS using DFS */
@@ -1544,11 +1526,6 @@ bool SCChecker::visitUnlessError5(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError5Accepting.clear();
-	visitedLHSUnlessError5Accepting.resize(g.getMaxStamp().get() + 1, false);
-	visitedRHSUnlessError5Accepting.clear();
-	visitedRHSUnlessError5Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
 		{1, lab},
@@ -1557,13 +1534,6 @@ bool SCChecker::visitUnlessError5(const EventLabel *lab) const
 	if (!visitLHSUnlessError5Iterative(startStatesLHS))
 		return false;
 
-	for (auto i = 0u; i < visitedLHSUnlessError5Accepting.size(); i++) {
-		if (visitedLHSUnlessError5Accepting[i] && !visitedRHSUnlessError5Accepting[i]) {
-			cexLab = &*std::find_if(g.label_begin(), g.label_end(),
-						[&](auto &lab) { return lab.getStamp() == i; });
-			return false;
-		}
-	}
 	return true;
 }
 
@@ -1626,9 +1596,6 @@ bool SCChecker::visitLHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &wor
 bool SCChecker::visitUnlessError6(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedLHSUnlessError6Accepting.clear();
-	visitedLHSUnlessError6Accepting.resize(g.getMaxStamp().get() + 1, false);
 
 	auto &v = lab->view(1);
 
@@ -1710,11 +1677,6 @@ bool SCChecker::visitUnlessError7(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError7Accepting.clear();
-	visitedLHSUnlessError7Accepting.resize(g.getMaxStamp().get() + 1, false);
-	visitedRHSUnlessError7Accepting.clear();
-	visitedRHSUnlessError7Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
 		{1, lab},
@@ -1723,13 +1685,6 @@ bool SCChecker::visitUnlessError7(const EventLabel *lab) const
 	if (!visitLHSUnlessError7Iterative(startStatesLHS))
 		return false;
 
-	for (auto i = 0u; i < visitedLHSUnlessError7Accepting.size(); i++) {
-		if (visitedLHSUnlessError7Accepting[i] && !visitedRHSUnlessError7Accepting[i]) {
-			cexLab = &*std::find_if(g.label_begin(), g.label_end(),
-						[&](auto &lab) { return lab.getStamp() == i; });
-			return false;
-		}
-	}
 	return true;
 }
 
@@ -1828,9 +1783,6 @@ bool SCChecker::visitUnlessError8(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError8Accepting.clear();
-	visitedLHSUnlessError8Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	auto &v = lab->view(1);
 
 	/* Explore from all accepting states in LHS using DFS */
@@ -1900,9 +1852,6 @@ bool SCChecker::visitLHSUnlessWarning9Iterative(std::vector<DFSWorklistEntry> &w
 bool SCChecker::visitUnlessWarning9(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedLHSUnlessWarning9Accepting.clear();
-	visitedLHSUnlessWarning9Accepting.resize(g.getMaxStamp().get() + 1, false);
 
 	auto &v = lab->view(0);
 

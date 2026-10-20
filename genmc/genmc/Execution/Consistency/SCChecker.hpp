@@ -242,7 +242,6 @@ private:
 	bool visitLHSUnlessError2Iterative(std::vector<DFSWorklistEntry> &worklist,
 					   const View &v) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError2Accepting;
 	bool visitUnlessError2(const EventLabel *lab) const;
 	bool checkError2(const EventLabel *lab) const;
 	bool visitError3(const EventLabel *lab) const;
@@ -253,8 +252,6 @@ private:
 
 	bool visitRHSUnlessError3Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError3Accepting;
-	mutable std::vector<bool> visitedRHSUnlessError3Accepting;
 	bool visitUnlessError3(const EventLabel *lab) const;
 	bool checkError3(const EventLabel *lab) const;
 	bool visitError4(const EventLabel *lab) const;
@@ -264,7 +261,6 @@ private:
 	bool visitLHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &worklist,
 					   const View &v) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError4Accepting;
 	bool visitUnlessError4(const EventLabel *lab) const;
 	bool checkError4(const EventLabel *lab) const;
 	bool visitError5(const EventLabel *lab) const;
@@ -275,8 +271,6 @@ private:
 
 	bool visitRHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError5Accepting;
-	mutable std::vector<bool> visitedRHSUnlessError5Accepting;
 	bool visitUnlessError5(const EventLabel *lab) const;
 	bool checkError5(const EventLabel *lab) const;
 	bool visitError6(const EventLabel *lab) const;
@@ -286,7 +280,6 @@ private:
 	bool visitLHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &worklist,
 					   const View &v) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError6Accepting;
 	bool visitUnlessError6(const EventLabel *lab) const;
 	bool checkError6(const EventLabel *lab) const;
 	bool visitError7(const EventLabel *lab) const;
@@ -297,8 +290,6 @@ private:
 
 	bool visitRHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError7Accepting;
-	mutable std::vector<bool> visitedRHSUnlessError7Accepting;
 	bool visitUnlessError7(const EventLabel *lab) const;
 	bool checkError7(const EventLabel *lab) const;
 	bool visitError8(const EventLabel *lab) const;
@@ -308,7 +299,6 @@ private:
 	bool visitLHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &worklist,
 					   const View &v) const;
 
-	mutable std::vector<bool> visitedLHSUnlessError8Accepting;
 	bool visitUnlessError8(const EventLabel *lab) const;
 	bool checkError8(const EventLabel *lab) const;
 	bool visitWarning9(const EventLabel *lab) const;
@@ -318,7 +308,6 @@ private:
 	bool visitLHSUnlessWarning9Iterative(std::vector<DFSWorklistEntry> &worklist,
 					     const View &v) const;
 
-	mutable std::vector<bool> visitedLHSUnlessWarning9Accepting;
 	bool visitUnlessWarning9(const EventLabel *lab) const;
 	bool checkWarning9(const EventLabel *lab) const;
 

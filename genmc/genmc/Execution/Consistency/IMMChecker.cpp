@@ -6648,9 +6648,6 @@ bool IMMChecker::visitUnlessError3(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError3Accepting.clear();
-	visitedLHSUnlessError3Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	auto &v = lab->view(0);
 
 	/* Explore from all accepting states in LHS using DFS */
@@ -6730,11 +6727,6 @@ bool IMMChecker::visitUnlessError4(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError4Accepting.clear();
-	visitedLHSUnlessError4Accepting.resize(g.getMaxStamp().get() + 1, false);
-	visitedRHSUnlessError4Accepting.clear();
-	visitedRHSUnlessError4Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
 		{1, lab},
@@ -6743,13 +6735,6 @@ bool IMMChecker::visitUnlessError4(const EventLabel *lab) const
 	if (!visitLHSUnlessError4Iterative(startStatesLHS))
 		return false;
 
-	for (auto i = 0u; i < visitedLHSUnlessError4Accepting.size(); i++) {
-		if (visitedLHSUnlessError4Accepting[i] && !visitedRHSUnlessError4Accepting[i]) {
-			cexLab = &*std::find_if(g.label_begin(), g.label_end(),
-						[&](auto &lab) { return lab.getStamp() == i; });
-			return false;
-		}
-	}
 	return true;
 }
 
@@ -6834,9 +6819,6 @@ bool IMMChecker::visitUnlessError5(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError5Accepting.clear();
-	visitedLHSUnlessError5Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	auto &v = lab->view(0);
 
 	/* Explore from all accepting states in LHS using DFS */
@@ -6916,11 +6898,6 @@ bool IMMChecker::visitUnlessError6(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError6Accepting.clear();
-	visitedLHSUnlessError6Accepting.resize(g.getMaxStamp().get() + 1, false);
-	visitedRHSUnlessError6Accepting.clear();
-	visitedRHSUnlessError6Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
 		{1, lab},
@@ -6929,13 +6906,6 @@ bool IMMChecker::visitUnlessError6(const EventLabel *lab) const
 	if (!visitLHSUnlessError6Iterative(startStatesLHS))
 		return false;
 
-	for (auto i = 0u; i < visitedLHSUnlessError6Accepting.size(); i++) {
-		if (visitedLHSUnlessError6Accepting[i] && !visitedRHSUnlessError6Accepting[i]) {
-			cexLab = &*std::find_if(g.label_begin(), g.label_end(),
-						[&](auto &lab) { return lab.getStamp() == i; });
-			return false;
-		}
-	}
 	return true;
 }
 
@@ -6998,9 +6968,6 @@ bool IMMChecker::visitLHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &wo
 bool IMMChecker::visitUnlessError7(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedLHSUnlessError7Accepting.clear();
-	visitedLHSUnlessError7Accepting.resize(g.getMaxStamp().get() + 1, false);
 
 	auto &v = lab->view(0);
 
@@ -7082,11 +7049,6 @@ bool IMMChecker::visitUnlessError8(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError8Accepting.clear();
-	visitedLHSUnlessError8Accepting.resize(g.getMaxStamp().get() + 1, false);
-	visitedRHSUnlessError8Accepting.clear();
-	visitedRHSUnlessError8Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
 		{1, lab},
@@ -7095,13 +7057,6 @@ bool IMMChecker::visitUnlessError8(const EventLabel *lab) const
 	if (!visitLHSUnlessError8Iterative(startStatesLHS))
 		return false;
 
-	for (auto i = 0u; i < visitedLHSUnlessError8Accepting.size(); i++) {
-		if (visitedLHSUnlessError8Accepting[i] && !visitedRHSUnlessError8Accepting[i]) {
-			cexLab = &*std::find_if(g.label_begin(), g.label_end(),
-						[&](auto &lab) { return lab.getStamp() == i; });
-			return false;
-		}
-	}
 	return true;
 }
 
@@ -7200,9 +7155,6 @@ bool IMMChecker::visitUnlessError9(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedLHSUnlessError9Accepting.clear();
-	visitedLHSUnlessError9Accepting.resize(g.getMaxStamp().get() + 1, false);
-
 	auto &v = lab->view(0);
 
 	/* Explore from all accepting states in LHS using DFS */
@@ -7272,9 +7224,6 @@ bool IMMChecker::visitLHSUnlessWarning10Iterative(std::vector<DFSWorklistEntry> 
 bool IMMChecker::visitUnlessWarning10(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedLHSUnlessWarning10Accepting.clear();
-	visitedLHSUnlessWarning10Accepting.resize(g.getMaxStamp().get() + 1, false);
 
 	auto &v = lab->view(2);
 
