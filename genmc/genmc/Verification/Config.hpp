@@ -61,7 +61,7 @@ struct Config {
 	std::optional<std::string> checkLinSpec;
 	unsigned int maxExtSize{};
 	bool dotPrintOnlyClientEvents{};
-	bool replayCompletedThreads{true};
+	bool replayCompletedThreads{false};
 	static constexpr bool emitNALabels = EMIT_NA_LABELS;
 
 	/*** Debugging options ***/
