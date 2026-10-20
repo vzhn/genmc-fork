@@ -138,6 +138,8 @@ public:
 		       bool isRelease, LockRole lockRole = LockRole::None);
 	void onFence(Event pos, bool isRelease);
 	void onLoopBegin(Event pos);
+	/** A thread was created at POS (a side effect of the current loop iteration) */
+	void onThreadCreate(Event pos);
 	void onAwaitStart(Event pos);
 	auto onSpinStart(Event pos) -> bool;
 	auto onAlloc(Event pos, ASize size, uint64_t alignment, StorageDuration sdur,

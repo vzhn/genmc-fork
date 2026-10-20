@@ -256,6 +256,8 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 			state.onSpinStart(ssLab->getPos());
 		} else if (const auto *lbLab = genmc::dyn_cast<LoopBeginLabel>(lab)) {
 			state.onLoopBegin(lbLab->getPos());
+		} else if (genmc::isa<ThreadCreateLabel>(lab)) {
+			state.onThreadCreate(lab->getPos());
 		} else if (const auto *asLab = genmc::dyn_cast<AwaitStartLabel>(lab)) {
 			state.onAwaitStart(asLab->getPos());
 		} else if (const auto *hpLab = genmc::dyn_cast<HpProtectLabel>(lab)) {
@@ -1805,6 +1807,7 @@ auto GenMCDriver::handleThreadCreate(std::unique_ptr<ThreadCreateLabel> tcLab) -
 	/* Add an event for the thread creation */
 	tcLab->setChildId(cid);
 	auto *lab = genmc::dyn_cast<ThreadCreateLabel>(addLabelToGraph(std::move(tcLab)));
+	g.getState().onThreadCreate(lab->getPos());
 
 	if (std::cmp_less(cid, g.getNumThreads())) {
 		/* Revive the thread: replace its stale begin (the thread info may differ) */
@@ -1837,10 +1840,13 @@ auto GenMCDriver::handleThreadCreate(const EventDbgInfo *dbg, Event pos, const T
 	++pos;
 	if (auto err = updateErrorInfoAndMaybeExit(pos, false, dbg); err)
 		return {.result = *err};
-	if (isExecutionDrivenByGraph(pos))
+	if (isExecutionDrivenByGraph(pos)) {
+		if constexpr (!Config::emitNALabels)
+			g.getState().onThreadCreate(pos);
 		return {.result = genmc::dyn_cast<ThreadCreateLabel>(g.getEventLabel(pos))
 					  ->getChildId(),
 			.count = 1U};
+	}
 	return handleThreadCreate(ThreadCreateLabel::create(pos, info, deps));
 }
 
