@@ -597,10 +597,25 @@ before a later write (fri), and GenMC's optimality check then rejects the
 only revisit that builds the execution (see the prefix stability above;
 a static rule for marked reads fixes 158 and breaks `C-viro-2020.09.29a`).
 Over herd7's counts: those with `cmpxchg()` (failed reads counted
-differently, as before), and a duplicate that vzhn.8 has too
-(`tests/cooking/lkmm/dup-revisit-nested-if`, reduced from seed 586; not
-under `-imm`). The fuzzing also found a view corrupted by a move
-(`RelocateTest.ViewWithPendingDiffMovesDown`, fixed).
+differently, as before), and duplicate explorations that vzhn.8 has too
+(seeds 586, 712; fixed after vzhn.9, see below). The fuzzing also found a
+view corrupted by a move (`RelocateTest.ViewWithPendingDiffMovesDown`,
+fixed).
+
+Duplicate explorations (after vzhn.9; `tests/correct/lkmm/dup-revisit-nested-if`,
+reduced from seed 586: herd7 9, GenMC 10). GenMC accepts a backward revisit
+only from the graph where the events it deletes were added maximally. Under
+LKMM, the prefix of a write keeps an earlier write of its thread to the same
+location (moi), so a revisit can keep a write that was placed non-maximally
+(co-before a write added before it) and delete that other write: the
+placement no longer shows, and the same graph also comes from the revisit
+by the kept write itself. `isCoAfterLaterSavedWrite()` rejects such a
+revisit, only where that other path exists (same location, the read no
+RMW and able to read from the kept write, the kept write no RMW); broader
+versions lost executions (`C-ManfredSpraul-L1G1xchg`, `C-SB+l-o-o-u+*-XE`,
+fuzz seeds 38, 276, 291, 414, 421). Fuzz seeds 0-799: 748 agree (586 and
+712 fixed, 19 closer: 526 for herd7's 523, was 535), no new disagreement;
+corpus, kernel tests, matrix and fast suite unchanged.
 
 Results (2026-10-20):
 
