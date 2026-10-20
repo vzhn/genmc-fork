@@ -798,7 +798,18 @@ static void addSpinStartCall(Loop *l)
 	auto *startFun =
 		l->getHeader()->getParent()->getParent()->getFunction("__VERIFIER_spin_start");
 
+	/* A header that starts by releasing a mutex comes from a rotated loop
+	 * (lock; check; unlock; with the unlocks before and in the loop merged
+	 * into the header). Start the iteration after the release: an
+	 * iteration then takes the mutex before releasing it, and a blocked
+	 * thread does not hold it */
 	auto i = l->getHeader()->getFirstNonPHIIt();
+	if (auto *ci = dyn_cast<CallInst>(&*i)) {
+		auto name = getCalledFunOrStripValName(*ci);
+		if (isInternalFunction(name) &&
+		    internalFunNames.at(name) == InternalFunctions::MutexUnlock)
+			i = std::next(i);
+	}
 	CallInst::Create(startFun, {}, "", i);
 }
 
@@ -901,13 +912,41 @@ static auto tryMoveInitialLoadToHeader(Loop *l, ModuleAnalysisManager &MAM) -> b
 	return true;
 }
 
+/* Whether the loop body takes and releases a mutex */
+static auto hasLockAndUnlock(const Loop *l) -> bool
+{
+	auto lock = false;
+	auto unlock = false;
+	for (auto *bb : l->blocks()) {
+		for (auto &i : *bb) {
+			auto *ci = dyn_cast<CallInst>(&i);
+			if (!ci)
+				continue;
+			auto name = getCalledFunOrStripValName(*ci);
+			if (!isInternalFunction(name))
+				continue;
+			auto icode = internalFunNames.at(name);
+			lock |= icode == InternalFunctions::MutexLock;
+			unlock |= icode == InternalFunctions::MutexUnlock;
+		}
+	}
+	return lock && unlock;
+}
+
 static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> bool
 {
 	auto *header = l->getHeader();
 
 	auto moved = tryMoveInitialLoadToHeader(l, MAM);
 	auto hasPHIs = !isBlockPHIClean(header);
-	if (hasPHIs &&
+
+	/* A loop that waits under a mutex (lock, check, unlock) often also
+	 * counts its progress in a PHI (e.g., consumed items). Such a loop is
+	 * only checked dynamically: an iteration that changes no PHI and has no
+	 * side effect besides taking and releasing the mutex repeats itself */
+	auto onlyDynamic = hasPHIs && !areBlockPHIsRelatedToLoopCASs(header, l) &&
+			   areHeaderPHIsComparable(header) && hasLockAndUnlock(l);
+	if (hasPHIs && !onlyDynamic &&
 	    (!areBlockPHIsRelatedToLoopCASs(header, l) || !areHeaderPHIsComparable(header)))
 		return false;
 
@@ -919,6 +958,11 @@ static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> b
 	llvm::Instruction *lastZNEEffect = nullptr;
 	llvm::Value *cont = nullptr;
 	for (auto &latch : latches) {
+		if (onlyDynamic) {
+			checkDynamically = true;
+			modified = true;
+			continue;
+		}
 		/* FAI-ZNE blocks ignore header PHIs (lock-ZNE requires none);
 		 * with PHIs such paths are checked dynamically. A ZNE spin end
 		 * blocks only if the iteration does not exit after it */

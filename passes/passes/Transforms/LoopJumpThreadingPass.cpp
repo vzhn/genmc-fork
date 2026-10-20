@@ -21,6 +21,7 @@
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/IR/CFG.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/Dominators.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Use.h>
@@ -190,7 +191,7 @@ static auto invertLoop(Loop *l, PHINode *criticalPHI) -> bool
 }
 
 auto LoopJumpThreadingPass::run(Loop &L, LoopAnalysisManager & /*AM*/,
-				LoopStandardAnalysisResults & /*AR*/, LPMUpdater & /*U*/)
+				LoopStandardAnalysisResults &AR, LPMUpdater & /*U*/)
 	-> PreservedAnalyses
 {
 	/* The whole point is to get rid of Φ-nodes in the header... */
@@ -209,8 +210,13 @@ auto LoopJumpThreadingPass::run(Loop &L, LoopAnalysisManager & /*AM*/,
 	if (!criticalPHI)
 		return PreservedAnalyses::all();
 
-	if (entryAlwaysJumpsToBody(&L))
-		return invertLoop(&L, criticalPHI) ? PreservedAnalyses::none()
-						   : PreservedAnalyses::all();
+	if (!entryAlwaysJumpsToBody(&L) || !invertLoop(&L, criticalPHI))
+		return PreservedAnalyses::all();
+
+	/* The loop adaptor keeps the dominator tree as preserved whatever we
+	 * return, and later passes (SpinAssumePass) use it: the preheader now
+	 * branches into the body */
+	AR.DT.recalculate(*L.getHeader()->getParent());
+	return PreservedAnalyses::none();
 	return PreservedAnalyses::all();
 }

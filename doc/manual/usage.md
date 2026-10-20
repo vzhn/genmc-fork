@@ -229,6 +229,26 @@ be very effective for a wide range of loops; for more details on
 whether it applies on a specific loop, please see [\[Kokologiannakis et
 al. 2021\]](references.md#kokologiannakis2021saver).
 
+Taking a mutex and releasing it again in the same iteration does not
+count as a side effect, so loops that wait under a mutex are cut too:
+
+```c
+while (taken < 2) {
+        pthread_mutex_lock(&m);
+        if (items > 0) {
+                items--;
+                taken++;
+        }
+        pthread_mutex_unlock(&m);
+}
+```
+
+An iteration that changes `taken`, or writes `items`, makes progress;
+one that only takes and releases `m` repeats the previous one. This does
+not apply to an iteration that waits in between, e.g., in
+`pthread_cond_wait()`, which releases the mutex and takes it back after
+a signal.
+
 Finally, for infinite loops with side effects, we can use the
 `-unroll=N` command-line option (see [Command-line
 Options](cli.md)). This option bounds all loops so that they are

@@ -151,6 +151,16 @@ void GenMCDriver::pushExecution(Execution &&e)
 	getConsChecker().recomputeCacheCounters(getExec().getGraph());
 }
 
+/* The role of a write in a mutex, for spinloop detection */
+static auto getLockRole(const WriteLabel *wLab) -> ExecutionState::LockRole
+{
+	if (genmc::isa<LockCasWriteLabel>(wLab))
+		return ExecutionState::LockRole::Acquire;
+	if (genmc::isa<UnlockWriteLabel>(wLab))
+		return ExecutionState::LockRole::Release;
+	return ExecutionState::LockRole::None;
+}
+
 auto GenMCDriver::popExecution() -> bool
 {
 	if (execStack.empty())
@@ -228,7 +238,7 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 				g.getState().onATStore(wLab->getPos(), wLab->getAccess(),
 						       g.getConsChecker()->getHbView(wLab),
 						       wLab->isEffectful(),
-						       wLab->isAtLeastRelease());
+						       wLab->isAtLeastRelease(), getLockRole(wLab));
 			}
 		} else if (const auto *aLab = genmc::dyn_cast<MallocLabel>(lab)) {
 			/* Keep the address the graph has: under dependency-tracking
@@ -246,6 +256,8 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 			state.onSpinStart(ssLab->getPos());
 		} else if (const auto *lbLab = genmc::dyn_cast<LoopBeginLabel>(lab)) {
 			state.onLoopBegin(lbLab->getPos());
+		} else if (const auto *asLab = genmc::dyn_cast<AwaitStartLabel>(lab)) {
+			state.onAwaitStart(asLab->getPos());
 		} else if (const auto *hpLab = genmc::dyn_cast<HpProtectLabel>(lab)) {
 			state.onProtect(hpLab->getHpAddr(), hpLab->getProtectedAddr());
 		}
@@ -1096,13 +1108,35 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 		return true;
 	}
 
+	/* An iteration that released a mutex can be observed: another thread
+	 * may take the mutex after it and write what the next iteration reads,
+	 * although that write depends on the iteration. Then only the thread's
+	 * own later writes are out of reach of the next iteration */
+	auto observable = false;
+	for (auto j = start.index; j > 0; j--) {
+		const auto *lab = g.getEventLabel(Event(tid, j));
+		if (isAwait ? genmc::isa<AwaitStartLabel>(lab) : genmc::isa<SpinStartLabel>(lab))
+			break;
+		observable |= genmc::isa<UnlockWriteLabel>(lab);
+	}
+	auto getReachableCoMax = [&](auto &rLab) -> const EventLabel * {
+		if (!observable)
+			return getCoMax(rLab);
+		auto rco = g.rco(rLab->getAddr());
+		auto coIt = std::ranges::find_if(rco, [&](auto &sLab) {
+			return sLab.getThread() != tid || sLab.getIndex() < rLab->getIndex();
+		});
+		return coIt == std::ranges::end(rco) ? g.getInitLabel()
+						     : (const EventLabel *)&*coIt;
+	};
+
 	for (auto j = start.index; j > 0; j--) {
 		const auto *lab = g.getEventLabel(Event(tid, j));
 		if (isAwait ? genmc::isa<AwaitStartLabel>(lab) : genmc::isa<SpinStartLabel>(lab))
 			return true;
 		VERIFY(!genmc::isa<LoopBeginLabel>(lab));
 		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab)) {
-			if (rLab->getRf() != getCoMax(rLab))
+			if (rLab->getRf() != getReachableCoMax(rLab))
 				return false;
 		}
 	}
@@ -2293,7 +2327,7 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 				g.updateDeferredValue(lab->getAccess(), *OLD_VAL);                 \
 			state.onATStore(lab->getPos(), lab->getAccess(),                           \
 					getConsChecker().getHbView(lab), lab->isEffectful(),       \
-					lab->isAtLeastRelease());                                  \
+					lab->isAtLeastRelease(), getLockRole(lab));                \
 		}                                                                                  \
 		return {lab->wasAddedMax(), 1U};                                                   \
 	}                                                                                          \
@@ -2714,7 +2748,7 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 	else
 		g.getState().onATStore(lab->getPos(), lab->getAccess(),
 				       getConsChecker().getHbView(lab), lab->isEffectful(),
-				       lab->isAtLeastRelease());
+				       lab->isAtLeastRelease(), getLockRole(lab));
 	return {.result = lab->wasAddedMax(), .count = 1U};
 }
 
@@ -3860,11 +3894,13 @@ auto GenMCDriver::handleSpinStart(const EventDbgInfo *dbg, Event pos)
 	return handleSpinStart(SpinStartLabel::create(pos));
 }
 
-/* An await is not a loop: it does not touch the loop state, so an await
- * nested in a spinloop leaves the loop's side-effect tracking alone */
+/* An await is not a loop: an await nested in a spinloop leaves the loop
+ * begin alone. It only marks the iteration as one that waited (see
+ * ExecutionState::onSpinStart()) */
 auto GenMCDriver::handleAwaitStart(std::unique_ptr<AwaitStartLabel> lab)
 	-> HandleResult<std::monostate>
 {
+	getExec().getGraph().getState().onAwaitStart(lab->getPos());
 	return handleDummy(std::move(lab));
 }
 
@@ -3874,8 +3910,11 @@ auto GenMCDriver::handleAwaitStart(const EventDbgInfo *dbg, Event pos)
 	++pos;
 	if (auto err = updateErrorInfoAndMaybeExit(pos, false, dbg); err)
 		return {.result = *err};
-	if (isExecutionDrivenByGraph(pos))
+	if (isExecutionDrivenByGraph(pos)) {
+		if constexpr (!Config::emitNALabels)
+			getExec().getGraph().getState().onAwaitStart(pos);
 		return {.result = std::monostate(), .count = 1U};
+	}
 	return handleAwaitStart(AwaitStartLabel::create(pos));
 }
 

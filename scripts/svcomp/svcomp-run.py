@@ -156,9 +156,9 @@ def in_atomic_section(out, tid, idx):
         if int(m.group(2)) == idx:
             return inside
         ev = m.group(3)
-        if ev.startswith("CW") and "(__svc_atomic_lock, 1)" in ev:
+        if ev.startswith("CW") and re.search(r"\(__svc_atomic_lock[.\w]*, 1\)", ev):
             inside = True
-        elif ev.startswith("W") and "(__svc_atomic_lock, 0)" in ev:
+        elif ev.startswith("W") and re.search(r"\(__svc_atomic_lock[.\w]*, 0\)", ev):
             inside = False
     return False
 
