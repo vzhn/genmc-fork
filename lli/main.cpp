@@ -838,6 +838,9 @@ static void printVerificationResults(const std::shared_ptr<const Config> &conf,
 		      "\nRuns repeated to move kept events: {} (dropped as unreachable: {})",
 		      res.relocationReruns, res.relocationsLost);
 	}
+	if (res.keptCheckReruns != 0U)
+		PRINT(VerbosityLevel::Error, "\nRuns repeated with eager consistency checks: {}",
+		      res.keptCheckReruns);
 	/* A wait that never finishes is otherwise silent. (Keep "blocked" and
 	 * "explored" out of this line: the test drivers grep for them.) */
 	if (res.spinBlocked != 0U && !conf->checkLiveness) {
