@@ -1760,7 +1760,7 @@ void Interpreter::visitAtomicRMWInst(AtomicRMWInst &I)
 
 	/* An RMW whose result is never used may commute with identical ones */
 	auto wattr = getWriteAttr(I);
-	if (I.use_empty() && !hasSCFence_)
+	if (I.use_empty())
 		wattr |= WriteAttr::Blind;
 
 	WARN_ON_ONCE(I.getOperation() == AtomicRMWInst::BinOp::Xchg && getDepTracker(),

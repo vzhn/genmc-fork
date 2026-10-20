@@ -406,16 +406,6 @@ Interpreter::Interpreter(std::unique_ptr<Module> M, std::unique_ptr<ModuleInfo> 
 			internalFunCache_.try_emplace(&F, it->second);
 	}
 
-	/* RMWs are marked blind only in programs without SC fences: under RC11, an SC
-	 * fence can order two otherwise unrelated RMWs through psc */
-	for (auto &F : *mod)
-		for (auto &BB : F)
-			for (auto &I : BB)
-				if (auto *FI = dyn_cast<FenceInst>(&I);
-				    FI &&
-				    FI->getOrdering() == AtomicOrdering::SequentiallyConsistent)
-					hasSCFence_ = true;
-
 	/* Set up a dependency tracker if the model requires it */
 	if (userConf->isDepTrackingModel)
 		dynState.depTracker = std::make_unique<DepTracker>();
