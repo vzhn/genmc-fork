@@ -130,10 +130,15 @@ public:
 	void onATLoad(Event pos, const AAccess &access, const View &view);
 	void onNAStore(Event pos, const AAccess &access, const View &view,
 		       const std::optional<SVal> &val);
+	/** The role of a write in a mutex: a loop iteration that only takes a
+	 * mutex and releases it again has no side effect */
+	enum class LockRole : std::uint8_t { None, Acquire, Release };
+
 	void onATStore(Event pos, const AAccess &access, const View &view, bool isEffectful,
-		       bool isRelease);
+		       bool isRelease, LockRole lockRole = LockRole::None);
 	void onFence(Event pos, bool isRelease);
 	void onLoopBegin(Event pos);
+	void onAwaitStart(Event pos);
 	auto onSpinStart(Event pos) -> bool;
 	auto onAlloc(Event pos, ASize size, uint64_t alignment, StorageDuration sdur,
 		     StorageType styp, AddressSpace spc) -> SAddr;
@@ -250,6 +255,11 @@ private:
 	LoopAccessMap loopAccess_;
 	std::unordered_set<LoopId> loopSideEffects_;
 	std::unordered_map<int, int> lastReleaseIdx_;
+	/* Per mutex, how many times the current loop iteration took it and has
+	 * not released it yet */
+	std::unordered_map<int, std::unordered_map<SAddr, int>> loopLockBalance_; /* by thread */
+	/* Threads whose current loop iteration waited in an await */
+	std::unordered_set<int> loopAwaited_;
 
 	/* symmetry reduction */
 	View lastMemAccess_;

@@ -107,6 +107,8 @@ void ExecutionState::clear()
 	loopAccess_.clear();
 	loopSideEffects_.clear();
 	lastReleaseIdx_.clear();
+	loopLockBalance_.clear();
+	loopAwaited_.clear();
 
 	/* symmetry reduction */
 	lastMemAccess_.clear();
@@ -377,13 +379,32 @@ auto ExecutionState::onSpinStart(Event pos) -> bool
 	ERROR_ON(!isInLoop(pos.thread), "No loop-beginning found!");
 
 	/* Next iteration needs to recheck for side-effects */
-	auto effects = doesCurrLoopHaveSideEffects(pos.thread);
+	/* An iteration that took a mutex counts as effect-free only if it did not
+	 * wait in an await (e.g., for a condition variable): such a wait lets
+	 * the next iteration see what the signaller did */
+	auto &balance = loopLockBalance_[pos.thread];
+	auto effects = doesCurrLoopHaveSideEffects(pos.thread) ||
+		       std::ranges::any_of(balance, [](auto &kv) { return kv.second != 0; }) ||
+		       (!balance.empty() && loopAwaited_.contains(pos.thread));
 	loopSideEffects_.erase(currentLoop_.at(pos.thread));
+	balance.clear();
+	loopAwaited_.erase(pos.thread);
 	return effects;
 }
 
 /* FIXME: nested loop */
-void ExecutionState::onLoopBegin(Event pos) { currentLoop_[pos.thread] = pos; }
+void ExecutionState::onLoopBegin(Event pos)
+{
+	currentLoop_[pos.thread] = pos;
+	loopLockBalance_[pos.thread].clear();
+	loopAwaited_.erase(pos.thread);
+}
+
+void ExecutionState::onAwaitStart(Event pos)
+{
+	if (isInLoop(pos.thread))
+		loopAwaited_.insert(pos.thread);
+}
 
 /* Returns a fresh address to be used from the interpreter */
 static auto getFreshAddr(int tid, ASize size, uint64_t alignment, StorageDuration sdur,
@@ -573,7 +594,7 @@ void ExecutionState::onNAStore(Event pos, const AAccess &access, const View &vie
 }
 
 void ExecutionState::onATStore(Event pos, const AAccess &access, const View &view, bool isEffectful,
-			       bool isRelease)
+			       bool isRelease, LockRole lockRole)
 {
 	recordMemAccess(lastAWriteView_, access, pos, view);
 	markInitialized(access, pos, view);
@@ -583,8 +604,29 @@ void ExecutionState::onATStore(Event pos, const AAccess &access, const View &vie
 		updateHpCount(access.addr, -1);
 		hpProtectMap_[access.addr] = nullptr;
 	}
-	if (isEffectful)
-		checkLoopSideEffects(pos, access, isRelease);
+	if (!isEffectful)
+		return;
+
+	/* A loop iteration that takes a mutex and releases it again leaves the
+	 * mutex as it found it: the iteration's other writes decide whether it
+	 * has side effects. A mutex still taken when the next iteration starts
+	 * is a side effect (see onSpinStart()). So is releasing a mutex the
+	 * iteration did not take (e.g., in a condition-variable wait, or after
+	 * loop rotation): the thread would be blocked holding it, while each
+	 * iteration lets other threads take it */
+	if (lockRole != LockRole::None && isInLoop(pos.thread)) {
+		auto &taken = loopLockBalance_[pos.thread][access.addr];
+		if (lockRole == LockRole::Acquire) {
+			++taken;
+			return;
+		}
+		if (taken > 0) {
+			--taken;
+			lastReleaseIdx_[pos.thread] = pos.index;
+			return;
+		}
+	}
+	checkLoopSideEffects(pos, access, isRelease);
 }
 
 void ExecutionState::onFence(Event pos, bool isRelease)
