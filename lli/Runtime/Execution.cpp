@@ -44,6 +44,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
+#include <llvm/IR/InstIterator.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include <algorithm>
@@ -1270,6 +1271,7 @@ void Interpreter::popStackAndReturnValueToCaller(Type *RetTy, GenericValue Resul
 
 	// Pop the current stack frame.
 	freeAllocas(ECStack().back().Allocas);
+	auto calleeFrameCtrl = std::move(ECStack().back().FrameCtrl);
 	ECStack().pop_back();
 
 	// if (ECStack.empty()) {  // Finished main.  Put result into exit code...
@@ -1293,6 +1295,8 @@ void Interpreter::popStackAndReturnValueToCaller(Type *RetTy, GenericValue Resul
 			if (!(&CallingSF.Caller)->getType()->isVoidTy()) {
 				if (retI) // if we are coming from a ret inst, update deps
 					updateDataDeps(getCurThr().id, I, retI->getReturnValue());
+				if (!calleeFrameCtrl.empty())
+					updateDataDeps(getCurThr().id, I, &calleeFrameCtrl);
 				SetValue(I, Result, CallingSF);
 			}
 			if (InvokeInst *II = dyn_cast<InvokeInst>(I))
@@ -1347,7 +1351,7 @@ void Interpreter::visitBranchInst(BranchInst &I)
 		Value *Cond = I.getCondition();
 		if (getOperandValue(Cond, SF).IntVal == 0) // If false cond...
 			Dest = I.getSuccessor(1);
-		updateCtrlDeps(getCurThr().id, Cond);
+		updateBranchCtrlDeps(I.getParent(), Cond);
 	}
 	SwitchToNewBasicBlock(Dest, SF);
 }
@@ -1370,7 +1374,7 @@ void Interpreter::visitSwitchInst(SwitchInst &I)
 	}
 	if (!Dest)
 		Dest = I.getDefaultDest(); // No cases matched: use default
-	updateCtrlDeps(getCurThr().id, Cond);
+	updateBranchCtrlDeps(I.getParent(), Cond);
 	SwitchToNewBasicBlock(Dest, SF);
 }
 
@@ -1378,7 +1382,7 @@ void Interpreter::visitIndirectBrInst(IndirectBrInst &I)
 {
 	ExecutionContext &SF = ECStack().back();
 	void *Dest = GVTOP(getOperandValue(I.getAddress(), SF));
-	updateCtrlDeps(getCurThr().id, I.getAddress());
+	updateBranchCtrlDeps(I.getParent(), I.getAddress());
 	SwitchToNewBasicBlock((BasicBlock *)Dest, SF);
 }
 
@@ -1398,6 +1402,26 @@ void Interpreter::SwitchToNewBasicBlock(BasicBlock *Dest, ExecutionContext &SF)
 	SF.CurBB = Dest;		// Update CurBB to branch destination
 	SF.CurInst = SF.CurBB->begin(); // Update new instruction ptr...
 
+	// The branches joining here end their control dependencies; the values
+	// the join chooses (its PHIs) depend on them. What their code can order
+	// before later events keeps them (see updateBranchCtrlDeps())
+	DepInfo joined;
+	if (scopesCtrlDeps()) {
+		auto &scopes = SF.CtrlScopes;
+		for (auto it = scopes.begin(); it != scopes.end();) {
+			if (it->join != Dest) {
+				++it;
+				continue;
+			}
+			joined.update(it->shadow.deps);
+			if (it->ordersAll)
+				getDepTracker()->updateCtrlDeps(getCurThr().id, it->shadow.deps);
+			else if (it->shadow.anyLoc || !it->shadow.addrs.empty())
+				getCurThr().ctrlShadows.push_back(std::move(it->shadow));
+			it = scopes.erase(it);
+		}
+	}
+
 	if (!isa<PHINode>(SF.CurInst))
 		return; // Nothing fancy to do
 
@@ -1413,6 +1437,8 @@ void Interpreter::SwitchToNewBasicBlock(BasicBlock *Dest, ExecutionContext &SF)
 		// Save the incoming value for this PHI node...
 		ResultValues.push_back(getOperandValue(IncomingValue, SF));
 		updateDataDeps(getCurThr().id, PN, IncomingValue);
+		if (!joined.empty())
+			updateDataDeps(getCurThr().id, PN, &joined);
 	}
 
 	// Now loop over all of the PHI nodes setting their values...
@@ -1714,6 +1740,7 @@ void Interpreter::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I)
 		res = retVal->val;                                                                 \
 		cmpRes = retVal->success;                                                          \
 		updateDataDeps(getCurThr().id, &I, currPos());                                     \
+		updateCasCtrlDeps(I);                                                              \
 		updateAddrPoDeps(getCurThr().id, I.getPointerOperand());                           \
 		if (!cmpRes)                                                                       \
 			break;                                                                     \
@@ -1912,7 +1939,20 @@ void Interpreter::visitCallInstWrapper(CallInstWrapper CS)
 	GenericValue SRC = getOperandValue(SF.Caller.getCalledOperand(), SF);
 	auto *calledFun = getFunctionFromPointer(GVTOP(SRC));
 	auto specialDeps = updateFunArgDeps(getCurThr().id, calledFun);
+
+	// Which function runs depends on the pointer: an indirect call is a
+	// branch whose region is the callee
+	const DepInfo *calleeCtrl = nullptr;
+	if (scopesCtrlDeps() && !isa<Function>(SF.Caller.getCalledOperand())) {
+		calleeCtrl = getDataDeps(getCurThr().id, SF.Caller.getCalledOperand());
+		if (calleeCtrl && !calleeCtrl->empty() &&
+		    (isInternalCall(calledFun) || calledFun->isDeclaration()))
+			updateCtrlDeps(getCurThr().id, SF.Caller.getCalledOperand());
+	}
+	auto depth = ECStack().size();
 	callFunction(calledFun, ArgVals, specialDeps);
+	if (calleeCtrl && ECStack().size() > depth)
+		ECStack().back().FrameCtrl.update(*calleeCtrl);
 	updateInternalFunRetDeps(getCurThr().id, calledFun, &CS);
 }
 
@@ -3573,6 +3613,14 @@ void Interpreter::callFunction(Function *F, const std::vector<GenericValue> &Arg
 	ExecutionContext &StackFrame = ECStack().back();
 	StackFrame.CurFunction = F;
 
+	// The frame's place in the thread's key context: the caller's call
+	// instance (the thread's first frame has none)
+	if (checkReplayKeys() && ECStack().size() > 1) {
+		auto &CallerSF = ECStack()[ECStack().size() - 2];
+		const Instruction *CI = &CallerSF.Caller;
+		StackFrame.KeyCall = {keyInstId(CI), CallerSF.KeyCounts[CI]++};
+	}
+
 	// Special handling for external functions.
 	if (F->isDeclaration()) {
 		auto translated = translateExternalCallArgs(F, ArgVals);
@@ -3613,6 +3661,7 @@ void Interpreter::runAtExitHandlers()
 		auto size = ECStack().size();
 		while (ECStack().size() >= size) {
 			llvm::ExecutionContext &SF = ECStack().back();
+			++getCurThr().visitNo;
 			llvm::Instruction &I = *SF.CurInst++;
 			visit(I);
 			if (!ECStack().empty()) {
@@ -3625,12 +3674,285 @@ void Interpreter::runAtExitHandlers()
 	setProgramState(oldState);
 }
 
+const DepInfo *Interpreter::getCtrlDeps(unsigned int tid)
+{
+	if (!getDepTracker())
+		return nullptr;
+	const auto *ctrl = getDepTracker()->getCtrlDeps(tid);
+	if (!scopesCtrlDeps())
+		return ctrl;
+
+	auto &thr = getThrById(tid);
+	auto open = [](const ExecutionContext &SF) {
+		return !SF.CtrlScopes.empty() || !SF.FrameCtrl.empty();
+	};
+	if (thr.ctrlShadows.empty() && std::ranges::none_of(thr.ECStack, open))
+		return ctrl;
+	thr.ctrlScratch = *ctrl;
+	for (const auto &SF : thr.ECStack) {
+		thr.ctrlScratch.update(SF.FrameCtrl);
+		for (const auto &scope : SF.CtrlScopes)
+			thr.ctrlScratch.update(scope.shadow.deps);
+	}
+	applyCtrlShadows(thr, thr.ctrlScratch);
+	return &thr.ctrlScratch;
+}
+
+static auto isReleaseOrStronger(AtomicOrdering o) -> bool
+{
+	return o == AtomicOrdering::Release || o == AtomicOrdering::AcquireRelease ||
+	       o == AtomicOrdering::SequentiallyConsistent;
+}
+
+/* Whether a call to an internal function F (code CODE) orders nothing (an
+ * assume, an assertion, a nondeterministic value...) */
+static auto isPureCode(InternalFunctions code) -> bool
+{
+	auto codeI = static_cast<std::underlying_type_t<InternalFunctions>>(code);
+	return
+#define FIRST_PURE_FUNCTION(NUM) codeI >= NUM &&
+#define LAST_PURE_FUNCTION(NUM) codeI <= NUM;
+#include "passes/InternalFunction.def"
+}
+
+void Interpreter::summarizeInst(Instruction &I, BranchRegion &R,
+				const SmallPtrSetImpl<BasicBlock *> *region)
+{
+	/* An address computed before the branch (outside its region) has the
+	 * value it has at the branch on every path */
+	/* (A plain write is left out: LKMM keeps plain accesses out of hb, and
+	 * with it in, GenMC misses racy executions herd7 has, C-non-race1-rwdep;
+	 * the corpus has no case the other way) */
+	auto written = [&](Value *ptr, bool marked) {
+		if (!marked)
+			return;
+		auto *PI = dyn_cast<Instruction>(ptr);
+		if (region && (!PI || !region->contains(PI->getParent())))
+			R.ptrs.insert(ptr);
+		else
+			R.anyLoc = true;
+		R.markedWrites |= marked;
+	};
+	if (auto *SI = dyn_cast<StoreInst>(&I)) {
+		written(SI->getPointerOperand(), SI->isAtomic());
+	} else if (auto *RI = dyn_cast<AtomicRMWInst>(&I)) {
+		written(RI->getPointerOperand(), true);
+	} else if (auto *XI = dyn_cast<AtomicCmpXchgInst>(&I)) {
+		written(XI->getPointerOperand(), true);
+	} else if (isa<FenceInst>(I)) {
+		R.ordersAll = true;
+	} else if (auto *CI = dyn_cast<CallBase>(&I)) {
+		auto *F = CI->getCalledFunction();
+		if (!F) {
+			R.ordersAll = true;
+		} else if (auto it = internalFunCache_.find(F); it != internalFunCache_.end()) {
+			/* A lock operation writes its lock (marked); others may order */
+			if (isMutexCode(it->second))
+				written(CI->getArgOperand(0), true);
+			else
+				R.ordersAll |= !isPureCode(it->second);
+		} else if (F->isIntrinsic()) {
+			R.ordersAll |= I.mayWriteToMemory();
+		} else if (F->isDeclaration()) {
+			R.ordersAll = true;
+		} else {
+			R.merge(getFunctionRegion(F));
+		}
+	}
+}
+
+const BranchRegion &Interpreter::getFunctionRegion(Function *F)
+{
+	if (auto it = funRegions_.find(F); it != funRegions_.end()) {
+		static const BranchRegion recursive{.ordersAll = true};
+		return it->second ? *it->second : recursive;
+	}
+	funRegions_[F] = std::nullopt; /* in progress: recursion orders all */
+	BranchRegion R;
+	for (auto &I : instructions(*F))
+		summarizeInst(I, R, nullptr);
+	auto &slot = funRegions_[F];
+	slot = std::move(R);
+	return *slot;
+}
+
+const BranchRegion &Interpreter::getBranchRegion(BasicBlock *BB, const BasicBlock *join)
+{
+	if (auto it = branchRegions_.find(BB); it != branchRegions_.end())
+		return it->second;
+	SmallPtrSet<BasicBlock *, 16> blocks;
+	SmallVector<BasicBlock *, 16> work(succ_begin(BB), succ_end(BB));
+	while (!work.empty()) {
+		auto *B = work.pop_back_val();
+		if (B == join || !blocks.insert(B).second)
+			continue;
+		work.append(succ_begin(B), succ_end(B));
+	}
+	BranchRegion R;
+	for (auto *B : blocks)
+		for (auto &I : *B)
+			summarizeInst(I, R, &blocks);
+	return branchRegions_[BB] = std::move(R);
+}
+
+/* GenMC's prefix (the kat's ppo) can order an event of a branch before a
+ * write after its join to a location the branch accesses (moi, fri), and
+ * before all after an ordering event (fences, releases, locks, thread
+ * events). Which events the branch has depends on its path, and a prefix
+ * must not: such an event depends on the branch's condition, as if inside */
+void Interpreter::applyCtrlShadows(Thread &thr, DepInfo &ctrl)
+{
+	if (thr.ctrlShadows.empty() || thr.ECStack.empty())
+		return;
+	auto &SF = thr.ECStack.back();
+	auto &I = *std::prev(SF.CurInst);
+
+	/* The kat's ppo edges from a branch's write x into an event e after the
+	 * join: moi (e a write to x's location); for a marked x, po-rel (e a
+	 * release), and mb, wmb (from the fence on, the branch's dependencies
+	 * become the thread's); a lock handover or a thread event, likewise */
+	enum class Fence { None, Mb, Wmb };
+	auto fence = Fence::None;
+	Value *wptr = nullptr;
+	auto release = false;
+	if (auto *SI = dyn_cast<StoreInst>(&I)) {
+		wptr = SI->getPointerOperand();
+		release = isReleaseOrStronger(SI->getOrdering());
+	} else if (auto *RI = dyn_cast<AtomicRMWInst>(&I)) {
+		wptr = RI->getPointerOperand();
+		release = isReleaseOrStronger(RI->getOrdering());
+	} else if (auto *XI = dyn_cast<AtomicCmpXchgInst>(&I)) {
+		wptr = XI->getPointerOperand();
+		release = isReleaseOrStronger(XI->getSuccessOrdering());
+	} else if (isa<FenceInst>(I)) {
+		fence = Fence::Mb;
+	} else if (auto *CI = dyn_cast<CallBase>(&I)) {
+		auto *F = CI->getCalledFunction();
+		auto it = F ? internalFunCache_.find(F) : internalFunCache_.end();
+		if (it == internalFunCache_.end()) {
+			fence = F && !F->isDeclaration() ? Fence::None : Fence::Mb;
+		} else if (it->second == InternalFunctions::LkmmFence) {
+			const auto *k = dyn_cast<ConstantInt>(CI->getArgOperand(0));
+			auto kind = k ? static_cast<LkmmFenceKind>(k->getZExtValue())
+				      : LkmmFenceKind::Mb;
+			fence = kind == LkmmFenceKind::Wmb ? Fence::Wmb
+				: kind == LkmmFenceKind::Rmb || kind == LkmmFenceKind::RcuLock ||
+						kind == LkmmFenceKind::RcuUnlock
+					? Fence::None
+					: Fence::Mb;
+		} else if (it->second == InternalFunctions::MutexUnlock) {
+			wptr = CI->getArgOperand(0); /* a release write of the lock */
+			release = true;
+		} else if (!isPureCode(it->second)) {
+			fence = Fence::Mb; /* locks (a handover), thread events, SRCU... */
+		}
+	}
+	void *addr = wptr ? GVTOP(getOperandValue(wptr, SF)) : nullptr;
+
+	for (auto it = thr.ctrlShadows.begin(); it != thr.ctrlShadows.end();) {
+		if (fence != Fence::None && it->markedWrites) {
+			ctrl.update(it->deps);
+			getDepTracker()->updateCtrlDeps(thr.id, it->deps);
+			it = thr.ctrlShadows.erase(it);
+			continue;
+		}
+		if ((wptr && (it->anyLoc || std::ranges::contains(it->addrs, addr))) ||
+		    (release && it->markedWrites))
+			ctrl.update(it->deps);
+		++it;
+	}
+}
+
+void Interpreter::updateCasCtrlDeps(AtomicCmpXchgInst &I)
+{
+	/* What a CAS orders after it depends on whether it succeeds (an
+	 * acquire on success only, as cmpxchg_acquire()): so does the prefix of
+	 * every later event, unless they all depend on the CAS */
+	if (scopesCtrlDeps() && I.getSuccessOrdering() != I.getFailureOrdering())
+		updateCtrlDeps(getCurThr().id, currPos());
+}
+
+const BasicBlock *Interpreter::getBranchJoin(BasicBlock *BB)
+{
+	auto *F = BB->getParent();
+	auto &pdt = postDoms_[F];
+	if (!pdt)
+		pdt = std::make_unique<PostDominatorTree>(*F);
+	const auto *node = pdt->getNode(BB);
+	const auto *idom = node ? node->getIDom() : nullptr;
+	return idom ? idom->getBlock() : nullptr;
+}
+
+void Interpreter::updateBranchCtrlDeps(BasicBlock *BB, Value *Cond)
+{
+	auto tid = getCurThr().id;
+	if (!scopesCtrlDeps()) {
+		updateCtrlDeps(tid, Cond);
+		return;
+	}
+
+	/* Without a join in the function (an early exit, a call that does not
+	 * return, an endless loop), the dependency is not scoped */
+	const auto *join = getBranchJoin(BB);
+	const auto *deps = getDataDeps(tid, Cond);
+	if (!join) {
+		updateCtrlDeps(tid, Cond);
+		return;
+	}
+	if (!deps || deps->empty())
+		return;
+	const auto &region = getBranchRegion(BB, join);
+	auto &SF = ECStack().back();
+	CtrlShadow shadow{.deps = *deps, .anyLoc = region.anyLoc, .markedWrites = region.markedWrites};
+	for (auto *ptr : region.ptrs)
+		shadow.addrs.push_back(GVTOP(getOperandValue(ptr, SF)));
+	auto &scopes = SF.CtrlScopes;
+	auto it = std::ranges::find_if(scopes, [&](auto &s) { return s.join == join; });
+	if (it != scopes.end()) {
+		it->ordersAll |= region.ordersAll;
+		it->shadow.merge(shadow);
+	} else {
+		scopes.push_back({.join = join, .ordersAll = region.ordersAll, .shadow = std::move(shadow)});
+	}
+}
+
+void Interpreter::prepareEventKey()
+{
+	auto &thr = getCurThr();
+	auto depth = thr.ECStack.size();
+	const Instruction *inst = depth ? &*std::prev(thr.ECStack.back().CurInst) : nullptr;
+	if (thr.keyVisit != thr.visitNo || thr.keyInst != inst || thr.keyDepth != depth) {
+		std::vector<EventKey::Step> path;
+		path.reserve(depth ? depth : 1);
+		for (auto i = 1U; i < depth; i++)
+			path.push_back(thr.ECStack[i].KeyCall);
+		path.emplace_back(keyInstId(inst), depth ? thr.ECStack.back().KeyCounts[inst]++ : 0);
+		thr.key = std::make_shared<const EventKey>(std::move(path));
+		thr.keyBase = currPos();
+		thr.keyVisit = thr.visitNo;
+		thr.keyInst = inst;
+		thr.keyDepth = depth;
+	}
+	driver->setEventKey(thr.key, thr.keyBase);
+}
+
+void Interpreter::undoEventKey()
+{
+	auto &thr = getCurThr();
+	if (thr.keyVisit != thr.visitNo)
+		return;
+	if (thr.keyDepth > 0 && thr.keyDepth == thr.ECStack.size())
+		--thr.ECStack.back().KeyCounts[thr.keyInst];
+	thr.keyVisit.reset();
+}
+
 void Interpreter::run()
 {
 	auto tid = driver->scheduleNext(dynState.globalInstructions);
 	while (std::holds_alternative<int>(tid)) {
 		scheduleThread(std::get<int>(tid));
 		llvm::ExecutionContext &SF = ECStack().back();
+		++getCurThr().visitNo;
 		llvm::Instruction &I = *SF.CurInst++;
 		visit(I);
 		if (!ECStack().empty()) {

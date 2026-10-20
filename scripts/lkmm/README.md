@@ -12,6 +12,8 @@ checking it against herd7, the reference implementation of LKMM.
 | `classify.py` | sorts the disagreements of a run by likely cause |
 | `kater-export.sh` | regenerates GenMC's consistency checkers from the kat files |
 | `compare-checkers.sh` | compares two GenMC builds under every model |
+| `fuzz-ctrl.py` | random litmus tests with branches of different lengths |
+| `feature-matrix.py` | runs the `-lkmm` tests under GenMC's options |
 
 ## Oracles (pinned)
 
@@ -531,6 +533,86 @@ IMM.
 - RCU-free tests: 57 random `auto/` corpus tests without RCU cost the same
   instructions under `-lkmm` as under `-imm` (ratio 1.002, compilation
   included; at most 1.022 for one test).
+
+## Control dependencies scoped to the `if`
+
+(Plan: `lkmm-ctrl-identity-plan.md`, option 1, steps 1-3; 2026-10-20.)
+Under `-lkmm` a control dependency ends at the join of its branch (the
+branch's immediate post-dominator), as LKMM's `ctrl` does. A branch whose
+join is the function's exit (an early return) keeps the old rule for the
+rest of the thread.
+
+- **Event keys** (step 1): each label records the instruction instance
+  that made it (per frame, the call instance, then the instruction and how
+  many times it ran in its frame; instructions numbered in module order, so
+  `-nthreads` workers agree). Replay checks the key of every label it
+  reuses (`-check-replay-keys`, always on under `-lkmm`).
+- **Relocation** (step 2): a revisit keeps events after the branch that the
+  re-run thread may reach after a branch of another length. When the key
+  of the instruction being run is that of a kept event further on (after
+  holes), the thread's events move down to it; when a kept event sits where
+  a new event goes, they move up (by 1, 2, 4... on repeats).
+  `ExecutionGraph::relocateThread()` moves the labels and rewrites the
+  positions in deps, views (dependency views get the opened slots as
+  holes) and the creates; prefix views are dropped; the work list and the
+  choice map follow. The run is then repeated from its start (the events it
+  added are cut), so that the interpreter, the execution state and the
+  schedule are built for the new positions. A run is dropped when a kept
+  event would be skipped or follow the thread's end, or when the thread
+  blocks before kept events and stays blocked (its block goes after them,
+  as a thread's last label, until it is unblocked). After an event is added
+  before kept events, the whole graph is checked once (an incremental check
+  assumes an event to be its thread's last).
+- **Dependencies** (step 3): the deps of a branch's condition last until
+  its join; the phis at the join take them (a value the branch chose); an
+  indirect call gives its callee's events the pointer's deps. GenMC's
+  exploration needs prefixes that do not change with a branch's path, so a
+  joined branch keeps its deps for what its code can order after the join
+  in the kat's ppo: a marked write to a location a marked write of the
+  branch writes (`moi`), a release after it (`po-rel`), and all after a
+  fence, a lock operation or a thread event (`mb`, `wmb`, lock handover);
+  a fence or an unknown call in the branch keeps them for the rest of the
+  thread. (Plain writes are left out: with them, GenMC misses racy
+  executions herd7 has, e.g. `C-non-race1-rwdep`, while no test needs them.)
+  A `cmpxchg` whose ordering on success is stronger than on failure
+  (`cmpxchg_acquire()`) makes all later events depend on its read, as its
+  `acq-po` depends on the value read; clang's branch on its success flag
+  did that before.
+- The code condenser (which merges the branches' common code, moving
+  their events out of the branch) is off under `-lkmm`.
+
+Bugs found on the way, each with a test: `ctrl-indirect-write` crashes
+vzhn.8 (an indirect call's callee did not depend on the pointer's read);
+`cas-fail-then-write`, a failed relaxed `cmpxchg()` followed by a kept
+write that a revisit makes succeed, crashed before its write got a slot
+(vzhn.8 misses its LB execution: 3 of herd7's 4).
+
+Random tests (`fuzz-ctrl.py`, seeds 0-799: two to three threads, nested
+`if`/`else` of different lengths, fences, acquire/release, relaxed
+`cmpxchg()`), with `--strict-counts`: vzhn.8 agrees on 723, this branch on
+746 (28 fixed: missing states or counts). 5 now miss executions
+(seeds 158, 372, 560, 606, 671): the existence of an event after a join
+depends on a register a branch set, or a marked read in a branch is ordered
+before a later write (fri), and GenMC's optimality check then rejects the
+only revisit that builds the execution (see the prefix stability above;
+a static rule for marked reads fixes 158 and breaks `C-viro-2020.09.29a`).
+Over herd7's counts: those with `cmpxchg()` (failed reads counted
+differently, as before), and a duplicate that vzhn.8 has too
+(`tests/cooking/lkmm/dup-revisit-nested-if`, reduced from seed 586; not
+under `-imm`). The fuzzing also found a view corrupted by a move
+(`RelocateTest.ViewWithPendingDiffMovesDown`, fixed).
+
+Results (2026-10-20):
+
+| suite | result |
+|---|---|
+| the 51 corpus tests classified as "control dependency past the `if`" | 45 agree (states and counts); 6 reclassified (2 locks, 3 cycles through plain writes, 1 thin-air) |
+| whole corpus (5571 files) | 5047 agree, 196 agree-racy, 8 agree-deadlock, 1 agree-flag, 1 count, 10 missing, all classified (17 entries, from 55) |
+| kernel `litmus-tests` (35) | 35 agree (with `--strict-counts`) |
+| `tests/correct/lkmm` (new: `ctrl-*`, `cas-fail-then-write`, `plain-lb2` from cooking) | pass, also with `-lkmm-reference` |
+| fast suite (rc11, imm, lkmm), also with `-check-replay-keys` | pass |
+| feature matrix | 1944 runs, no deviation |
+| unit tests (`BUILD_TESTS=ON`, incl. `RelocateTest`) | pass |
 
 ## Kater and the generated checkers
 

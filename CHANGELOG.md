@@ -8,6 +8,16 @@ released.
 ## [Unreleased]
 
 - Merge of MIXER [POPL'25] into mainline GenMC
+- `-lkmm`: a control dependency ends at the join of its branch, as in the
+  kernel model: GenMC finds the executions (and bugs) where a write after an
+  `if` is reordered before the read the condition tested. A revisit may now
+  keep events after a branch that the re-run thread takes with another
+  length; GenMC moves them to where their instruction runs. 45 of the 51
+  corpus tests that disagreed with herd7 for this agree now.
+- `-check-replay-keys` (debugging): when GenMC re-runs a thread and reuses
+  an event of the graph, check that the same instance of the same
+  instruction produced it (an internal error otherwise). Always on under
+  `-lkmm`.
 
 
 ## [0.19.0-vzhn.8] - 2026.10.19

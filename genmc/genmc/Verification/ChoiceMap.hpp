@@ -47,6 +47,22 @@ public:
 
 	void cut(const VectorClock &v);
 
+	/** Follows a move of THREAD's events (see ExecutionGraph::relocateThread()) */
+	void relocateThread(int thread, int from, int delta)
+	{
+		auto move = [&](Event e) {
+			return e.thread == thread ? Event(thread, relocatedIndex(e.index, from, delta))
+						  : e;
+		};
+		std::unordered_map<Event, VSet<Event>> moved;
+		for (const auto &[e, es] : cmap_) {
+			auto &mes = moved[move(e)];
+			for (const auto &o : es)
+				mes.insert(move(o));
+		}
+		cmap_ = std::move(moved);
+	}
+
 private:
 	std::unordered_map<Event, VSet<Event>> cmap_;
 };

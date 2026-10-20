@@ -147,6 +147,11 @@ static llvm::cl::opt<bool> clLkmmReference(
 	llvm::cl::desc("Under -lkmm, check every graph with a direct evaluation of the model "
 		       "too, and stop when it disagrees with the checker (slow)"));
 
+static llvm::cl::opt<bool> clCheckReplayKeys(
+	"check-replay-keys", llvm::cl::cat(clDebugging),
+	llvm::cl::desc("Check that every event reused when re-running a thread was produced by "
+		       "the same instruction instance (always on under -lkmm)"));
+
 static llvm::cl::opt<bool> clCheckLiveness("check-liveness", llvm::cl::cat(clGeneral),
 					   llvm::cl::desc("Check for liveness violations"));
 
@@ -399,7 +404,9 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	lliConfig.castElimination = !clDisableCastElimination;
 	lliConfig.inlineFunctions = !clDisableFunctionInliner;
 	lliConfig.spinAssume = !clDisableSpinAssume;
-	lliConfig.codeCondenser = !clDisableCodeCondenser;
+	/* Under LKMM, a control dependency ends at the join of its branch: merging
+	 * the branches' common code moves their events out of the branch */
+	lliConfig.codeCondenser = !clDisableCodeCondenser && clModelType != ModelType::LKMM;
 	lliConfig.loadAnnot = !clDisableLoadAnnot;
 	lliConfig.assumePropagation = !clDisableAssumePropagation;
 	/* The detector suggests a model from the orderings used; kernel code is
@@ -449,6 +456,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.printErrorTrace = clPrintErrorTrace;
 	conf.checkLiveness = clCheckLiveness;
 	conf.lkmmReference = clLkmmReference;
+	conf.checkReplayKeys = clCheckReplayKeys || clModelType == ModelType::LKMM;
 #if EMIT_NA_LABELS
 	conf.instructionCaching = clCacheInstructions;
 #endif
@@ -807,6 +815,13 @@ static void printVerificationResults(const std::shared_ptr<const Config> &conf,
 	if (res.exploredBlocked != 0U) {
 		PRINT(VerbosityLevel::Error, "\nNumber of blocked executions seen: {}",
 		      res.exploredBlocked);
+	}
+	/* -lkmm: runs whose thread took a branch of another length before events
+	 * that a revisit kept (see GenMCDriver::alignKeptEvents()) */
+	if (res.relocationReruns != 0U || res.relocationsLost != 0U) {
+		PRINT(VerbosityLevel::Error,
+		      "\nRuns repeated to move kept events: {} (dropped as unreachable: {})",
+		      res.relocationReruns, res.relocationsLost);
 	}
 	/* A wait that never finishes is otherwise silent. (Keep "blocked" and
 	 * "explored" out of this line: the test drivers grep for them.) */

@@ -61,6 +61,7 @@ public:
 		ctrlDeps[tid].update(dataDeps[tid][src]);
 	};
 	void updateCtrlDeps(unsigned int tid, Event e) { ctrlDeps[tid].update(DepInfo(e)); };
+	void updateCtrlDeps(unsigned int tid, const DepInfo &deps) { ctrlDeps[tid].update(deps); };
 
 	/* Clears the dependencies calculated for thread TID */
 	void clearDeps(unsigned int tid)

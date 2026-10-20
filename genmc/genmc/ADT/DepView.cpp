@@ -41,6 +41,26 @@ void DepView::addHolesInRange(Event start, int endIdx)
 		addHole(Event(start.thread, i));
 }
 
+void DepView::relocateThread(int thread, int from, int delta)
+{
+	auto max = getMax(thread);
+	if (max < from + std::min(delta, 0))
+		return;
+
+	if (std::cmp_less(thread, holes_.size())) {
+		Holes moved;
+		for (auto h : holes_[thread]) {
+			if (delta < 0 && h >= from + delta && h < from)
+				continue;
+			moved.insert(relocatedIndex(h, from, delta));
+		}
+		holes_[thread] = std::move(moved);
+	}
+	view_.setMax(Event(thread, relocatedIndex(max, from, delta)));
+	if (delta > 0 && max >= from)
+		addHolesInRange(Event(thread, from), from + delta);
+}
+
 void DepView::removeHole(const Event e) { holes_[e.thread].erase(e.index); }
 
 void DepView::removeAllHoles(int thread) { holes_[thread].clear(); }

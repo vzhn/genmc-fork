@@ -140,6 +140,21 @@ public:
 	/** Returns to the interpreter the next thread to run (nullopt if none) */
 	auto scheduleNext(std::span<Action> runnable) -> ScheduleResult;
 
+	/** With -check-replay-keys: the instruction instance the interpreter is
+	 * about to execute in the thread of @p base, whose events will follow
+	 * @p base. Labels added after it get the key; labels reused on replay
+	 * must have it. Cleared after the instruction's call to the driver. */
+	void setEventKey(std::shared_ptr<const EventKey> key, Event base)
+	{
+		currKey = std::move(key);
+		currKeyBase = base;
+	}
+	void clearEventKey() { currKey = nullptr; }
+	auto checksReplayKeys() const -> bool { return getConf()->checkReplayKeys; }
+
+	/** Under LKMM, a control dependency ends at the join of its branch */
+	auto scopesCtrlDeps() const -> bool { return relocatesKeptEvents(); }
+
 	/** Attemps to complete the execution by inspecting the cache.
 	 * Returns whether it succeeded. */
 	auto runFromCache() -> bool;
@@ -532,6 +547,34 @@ private:
 	/** Returns true if the exploration is guided by a graph */
 	auto isExecutionDrivenByGraph(Event curr) -> bool;
 
+	/** Under LKMM, kept events of the current thread may sit where the
+	 * thread's new path does not reach them (a control dependency ends at the
+	 * join of its branch): moves them so that @p curr's instruction instance
+	 * meets its own event. Returns whether the label now at @p curr is the
+	 * instance's. A move ends the run, which is repeated (done()). */
+	auto alignKeptEvents(Event curr, const EventLabel *lab) -> bool;
+
+	/** Moves THREAD's events from FROM by DELTA in the current execution
+	 * (graph, work list, choices) */
+	void relocateExecution(int thread, int from, int delta);
+
+	/** relocateExecution(), and schedules a repeat of the run */
+	void relocateAndRerun(int thread, int from, int delta);
+
+	/** Whether kept events are moved to their instruction (see alignKeptEvents()) */
+	auto relocatesKeptEvents() const -> bool
+	{
+		return getConf()->checkReplayKeys && getConf()->model == ModelType::LKMM;
+	}
+
+	/** Stops with an internal error unless @p lab, reused on replay, comes
+	 * from the instruction instance being executed (as its @p sub-th event) */
+	void checkReplayKey(const EventLabel *lab, std::uint32_t sub) const;
+
+	/** Gives @p lab the key of the instruction instance being executed, if
+	 * it is one of its events (probe labels are reused: clears it otherwise) */
+	void assignEventKey(EventLabel *lab) const;
+
 	/** Error reporting: initiates an exploration to collect metadata */
 	void initiateErrorReplay(const ErrorDetails &details);
 
@@ -805,6 +848,22 @@ private:
 
 	/** Linearizability checker */
 	std::unique_ptr<LinearizabilityChecker> relinche;
+
+	/** The instruction instance being executed (see setEventKey()) */
+	std::shared_ptr<const EventKey> currKey;
+	Event currKeyBase;
+
+	/** The current run's start (its graph's maximum stamp and the number of
+	 * items in its work list), to repeat it after a relocation */
+	Stamp runStartStamp_{0};
+	size_t runStartWork_{};
+	bool rerunAfterRelocation_ = false;
+	unsigned relocationsInRun_{};
+
+	/* An event went before kept events: the incremental checks assume an
+	 * event to be added after its thread's others, so the whole graph is
+	 * checked (before the next step, see scheduleNext()) */
+	bool addedBeforeKept_ = false;
 
 	/** Opt: Whether this execution is moot (locking) */
 	bool isMootExecution = false;

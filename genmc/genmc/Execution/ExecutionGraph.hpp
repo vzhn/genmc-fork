@@ -1021,6 +1021,21 @@ public:
 	/* Boolean helper functions */
 
 	/** A graph is blocked if any of its threads is blocked */
+	/** Whether a thread was to block before events a revisit kept after
+	 * its position (see GenMCDriver::alignKeptEvents()): those events can
+	 * no longer be reached in this run */
+	[[nodiscard]] auto keptEventsUnreachable() const -> bool { return keptUnreachable_; }
+	void setKeptEventsUnreachable(bool b) { keptUnreachable_ = b; }
+
+	/** Whether THREAD has events (not holes) after index IDX */
+	[[nodiscard]] auto hasEventsAfter(int thread, int idx) const -> bool
+	{
+		for (auto i = idx + 1; i < getThreadSize(thread); i++)
+			if (!genmc::isa<EmptyLabel>(getEventLabel(Event(thread, i))))
+				return true;
+		return false;
+	}
+
 	auto isBlocked() const -> bool
 	{
 		return std::ranges::any_of(thr_ids(),
@@ -1130,6 +1145,13 @@ public:
 
 	/* Cuts a graph so that it only contains events with stamp <= st */
 	virtual void cutToStamp(Stamp st);
+
+	/** Moves the events of THREAD from index FROM on by DELTA. DELTA > 0
+	 * opens DELTA holes at FROM; DELTA < 0 removes the holes in
+	 * [FROM + DELTA, FROM), which must all be holes. Positions stored in
+	 * labels (deps, views, creates) follow; prefix views are dropped, to be
+	 * recalculated. Relations are pointers and are unaffected. */
+	void relocateThread(int thread, int from, int delta);
 
 	/** Removes the trailing threads that only have a begin whose create was
 	 * cut, and marks the begins of such threads elsewhere as terminated */
@@ -1278,6 +1300,9 @@ protected:
 	bool haveNAs_{};
 	// NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
 	ExecutionState *state_{};
+
+	/* See keptEventsUnreachable() */
+	bool keptUnreachable_ = false;
 
 	// NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
 	bool pruned_{};

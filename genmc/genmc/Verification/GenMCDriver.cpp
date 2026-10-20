@@ -268,6 +268,10 @@ auto GenMCDriver::handleExecutionStart() -> bool
 
 	/* Set various exploration options for this execution */
 	unmoot();
+	addedBeforeKept_ = false;
+	g.setKeptEventsUnreachable(false);
+	runStartStamp_ = g.getMaxStamp();
+	runStartWork_ = getExec().getWorkqueue().size();
 	state.clear();
 	if constexpr (Config::emitNALabels)
 		reconstructState(g, state);
@@ -385,6 +389,13 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		return {};
 	}
 
+	/* A thread stopped before events that others observe: not an execution
+	 * (whether blocked or not), see alignKeptEvents() */
+	if (relocatesKeptEvents() && lkmm::hasThreadBlockedBeforeKept(g)) {
+		++result.relocationsLost;
+		return {};
+	}
+
 	/* Helper: Check helping CAS annotation */
 	if (getConf()->helper)
 		checkHelpingCasAnnotation();
@@ -488,6 +499,25 @@ void GenMCDriver::restartExecution()
 
 auto GenMCDriver::done() -> bool
 {
+	/* Repeat a run whose thread's kept events were moved: from its start
+	 * (the events added since are cut), so that every structure built during
+	 * the run sees the new positions */
+	if (rerunAfterRelocation_ && !isHalting()) {
+		rerunAfterRelocation_ = false;
+		++result.relocationReruns;
+		static constexpr auto kMaxRelocations = 64U;
+		ERROR_ON(++relocationsInRun_ > kMaxRelocations,
+			 "Internal error: a thread's kept events do not settle\nPlease submit a "
+			 "bug report to {}\n",
+			 PACKAGE_BUGREPORT);
+		getExec().getWorkqueue().truncate(runStartWork_);
+		getExec().restrict(runStartStamp_);
+		getConsChecker().recomputeCacheCounters(getExec().getGraph());
+		repairDanglingReads(getExec().getGraph());
+		return false;
+	}
+	relocationsInRun_ = 0;
+
 	auto validExecution = false;
 	while (!isHalting() && !validExecution) {
 		auto item = getExec().getWorkqueue().getNext();
@@ -531,19 +561,34 @@ void GenMCDriver::blockThreadTryMoot(std::unique_ptr<BlockLabel> bLab)
 {
 	auto &g = getExec().getGraph();
 	auto pos = bLab->getPos();
+	/* (A block before kept events goes after them: no previous access to
+	 * judge by, see blockThread()) */
+	auto beforeKept = g.hasEventsAfter(pos.thread, pos.index);
 	blockThread(g, std::move(bLab));
+	if (beforeKept)
+		return;
 	auto *lab = g.getLastThreadLabel(pos.thread);
 	mootExecutionIfFullyBlocked(lab);
 }
 
 auto GenMCDriver::scheduleNext(std::span<Action> runnable) -> ScheduleResult
 {
+	auto &g = getExec().getGraph();
+	if (addedBeforeKept_ && !isMoot()) {
+		addedBeforeKept_ = false;
+		if (!getConsChecker().isConsistent(g))
+			moot();
+	}
+	if (g.keptEventsUnreachable()) {
+		g.setKeptEventsUnreachable(false);
+		++result.relocationsLost;
+		moot();
+	}
 	if (isHalting())
 		return Error{};
 	if (isMoot())
 		return Blocked{};
 
-	auto &g = getExec().getGraph();
 	if (auto next = getScheduler().schedule(g, runnable); next)
 		return *next;
 	return g.isBlocked() ? ScheduleResult(Blocked{}) : ScheduleResult(Finished{});
@@ -603,7 +648,97 @@ auto GenMCDriver::isExecutionDrivenByGraph(Event curr) -> bool
 	/* Compare positions and not sizes: pruning skews the event count */
 	const auto &g = getExec().getGraph();
 	const auto *lab = g.getEventLabelIfPresent(curr);
-	return lab != nullptr && !genmc::isa<EmptyLabel>(lab);
+	auto keyed = currKey && curr.thread == currKeyBase.thread && curr.index > currKeyBase.index;
+	if (keyed && relocatesKeptEvents())
+		return alignKeptEvents(curr, lab);
+	if (lab == nullptr || genmc::isa<EmptyLabel>(lab))
+		return false;
+	if (keyed)
+		checkReplayKey(lab, curr.index - currKeyBase.index);
+	return true;
+}
+
+auto GenMCDriver::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
+{
+	auto &g = getExec().getGraph();
+	auto sub = curr.index - currKeyBase.index;
+	auto isOwn = [&](const EventLabel *oLab) {
+		return oLab->getKey() && *oLab->getKey() == *currKey && oLab->getKeySub() == sub;
+	};
+	auto later = [&g, curr] {
+		auto size = g.getThreadSize(curr.thread);
+		return std::views::iota(std::min(curr.index + 1, size), size) |
+		       std::views::transform([&g, curr](int i) {
+			       return g.getEventLabel(Event(curr.thread, i));
+		       }) |
+		       std::views::filter([](auto *oLab) { return !genmc::isa<EmptyLabel>(oLab); });
+	};
+
+	if (lab != nullptr && !genmc::isa<EmptyLabel>(lab)) {
+		if (isOwn(lab))
+			return true;
+		if (!lab->getKey())
+			checkReplayKey(lab, sub); /* a missing key is an error still */
+
+		/* A new event before kept ones. If the kept events include this
+		 * instance's, the ones in between would be skipped: no such run */
+		auto skipsKept = std::ranges::any_of(later(), isOwn);
+		if (skipsKept) {
+			++result.relocationsLost;
+			relocateExecution(curr.thread, curr.index, 1);
+			moot();
+			return false;
+		}
+		/* Open a gap (doubling on repeats; the surplus is closed later) */
+		relocateAndRerun(curr.thread, curr.index, 1 << std::min(relocationsInRun_, 10U));
+		return false;
+	}
+
+	/* A hole: fill it, unless this instance's event is kept further on,
+	 * after holes only (the old path was longer): move it here */
+	auto rest = later();
+	auto first = std::ranges::begin(rest);
+	if (first == std::ranges::end(rest))
+		return false;
+	if (!isOwn(*first)) {
+		addedBeforeKept_ = true;
+		return false;
+	}
+	relocateAndRerun(curr.thread, (*first)->getIndex(), curr.index - (*first)->getIndex());
+	return true;
+}
+
+void GenMCDriver::relocateExecution(int thread, int from, int delta)
+{
+	getExec().getGraph().relocateThread(thread, from, delta);
+	getExec().getWorkqueue().relocateThread(thread, from, delta);
+	getExec().getChoiceMap().relocateThread(thread, from, delta);
+}
+
+void GenMCDriver::relocateAndRerun(int thread, int from, int delta)
+{
+	relocateExecution(thread, from, delta);
+	rerunAfterRelocation_ = true;
+	moot();
+}
+
+void GenMCDriver::assignEventKey(EventLabel *lab) const
+{
+	if (currKey && lab->getThread() == currKeyBase.thread &&
+	    lab->getIndex() > currKeyBase.index)
+		lab->setKey(currKey, lab->getIndex() - currKeyBase.index);
+	else
+		lab->setKey(nullptr, 0);
+}
+
+void GenMCDriver::checkReplayKey(const EventLabel *lab, std::uint32_t sub) const
+{
+	if (lab->getKey() && *lab->getKey() == *currKey && lab->getKeySub() == sub)
+		return;
+	ERROR("Internal error: replaying {} reuses the label of another instruction instance "
+	      "({} #{}, now {} #{}): {}\nPlease submit a bug report to {}\n",
+	      lab->getPos(), lab->getKey() ? lab->getKey()->toString() : "none",
+	      lab->getKeySub(), currKey->toString(), sub, *lab, PACKAGE_BUGREPORT);
 }
 
 auto GenMCDriver::executionExceedsBound(BoundCalculationStrategy strategy) const -> bool
@@ -635,6 +770,10 @@ auto GenMCDriver::addLabelToGraph(std::unique_ptr<EventLabel> lab) -> EventLabel
 	/* Prune the graph when it exceeds the window */
 	if (inRandomMode() && getConf()->maxGraphSize.has_value())
 		maybeCutGraph(&*lab);
+
+	/* (A label may come with its key: a cached one, an RMW's write) */
+	if (!lab->getKey())
+		assignEventKey(&*lab);
 
 	/* Add and update views */
 	auto *addedLab = g.add(std::move(lab));
@@ -687,6 +826,7 @@ void GenMCDriver::configureProbe(MemLabel *rLab, Event pos, SAddr addr, ASize si
 	rLab->reset();
 
 	rLab->setPos(pos);
+	assignEventKey(rLab);
 	rLab->setAddr(addr);
 	rLab->setSize(size);
 	rLab->setDeps(deps);
@@ -1712,6 +1852,19 @@ auto GenMCDriver::handleThreadFinish(std::unique_ptr<ThreadFinishLabel> eLab)
 	auto &g = getExec().getGraph();
 
 	auto *lab = addLabelToGraph(std::move(eLab));
+
+	/* Kept events after the end (see alignKeptEvents()) are never reached */
+	if (relocatesKeptEvents() &&
+	    std::ranges::any_of(std::views::iota(lab->getIndex() + 1,
+						 g.getThreadSize(lab->getThread())),
+				[&](int i) {
+					return !genmc::isa<EmptyLabel>(
+						g.getEventLabel(Event(lab->getThread(), i)));
+				})) {
+		++result.relocationsLost;
+		moot();
+		return {.result = std::monostate(), .count = 1U};
+	}
 	if (getRcuNesting(g, lab->getPos()) > 0) {
 		reportError(lab->getPos(),
 			    {lab->getPos(), VerificationError::VE_InvalidRcu,
@@ -1849,8 +2002,12 @@ void GenMCDriver::checkReconsiderFaiSpinloop(const MemAccessLabel *lab)
 		/* If it does, and also breaks the assumptions, unblock thread */
 		if (!getConsChecker().getHbView(faiLab).contains(lab->getPos())) {
 			auto pos = eLab->getPos();
+			auto key = eLab->getSharedKey();
+			auto keySub = eLab->getKeySub();
 			unblockThread(g, pos);
-			addLabelToGraph(FaiZNESpinEndLabel::create(pos));
+			auto zLab = FaiZNESpinEndLabel::create(pos);
+			zLab->setKey(std::move(key), keySub);
+			addLabelToGraph(std::move(zLab));
 		}
 	}
 }
@@ -2763,8 +2920,10 @@ void GenMCDriver::mootExecutionIfFullyBlocked(EventLabel *bLab)
 
 auto GenMCDriver::handleBlock(std::unique_ptr<BlockLabel> lab) -> HandleResult<std::monostate>
 {
-	/* Call addLabelToGraph first to cache the label */
-	addLabelToGraph(lab->clone());
+	/* Call addLabelToGraph first to cache the label (not before kept
+	 * events, where blockThread() puts the block after them) */
+	if (!getExec().getGraph().hasEventsAfter(lab->getThread(), lab->getIndex()))
+		addLabelToGraph(lab->clone());
 	blockThreadTryMoot(std::move(lab));
 	return {.result = std::monostate(), .count = 1U};
 }
@@ -2809,6 +2968,24 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 	/* If anyone has already detected an error, no need to report another */
 	if (isHalting())
 		return;
+
+	/* Not an execution: a thread stopped before events that others observe
+	 * (see alignKeptEvents()), or an event went before kept ones and the
+	 * graph has not been checked since */
+	if (relocatesKeptEvents() && !scheduler.inErrorReplay()) {
+		if (lkmm::hasThreadBlockedBeforeKept(g)) {
+			++result.relocationsLost;
+			moot();
+			return;
+		}
+		if (addedBeforeKept_) {
+			addedBeforeKept_ = false;
+			if (!getConsChecker().isConsistent(g)) {
+				moot();
+				return;
+			}
+		}
+	}
 
 	/* If under estimation, ignore soft errors; they're gonna be reported later on
 	 * anyway */
@@ -3019,6 +3196,10 @@ auto GenMCDriver::removeCASReadIfBlocks(const ReadLabel *rLab, const EventLabel 
 		return false;
 	/* Skip if bounding is enabled */
 	if (getConf()->bound.has_value())
+		return false;
+	/* ... or if the read is to stay before kept events: the block goes
+	 * after them (see blockThread()), and the read is re-run */
+	if (g.hasEventsAfter(rLab->getThread(), rLab->getIndex()))
 		return false;
 
 	/* If the CAS blocks, block thread altogether */
@@ -3333,6 +3514,15 @@ auto GenMCDriver::completeRevisitedRMW(const ReadLabel *rLab) -> WriteLabel *
 	if (!wLab)
 		return nullptr;
 
+	/* The read was followed by kept events (a failed CAS has no write, and
+	 * the events after it may not depend on it): make room for the write */
+	if (const auto *nLab = getExec().getGraph().getEventLabelIfPresent(wLab->getPos());
+	    nLab && !genmc::isa<EmptyLabel>(nLab))
+		relocateExecution(wLab->getThread(), wLab->getIndex(), 1);
+
+	/* Added for the read's instruction, as its next event */
+	if (rLab->getKey())
+		wLab->setKey(rLab->getSharedKey(), rLab->getKeySub() + 1);
 	auto *lab = genmc::dyn_cast<WriteLabel>(addLabelToGraph(std::move(wLab)));
 	VERIFY(rLab->getRf());
 	lab->addCo(rLab->getRf());

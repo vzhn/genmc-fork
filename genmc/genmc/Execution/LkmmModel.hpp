@@ -55,6 +55,10 @@ struct Race {
 
 /** Whether G has a synchronize_rcu() or synchronize_srcu(): without one, rb
  * is empty */
+/** Whether a thread of G stopped before events a revisit kept (its block
+ * went after them, see blockThread()) */
+auto hasThreadBlockedBeforeKept(const ExecutionGraph &g) -> bool;
+
 auto hasGracePeriod(const ExecutionGraph &g) -> bool;
 
 /** Whether G has a potential race (the cat's pre-race): a plain access and

@@ -147,8 +147,15 @@ auto Scheduler::scheduleReplay(const ExecutionGraph &g, std::span<Action> runnab
 	 *    in such cases, schedule() is not called in between the events.
 	 * 2. some runtimes may call schedule() before local instructions not tracked in the
 	 *    graph (i.e., runnable remains the same across different calls) */
+	/* (A thread that stopped before events it keeps does not get to them) */
+	auto stoppedBeforeKept = [&g](int tid) {
+		const auto *bLab = genmc::dyn_cast_if_present<BlockLabel>(g.getLastThreadLabel(tid));
+		return bLab && bLab->isAfterKept();
+	};
 	while (!replaySchedule_.empty() &&
-	       replaySchedule_.back().index <= runnable[replaySchedule_.back().thread].event.index)
+	       (replaySchedule_.back().index <=
+			runnable[replaySchedule_.back().thread].event.index ||
+		stoppedBeforeKept(replaySchedule_.back().thread)))
 		replaySchedule_.pop_back();
 
 	if (replaySchedule_.empty())
