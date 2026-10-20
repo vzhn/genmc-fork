@@ -10,6 +10,34 @@ released.
 - Merge of MIXER [POPL'25] into mainline GenMC
 
 
+## [0.19.0-vzhn.11] - 2026.10.20
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Changed
+
+- When in-place revisiting (IPR) turns unordered writes into an error,
+  GenMC prints a tip and starts over without IPR instead of stopping (#86).
+  The program may have a bug that the error hid.
+
+### Fixed
+
+- Symmetry reduction missed bugs that a join can observe (#86): joining a
+  symmetric thread before its symmetric predecessors (e.g., a race with a
+  predecessor that is still running) or using the return value of a joined
+  symmetric thread. Such joins are now an error ("Execution not well-formed
+  for symmetry reduction"); with inferred symmetry, GenMC starts over
+  without symmetry reduction. This also affected 0.19.0-vzhn.10, where
+  more programs get symmetry reduction, and earlier versions.
+- Spinloop detection treated an iteration whose only effect is creating a
+  thread or freeing memory as side-effect free (#84): e.g.
+  `while (!flag) pthread_create(...)` was cut after the first spawn and
+  bugs needing a second thread were missed.
+- `scripts/svcomp`: a run that ended unsuccessfully without an error line
+  (e.g., unordered writes treated as an error) no longer counts as a safe
+  verdict (#86).
+
+
 ## [0.19.0-vzhn.10] - 2026.10.20
 
 Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
