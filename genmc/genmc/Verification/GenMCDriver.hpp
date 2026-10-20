@@ -826,6 +826,10 @@ private:
 	 * either (po U rf) or (AR U rf) */
 	auto getPrefixView(const EventLabel *lab) const -> const VectorClock &;
 
+	/** The part of LAB's prefix its revisits take (not cached; see
+	 * ConsistencyChecker::calculateRevisitPrefixView()) */
+	auto getRevisitPrefixView(const EventLabel *lab) const -> std::unique_ptr<VectorClock>;
+
 	/** Random generator facilities used */
 	using MyRNG = std::mt19937;
 	using MyDist = std::uniform_int_distribution<MyRNG::result_type>;

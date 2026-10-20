@@ -2045,6 +2045,14 @@ auto GenMCDriver::getPrefixView(const EventLabel *lab) const -> const VectorCloc
 	return lab->getPrefixView();
 }
 
+auto GenMCDriver::getRevisitPrefixView(const EventLabel *lab) const
+	-> std::unique_ptr<VectorClock>
+{
+	if (!scopesCtrlDeps())
+		return getPrefixView(lab).clone();
+	return getConsChecker().calculateRevisitPrefixView(lab);
+}
+
 auto GenMCDriver::getRfsApproximation(ReadLabel *lab) -> std::vector<EventLabel *>
 {
 	auto &checker = getConsChecker();
@@ -2587,8 +2595,10 @@ auto GenMCDriver::getRevisitableApproximation(WriteLabel *sLab) -> std::vector<R
 	if (getConf()->isDepTrackingModel && !hasReads(getExec().getGraph(), sLab->getAddr()))
 		return {};
 
-	const auto &prefix = getPrefixView(sLab);
-	auto loads = getRevisitable(sLab, prefix);
+	/* (Computed for the other models' checkers, see above) */
+	getPrefixView(sLab);
+	auto prefix = getRevisitPrefixView(sLab);
+	auto loads = getRevisitable(sLab, *prefix);
 	getConsChecker().filterCoherentRevisits(sLab, loads);
 	std::ranges::sort(
 		loads, [](auto &lab1, auto &lab2) { return lab1->getStamp() > lab2->getStamp(); });
@@ -3372,7 +3382,15 @@ auto GenMCDriver::getRevisitView(const ReadLabel *rLab, const WriteLabel *sLab) 
 	const auto &g = getExec().getGraph();
 	auto preds = g.getPredsView(rLab->getPos());
 
-	updatePredsWithPrefixView(g, *preds, getPrefixView(sLab));
+	/* A read in the write's prefix only through pctrl (-lkmm, see
+	 * getRevisitPrefixView()): the prefix has events computed from the read's
+	 * old value, so the revisit keeps the part of it without pctrl */
+	const auto &prefix = getPrefixView(sLab);
+	if (prefix.contains(rLab->getPos())) {
+		updatePredsWithPrefixView(g, *preds, *getRevisitPrefixView(sLab));
+		return preds;
+	}
+	updatePredsWithPrefixView(g, *preds, prefix);
 	return preds;
 }
 
@@ -3543,14 +3561,14 @@ auto GenMCDriver::copyGraph(const BackwardRevisit *br, VectorClock *v) const
 	const auto &g = getExec().getGraph();
 
 	/* Adjust the view that will be used for copying */
-	const auto &prefix = getPrefixView(g.getEventLabel(br->getRev()));
+	auto prefix = getRevisitPrefixView(g.getEventLabel(br->getRev()));
 	auto og = g.getCopyUpTo(*v);
 
 	/** Ensure the prefix of the write will not be revisitable.
 	 * This is also used to check whether a write has revisited,
 	 * and appropriately prevent some revisits */
 	for (auto &lab : og->labels()) {
-		if (prefix.contains(lab.getPos()))
+		if (prefix->contains(lab.getPos()))
 			lab.setRevisitStatus(false);
 	}
 	return og;

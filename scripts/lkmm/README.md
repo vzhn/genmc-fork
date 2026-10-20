@@ -617,6 +617,20 @@ fuzz seeds 38, 276, 291, 414, 421). Fuzz seeds 0-799: 748 agree (586 and
 712 fixed, 19 closer: 526 for herd7's 523, was 535), no new disagreement;
 corpus, kernel tests, matrix and fast suite unchanged.
 
+Prefix-only control dependencies (#77). The deps the shadow rule above
+gives an event after a join are `pctrl` (`EventDeps::pctrl`, a Kater
+builtin relation), not `ctrl`: the kat's prefix (`ppo`, via `pcdep`) has
+them, LKMM's `lkppo` (consistency) does not, so they no longer make an
+execution herd7 allows inconsistent (`ctrl-shadow-not-ppo`, fuzz seed 286:
+9, was 8). A write's revisits take a second prefix without them (the kat's
+`rppo`; Kater generates `calculateRevisitPrefixView()` when a model declares
+it): a read in the prefix only through `pctrl` may be revisited by the
+write, and such a revisit keeps the prefix without `pctrl`, as the full one
+has events computed from the read's old value (`ctrl-shadow-revisit-keeps`:
+keeping it gave a 4th execution where a thread reads 1 and skips its
+branch). Fuzz seeds 0-799: 750 agree (286 and 716 fixed); with registers as
+locals and without `JumpThreadingPass` (#78), also fuzz seed 506's variants.
+
 Results (2026-10-20):
 
 | suite | result |

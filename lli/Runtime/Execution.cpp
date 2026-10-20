@@ -1416,7 +1416,8 @@ void Interpreter::SwitchToNewBasicBlock(BasicBlock *Dest, ExecutionContext &SF)
 			}
 			joined.update(it->shadow.deps);
 			if (it->ordersAll)
-				getDepTracker()->updateCtrlDeps(getCurThr().id, it->shadow.deps);
+				getDepTracker()->updatePrefixCtrlDeps(getCurThr().id,
+								      it->shadow.deps);
 			else if (it->shadow.anyLoc || !it->shadow.addrs.empty())
 				getCurThr().ctrlShadows.push_back(std::move(it->shadow));
 			it = scopes.erase(it);
@@ -3686,10 +3687,13 @@ const DepInfo *Interpreter::getCtrlDeps(unsigned int tid)
 		return ctrl;
 
 	auto &thr = getThrById(tid);
+	thr.pctrlScratch = *getDepTracker()->getPrefixCtrlDeps(tid);
+	applyCtrlShadows(thr, thr.pctrlScratch);
+
 	auto open = [](const ExecutionContext &SF) {
 		return !SF.CtrlScopes.empty() || !SF.FrameCtrl.empty();
 	};
-	if (thr.ctrlShadows.empty() && std::ranges::none_of(thr.ECStack, open))
+	if (std::ranges::none_of(thr.ECStack, open))
 		return ctrl;
 	thr.ctrlScratch = *ctrl;
 	for (const auto &SF : thr.ECStack) {
@@ -3697,7 +3701,6 @@ const DepInfo *Interpreter::getCtrlDeps(unsigned int tid)
 		for (const auto &scope : SF.CtrlScopes)
 			thr.ctrlScratch.update(scope.shadow.deps);
 	}
-	applyCtrlShadows(thr, thr.ctrlScratch);
 	return &thr.ctrlScratch;
 }
 
@@ -3726,15 +3729,18 @@ void Interpreter::summarizeInst(Instruction &I, BranchRegion &R,
 	/* (A plain write is left out: LKMM keeps plain accesses out of hb, and
 	 * with it in, GenMC misses racy executions herd7 has, C-non-race1-rwdep;
 	 * the corpus has no case the other way) */
-	auto written = [&](Value *ptr, bool marked) {
-		if (!marked)
-			return;
+	auto accessed = [&](Value *ptr) {
 		auto *PI = dyn_cast<Instruction>(ptr);
 		if (region && (!PI || !region->contains(PI->getParent())))
 			R.ptrs.insert(ptr);
 		else
 			R.anyLoc = true;
-		R.markedWrites |= marked;
+	};
+	auto written = [&](Value *ptr, bool marked) {
+		if (!marked)
+			return;
+		accessed(ptr);
+		R.markedWrites = true;
 	};
 	if (auto *SI = dyn_cast<StoreInst>(&I)) {
 		written(SI->getPointerOperand(), SI->isAtomic());
@@ -3855,7 +3861,7 @@ void Interpreter::applyCtrlShadows(Thread &thr, DepInfo &ctrl)
 	for (auto it = thr.ctrlShadows.begin(); it != thr.ctrlShadows.end();) {
 		if (fence != Fence::None && it->markedWrites) {
 			ctrl.update(it->deps);
-			getDepTracker()->updateCtrlDeps(thr.id, it->deps);
+			getDepTracker()->updatePrefixCtrlDeps(thr.id, it->deps);
 			it = thr.ctrlShadows.erase(it);
 			continue;
 		}

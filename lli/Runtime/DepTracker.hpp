@@ -39,6 +39,13 @@ public:
 	/* Returns the control dependencies collected so far for tid */
 	const DepInfo *getCtrlDeps(unsigned int tid) { return &ctrlDeps[tid]; };
 
+	/* Returns the prefix-only control dependencies (-lkmm) of tid */
+	const DepInfo *getPrefixCtrlDeps(unsigned int tid) { return &pctrlDeps[tid]; };
+	void updatePrefixCtrlDeps(unsigned int tid, const DepInfo &deps)
+	{
+		pctrlDeps[tid].update(deps);
+	};
+
 	/* Updates data dependencies of dst, as it is dependent on src */
 	void updateDataDeps(unsigned int tid, llvm::Value *dst, llvm::Value *src)
 	{
@@ -69,6 +76,7 @@ public:
 		dataDeps[tid].clear();
 		addrPoDeps[tid].clear();
 		ctrlDeps[tid].clear();
+		pctrlDeps[tid].clear();
 	};
 
 private:
@@ -80,6 +88,7 @@ private:
 	 * keep a DepInfo item for these */
 	std::unordered_map<unsigned int, DepInfo> addrPoDeps;
 	std::unordered_map<unsigned int, DepInfo> ctrlDeps;
+	std::unordered_map<unsigned int, DepInfo> pctrlDeps;
 };
 
 struct DepTrackerCloner {

@@ -406,6 +406,7 @@ public:
 	DEFINE_PPO_ACC(data);
 	DEFINE_PPO_ACC(addr);
 	DEFINE_PPO_ACC(ctrl);
+	DEFINE_PPO_ACC(pctrl);
 #undef DEFINE_PPO_ACC
 
 	/***************************************************************************

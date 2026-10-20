@@ -48,3 +48,9 @@ auto ConsistencyChecker::create(const Config *conf) -> std::unique_ptr<Consisten
 		UNREACHABLE();
 	}
 }
+
+auto ConsistencyChecker::calculateRevisitPrefixView(const EventLabel *lab) const
+	-> std::unique_ptr<VectorClock>
+{
+	return calculatePrefixView(lab);
+}

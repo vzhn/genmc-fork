@@ -246,8 +246,12 @@ std::unique_ptr<EventDeps> Interpreter::makeEventDeps(const DepInfo *addr, const
 		result->addr = *addr;
 	if (data)
 		result->data = *data;
-	if (ctrl)
+	if (ctrl) {
 		result->ctrl = *ctrl;
+		/* Computed with it (getCtrlDeps()) */
+		if (scopesCtrlDeps())
+			result->pctrl = getCurThr().pctrlScratch;
+	}
 	if (addrPo)
 		result->addrPo = *addrPo;
 	if (cas)
