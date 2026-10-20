@@ -132,11 +132,12 @@ auto LKMMRcuChecker::checkAccessFreed(const EventLabel *lab, const EventLabel *&
 				}
 	}
 
-	/* An access added after the free is not before it (without RCU) */
+	/* An access added after the free is not before it (without RCU), unless
+	 * the free is a kept event that the access's thread reaches again */
 	if (genmc::isa<ReadLabel>(lab) || genmc::isa<WriteLabel>(lab))
 		if (auto pos = g.free_pos(lab); pos) {
 			const auto *fLab = g.getEventLabel(*pos);
-			if (!lkmm::hasGracePeriod(g) || !lkmm::isRcuOrderedBefore(g, lab, fLab)) {
+			if (!isBefore(lab, fLab)) {
 				race = fLab;
 				return {VerificationError::VE_AccessFreed};
 			}
