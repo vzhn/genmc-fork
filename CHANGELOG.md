@@ -10,6 +10,48 @@ released.
 - Merge of MIXER [POPL'25] into mainline GenMC
 
 
+## [0.19.0-vzhn.10] - 2026.10.20
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Changed
+
+- Symmetry reduction applies to more programs (#76): to workers spawned in
+  a loop (accesses to a local variable whose address never leaves its
+  function no longer break symmetry, e.g. `pthread_t t[N]`) and to threads
+  that ignore their argument. Execution counts drop accordingly (25 tests
+  of the suite). When every symmetry was inferred and SR meets unordered
+  writes, GenMC prints a tip and starts over without SR instead of failing.
+- Spin loops that wait under a mutex are detected (#82): taking and
+  releasing a mutex in an iteration is no longer a side effect, so such
+  loops terminate. An iteration that released a mutex counts as observable
+  for liveness.
+- `-lkmm`: the dependencies GenMC keeps for an event after a branch, for
+  what the branch's code could order on another path, are only in GenMC's
+  prefix, not in LKMM's ordering (#83). This removes lost executions where
+  they made an execution herd7 allows inconsistent, and a write may now
+  revisit a read that is in its prefix only through them.
+
+### Fixed
+
+- `-lkmm`: an execution could be explored twice when a revisit kept a
+  write placed non-maximally in coherence (#75).
+- `-lkmm`: an event added before events kept further on in its thread
+  could walk an inverted coherence range (an abort depending on the heap),
+  and with `-nthreads` the write-write race warning crashed on every run of
+  such a program (#81).
+- `LoopJumpThreadingPass` left a stale dominator tree, and the spin-assume
+  pass then built a broken module ("Instruction does not dominate all
+  uses") (#82).
+- `scripts/svcomp` builds against the new `pthread.h` condition variables
+  and finds `main(argc, argv)` in included headers (#80).
+
+### Added
+
+- `scripts/lkmm/litmus2c.py --local-regs` (#79), and `matrix-skip` files
+  for `scripts/lkmm/feature-matrix.py` (#81).
+
+
 ## [0.19.0-vzhn.9] - 2026.10.20
 
 Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
