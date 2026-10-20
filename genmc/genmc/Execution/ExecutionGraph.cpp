@@ -154,6 +154,8 @@ auto ExecutionGraph::addLabelToGraph(std::unique_ptr<EventLabel> lab) -> EventLa
 
 	/* Track coherence if necessary */
 	if (auto *mLab = genmc::dyn_cast<MemAccessLabel>(&*lab)) {
+		if (auto *wLab = genmc::dyn_cast<WriteLabel>(mLab); wLab && wLab->isWWRacy())
+			mayHaveWWRacy_ = true;
 		trackCoherenceAtLoc(mLab->getAddr());
 		accessMap_[mLab->getAddr()].push_back(&*lab);
 	}

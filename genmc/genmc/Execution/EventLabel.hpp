@@ -1198,6 +1198,7 @@ public:
 	/** Helpers for various write attributes */
 	auto isFinal() const -> bool { return hasAttr(WriteAttr::Final); }
 	auto isLocal() const -> bool { return hasAttr(WriteAttr::Local); }
+	auto isWWRacy() const -> bool { return hasAttr(WriteAttr::WWRacy); }
 
 	/** Whether this is part of an RMW operation */
 	auto isRMW() const -> bool;

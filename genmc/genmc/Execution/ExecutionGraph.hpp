@@ -1025,6 +1025,15 @@ public:
 	/** Whether a thread was to block before events a revisit kept after
 	 * its position (see GenMCDriver::alignKeptEvents()): those events can
 	 * no longer be reached in this run */
+	/* Whether a write of the graph may be marked as racing with another
+	 * write (an over-approximation: the flag is sticky) */
+	[[nodiscard]] auto mayHaveWWRacyWrites() const -> bool { return mayHaveWWRacy_; }
+	void markWWRacy(WriteLabel *wLab)
+	{
+		wLab->setAttr(WriteAttr::WWRacy);
+		mayHaveWWRacy_ = true;
+	}
+
 	[[nodiscard]] auto keptEventsUnreachable() const -> bool { return keptUnreachable_; }
 	void setKeptEventsUnreachable(bool b) { keptUnreachable_ = b; }
 
@@ -1304,6 +1313,9 @@ protected:
 
 	/* See keptEventsUnreachable() */
 	bool keptUnreachable_ = false;
+
+	/* See mayHaveWWRacyWrites() */
+	bool mayHaveWWRacy_ = false;
 
 	// NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
 	bool pruned_{};

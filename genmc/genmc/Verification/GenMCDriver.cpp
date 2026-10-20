@@ -1042,8 +1042,10 @@ auto GenMCDriver::checkIPRValidity(const ReadLabel *rLab) -> std::optional<Verif
 		return {};
 
 	auto &g = getExec().getGraph();
-	auto racyIt = std::ranges::find_if(
-		g.co(rLab->getAddr()), [&](auto &wLab) { return wLab.hasAttr(WriteAttr::WWRacy); });
+	if (!g.mayHaveWWRacyWrites())
+		return {};
+	auto racyIt = std::ranges::find_if(g.co(rLab->getAddr()),
+					   [&](auto &wLab) { return wLab.isWWRacy(); });
 	if (racyIt == std::ranges::end(g.co(rLab->getAddr())))
 		return {};
 
@@ -3243,7 +3245,7 @@ auto GenMCDriver::reportWarningOnce(Event pos, VerificationError wcode,
 	if (!knownWarnings.contains(wcode))
 		knownWarnings.insert(wcode);
 	if (wcode == VerificationError::VE_WWRace)
-		getExec().getGraph().getWriteLabel(pos)->setAttr(WriteAttr::WWRacy);
+		getExec().getGraph().markWWRacy(getExec().getGraph().getWriteLabel(pos));
 	return upgradeWarning;
 }
 
