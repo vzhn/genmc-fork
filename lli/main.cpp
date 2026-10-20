@@ -1035,16 +1035,29 @@ auto main(int argc, char **argv) -> int
 		break;
 	}
 	case ExplorationMode::verify: {
-		/* Unordered writes are an error under SR. If GenMC inferred all
-		 * symmetries itself, they are not the user's: start over without SR */
-		auto retryWithoutSR = [&](const VerificationResult &r) {
-			if (!r.status.has_value() || !r.inferredSymmetryError)
+		/* Unordered writes are an error under IPR, and under SR. Both are
+		 * GenMC's own optimizations (unless the user declared the symmetry):
+		 * start over without the one that made them an error */
+		auto retryWithout = [&](const VerificationResult &r) {
+			if (!r.status.has_value())
 				return false;
-			LOG(VerbosityLevel::Tip,
-			    "Symmetry reduction does not support the unordered writes found. "
-			    "Starting over without it (-disable-sr avoids the first attempt).");
-			conf->symmetryReduction = false;
-			return true;
+			if (r.iprError && conf->ipr) {
+				LOG(VerbosityLevel::Tip,
+				    "In-place revisiting does not support the unordered writes found. "
+				    "Starting over without it (-disable-ipr avoids the first attempt).");
+				conf->ipr = false;
+				return true;
+			}
+			if (r.inferredSymmetryError && conf->symmetryReduction) {
+				LOG(VerbosityLevel::Tip,
+				    "Symmetry reduction does not support this program (unordered "
+				    "writes, or symmetric threads joined out of order or with their "
+				    "results used). Starting over without it (-disable-sr avoids the "
+				    "first attempt).");
+				conf->symmetryReduction = false;
+				return true;
+			}
+			return false;
 		};
 
 		/* Estimate the state space anyway */
@@ -1053,7 +1066,7 @@ auto main(int argc, char **argv) -> int
 			    "Estimating state-space size before verification. For better "
 			    "performance, you can use --disable-estimation.");
 			res = estimate(lliConfig, conf, moduleUP, modInfo);
-			if (retryWithoutSR(res))
+			while (retryWithout(res))
 				res = estimate(lliConfig, conf, moduleUP, modInfo);
 			printEstimationResults(conf, begin, res);
 			if (res.status.has_value())
@@ -1061,17 +1074,19 @@ auto main(int argc, char **argv) -> int
 		}
 
 		/* Keep a copy of the module in case verification is repeated */
-		std::unique_ptr<llvm::LLVMContext> spareCtx;
-		std::unique_ptr<llvm::Module> spareMod;
-		std::unique_ptr<ModuleInfo> spareMI;
-		if (conf->symmetryReduction) {
-			spareCtx = std::make_unique<llvm::LLVMContext>();
-			spareMod = LLVMModule::cloneModule(moduleUP, spareCtx);
-			spareMI = modInfo->clone(*spareMod);
+		std::vector<std::unique_ptr<llvm::LLVMContext>> spareCtxs;
+		auto cloneInput = [&]() {
+			spareCtxs.push_back(std::make_unique<llvm::LLVMContext>());
+			auto mod = LLVMModule::cloneModule(moduleUP, spareCtxs.back());
+			auto mi = modInfo->clone(*mod);
+			return std::make_pair(std::move(mod), std::move(mi));
+		};
+		auto [mod, mi] = cloneInput();
+		res = verify(lliConfig, conf, std::move(mod), std::move(mi));
+		while (retryWithout(res)) {
+			auto [rmod, rmi] = cloneInput();
+			res = verify(lliConfig, conf, std::move(rmod), std::move(rmi));
 		}
-		res = verify(lliConfig, conf, std::move(moduleUP), std::move(modInfo));
-		if (retryWithoutSR(res))
-			res = verify(lliConfig, conf, std::move(spareMod), std::move(spareMI));
 		printVerificationResults(conf, res);
 
 		/* Serialize spec if in analysis mode */

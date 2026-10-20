@@ -3224,8 +3224,9 @@ void Interpreter::callThreadJoin(Function *F, const std::vector<GenericValue> &A
 {
 	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id),
 				  getAddrPoDeps(getCurThr().id), nullptr);
+	auto resultUsed = !(&ECStack().back().Caller)->use_empty();
 	auto ret = CALL_DRIVER(handleThreadJoin, currDbgInfo(), currPos(),
-			       ArgVals[0].IntVal.getLimitedValue(), GET_DEPS(deps));
+			       ArgVals[0].IntVal.getLimitedValue(), GET_DEPS(deps), resultUsed);
 	auto result = std::get_if<SVal>(&ret);
 	if (!result)
 		return;

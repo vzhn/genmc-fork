@@ -24,6 +24,8 @@ struct VerificationResult {
 	long double estimationVariance{}; /**< The (biased) variance of the estimations */
 	bool inferredSymmetryError{}; /**< Whether the error is unordered writes, an error
 					only because of symmetries GenMC inferred */
+	bool iprError{}; /**< Whether the error is unordered writes, an error only because
+			    of in-place revisiting */
 #ifdef ENABLE_GENMC_DEBUG
 	unsigned exploredMoot{};	       /**< Number of moot executions _encountered_ */
 	unsigned duplicates{};		       /**< Number of duplicate executions explored */
@@ -44,6 +46,7 @@ struct VerificationResult {
 		if (other.status.has_value()) {
 			status = other.status;
 			inferredSymmetryError = other.inferredSymmetryError;
+			iprError = other.iprError;
 		}
 		message += other.message;
 		explored += other.explored;
