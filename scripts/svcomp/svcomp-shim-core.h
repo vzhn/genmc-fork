@@ -21,7 +21,7 @@
  *   in the explored executions where it reads the helper thread's 1. At most
  *   SVC_MAX_SPURIOUS (default 1) wait calls per execution may wake spuriously;
  *   later calls always wait for a signal, so a waiting loop still ends.
- * - __VERIFIER_atomic_begin/end: a global lock. Correct for atomic sections
+ * - __VERIFIER_atomic_begin/end: a global mutex. Correct for atomic sections
  *   that neither nest nor block, but it differs from SV-COMP's semantics
  *   for data races in both directions. The lock adds synchronisation that
  *   uninterruptible sections do not have, so it can hide a race. And
@@ -48,7 +48,7 @@ static int __svc_choice[SVC_MAX_CHOICES];
 static int __svc_next_choice;
 static int __svc_spurious[SVC_MAX_SPURIOUS > 0 ? SVC_MAX_SPURIOUS : 1];
 static int __svc_next_spurious;
-static int __svc_atomic_lock;
+static __VERIFIER_mutex_t __svc_atomic_lock = { 0 }; /* unlocked */
 
 static int __svc_nondet_val(void)
 {
@@ -92,19 +92,17 @@ static int __svc_spurious_wakeup(void)
 	return 1;
 }
 
+/* GenMC's own mutex, so that a loop that waits in atomic sections is
+ * recognised as a spinloop (an iteration that only enters and leaves the
+ * section has no side effect) */
 void __VERIFIER_atomic_begin(void)
 {
-	int free = 0;
-	while (!__atomic_compare_exchange_n(&__svc_atomic_lock, &free, 1, 0,
-					    __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
-		free = 0;
-		__VERIFIER_await(__atomic_load_n(&__svc_atomic_lock, __ATOMIC_RELAXED) == 0);
-	}
+	__VERIFIER_mutex_lock(&__svc_atomic_lock);
 }
 
 void __VERIFIER_atomic_end(void)
 {
-	__atomic_store_n(&__svc_atomic_lock, 0, __ATOMIC_RELEASE);
+	__VERIFIER_mutex_unlock(&__svc_atomic_lock);
 }
 
 static void __svc_atomic_guard_release(int *unused)
