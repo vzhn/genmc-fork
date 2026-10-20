@@ -143,6 +143,39 @@ auto ReadLabel::valueMakesAssumeSucceed(const SVal &val) const -> bool
 	return getAnnot() && Evaluator().evaluate(&*getAnnot()->expr, val);
 }
 
+/* The co-last write that an access re-added at POS, to ADDR, can read from
+ * or follow in coherence. A revisit may keep a po-later access of the thread
+ * (-lkmm: the prefix of the revisiting event is ppo-based, see
+ * GenMCDriver::isMaximalExtension()), and coherence bounds the access by the
+ * first one present: a read cannot read a po-later write of its thread, nor
+ * any write past the one a po-later read reads, and a write precedes both.
+ * With no such access, the graph's co-maximal write */
+static auto coMaxReachable(const ExecutionGraph &g, SAddr addr, Event pos, bool isWrite)
+	-> const EventLabel *
+{
+	for (auto j = pos.index + 1; j < g.getThreadSize(pos.thread); j++) {
+		const auto *mLab = genmc::dyn_cast<MemAccessLabel>(g.getEventLabel(Event(pos.thread, j)));
+		if (!mLab || mLab->getAddr() != addr)
+			continue;
+
+		const EventLabel *bound = mLab;
+		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(mLab)) {
+			if (!rLab->getRf())
+				continue;
+			if (!isWrite)
+				return rLab->getRf();
+			bound = rLab->getRf();
+		}
+		const auto *bLab = genmc::dyn_cast<WriteLabel>(bound);
+		if (!bLab)
+			return bound; /* the initializer */
+		auto preds = g.co_preds(bLab);
+		return preds.begin() == preds.end() ? static_cast<const EventLabel *>(g.getInitLabel())
+						    : &*preds.begin();
+	}
+	return g.co_max(addr);
+}
+
 void ReadLabel::setRf(EventLabel *rfLab)
 {
 	/* Remember old rf before setting */
@@ -177,7 +210,7 @@ void ReadLabel::setRf(EventLabel *rfLab)
 		UNREACHABLE();
 
 	/* and adjust the max flag... */
-	this->setAddedMax(getParent()->co_max(this->getAddr()) == rfLab);
+	this->setAddedMax(coMaxReachable(*getParent(), getAddr(), getPos(), false) == rfLab);
 
 	/* as well as orderings for CASes. Don't try to resolve values from
 	 * reads of uninitialized dynamic memory */
@@ -201,7 +234,7 @@ void WriteLabel::moveCo(EventLabel *predLab)
 	auto &g = *getParent();
 	g.coherence[getAddr()].remove(*this);
 	addCo(predLab);
-	this->setAddedMax(this == &g.coherence[getAddr()].back());
+	this->setAddedMax(this == coMaxReachable(g, getAddr(), getPos(), true));
 }
 
 auto BlockLabel::createAssumeBlock(Event pos, AssumeType type) -> std::unique_ptr<BlockLabel>
