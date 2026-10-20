@@ -4,7 +4,8 @@
 Runs every tests/correct/lkmm test (each args line, each variant) under
 -lkmm with a set of option variations, and every wrong test that opts into
 -lkmm (genmc.lkmm.*.in) with -print-error-trace and -dump-error-graph.
-Correct runs must give the expected count (estimation must give an
+A test's matrix-skip file can leave configurations out (with the issue
+that makes them differ). Correct runs must give the expected count (estimation must give an
 estimate; -disable-spin-assume must give no error; -check-liveness may
 report a liveness violation if the base run has blocked executions), wrong
 runs must report the base run's error.
@@ -44,16 +45,29 @@ def run(genmc, args, src, timeout):
             "tail": out.strip().splitlines()[-3:]}
 
 
+def matrix_skip(d):
+    """The configurations a test's matrix-skip file leaves out: one name per
+    line, then a reason after '#' (a known issue, e.g. a count that depends
+    on the exploration order)"""
+    f = d + "matrix-skip"
+    if not os.path.exists(f):
+        return set()
+    return {l.split("#")[0].strip() for l in open(f)} - {""}
+
+
 def jobs(dots):
     for d in sorted(glob.glob(f"{ROOT}/tests/correct/lkmm/*/")):
         a, x = d + "args.lkmm.mo.in", d + "expected.lkmm.mo.in"
         if not os.path.exists(x):
             continue
         lines = open(a).read().splitlines() if os.path.exists(a) else ["|"]
+        skip = matrix_skip(d)
         for i, (line, exp) in enumerate(zip(lines, open(x).read().split())):
             gargs, _, cargs = line.partition("|")
             for v in sorted(glob.glob(d + "variants/*.c")):
                 for c, opts in CONFIGS.items():
+                    if c in skip:
+                        continue
                     yield ("correct", d, i, v, c, gargs.split() + opts, cargs.split() + [v], int(exp))
     for f in sorted(glob.glob(f"{ROOT}/tests/wrong/*/*/genmc.lkmm.*.in")):
         d = os.path.dirname(f) + "/"
