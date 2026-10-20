@@ -101,10 +101,13 @@ struct EventDeps {
 	DepInfo ctrl;
 	DepInfo addrPo;
 	DepInfo cas;
+	/* -lkmm: what a branch's events can order after its join, whichever path
+	 * runs (see Interpreter::applyCtrlShadows()): in the prefix, not in ctrl */
+	DepInfo pctrl;
 
 	template <typename F> void remap(F f)
 	{
-		for (auto *d : {&addr, &data, &ctrl, &addrPo, &cas})
+		for (auto *d : {&addr, &data, &ctrl, &addrPo, &cas, &pctrl})
 			d->remap(f);
 	}
 };

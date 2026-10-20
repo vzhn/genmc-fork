@@ -254,6 +254,9 @@ public:
 	/* The thread's control dependencies, with those of the open branches */
 	DepInfo ctrlScratch;
 
+	/* The prefix-only ones of the current event (shadows, see EventDeps) */
+	DepInfo pctrlScratch;
+
 	/* Branches joined whose code accessed memory: the writes after the join
 	 * to a location the branch may access get their dependencies (moi, fri),
 	 * and so does all after an ordering event (fences, releases...) */

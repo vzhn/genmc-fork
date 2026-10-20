@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater 9e2169f (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater b25657f-dirty (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_LKMM_CHECKER_HPP
@@ -171,6 +171,8 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	std::vector<EventLabel *> getCoherentPlacings(WriteLabel *sLab) override;
 	void updateMMViews(EventLabel *lab) override;
 	std::unique_ptr<VectorClock> calculatePrefixView(const EventLabel *lab) const override;
+	std::unique_ptr<VectorClock>
+	calculateRevisitPrefixView(const EventLabel *lab) const override;
 	bool isDepTracking() const override;
 	void calculateSaved(EventLabel *lab);
 	void calculateViews(EventLabel *lab);
@@ -180,27 +182,27 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	void maybeDecreaseCacheCounters(const EventLabel *lab) const override;
 	void maybeIncreaseCacheCounters(const EventLabel *lab) const override;
 
-	mutable NodeStatusVector<uint32_t> visitedCalc122_0;
-	mutable NodeStatusVector<uint32_t> visitedCalc122_1;
-	mutable NodeStatusVector<uint32_t> visitedCalc122_2;
+	mutable NodeStatusVector<uint32_t> visitedCalc125_0;
+	mutable NodeStatusVector<uint32_t> visitedCalc125_1;
+	mutable NodeStatusVector<uint32_t> visitedCalc125_2;
 
-	bool visitCalc122Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
+	bool visitCalc125Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
-	View visitCalc122(const EventLabel *lab) const;
+	View visitCalc125(const EventLabel *lab) const;
 	auto getCohView(const EventLabel *lab) const -> const View & { return lab->view(0); }
 	auto getCohViewIndex() const -> unsigned { return 0; }
 
-	auto checkCalc122(const EventLabel *lab) const;
-	mutable NodeStatusVector<uint32_t> visitedCalc123_0;
-	mutable NodeStatusVector<uint32_t> visitedCalc123_1;
-	mutable NodeStatusVector<uint32_t> visitedCalc123_2;
+	auto checkCalc125(const EventLabel *lab) const;
+	mutable NodeStatusVector<uint32_t> visitedCalc126_0;
+	mutable NodeStatusVector<uint32_t> visitedCalc126_1;
+	mutable NodeStatusVector<uint32_t> visitedCalc126_2;
 
-	bool visitCalc123Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
+	bool visitCalc126Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
-	View visitCalc123(const EventLabel *lab) const;
+	View visitCalc126(const EventLabel *lab) const;
 	auto getHbViewIndex() const -> unsigned { return 1; }
 
-	auto checkCalc123(const EventLabel *lab) const;
+	auto checkCalc126(const EventLabel *lab) const;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_0;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_1;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_2;
@@ -424,6 +426,70 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable std::vector<NodeStatus> visitedPPoRf27;
 	mutable std::vector<NodeStatus> visitedPPoRf28;
 	mutable std::vector<NodeStatus> visitedPPoRf29;
+
+	void visitRPPoRf0(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf1(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf2(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf3(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf4(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf5(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf6(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf7(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf8(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf9(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf10(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf11(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf12(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf13(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf14(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf15(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf16(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf17(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf18(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf19(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf20(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf21(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf22(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf23(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf24(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf25(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf26(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf27(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf28(const EventLabel *lab, DepView &pporf) const;
+	void visitRPPoRf29(const EventLabel *lab, DepView &pporf) const;
+
+	DepView calcRPPoRfBefore(const EventLabel *lab) const;
+
+	mutable std::vector<NodeStatus> visitedRPPoRf0;
+	mutable std::vector<NodeStatus> visitedRPPoRf1;
+	mutable std::vector<NodeStatus> visitedRPPoRf2;
+	mutable std::vector<NodeStatus> visitedRPPoRf3;
+	mutable std::vector<NodeStatus> visitedRPPoRf4;
+	mutable std::vector<NodeStatus> visitedRPPoRf5;
+	mutable std::vector<NodeStatus> visitedRPPoRf6;
+	mutable std::vector<NodeStatus> visitedRPPoRf7;
+	mutable std::vector<NodeStatus> visitedRPPoRf8;
+	mutable std::vector<NodeStatus> visitedRPPoRf9;
+	mutable std::vector<NodeStatus> visitedRPPoRf10;
+	mutable std::vector<NodeStatus> visitedRPPoRf11;
+	mutable std::vector<NodeStatus> visitedRPPoRf12;
+	mutable std::vector<NodeStatus> visitedRPPoRf13;
+	mutable std::vector<NodeStatus> visitedRPPoRf14;
+	mutable std::vector<NodeStatus> visitedRPPoRf15;
+	mutable std::vector<NodeStatus> visitedRPPoRf16;
+	mutable std::vector<NodeStatus> visitedRPPoRf17;
+	mutable std::vector<NodeStatus> visitedRPPoRf18;
+	mutable std::vector<NodeStatus> visitedRPPoRf19;
+	mutable std::vector<NodeStatus> visitedRPPoRf20;
+	mutable std::vector<NodeStatus> visitedRPPoRf21;
+	mutable std::vector<NodeStatus> visitedRPPoRf22;
+	mutable std::vector<NodeStatus> visitedRPPoRf23;
+	mutable std::vector<NodeStatus> visitedRPPoRf24;
+	mutable std::vector<NodeStatus> visitedRPPoRf25;
+	mutable std::vector<NodeStatus> visitedRPPoRf26;
+	mutable std::vector<NodeStatus> visitedRPPoRf27;
+	mutable std::vector<NodeStatus> visitedRPPoRf28;
+	mutable std::vector<NodeStatus> visitedRPPoRf29;
 };
 
 // NOLINTEND

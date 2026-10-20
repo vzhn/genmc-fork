@@ -107,6 +107,7 @@ public:
 	auto data() const { return std::views::all(deps.data); }
 	auto addr() const { return std::views::all(deps.addr); }
 	auto ctrl() const { return std::views::all(deps.ctrl); }
+	auto pctrl() const { return std::views::all(deps.pctrl); }
 
 	/** Returns the discriminator of this object */
 	auto getKind() const -> EventLabelKind { return kind; }

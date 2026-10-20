@@ -93,6 +93,12 @@ public:
 	virtual auto calculatePrefixView(const EventLabel *lab) const
 		-> std::unique_ptr<VectorClock> = 0;
 
+	/** The part of LAB's prefix a write's revisits take: a read in the prefix
+	 * but not in this one may still be revisited by LAB (-lkmm: a branch's
+	 * condition kept with the events after its join, see the kat's rppo) */
+	virtual auto calculateRevisitPrefixView(const EventLabel *lab) const
+		-> std::unique_ptr<VectorClock>;
+
 	/* The hb view lives at getHbViewIndex() in every label's view array */
 	[[nodiscard]] auto getHbView(const EventLabel *lab) const -> const View &;
 	[[nodiscard]] virtual auto getHbViewIndex() const -> unsigned = 0;
