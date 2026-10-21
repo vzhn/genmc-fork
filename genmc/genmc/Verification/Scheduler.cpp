@@ -127,11 +127,12 @@ static auto calculateReplaySchedule(const ExecutionGraph &g, const Config *conf,
 	return result;
 }
 
-void Scheduler::resetExplorationOptions(const ExecutionGraph &g)
+void Scheduler::resetExplorationOptions(const ExecutionGraph &g, bool replay)
 {
 	setRescheduledRead(Event::getInit());
 	threadPrios_.clear();
-	replaySchedule_ = calculateReplaySchedule(g, getConf(), eventToReexecute_);
+	replaySchedule_ = replay ? calculateReplaySchedule(g, getConf(), eventToReexecute_)
+				 : std::vector<Event>{};
 
 	/* Check whether the event that led to this execs needs thread prioritization */
 	for (auto tid : g.thr_ids()) {

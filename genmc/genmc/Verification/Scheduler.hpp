@@ -53,7 +53,9 @@ public:
 	static auto create(const Config *config) -> std::unique_ptr<Scheduler>;
 
 	/** Should be called at the beginning of each execution */
-	void resetExplorationOptions(const ExecutionGraph &g);
+	/** Resets the options for a new execution; REPLAY says whether the
+	 * runtime replays the graph (a resumed execution does not) */
+	void resetExplorationOptions(const ExecutionGraph &g, bool replay = true);
 
 	/** Returns the next thread to run according to the specified policy  */
 	[[nodiscard]] auto schedule(ExecutionGraph &g, std::span<Action> runnable)

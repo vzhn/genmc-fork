@@ -169,6 +169,10 @@ public:
 		return std::exchange(pendingResume_, nullptr);
 	}
 
+	/** Prepares the replay of the graph after a resume point was taken
+	 * but could not be used (see Interpreter::resumeFrom()) */
+	void prepareReplay();
+
 	/** Under LKMM, a control dependency ends at the join of its branch */
 	auto scopesCtrlDeps() const -> bool { return relocatesKeptEvents(); }
 

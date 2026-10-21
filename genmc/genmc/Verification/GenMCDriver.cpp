@@ -292,8 +292,13 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	state.clear();
 	if constexpr (Config::emitNALabels)
 		reconstructState(g, state);
-	getScheduler().resetExplorationOptions(g);
+	getScheduler().resetExplorationOptions(g, /*replay=*/!pendingResume_);
 	return getScheduler().inErrorReplay();
+}
+
+void GenMCDriver::prepareReplay()
+{
+	getScheduler().resetExplorationOptions(getExec().getGraph());
 }
 
 void GenMCDriver::checkHelpingCasAnnotation()
