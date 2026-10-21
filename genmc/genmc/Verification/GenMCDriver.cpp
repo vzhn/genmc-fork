@@ -310,9 +310,9 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 			if (state.isAllocated(addr) && state.getAllocAccess(addr).addr == addr)
 				state.onFree(dLab->getPos(), addr, genmc::isa<HpRetireLabel>(dLab));
 		} else if (const auto *ssLab = genmc::dyn_cast<SpinStartLabel>(lab)) {
-			state.onSpinStart(ssLab->getPos());
+			state.onSpinStart(ssLab->getPos(), ssLab->getLoop());
 		} else if (const auto *lbLab = genmc::dyn_cast<LoopBeginLabel>(lab)) {
-			state.onLoopBegin(lbLab->getPos());
+			state.onLoopBegin(lbLab->getPos(), lbLab->getLoop());
 		} else if (genmc::isa<ThreadCreateLabel>(lab)) {
 			state.onThreadCreate(lab->getPos());
 		} else if (const auto *asLab = genmc::dyn_cast<AwaitStartLabel>(lab)) {
@@ -1272,13 +1272,29 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 	VERIFY(genmc::isa<BlockLabel>(g.getLastThreadLabel(tid)));
 	/* A blocked await is judged by the reads of its condition (back to its
 	 * AwaitStart). A blocked spinloop is judged by its whole iteration (back
-	 * to the SpinStart), including the reads of any await nested in it. */
-	const auto isAwait = genmc::isa<AwaitBlockLabel>(g.getLastThreadLabel(tid));
-	const auto *lastLab = g.po_imm_pred(g.getLastThreadLabel(tid));
+	 * to the SpinStart), including the reads of any await nested in it.
+	 * The iteration of a loop includes the loops nested in it: a blocked
+	 * SpinStart judges the iteration since the previous SpinStart of its
+	 * loop. (A spin end has no spinloop nested in its iteration, which
+	 * starts at the last SpinStart; see SpinAssumePass.) */
+	const auto *bLab = g.getLastThreadLabel(tid);
+	const auto isAwait = genmc::isa<AwaitBlockLabel>(bLab);
+	const auto *lastLab = g.po_imm_pred(bLab);
 	if (isAwait && genmc::isa<AwaitStartLabel>(lastLab))
 		return true;
-	auto start = genmc::isa<SpinStartLabel>(lastLab) ? lastLab->getPos().prev()
-							 : lastLab->getPos();
+	const auto *ssLab = genmc::dyn_cast<SpinStartLabel>(lastLab);
+	auto start = ssLab ? lastLab->getPos().prev() : lastLab->getPos();
+	std::optional<LoopKey> loop;
+	if (const auto *sbLab = genmc::dyn_cast<SpinloopBlockLabel>(bLab))
+		loop = sbLab->getLoop();
+	if (!loop && ssLab)
+		loop = ssLab->getLoop();
+	auto isIterStart = [&](const EventLabel *lab) {
+		if (isAwait)
+			return genmc::isa<AwaitStartLabel>(lab);
+		const auto *sLab = genmc::dyn_cast<SpinStartLabel>(lab);
+		return sLab && (!loop || sLab->getLoop() == *loop);
+	};
 
 	/* Helper to get the co-max label */
 	auto getCoMax = [&](auto &rLab) {
@@ -1324,7 +1340,7 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 	auto observable = false;
 	for (auto j = start.index; j > 0; j--) {
 		const auto *lab = g.getEventLabel(Event(tid, j));
-		if (isAwait ? genmc::isa<AwaitStartLabel>(lab) : genmc::isa<SpinStartLabel>(lab))
+		if (isIterStart(lab))
 			break;
 		observable |= genmc::isa<UnlockWriteLabel>(lab);
 	}
@@ -1341,9 +1357,10 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 
 	for (auto j = start.index; j > 0; j--) {
 		const auto *lab = g.getEventLabel(Event(tid, j));
-		if (isAwait ? genmc::isa<AwaitStartLabel>(lab) : genmc::isa<SpinStartLabel>(lab))
+		if (isIterStart(lab))
 			return true;
-		VERIFY(!genmc::isa<LoopBeginLabel>(lab));
+		VERIFY(!genmc::isa<LoopBeginLabel>(lab) ||
+		       (loop && genmc::cast<LoopBeginLabel>(lab)->getLoop() != *loop));
 		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab)) {
 			if (rLab->getRf() != getReachableCoMax(rLab))
 				return false;
@@ -4745,19 +4762,20 @@ auto GenMCDriver::handleSpinStart(std::unique_ptr<SpinStartLabel> lab)
 {
 	auto &g = getExec().getGraph();
 	auto &frontier = g.getState();
+	auto loop = lab->getLoop();
 	auto *stLab = addLabelToGraph(std::move(lab));
 
 	/* Check for side-effects only if it's not the first spin-start */
-	if (genmc::isa<LoopBeginLabel>(g.po_imm_pred(stLab)) ||
-	    frontier.onSpinStart(stLab->getPos()))
+	const auto *lbLab = genmc::dyn_cast<LoopBeginLabel>(g.po_imm_pred(stLab));
+	if ((lbLab && lbLab->getLoop() == loop) || frontier.onSpinStart(stLab->getPos(), loop))
 		return {.result = std::monostate(), .count = 1U};
 
 	/* Spinloop detected */
-	blockThreadTryMoot(SpinloopBlockLabel::create(stLab->getPos()));
+	blockThreadTryMoot(SpinloopBlockLabel::create(stLab->getPos(), loop));
 	return {.result = std::monostate(), .count = 1U};
 }
 
-auto GenMCDriver::handleSpinStart(const EventDbgInfo *dbg, Event pos)
+auto GenMCDriver::handleSpinStart(const EventDbgInfo *dbg, Event pos, LoopKey loop)
 	-> HandleResult<std::monostate>
 {
 	++pos;
@@ -4765,10 +4783,10 @@ auto GenMCDriver::handleSpinStart(const EventDbgInfo *dbg, Event pos)
 		return {.result = *err};
 	if (isExecutionDrivenByGraph(pos)) {
 		if constexpr (!Config::emitNALabels)
-			getExec().getGraph().getState().onSpinStart(pos);
+			getExec().getGraph().getState().onSpinStart(pos, loop);
 		return {.result = std::monostate(), .count = 1U};
 	}
-	return handleSpinStart(SpinStartLabel::create(pos));
+	return handleSpinStart(SpinStartLabel::create(pos, loop));
 }
 
 /* An await is not a loop: an await nested in a spinloop leaves the loop
@@ -4881,11 +4899,11 @@ auto GenMCDriver::handleDummy(std::unique_ptr<EventLabel> lab) -> HandleResult<s
 auto GenMCDriver::handleLoopBegin(std::unique_ptr<LoopBeginLabel> lab)
 	-> HandleResult<std::monostate>
 {
-	getExec().getGraph().getState().onLoopBegin(lab->getPos());
+	getExec().getGraph().getState().onLoopBegin(lab->getPos(), lab->getLoop());
 	return handleDummy(std::move(lab));
 }
 
-auto GenMCDriver::handleLoopBegin(const EventDbgInfo *dbg, Event pos)
+auto GenMCDriver::handleLoopBegin(const EventDbgInfo *dbg, Event pos, LoopKey loop)
 	-> HandleResult<std::monostate>
 {
 	++pos;
@@ -4893,10 +4911,10 @@ auto GenMCDriver::handleLoopBegin(const EventDbgInfo *dbg, Event pos)
 		return {.result = *err};
 	if (isExecutionDrivenByGraph(pos)) {
 		if constexpr (!Config::emitNALabels)
-			getExec().getGraph().getState().onLoopBegin(pos);
+			getExec().getGraph().getState().onLoopBegin(pos, loop);
 		return {.result = std::monostate(), .count = 1U};
 	}
-	return handleLoopBegin(LoopBeginLabel::create(pos));
+	return handleLoopBegin(LoopBeginLabel::create(pos, loop));
 }
 auto GenMCDriver::handleHpProtect(const EventDbgInfo *dbg, Event pos, SAddr hpAddr, SAddr protAddr)
 	-> HandleResult<std::monostate>

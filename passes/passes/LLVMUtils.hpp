@@ -25,6 +25,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Value.h>
 
+#include <cstdint>
 #include <string>
 
 using TerminatorInst = llvm::Instruction;
@@ -151,6 +152,22 @@ inline auto getWriteAttr(llvm::Instruction &I) -> WriteAttr
 
 	auto flags = llvm::cast<llvm::ConstantInt>(op->getValue())->getZExtValue();
 	return static_cast<WriteAttr>(flags);
+}
+
+/**
+ * Extracts the number of the loop that a call to __VERIFIER_loop_begin() or
+ * __VERIFIER_spin_start() belongs to (see SpinAssumePass).
+ * Returns 0 if the call is not annotated (a manual instrumentation).
+ */
+inline auto getLoopId(llvm::Instruction &I) -> uint32_t
+{
+	auto *metadata = I.getMetadata("genmc.loop");
+	if (!metadata)
+		return 0;
+
+	auto *op = llvm::dyn_cast<llvm::ConstantAsMetadata>(metadata->getOperand(0));
+	VERIFY(op);
+	return llvm::cast<llvm::ConstantInt>(op->getValue())->getZExtValue();
 }
 
 namespace details {
