@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <cstring>
 #include <format>
-#include <numeric>
 #include <unordered_map>
 #include <vector>
 
@@ -247,8 +246,9 @@ auto describeLabel(const ExecutionGraph &g, const EventLabel &lab, const ThreadN
 		s += std::format(":a{}:s{}", names.addr(mLab->getAddr()), mLab->getSize().get());
 	if (const auto *rLab = genmc::dyn_cast<ReadLabel>(&lab)) {
 		if (rLab->getRf()) {
-			s += std::format(":rf{}:v{}", names.event(rLab->getRf()->getPos()),
-					 names.value(rLab->getRf()->getAccessValue(rLab->getAccess())));
+			s += std::format(
+				":rf{}:v{}", names.event(rLab->getRf()->getPos()),
+				names.value(rLab->getRf()->getAccessValue(rLab->getAccess())));
 		} else {
 			s += ":rf-";
 		}

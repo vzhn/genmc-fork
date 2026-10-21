@@ -43,8 +43,8 @@ struct HashGraph {
 	auto write(int tid, SAddr addr, SVal val) -> WriteLabel *
 	{
 		auto pos = Event(tid, g.getThreadSize(tid));
-		auto *wLab = genmc::cast<WriteLabel>(g.add(
-			WriteLabel::create(pos, MemOrdering::Relaxed, addr, ASize(4), val)));
+		auto *wLab = genmc::cast<WriteLabel>(
+			g.add(WriteLabel::create(pos, MemOrdering::Relaxed, addr, ASize(4), val)));
 		wLab->addCo(g.co_max(addr));
 		return wLab;
 	}
@@ -52,8 +52,8 @@ struct HashGraph {
 	auto read(int tid, SAddr addr, EventLabel *rf) -> ReadLabel *
 	{
 		auto pos = Event(tid, g.getThreadSize(tid));
-		return genmc::cast<ReadLabel>(g.add(
-			ReadLabel::create(pos, MemOrdering::Relaxed, addr, ASize(4), rf, std::nullopt)));
+		return genmc::cast<ReadLabel>(g.add(ReadLabel::create(
+			pos, MemOrdering::Relaxed, addr, ASize(4), rf, std::nullopt)));
 	}
 };
 

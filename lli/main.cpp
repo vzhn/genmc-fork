@@ -503,7 +503,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 		lliConfig.loadAnnot = false;
 		lliConfig.bam = false;
 		if (lliConfig.threads != 1)
-			WARN("-exhaustive runs single-threaded (-nthreads ignored).\n");
+			WARN("-exhaustive runs single-threaded (-nthreads ignored)");
 		lliConfig.threads = 1;
 	}
 

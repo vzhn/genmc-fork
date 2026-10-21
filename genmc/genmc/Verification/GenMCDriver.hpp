@@ -438,8 +438,7 @@ protected:
 
 	/** If @p lab is a weak CAS, pushes its spurious failure reading each
 	 * coherent write that @p kept (its rf approximation) left out */
-	void pushWeakCasFailuresOnDroppedRfs(ReadLabel *lab,
-					     const std::vector<EventLabel *> &kept);
+	void pushWeakCasFailuresOnDroppedRfs(ReadLabel *lab, const std::vector<EventLabel *> &kept);
 
 	/** Est: Returns true if we are currently running in estimation mode */
 	auto inEstimationMode() const -> bool

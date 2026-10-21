@@ -23,7 +23,7 @@ struct VerificationResult {
 	unsigned keptCheckReruns{};  /**< Runs repeated with eager checks of events before kept ones */
 	unsigned exploredDuplicates{}; /**< -exhaustive: complete executions seen again (not counted
 					  in explored) */
-	unsigned graphsVisited{};    /**< -exhaustive: distinct graphs produced by revisits */
+	unsigned graphsVisited{};      /**< -exhaustive: distinct graphs produced by revisits */
 	unsigned revisitsRepeated{}; /**< -exhaustive: revisits skipped, their graph seen before */
 	long double estimationMean{};	  /**< The mean of estimations */
 	long double estimationVariance{}; /**< The (biased) variance of the estimations */
