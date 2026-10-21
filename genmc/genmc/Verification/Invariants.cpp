@@ -502,6 +502,19 @@ auto planCopyUpTo(const ExecutionGraph &g, const VectorClock &v) -> RestrictionP
 	return plan;
 }
 
+void checkCopyView(const ExecutionGraph &g, const VectorClock &v, const Context &ctx)
+{
+	const auto n = g.getNumThreads();
+	for (auto t = 0; t < v.size(); t++) {
+		if (t >= n || v.getMax(t) >= g.getThreadSize(t))
+			fail(kI1,
+			     std::format("the view to copy reaches ({}, {}), beyond thread {}'s "
+					 "{} labels",
+					 t, v.getMax(t), t, t < n ? g.getThreadSize(t) : 0),
+			     &g, ctx);
+	}
+}
+
 void checkGraph(const ExecutionGraph &g, const Context &ctx, const RestrictionPlan *plan)
 {
 	checkThreads(g, ctx);

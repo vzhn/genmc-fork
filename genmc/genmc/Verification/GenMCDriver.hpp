@@ -178,7 +178,10 @@ public:
 	}
 
 	/** Under LKMM, a control dependency ends at the join of its branch */
-	auto scopesCtrlDeps() const -> bool { return relocatesKeptEvents(); }
+	auto scopesCtrlDeps() const -> bool
+	{
+		return getConf()->checkReplayKeys && getConf()->model == ModelType::LKMM;
+	}
 
 	/** Attemps to complete the execution by inspecting the cache.
 	 * Returns whether it succeeded. */
@@ -595,10 +598,14 @@ private:
 	/** relocateExecution(), and schedules a repeat of the run */
 	void relocateAndRerun(int thread, int from, int delta);
 
-	/** Whether kept events are moved to their instruction (see alignKeptEvents()) */
+	/** Whether kept events are moved to their instruction (see alignKeptEvents()):
+	 * under LKMM, and under IMM with -exhaustive, where a revisit can keep
+	 * events after a CAS whose outcome changes, and so whether it writes */
 	auto relocatesKeptEvents() const -> bool
 	{
-		return getConf()->checkReplayKeys && getConf()->model == ModelType::LKMM;
+		return getConf()->checkReplayKeys &&
+		       (getConf()->model == ModelType::LKMM ||
+			(getConf()->exhaustive && getConf()->model == ModelType::IMM));
 	}
 
 	/** Stops with an internal error unless @p lab, reused on replay, comes
@@ -667,9 +674,34 @@ private:
 
 	/** Given a revisit RLAB <- WLAB, returns the view of the resulting graph.
 	 * (This function can be abused and also be utilized for returning the view
-	 * of "fictional" revisits, e.g., the view of an event in a maximal path.) */
+	 * of "fictional" revisits, e.g., the view of an event in a maximal path.)
+	 * -exhaustive under IMM: null when no well-formed graph results (see
+	 * keepValueDependencies()) */
 	auto getRevisitView(const ReadLabel *rLab, const WriteLabel *sLab) const
 		-> std::unique_ptr<VectorClock>;
+
+	/** -exhaustive under IMM: adds to V, the view of a revisit of R, what
+	 * the events it keeps depend on for their value and existence. Returns
+	 * false if that includes R or an event the graph does not have */
+	auto keepValueDependencies(Event r, VectorClock &v) const -> bool;
+
+	/** -exhaustive under IMM: adds to LOADS the CAS reads in PREFIX, SLAB's
+	 * prefix, whose ordering or write part reading from SLAB would change */
+	void addRevisitableCases(WriteLabel *sLab, const VectorClock &prefix,
+				 std::vector<ReadLabel *> &loads);
+
+	/** -exhaustive under IMM: computes the views of G's labels anew, in G,
+	 * and drops their cached prefix views. Returns false if they do not
+	 * settle (an hb cycle) */
+	auto recomputeViews(ExecutionGraph &g) -> bool;
+
+	/** -exhaustive under IMM: whether G, with the views its labels have, is
+	 * consistent: coherence, the atomicity of its RMWs, the other axioms */
+	auto isGraphConsistent(const ExecutionGraph &g) const -> bool;
+
+	/** -exhaustive under IMM: whether the complete execution G is
+	 * consistent, checked on a copy whose views are computed anew */
+	auto isExecutionConsistent(const ExecutionGraph &g) -> bool;
 
 	auto isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLabel *lab) -> bool;
 

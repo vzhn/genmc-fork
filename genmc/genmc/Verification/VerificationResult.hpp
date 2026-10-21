@@ -25,6 +25,8 @@ struct VerificationResult {
 					  in explored) */
 	unsigned graphsVisited{};      /**< -exhaustive: distinct graphs produced by revisits */
 	unsigned revisitsRepeated{}; /**< -exhaustive: revisits skipped, their graph seen before */
+	unsigned exploredInconsistent{}; /**< -exhaustive under IMM: complete executions not
+					    counted, inconsistent when checked anew */
 	long double estimationMean{};	  /**< The mean of estimations */
 	long double estimationVariance{}; /**< The (biased) variance of the estimations */
 	bool inferredSymmetryError{}; /**< Whether the error is unordered writes, an error
@@ -64,6 +66,7 @@ struct VerificationResult {
 		exploredDuplicates += other.exploredDuplicates;
 		graphsVisited += other.graphsVisited;
 		revisitsRepeated += other.revisitsRepeated;
+		exploredInconsistent += other.exploredInconsistent;
 		estimationMean += other.estimationMean;
 		estimationVariance += other.estimationVariance;
 #ifdef ENABLE_GENMC_DEBUG

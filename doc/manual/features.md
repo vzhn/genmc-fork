@@ -570,6 +570,27 @@ the create event in the parent, recursively), not by their id, since
 ids are assigned in creation order and two runs reaching the same graph
 through different schedules may number nested threads differently.
 
+Under `-imm`, whose revisits keep events after holes (dependency
+tracking), the reference keeps its graphs well formed and consistent:
+
+- a revisit keeps, with every event it keeps, what that event's value and
+  existence depend on (its data, address, control and CAS dependencies,
+  an RMW's read for its write part, a read's write, its thread's
+  creation); a revisit for which that includes the revisited read, or an
+  event the graph does not have, is not taken. No kept write then changes
+  when the threads fill the holes;
+- the views of the revisited graph's labels are computed anew, and the
+  graph is checked as a whole (coherence, RMW atomicity, the other
+  axioms); an inconsistent one is not explored. A read or write that
+  fills a hole and that the kept events leave no coherent choice ends
+  the run;
+- a complete execution is counted only if it is consistent when checked
+  anew; the `Exhaustive:` line says how many were not;
+- kept events are moved to their instruction when a CAS before them
+  gains or loses its write part (as under `-lkmm`, with replay keys), and
+  a CAS that succeeds is revisitable by a write that would make it fail
+  or change its ordering, even if it is in that write's prefix.
+
 The mode is for small programs: memory grows with the visited graphs,
 and the exploration repeats work the maximality check avoids. It runs
 single-threaded. `scripts/oracle-diff.sh` compares the default
