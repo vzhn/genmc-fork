@@ -851,7 +851,11 @@ template <typename T> auto SExprEvaluator<T>::visitSDivExpr(SDivExpr<T> &e) -> R
 {
 	auto l = visitSigned(e.getKid(0)).getSigned();
 	auto r = visitSigned(e.getKid(1)).getSigned();
-	if (r == 0 || (r == -1 && l == std::numeric_limits<int64_t>::min()))
+	/* The signed minimum of the expression's width, divided by -1, overflows */
+	auto w = std::min(e.getWidth(), SVal::width);
+	auto min = w == SVal::width ? std::numeric_limits<int64_t>::min()
+				    : -(static_cast<int64_t>(1) << (w - 1));
+	if (r == 0 || (r == -1 && l == min))
 		return SVal(0);
 	return wrap(SVal(static_cast<uint64_t>(l / r)), e.getWidth());
 }
