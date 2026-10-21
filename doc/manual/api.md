@@ -24,6 +24,27 @@ The following functions are supported from `pthread.h`:
 - `int pthread_barrier_init (pthread_barrier_t *, const pthread_barrierattr_t *, unsigned)`
 - `int pthread_barrier_wait (pthread_barrier_t *)`
 - `int pthread_barrier_destroy (pthread_barrier_t *)`
+- `int pthread_rwlock_init (pthread_rwlock_t *, const pthread_rwlockattr_t *)`,
+  `pthread_rwlock_rdlock`, `pthread_rwlock_tryrdlock`, `pthread_rwlock_wrlock`,
+  `pthread_rwlock_trywrlock`, `pthread_rwlock_unlock` and `pthread_rwlock_destroy`
+  (`(pthread_rwlock_t *)`); at most `__VERIFIER_MAX_THREAD_NUM` threads (default 8)
+- `int pthread_cond_init (pthread_cond_t *, const pthread_condattr_t *)`,
+  `pthread_cond_wait (pthread_cond_t *, pthread_mutex_t *)`, `pthread_cond_signal`,
+  `pthread_cond_broadcast` and `pthread_cond_destroy` (`(pthread_cond_t *)`)
+- `int pthread_once (pthread_once_t *, void (*) (void))`: a caller that finds the
+  init routine running waits until it returns
+- `int pthread_key_create (pthread_key_t *, void (*) (void *))`,
+  `int pthread_key_delete (pthread_key_t)`, `void *pthread_getspecific (pthread_key_t)`
+  and `int pthread_setspecific (pthread_key_t, const void *)`: at most
+  `__VERIFIER_MAX_KEY_NUM` keys (default 8), never reused; destructors are not called
+- `int pthread_atfork (void (*) (void), void (*) (void), void (*) (void))`: at most
+  `__VERIFIER_MAX_ATFORK_NUM` registrations (default 8). There is no `fork()`; a
+  program runs the handlers with `__VERIFIER_atfork_prepare()` (the prepare
+  handlers, last registered first), then `__VERIFIER_atfork_parent()` or
+  `__VERIFIER_atfork_child()` (the parent or child handlers, first registered
+  first, of those that `__VERIFIER_atfork_prepare()` ran)
+
+The limits can be changed with compiler flags, e.g. `genmc -- -D__VERIFIER_MAX_KEY_NUM=16 file.c`.
 
 ### `stdlib` API
 

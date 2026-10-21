@@ -67,6 +67,15 @@ released.
 
 ### Added
 
+- `pthread.h` has `pthread_once()`, thread-specific data
+  (`pthread_key_create()`, `_delete()`, `pthread_getspecific()`,
+  `pthread_setspecific()`), `pthread_rwlock_trywrlock()` and
+  `pthread_atfork()` (#154). A `pthread_once()` caller that finds the init
+  routine running waits until it returns. Keys are never reused, and their
+  destructors are not called. As GenMC has no `fork()`, a program runs the
+  fork handlers itself with `__VERIFIER_atfork_prepare()`, then
+  `__VERIFIER_atfork_parent()` or `__VERIFIER_atfork_child()`
+  (`tests/correct/infr/pthread-{once-key,rwlock-trywrlock,atfork}`).
 - The expression evaluator's arithmetic is in `genmc/Support/SExprOps.hpp`,
   as functions of the operands' values and width; `scripts/prove-sexpr-ops.sh`
   proves them equal to LLVM's integer semantics for all inputs with Alive2.

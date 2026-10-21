@@ -29,6 +29,7 @@ extern "C"
 /* #include <time.h> */
 #include <stdio.h>
 #include <assert.h>
+#include <errno.h>
 #include <genmc_internal.h>
 #include <genmc.h>
 
@@ -37,10 +38,10 @@ typedef __VERIFIER_barrier_t pthread_barrier_t;
 typedef __VERIFIER_barrierattr_t pthread_barrierattr_t;
 typedef struct { unsigned int __seq; } pthread_cond_t;
 typedef __VERIFIER_condattr_t pthread_condattr_t;
-/* typedef int pthread_key_t; */
+typedef unsigned int pthread_key_t;
 typedef __VERIFIER_mutex_t pthread_mutex_t;
 typedef __VERIFIER_mutexattr_t pthread_mutexattr_t;
-/* typedef int pthread_once_t; */
+typedef int pthread_once_t;
 typedef __VERIFIER_rwlock_t pthread_rwlock_t;
 typedef __VERIFIER_rwlockattr_t pthread_rwlockattr_t;
 /* typedef struct { int __private; } pthread_spinlock_t; */
@@ -308,15 +309,39 @@ pthread_t pthread_self(void)
 /* extern int pthread_yield (void) ; */
 
 
-/* /\* Functions for handling initialization.  *\/ */
+/* Functions for handling initialization.
 
-/* /\* Guarantee that the initialization function INIT_ROUTINE will be called */
-/*    only once, even if pthread_once is executed several times with the */
-/*    same ONCE_CONTROL argument. ONCE_CONTROL must point to a static or */
-/*    extern variable initialized to PTHREAD_ONCE_INIT. */
-/*  *\/ */
-/* extern int pthread_once (pthread_once_t *__once_control, */
-/* 			 void (*__init_routine) (void)) ; */
+   ONCE_CONTROL goes from PTHREAD_ONCE_INIT (0) to 1 when a caller starts
+   INIT_ROUTINE, and to 2 when INIT_ROUTINE returns. A caller that finds
+   it at 1 waits (in __VERIFIER_await()) until it is 2, so no caller
+   returns before the initialization is done; under -check-liveness, a
+   caller left waiting (e.g., INIT_ROUTINE calls pthread_once() on its own
+   ONCE_CONTROL) is reported. Cancellation of INIT_ROUTINE is not
+   modelled.  */
+
+/* Guarantee that the initialization function INIT_ROUTINE will be called
+   only once, even if pthread_once is executed several times with the
+   same ONCE_CONTROL argument. ONCE_CONTROL must point to a static or
+   extern variable initialized to PTHREAD_ONCE_INIT.  */
+__attribute__ ((always_inline)) static inline
+int pthread_once(pthread_once_t *__once_control, void (*__init_routine) (void))
+{
+	int __state = 0;
+
+	if (__atomic_compare_exchange_n(__once_control, &__state, 1, false,
+					__ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE)) {
+		__init_routine();
+		__atomic_store_n(__once_control, 2, __ATOMIC_RELEASE);
+		return 0;
+	}
+	if (__state == 2)
+		return 0;
+
+	__VERIFIER_await_start();
+	__VERIFIER_assume_internal(__atomic_load_n(__once_control, __ATOMIC_ACQUIRE) == 2,
+				   GENMC_ASSUME_AWAIT);
+	return 0;
+}
 
 
 /* /\* Functions for handling cancellation. */
@@ -506,10 +531,28 @@ int pthread_rwlock_wrlock (pthread_rwlock_t *__rwlock)
 	return 0;
 }
 
-/* /\* Try to acquire write lock for RWLOCK.  *\/ */
-/* __attribute__ ((always_inline)) static inline */
-/* int pthread_rwlock_trywrlock (pthread_rwlock_t *__rwlock) */
-/*      ; */
+/* Try to acquire write lock for RWLOCK. Like pthread_rwlock_wrlock(),
+   this takes every thread's mutex in turn; if one is taken, the ones
+   already taken are released again and EBUSY is returned. A concurrent
+   pthread_rwlock_tryrdlock() or _trywrlock() can therefore fail while
+   the lock is only partly taken, though no thread holds it.  */
+__attribute__ ((always_inline)) static inline
+int pthread_rwlock_trywrlock (pthread_rwlock_t *__rwlock)
+{
+	long self = __VERIFIER_thread_self();
+	assert(self < __VERIFIER_MAX_THREAD_NUM &&
+	       "Max supported thread number for rwlocks exceeded! Use -D__VERIFIER_MAX_THREAD_NUM "
+	       "to set a different limit.");
+	for (int i = 0U; i < __VERIFIER_MAX_THREAD_NUM; i++) {
+		if (__VERIFIER_mutex_trylock(&__rwlock->__private[i]) != 0) {
+			while (i-- > 0)
+				__VERIFIER_mutex_unlock(&__rwlock->__private[i]);
+			return EBUSY;
+		}
+	}
+	__VERIFIER_rwlock_reader = false;
+	return 0;
+}
 
 /* Unlock RWLOCK.  */
 __attribute__((always_inline)) static inline int pthread_rwlock_unlock(pthread_rwlock_t *__rwlock)
@@ -642,42 +685,157 @@ int pthread_condattr_destroy(pthread_condattr_t *__attr)
 
 
 
-/* /\* Functions for handling thread-specific data.  *\/ */
+/* Functions for handling thread-specific data.
 
-/* /\* Create a key value identifying a location in the thread-specific */
-/*    data area.  Each thread maintains a distinct thread-specific data */
-/*    area.  DESTR_FUNCTION, if non-NULL, is called with the value */
-/*    associated to that key when the key is destroyed. */
-/*    DESTR_FUNCTION is not called if the value associated is NULL when */
-/*    the key is destroyed.  *\/ */
-/* extern int pthread_key_create (pthread_key_t *__key, */
-/* 			       void (*__destr_function) (void *)) ; */
+   The values live in one array, a row per thread (indexed by
+   pthread_self()) and a column per key, that each thread only accesses in
+   its own row. Keys are handed out in order and never reused, so a new key
+   reads as NULL in every thread, even after pthread_key_delete(). At most
+   __VERIFIER_MAX_KEY_NUM keys can be created (-D__VERIFIER_MAX_KEY_NUM to
+   change it), and threads are limited by __VERIFIER_MAX_THREAD_NUM as for
+   rwlocks. Destructors are not called at thread exit.  */
 
-/* /\* Destroy KEY.  *\/ */
-/* extern int pthread_key_delete (pthread_key_t __key) ; */
+#ifndef __VERIFIER_MAX_KEY_NUM
+# define __VERIFIER_MAX_KEY_NUM 8
+#endif
 
-/* /\* Return current value of the thread-specific data slot identified by KEY.  *\/ */
-/* extern void *pthread_getspecific (pthread_key_t __key) ; */
+static unsigned int __VERIFIER_key_next;
+static const void *__VERIFIER_key_values[__VERIFIER_MAX_THREAD_NUM][__VERIFIER_MAX_KEY_NUM];
 
-/* /\* Store POINTER in the thread-specific data slot identified by KEY. *\/ */
-/* extern int pthread_setspecific (pthread_key_t __key, */
-/* 				const void *__pointer) ; */
+/* Create a key value identifying a location in the thread-specific
+   data area.  Each thread maintains a distinct thread-specific data
+   area.  DESTR_FUNCTION is ignored (see above).  */
+__attribute__ ((always_inline)) static inline
+int pthread_key_create (pthread_key_t *__key, void (*__destr_function) (void *))
+{
+	unsigned int __k = __atomic_fetch_add(&__VERIFIER_key_next, 1, __ATOMIC_RELAXED);
+
+	if (__k >= __VERIFIER_MAX_KEY_NUM)
+		return EAGAIN;
+	*__key = __k;
+	return 0;
+}
+
+/* Destroy KEY.  */
+__attribute__ ((always_inline)) static inline
+int pthread_key_delete (pthread_key_t __key)
+{
+	return __key < __VERIFIER_MAX_KEY_NUM ? 0 : EINVAL;
+}
+
+/* Return current value of the thread-specific data slot identified by KEY.  */
+__attribute__ ((always_inline)) static inline
+void *pthread_getspecific (pthread_key_t __key)
+{
+	long self = __VERIFIER_thread_self();
+	assert(self < __VERIFIER_MAX_THREAD_NUM &&
+	       "Max supported thread number for thread-specific data exceeded! "
+	       "Use -D__VERIFIER_MAX_THREAD_NUM to set a different limit.");
+	if (__key >= __VERIFIER_MAX_KEY_NUM)
+		return NULL;
+	return (void *) __VERIFIER_key_values[self][__key];
+}
+
+/* Store POINTER in the thread-specific data slot identified by KEY. */
+__attribute__ ((always_inline)) static inline
+int pthread_setspecific (pthread_key_t __key, const void *__pointer)
+{
+	long self = __VERIFIER_thread_self();
+	assert(self < __VERIFIER_MAX_THREAD_NUM &&
+	       "Max supported thread number for thread-specific data exceeded! "
+	       "Use -D__VERIFIER_MAX_THREAD_NUM to set a different limit.");
+	if (__key >= __VERIFIER_MAX_KEY_NUM)
+		return EINVAL;
+	__VERIFIER_key_values[self][__key] = __pointer;
+	return 0;
+}
 
 
-/* /\* Install handlers to be called when a new process is created with FORK. */
-/*    The PREPARE handler is called in the parent process just before performing */
-/*    FORK. The PARENT handler is called in the parent process just after FORK. */
-/*    The CHILD handler is called in the child process.  Each of the three */
-/*    handlers can be NULL, meaning that no handler needs to be called at that */
-/*    point. */
-/*    PTHREAD_ATFORK can be called several times, in which case the PREPARE */
-/*    handlers are called in LIFO order (last added with PTHREAD_ATFORK, */
-/*    first called before FORK), and the PARENT and CHILD handlers are called */
-/*    in FIFO (first added, first called).  *\/ */
+/* Fork handlers.
 
-/* extern int pthread_atfork (void (*__prepare) (void), */
-/* 			   void (*__parent) (void), */
-/* 			   void (*__child) (void)) ; */
+   GenMC has no fork(), so pthread_atfork() only registers the handlers
+   (at most __VERIFIER_MAX_ATFORK_NUM, -D__VERIFIER_MAX_ATFORK_NUM to
+   change it), and a program runs them itself, in the thread that would
+   call fork():
+
+     __VERIFIER_atfork_prepare();   the PREPARE handlers, last added first
+     ...                            what happens at the fork
+     __VERIFIER_atfork_parent();    the PARENT handlers, first added first
+       or __VERIFIER_atfork_child();  the CHILD handlers, first added first
+
+   The parent or child call runs the handlers that were registered when
+   __VERIFIER_atfork_prepare() started, as glibc does; handlers registered
+   meanwhile are left out. No lock is held while a handler runs, so a
+   handler may call pthread_atfork().  */
+
+#ifndef __VERIFIER_MAX_ATFORK_NUM
+# define __VERIFIER_MAX_ATFORK_NUM 8
+#endif
+
+static pthread_mutex_t __VERIFIER_atfork_lock = PTHREAD_MUTEX_INITIALIZER;
+static void (*__VERIFIER_atfork_handlers[__VERIFIER_MAX_ATFORK_NUM][3]) (void);
+static unsigned int __VERIFIER_atfork_num;
+static __thread unsigned int __VERIFIER_atfork_running;
+
+/* Install handlers to be called when a new process is created with FORK.
+   The PREPARE handler is called in the parent process just before performing
+   FORK. The PARENT handler is called in the parent process just after FORK.
+   The CHILD handler is called in the child process.  Each of the three
+   handlers can be NULL, meaning that no handler needs to be called at that
+   point.
+   PTHREAD_ATFORK can be called several times, in which case the PREPARE
+   handlers are called in LIFO order (last added with PTHREAD_ATFORK,
+   first called before FORK), and the PARENT and CHILD handlers are called
+   in FIFO (first added, first called).  */
+__attribute__ ((always_inline)) static inline
+int pthread_atfork (void (*__prepare) (void), void (*__parent) (void),
+		    void (*__child) (void))
+{
+	int __ret = 0;
+
+	__VERIFIER_mutex_lock(&__VERIFIER_atfork_lock);
+	unsigned int __n = __atomic_load_n(&__VERIFIER_atfork_num, __ATOMIC_RELAXED);
+	if (__n < __VERIFIER_MAX_ATFORK_NUM) {
+		__VERIFIER_atfork_handlers[__n][0] = __prepare;
+		__VERIFIER_atfork_handlers[__n][1] = __parent;
+		__VERIFIER_atfork_handlers[__n][2] = __child;
+		__atomic_store_n(&__VERIFIER_atfork_num, __n + 1, __ATOMIC_RELEASE);
+	} else {
+		__ret = ENOMEM;
+	}
+	__VERIFIER_mutex_unlock(&__VERIFIER_atfork_lock);
+	return __ret;
+}
+
+/* Run the PREPARE handlers, last registered first.  */
+__attribute__ ((always_inline)) static inline
+void __VERIFIER_atfork_prepare (void)
+{
+	unsigned int __n = __atomic_load_n(&__VERIFIER_atfork_num, __ATOMIC_ACQUIRE);
+
+	__VERIFIER_atfork_running = __n;
+	while (__n-- > 0)
+		if (__VERIFIER_atfork_handlers[__n][0])
+			__VERIFIER_atfork_handlers[__n][0]();
+}
+
+/* Run the PARENT handlers, first registered first.  */
+__attribute__ ((always_inline)) static inline
+void __VERIFIER_atfork_parent (void)
+{
+	for (unsigned int __i = 0; __i < __VERIFIER_atfork_running; __i++)
+		if (__VERIFIER_atfork_handlers[__i][1])
+			__VERIFIER_atfork_handlers[__i][1]();
+}
+
+/* Run the CHILD handlers, first registered first.  */
+__attribute__ ((always_inline)) static inline
+void __VERIFIER_atfork_child (void)
+{
+	for (unsigned int __i = 0; __i < __VERIFIER_atfork_running; __i++)
+		if (__VERIFIER_atfork_handlers[__i][2])
+			__VERIFIER_atfork_handlers[__i][2]();
+}
 
 
 /* Functions to handle barriers.  */
