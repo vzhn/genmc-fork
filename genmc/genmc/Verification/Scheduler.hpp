@@ -57,6 +57,12 @@ public:
 	 * runtime replays the graph (a resumed execution does not) */
 	void resetExplorationOptions(const ExecutionGraph &g, bool replay = true);
 
+	/** The events the runtime is still to be driven through, latest first */
+	[[nodiscard]] auto getReplaySchedule() const -> const std::vector<Event> &
+	{
+		return replaySchedule_;
+	}
+
 	/** Returns the next thread to run according to the specified policy  */
 	[[nodiscard]] auto schedule(ExecutionGraph &g, std::span<Action> runnable)
 		-> std::optional<int>;

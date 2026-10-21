@@ -362,6 +362,11 @@ auto GenMCDriver::handleExecutionStart() -> bool
 					 &g, invariantContext("starting an execution"));
 	}
 	getScheduler().resetExplorationOptions(g, /*replay=*/!pendingResume_);
+	/* A resumed execution is driven through the holes before its kept
+	 * events as a replayed one is (I4) */
+	if (pendingResume_ && checksInvariants())
+		invariants::checkResumeSchedule(g, getScheduler().getReplaySchedule(),
+						invariantContext("starting a resumed execution"));
 	return getScheduler().inErrorReplay();
 }
 
@@ -2892,6 +2897,8 @@ auto GenMCDriver::saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>
 	auto rp = resumeHook_(pos);
 	if (!rp)
 		return nullptr;
+	if (checksInvariants())
+		rp->fingerprint = invariants::fingerprint(g, pos);
 	resumePoints_.push_back(rp);
 	if (resumePoints_.size() > getConf()->resumePoints)
 		resumePoints_.pop_front();
@@ -4051,6 +4058,11 @@ auto GenMCDriver::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 		pendingResume_ = fr->getResumePoint();
 		if (pendingResume_ && --pendingResume_->pending == 0)
 			std::erase(resumePoints_, pendingResume_); /* its last revisit */
+		if (pendingResume_ && checksInvariants() && pendingResume_->fingerprint)
+			invariants::checkResume(g, *pendingResume_->fingerprint,
+						pendingResume_->threadPositions(),
+						invariantContext("restricting the graph for a "
+								 "resumed revisit"));
 		return forwardRevisit(*fr);
 	}
 	if (auto *br = genmc::dyn_cast<BackwardRevisit>(&*item)) {

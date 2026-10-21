@@ -115,6 +115,15 @@ struct InterpreterResumePoint : public ResumePoint {
 	ProgramState programState{};
 	GenericValue exitValue;
 	std::vector<Function *> atExitHandlers;
+
+	[[nodiscard]] auto threadPositions() const -> std::vector<Event> override
+	{
+		std::vector<Event> positions;
+		positions.reserve(globalInstructions.size());
+		for (const auto &action : globalInstructions)
+			positions.push_back(action.event);
+		return positions;
+	}
 };
 
 auto Interpreter::saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>

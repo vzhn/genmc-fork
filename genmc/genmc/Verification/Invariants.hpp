@@ -73,6 +73,17 @@
  *    later allocation cannot overlap a block the graph holds (PR #66: the
  *    map was rebuilt by allocating anew in po order, and two stack variables
  *    overlapped after a stamp cut under IMM).
+ *
+ * I4 Resume points (fingerprint(), checkResume()). When the runtime's state
+ *    is saved for the forward revisits of an event, the graph is summarised
+ *    (GraphFingerprint: per thread the last index and a hash of the labels'
+ *    kinds, positions, addresses, sizes, values, rf sources and thread
+ *    links; the coherence orders; the revisited event's own rf and co are
+ *    left out since the revisit changes them). When a revisit resumes from
+ *    the state, the graph restricted for it must have the same fingerprint,
+ *    and the state's per-thread positions must not sit past a hole of the
+ *    graph (a thread cannot have passed an event the graph lacks).
+ *    (Issue #111: executions lost under IMM when resuming from older states.)
  */
 
 #ifndef GENMC_INVARIANTS_HPP
@@ -81,6 +92,7 @@
 #include "genmc/Execution/Event.hpp"
 #include "genmc/Execution/Stamp.hpp"
 #include "genmc/Verification/GenMCDriver.hpp"
+#include "genmc/Verification/GraphFingerprint.hpp"
 
 #include <optional>
 #include <source_location>
@@ -125,6 +137,24 @@ void checkGraph(const ExecutionGraph &g, const Context &ctx, const RestrictionPl
 
 /** I3: the allocation map of STATE agrees with the lifecycle labels of G */
 void checkAllocations(const ExecutionGraph &g, const ExecutionState &state, const Context &ctx);
+
+/** I4: summarises G for the revisits of SAVED */
+auto fingerprint(const ExecutionGraph &g, Event saved) -> GraphFingerprint;
+
+/** I4: how G (restricted for a revisit of SAVED's event) differs from the
+ * fingerprint taken when the state was saved, if it does; POSITIONS are the
+ * state's per-thread positions (empty if unknown) */
+auto resumeMismatch(const ExecutionGraph &g, const GraphFingerprint &saved,
+		    const std::vector<Event> &positions) -> std::optional<std::string>;
+
+/** I4: fails on a mismatch (see resumeMismatch()) */
+void checkResume(const ExecutionGraph &g, const GraphFingerprint &saved,
+		 const std::vector<Event> &positions, const Context &ctx);
+
+/** I4: SCHEDULE (the scheduler's replay schedule, latest first) drives every
+ * thread of G through the holes before its kept events */
+void checkResumeSchedule(const ExecutionGraph &g, const std::vector<Event> &schedule,
+			 const Context &ctx);
 
 /** Reports a violation of INVARIANT (WHAT describes it) and aborts; G is printed if given */
 [[noreturn]] void fail(std::string_view invariant, const std::string &what, const ExecutionGraph *g,

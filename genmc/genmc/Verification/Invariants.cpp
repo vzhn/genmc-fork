@@ -60,6 +60,7 @@ namespace {
 
 constexpr std::string_view kI1 = "I1 (restriction)";
 constexpr std::string_view kI3 = "I3 (allocation map)";
+constexpr std::string_view kI4 = "I4 (resume point)";
 
 /** Whether LAB, a pointer another label stores, is a label of G */
 auto inGraph(const ExecutionGraph &g, const EventLabel *lab) -> bool
@@ -423,6 +424,43 @@ void checkPlan(const ExecutionGraph &g, const Context &ctx, const RestrictionPla
 	}
 }
 
+/*******************************************************************************
+ **                        I4: fingerprints
+ ******************************************************************************/
+
+auto hashLabel(const ExecutionGraph &g, const EventLabel &lab, Event saved) -> std::size_t
+{
+	std::size_t h = 0;
+	hash_combine(h, static_cast<int>(lab.getKind()));
+	hash_combine(h, lab.getPos());
+	if (const auto *mLab = genmc::dyn_cast<MemAccessLabel>(&lab)) {
+		hash_combine(h, mLab->getAddr().get());
+		hash_combine(h, mLab->getSize().get());
+	}
+	if (const auto *aLab = genmc::dyn_cast<MallocLabel>(&lab)) {
+		hash_combine(h, aLab->getAddr().get());
+		hash_combine(h, aLab->getSize().get());
+	}
+	if (const auto *dLab = genmc::dyn_cast<FreeLabel>(&lab))
+		hash_combine(h, dLab->getAddr().get());
+	if (lab.getPos() != saved) {
+		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(&lab))
+			hash_combine(h, rLab->getRf() ? rLab->getRf()->getPos() : Event(-1, -1));
+		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(&lab))
+			hash_combine(h, wLab->getVal().get());
+	}
+	if (const auto *bLab = genmc::dyn_cast<ThreadStartLabel>(&lab)) {
+		hash_combine(h, bLab->getCreateId());
+		hash_combine(h, bLab->getCreate() != nullptr);
+		hash_combine(h, bLab->isTerminated());
+	}
+	if (const auto *tcLab = genmc::dyn_cast<ThreadCreateLabel>(&lab))
+		hash_combine(h, tcLab->getChildId());
+	if (const auto *jLab = genmc::dyn_cast<ThreadJoinLabel>(&lab))
+		hash_combine(h, jLab->getChildId());
+	return h;
+}
+
 } // namespace
 
 auto planCutToStamp(const ExecutionGraph &g, Stamp st) -> RestrictionPlan
@@ -550,6 +588,156 @@ void checkAllocations(const ExecutionGraph &g, const ExecutionState &state, cons
 			failI3(std::format("the block of {} is marked freed by {}, which is not a "
 					   "free of it",
 					   info.pos, *info.freePos));
+	}
+}
+
+/*******************************************************************************
+ **                        I4: resume points
+ ******************************************************************************/
+
+auto fingerprint(const ExecutionGraph &g, Event saved) -> GraphFingerprint
+{
+	GraphFingerprint fp;
+	fp.saved = saved;
+	fp.maxStamp = g.getMaxStamp();
+	for (auto t : g.thr_ids()) {
+		/* Trailing holes and block labels are left out. A cut to the
+		 * stamp of the save drops a trailing hole filled since (holes have
+		 * stamps, and the new label a newer one), and a block label
+		 * removed since (the thread was unblocked and retried its
+		 * instruction, which added a newer label): the thread of the saved
+		 * state then retries the instruction in the resumed execution, as
+		 * it would in a replayed one */
+		auto last = -1;
+		for (const auto &lab : g.po(t))
+			if (!genmc::isa<EmptyLabel>(&lab) && !genmc::isa<BlockLabel>(&lab))
+				last = lab.getIndex();
+		std::size_t h = 0;
+		for (const auto &lab : g.po(t))
+			if (lab.getIndex() <= last)
+				hash_combine(h, hashLabel(g, lab, saved));
+		fp.lastIndex.push_back(last);
+		fp.threadHash.push_back(h);
+	}
+
+	/* Coherence, in a fixed location order. (A location without writes
+	 * is left out: a cut keeps the entry of a location that only labels
+	 * it turns into holes accessed, which the graph at the save lacked) */
+	for (auto lIt = g.loc_begin(); lIt != g.loc_end(); ++lIt) {
+		std::size_t h = 0;
+		auto writes = 0U;
+		for (const auto &wLab : g.co(lIt->first)) {
+			if (wLab.getPos() == saved)
+				continue;
+			hash_combine(h, wLab.getPos());
+			++writes;
+		}
+		if (writes > 0)
+			fp.coHashes.emplace_back(lIt->first.get(), h);
+	}
+	std::ranges::sort(fp.coHashes);
+	return fp;
+}
+
+auto resumeMismatch(const ExecutionGraph &g, const GraphFingerprint &saved,
+		    const std::vector<Event> &positions) -> std::optional<std::string>
+{
+	std::optional<std::string> mismatch;
+	auto failI4 = [&](std::string what) {
+		if (!mismatch)
+			mismatch = std::move(what);
+	};
+	auto now = fingerprint(g, saved.saved);
+	auto prefix = std::format("resuming the revisit of {} (state saved at stamp {})",
+				  saved.saved, saved.maxStamp);
+
+	if (now.lastIndex.size() != saved.lastIndex.size()) {
+		failI4(std::format("{}: the restricted graph has {} threads, the graph at the "
+				   "save had {}",
+				   prefix, now.lastIndex.size(), saved.lastIndex.size()));
+		return mismatch;
+	}
+	for (auto t = 0U; t < now.lastIndex.size(); t++) {
+		if (now.lastIndex[t] != saved.lastIndex[t])
+			failI4(std::format(
+				"{}: thread {} ends at index {} in the restricted graph, "
+				"at {} in the graph at the save",
+				prefix, t, now.lastIndex[t], saved.lastIndex[t]));
+	}
+	for (auto t = 0U; t < now.threadHash.size(); t++) {
+		if (now.threadHash[t] != saved.threadHash[t])
+			failI4(std::format("{}: the labels of thread {} differ from those of the "
+					   "graph at the save",
+					   prefix, t));
+	}
+	for (auto i = 0U; i < std::max(now.coHashes.size(), saved.coHashes.size()); i++) {
+		if (i >= now.coHashes.size() || i >= saved.coHashes.size() ||
+		    now.coHashes[i] != saved.coHashes[i]) {
+			auto addr = i < now.coHashes.size() ? now.coHashes[i].first
+							    : saved.coHashes[i].first;
+			failI4(std::format("{}: the coherence order of {} differs from that of "
+					   "the graph at the save",
+					   prefix, SAddr(addr)));
+			break;
+		}
+	}
+	if (mismatch)
+		return mismatch;
+
+	/* The state's threads against the graph (the runtime declines a
+	 * state with a thread past the graph, see Interpreter::resumeFrom()) */
+	if (positions.size() > now.lastIndex.size())
+		return mismatch;
+	for (auto t = 0U; t < positions.size(); t++)
+		if (positions[t].index > now.lastIndex[t])
+			return mismatch;
+	for (auto t = 0U; t < positions.size(); t++) {
+		if (positions[t].thread != static_cast<int>(t))
+			failI4(std::format("{}: the state's thread {} is at {}", prefix, t,
+					   positions[t]));
+		for (auto j = 1; j <= positions[t].index; j++) {
+			if (genmc::isa<EmptyLabel>(g.getEventLabel(Event(t, j))))
+				failI4(std::format(
+					"{}: the state's thread {} is at {} but the "
+					"restricted graph has a hole at ({}, {}) before it",
+					prefix, t, positions[t], t, j));
+		}
+	}
+	return mismatch;
+}
+
+void checkResume(const ExecutionGraph &g, const GraphFingerprint &saved,
+		 const std::vector<Event> &positions, const Context &ctx)
+{
+	if (auto mismatch = resumeMismatch(g, saved, positions))
+		fail(kI4, *mismatch, &g, ctx);
+}
+
+void checkResumeSchedule(const ExecutionGraph &g, const std::vector<Event> &schedule,
+			 const Context &ctx)
+{
+	for (auto t : g.thr_ids()) {
+		auto hole = -1;
+		for (const auto &lab : g.po(t)) {
+			if (genmc::isa<EmptyLabel>(&lab)) {
+				if (hole < 0)
+					hole = lab.getIndex();
+				continue;
+			}
+			/* A replay is driven through the atomic kept events only
+			 * (the schedule leaves out non-atomic ones and blocks) */
+			if (hole < 0 || lab.isNotAtomic() || genmc::isa<BlockLabel>(&lab))
+				continue;
+			if (std::ranges::none_of(schedule, [&](const Event &e) {
+				    return e.thread == t && e.index > hole;
+			    }))
+				fail(kI4,
+				     std::format("the resumed execution is not driven through the "
+						 "hole at ({}, {}) before the kept event {} (its "
+						 "schedule is {})",
+						 t, hole, lab.getPos(), schedule),
+				     &g, ctx);
+		}
 	}
 }
 
