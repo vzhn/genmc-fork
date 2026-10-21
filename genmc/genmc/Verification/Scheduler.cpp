@@ -20,6 +20,7 @@
 #include "genmc/Support/Cast.hpp"
 #include "genmc/Support/Error.hpp"
 #include "genmc/Verification/Config.hpp"
+#include "genmc/Verification/Invariants.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -120,6 +121,16 @@ static auto calculateReplaySchedule(const ExecutionGraph &g, const Config *conf,
 			return pos != errorEvent && g.getEventLabel(pos)->isNotAtomic();
 		});
 	}
+
+	/* The target must have survived the erasures above: a replay that
+	 * does not reach it loses the error (see -check-invariants, I2) */
+	if (conf->checkInvariants && errorEvent &&
+	    std::ranges::find(result, *errorEvent) == result.end())
+		invariants::fail(
+			"I2 (error replay)",
+			std::format("the replay target {} is not in the replay schedule {}",
+				    *errorEvent, result),
+			&g, {.where = "calculating the replay schedule"});
 
 	/* The schedule is still reversed, need to fix that. */
 	std::ranges::reverse(result);

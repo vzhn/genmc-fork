@@ -202,6 +202,20 @@ auto GenMCDriver::popExecution() -> bool
 
 void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 {
+	/* A task is only taken once the previous one is done, and a done task
+	 * has reported its errors (or the pool halted and no task is taken):
+	 * a replay still pending here is stale (see -check-invariants, I2) */
+	if (checksInvariants() && (getScheduler().inErrorReplay() || bufferedError_)) {
+		auto target = getScheduler().getErrorReplayEvent();
+		invariants::fail("I2 (error replay)",
+				 std::format("a new task is taken with an error replay pending "
+					     "(target {}, buffered error: {})",
+					     target ? std::format("{}", *target) : "none",
+					     bufferedError_.has_value()),
+				 execStack.empty() ? static_cast<const ExecutionGraph *>(nullptr)
+						   : &getExec().getGraph(),
+				 invariantContext("taking a task from the pool"));
+	}
 	checkGraphInvariants(*exec->graph, "taking a task from the pool");
 
 	/* A replay that collects an error's metadata belongs to the executions
@@ -323,6 +337,20 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	state.clear();
 	if constexpr (Config::emitNALabels)
 		reconstructState(g, state);
+	/* An error replay replays to its target, which the graph holds (I2) */
+	if (checksInvariants() && getScheduler().inErrorReplay()) {
+		auto target = *getScheduler().getErrorReplayEvent();
+		if (!bufferedError_ || !g.containsPosNonEmpty(target))
+			invariants::fail("I2 (error replay)",
+					 std::format("an execution starts in error replay but its "
+						     "target {} is {} (buffered error: {})",
+						     target,
+						     g.containsPosNonEmpty(target)
+							     ? "in the graph"
+							     : "not in the graph",
+						     bufferedError_.has_value()),
+					 &g, invariantContext("starting an execution"));
+	}
 	getScheduler().resetExplorationOptions(g, /*replay=*/!pendingResume_);
 	return getScheduler().inErrorReplay();
 }
@@ -1776,6 +1804,17 @@ auto GenMCDriver::handleThreadKill(const EventDbgInfo *dbg, Event pos)
 		 * that targets it (updateErrorInfoAndMaybeExit() may have just ended the
 		 * replay), or by a replay with race detection disabled */
 		VERIFY(genmc::isa<ThreadKillLabel>(getExec().getGraph().getEventLabel(pos)));
+		/* (I2: an ongoing error replay only re-executes the kill if it is
+		 * its target, or if non-atomic events stay in its schedule) */
+		if (checksInvariants() && getScheduler().inErrorReplay() &&
+		    !getScheduler().isErrorReplayEvent(pos) && !getConf()->disableRaceDetection &&
+		    !getConf()->replayCompletedThreads)
+			invariants::fail(
+				"I2 (error replay)",
+				std::format("the kill {} is re-executed by an error replay "
+					    "targeting {}",
+					    pos, *getScheduler().getErrorReplayEvent()),
+				&getExec().getGraph(), invariantContext("replaying a kill"));
 		return {.result = std::monostate{}, .count = 1U};
 	}
 	return handleThreadKill(ThreadKillLabel::create(pos));

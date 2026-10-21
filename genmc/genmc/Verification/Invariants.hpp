@@ -51,6 +51,18 @@
  *      whose creates were cut.
  *    Validation: with beb1df1 reverted, tests/correct/infr/nested-create-*
  *    fail it at the first restriction that cuts a create.
+ *
+ * I2 Error replay (Scheduler.cpp, GenMCDriver.cpp). Whenever an error replay
+ *    is pending, its target is in the schedule calculateReplaySchedule()
+ *    returns (checked after the non-atomic accesses and the finished threads
+ *    are erased, where the fix of PR #22 sits: the target used to be erased
+ *    with the non-atomic accesses, and the error was lost or the next
+ *    execution aborted); a new execution started in error replay has the
+ *    buffered error and its target in the graph; initFromState() is entered
+ *    with no pending replay (PR #19: a worker kept a stale target across the
+ *    tasks it took); a kill event reached while driven by the graph is a
+ *    kill label and is only re-executed by a replay that targets it or that
+ *    keeps non-atomic events (PR #31).
  */
 
 #ifndef GENMC_INVARIANTS_HPP
