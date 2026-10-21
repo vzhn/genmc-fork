@@ -217,8 +217,14 @@ static auto isPHIRelatedToCASRes(const PHINode *phi,
 	return isPHIRelatedToCASRes(phi, cass, phiChain, related);
 }
 
+/*
+ * The loads may differ in ordering (a relaxed check before the loop, an
+ * acquire one in it): each keeps its own, and the spin-end only blocks an
+ * iteration that leaves the PHI unchanged, whatever ordering read the value
+ * (#91). Only tryMoveInitialLoadToHeader(), which moves a load, needs equal
+ * orderings.
+ */
 static auto isPHIRelatedToLoad(const PHINode *curr, Value *&loadPtr,
-			       std::optional<AtomicOrdering> &loadOrd,
 			       SmallVector<const PHINode *, 4> &phiChain,
 			       VSet<const PHINode *> &related) -> bool
 {
@@ -231,18 +237,14 @@ static auto isPHIRelatedToLoad(const PHINode *curr, Value *&loadPtr,
 		if (auto *li = dyn_cast_or_null<LoadInst>(val)) {
 			if (loadPtr && !accessSameVariable(li->getPointerOperand(), loadPtr))
 				return false;
-			if (loadOrd.has_value() &&
-			    !areSameLoadOrdering(li->getOrdering(), *loadOrd))
-				return false;
 			loadPtr = li->getPointerOperand();
-			loadOrd = li->getOrdering();
 		} else {
 			auto *phi = dyn_cast<PHINode>(val);
 			if (!phi)
 				return false;
 
 			phiChain.push_back(curr);
-			if (!isPHIRelatedToLoad(phi, loadPtr, loadOrd, phiChain, related))
+			if (!isPHIRelatedToLoad(phi, loadPtr, phiChain, related))
 				return false;
 			phiChain.pop_back();
 		}
@@ -253,11 +255,10 @@ static auto isPHIRelatedToLoad(const PHINode *curr, Value *&loadPtr,
 static auto isPHIRelatedToLoad(const PHINode *phi) -> bool
 {
 	Value *loadPtr = nullptr; // NOLINT(misc-const-correctness)
-	std::optional<AtomicOrdering> loadOrd;
 	VSet<const PHINode *> related;
 	SmallVector<const PHINode *, 4> phiChain;
 
-	return isPHIRelatedToLoad(phi, loadPtr, loadOrd, phiChain, related);
+	return isPHIRelatedToLoad(phi, loadPtr, phiChain, related);
 }
 
 /*

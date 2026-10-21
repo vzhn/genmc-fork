@@ -11,6 +11,12 @@ released.
 
 ### Fixed
 
+- A spin loop whose check before the loop reads with a different memory
+  order than the loop's read (`w = load_relaxed(&f); while (w) w =
+  load_acquire(&f);`) was not recognized as spinning, and GenMC did not
+  terminate on it (#91). The loads feeding a header PHI no longer have to
+  share an ordering: each keeps its own, and an iteration is blocked only
+  if it leaves the PHI unchanged.
 - A logical negation in an annotation expression always evaluated to 0
   (`SExprEvaluator::visitNotExpr()` negated the operand's pointer, #64).
   Loop jump threading never inverted a loop whose header leaves it on the
