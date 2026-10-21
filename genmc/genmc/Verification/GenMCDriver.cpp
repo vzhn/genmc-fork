@@ -1057,6 +1057,24 @@ auto GenMCDriver::toCasResult(HandleResult<SVal> res, Event pos) -> HandleResult
 	return {.result = Invalid{}, .count = res.count};
 }
 
+/* The rfs getRfsApproximation() drops are the writes whose successful RMW
+ * would violate atomicity (a settled RMW reads them already). A weak CAS can
+ * still read such a write and fail spuriously: that execution has no write to
+ * violate anything, and no other path explores it */
+void GenMCDriver::pushWeakCasFailuresOnDroppedRfs(ReadLabel *lab,
+						  const std::vector<EventLabel *> &kept)
+{
+	const auto *cLab = genmc::dyn_cast<CasReadLabel>(lab);
+	if (!cLab || !cLab->isWeak())
+		return;
+	for (auto *sLab : getConsChecker().getCoherentStores(lab)) {
+		if (std::ranges::find(kept, sLab) != kept.end())
+			continue;
+		getExec().getWorkqueue().add(
+			std::make_unique<WeakCasFailureRevisit>(lab->getPos(), sLab->getPos()));
+	}
+}
+
 void GenMCDriver::maybePushWeakCasFailure(const CasReadLabel *cLab)
 {
 	/* Pushes the spurious-failure option of a *successful* weak CAS;
@@ -2446,6 +2464,8 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 	auto stores = getRfsApproximation(lab);
 	VERIFY(!stores.empty());
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Rfs: {}", stores););
+	if (inVerificationMode())
+		pushWeakCasFailuresOnDroppedRfs(lab, stores);
 	filterOptimizeRfs(lab, stores);
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Rfs (optimized): {}", stores););
 
