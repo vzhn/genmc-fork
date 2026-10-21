@@ -575,7 +575,9 @@ and the exploration repeats work the maximality check avoids. It runs
 single-threaded. `scripts/oracle-diff.sh` compares the default
 exploration with it over the test suite, and `scripts/fuzz-c11.py` over
 random C11 programs; every disagreement is a bug, in the reference or
-in the exploration. `-exhaustive` is not supported with `-lkmm`.
+in the exploration. Under `-lkmm` the mode runs too (kept events are
+relocated as in the default exploration), and agrees with herd7 on the
+kernel's litmus tests.
 
 ## Checking Liveness
 
