@@ -21,8 +21,11 @@
 # the expected files may assume those reductions, so the comparison is not
 # with them), and with -exhaustive. A test disagrees when the two runs differ
 # in the number of complete executions (the deduplicated number under
-# -exhaustive) or in the verdict (no errors, or the error reported). Both runs
-# use -disable-estimation and -disable-mm-detector, like the test suite.
+# -exhaustive) or in the verdict (no errors, or an error). Two runs that both
+# report an error agree: the exploration stops at the first error, so the
+# executions counted before it, and which of several errors comes first,
+# depend on the order. Both runs use -disable-estimation and
+# -disable-mm-detector, like the test suite.
 #
 # Options:
 #   -m <models>   comma-separated models (default: rc11,imm,sc)
@@ -130,6 +133,15 @@ run_one() {
     fi
     local raw
     raw=$(echo "${out2}" | awk '/^Exhaustive:/ { print $2 }')
+    # An error stops the exploration: the executions counted before it, and
+    # which of several errors is met first, depend on the order, so two runs
+    # that both report an error agree
+    if [ "${v1}" != "none" ] && [ "${v2}" != "none" ]; then
+	if [ -n "${VERBOSE}" ]; then
+	    echo "ok ${tag}: error in both (default=${n1:-?} ${v1}, exhaustive=${n2:-?} ${v2})"
+	fi
+	return
+    fi
     if [ "${n1}" != "${n2}" ] || [ "${v1}" != "${v2}" ]; then
 	echo "MISMATCH ${tag}: default=${n1:-?} ${v1}, exhaustive=${n2:-?} ${v2} (raw ${raw:-?})"
 	return
