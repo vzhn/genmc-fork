@@ -811,7 +811,7 @@ template <typename T> auto SExprEvaluator<T>::visitTruncExpr(TruncExpr<T> &e) ->
 
 template <typename T> auto SExprEvaluator<T>::visitNotExpr(NotExpr<T> &e) -> RetTy
 {
-	return SVal(!e.getKid(0));
+	return SVal(!this->visit(e.getKid(0)).getBool());
 }
 
 #define IMPLEMENT_BINOP_NONMEM(op) return this->visit(e.getKid(0)) op this->visit(e.getKid(1))

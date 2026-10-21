@@ -317,10 +317,9 @@ TEST(SExprEvaluatorTest, Casts)
 	EXPECT_EQ(mismatches, 0);
 }
 
-/* A logical negation: 1 iff its operand is 0. Disabled: visitNotExpr()
- * negates the operand's pointer (#64), and fixing it turns loop jump
- * threading on for loops it has never inverted, which needs its own tests */
-TEST(SExprEvaluatorTest, DISABLED_Not)
+/* A logical negation: 1 iff its operand is 0 (#64: visitNotExpr() negated
+ * the operand's pointer, so every negation was 0) */
+TEST(SExprEvaluatorTest, Not)
 {
 	for (auto w : {1U, 8U, 32U})
 		for (auto a : boundaryValues(w))
