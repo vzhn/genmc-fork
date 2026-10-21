@@ -626,11 +626,15 @@ static auto compileInput(const LLIConfig &lliConfig, const std::unique_ptr<llvm:
 {
 	const auto *path = CLANGPATH;
 	auto command = path + buildCompilationArgs(lliConfig);
-	if (std::system(command.c_str()) != 0)
-		return false;
+	auto compiled = std::system(command.c_str()) == 0;
+	if (compiled)
+		module = LLVMModule::parseLLVMModule(getOutFilename(lliConfig), ctx);
 
-	module = LLVMModule::parseLLVMModule(getOutFilename(lliConfig), ctx);
-	return true;
+	/* The file has served its purpose (a failed compilation may leave a
+	 * partial one): without this, every run leaks it in the temp directory */
+	std::error_code ec;
+	std::filesystem::remove(getOutFilename(lliConfig), ec);
+	return compiled;
 }
 
 /**
