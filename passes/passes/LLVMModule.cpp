@@ -16,6 +16,7 @@
 #include "genmc/Support/SExprVisitor.hpp"
 #include "passes/LLIConfig.hpp"
 #include "passes/ModuleInfo.hpp"
+#include "passes/PassChecker.hpp"
 #include "passes/Transforms/BarrierResultCheckerPass.hpp"
 #include "passes/Transforms/BisimilarityCheckerPass.hpp"
 #include "passes/Transforms/CallInfoCollectionPass.hpp"
@@ -50,6 +51,7 @@
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/PassInstrumentation.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
@@ -223,7 +225,12 @@ auto transformLLVMModule(llvm::Module &mod, ModuleInfo &MI, const LLIConfig *con
 	fam.registerPass([&] { return BisimilarityAnalysis(); });
 	fam.registerPass([&] { return LoadAnnotationAnalysis(); });
 
-	llvm::PassBuilder PB;
+	llvm::PassInstrumentationCallbacks PIC;
+	PassChecker checker(conf->outputLlvmPasses, conf->verifyPassAnalyses, conf->helper,
+			    conf->confirmation, conf->finalWrite, fam);
+	checker.registerCallbacks(PIC);
+
+	llvm::PassBuilder PB(nullptr, llvm::PipelineTuningOptions(), std::nullopt, &PIC);
 	PB.registerModuleAnalyses(mam);
 	PB.registerCGSCCAnalyses(cgam);
 	PB.registerFunctionAnalyses(fam);
@@ -305,6 +312,7 @@ auto transformLLVMModule(llvm::Module &mod, ModuleInfo &MI, const LLIConfig *con
 	}
 
 	preserved.intersect(basicOptsMGR.run(mod, mam));
+	checker.writeAnnotationObligations(mod, PI.annotInfo);
 
 	initializeModuleInfo(MI, PI, mod);
 
