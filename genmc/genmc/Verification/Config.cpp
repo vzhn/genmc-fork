@@ -39,6 +39,25 @@ auto Config::validate(std::vector<std::string> &warnings) -> ValidationStatus
 {
 	ConfigErrorList errors;
 
+	/* -exhaustive is a reference: the reductions that change which graphs
+	 * are explored are off, and so is everything that resumes or skips a
+	 * replay (the runs are driven by the graph alone) */
+	if (exhaustive) {
+		symmetryReduction = false;
+		ipr = false;
+		disableBAM = true;
+		helper = false;
+		blindRMWReduction = false;
+		confirmation = false;
+		LAPOR = false;
+		finalWrite = false;
+		resumePoints = 0;
+		estimate = false;
+		instructionCaching = false;
+		if (mode != ExplorationMode::verify)
+			errors.emplace_back("-exhaustive requires --mode=verify.");
+	}
+
 	/* Check exploration options */
 	if (LAPOR) {
 		errors.emplace_back("LAPOR is temporarily disabled.");

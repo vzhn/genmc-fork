@@ -19,6 +19,7 @@
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/ChoiceMap.hpp"
 #include "genmc/Verification/Config.hpp"
+#include "genmc/Verification/GraphHash.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
 #include "genmc/Verification/Scheduler.hpp"
@@ -32,6 +33,7 @@
 #include <memory>
 #include <random>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -434,6 +436,10 @@ protected:
 	 * worklist item to also explore its spurious-failure outcome. */
 	void maybePushWeakCasFailure(const CasReadLabel *cLab);
 
+	/** If @p lab is a weak CAS, pushes its spurious failure reading each
+	 * coherent write that @p kept (its rf approximation) left out */
+	void pushWeakCasFailuresOnDroppedRfs(ReadLabel *lab, const std::vector<EventLabel *> &kept);
+
 	/** Est: Returns true if we are currently running in estimation mode */
 	auto inEstimationMode() const -> bool
 	{
@@ -672,6 +678,18 @@ private:
 	 * RLAB <- SLAB form a maximal extension */
 	auto isMaximalExtension(const BackwardRevisit &r) -> bool;
 
+	/** -exhaustive: whether every read the revisit R keeps (but the
+	 * revisited one) keeps the write it reads from */
+	auto isRevisitViewClosed(const BackwardRevisit &r) -> bool;
+
+	/** -exhaustive: whether the graph R produces keeps an RMW that reads
+	 * from the write the revisiting RMW reads from (atomicity) */
+	auto keepsConflictingRMW(const BackwardRevisit &r) -> bool;
+
+	/** -exhaustive: records the graph ITEM produced in the visited set.
+	 * Returns whether it is new (a repeated graph is not explored again) */
+	auto visitRevisitedGraph(const Revisit &item) -> bool;
+
 	/** Calculates all possible coherence placings for SLAB and
 	 * pushes them to the worklist. */
 	void calcCoOrderings(WriteLabel *sLab, const std::vector<EventLabel *> &cos);
@@ -709,6 +727,10 @@ private:
 	 * Returns a pointer to the newly added event, or nullptr
 	 * if the event was not an RMW, or was an unsuccessful one */
 	auto completeRevisitedRMW(const ReadLabel *rLab) -> WriteLabel *;
+
+	/** Updates the kept write part of RLAB, an RMW read executed anew,
+	 * from the read's rf (null if the RMW no longer writes) */
+	auto updateKeptRMWWrite(const ReadLabel *rLab) -> WriteLabel *;
 
 	/** Copies the current EG according to BR's view V.
 	 * May modify V but will not execute BR in the copy. */
@@ -959,6 +981,10 @@ private:
 	/** Restricts the current execution to STAMP (see Execution::restrict()),
 	 * checking I1 under -check-invariants */
 	void restrictExecution(Stamp stamp, std::string_view where);
+	/** -exhaustive: the canonical hashes of the graphs revisits produced,
+	 * and of the complete executions counted (see visitRevisitedGraph()) */
+	std::unordered_set<GraphHash> visitedGraphs_;
+	std::unordered_set<GraphHash> countedExecutions_;
 
 	/** Saves the runtime state at the event at POS for the forward revisits
 	 * queued for it (null if the run cannot resume, see saveResumePoint()) */

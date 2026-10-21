@@ -535,6 +535,50 @@ could observe their order, GenMC reports `Execution not well-formed for
 --blind-rmw-reduction`. Such a program has to be checked without the
 flag.
 
+## Reference Exploration
+
+GenMC's exploration (TruSt) accepts a backward revisit, a write
+revisiting an earlier read, only when the events it removes form a
+*maximal extension*. That check is what makes every execution explored
+exactly once and the exploration terminate without a visited set, and
+it is where the exploration's optimizations meet: a mistake there, or
+in a reduction layered on it, silently loses executions. With
+`-exhaustive`, GenMC becomes a slow but simple reference against which
+the default exploration can be compared:
+
+- every consistent backward revisit is explored (no maximality or
+  duplicate check of any kind);
+- termination and deduplication come from a visited set: the graph each
+  revisit (backward or forward) produces is hashed canonically, and a
+  revisit whose graph was produced before is skipped. Without the
+  maximality check TruSt can cycle (`w1` revisits `r`; `w2`, re-added,
+  revisits `r` back to the graph where it read from `w2`), and the
+  visited set is what stops it. Complete executions are counted once
+  per canonical graph too; "Number of complete executions explored" is
+  the deduplicated number, and an `Exhaustive:` line gives the raw one;
+- every optimization that changes which graphs are explored is off:
+  symmetry reduction, in-place revisiting, BAM, the helper and
+  confirmation patterns, the blind-RMW reduction, load annotations
+  (which prune reads that would block), resume points (every run replays
+  its graph) and estimation. A line at the start of the run says so.
+
+The canonical hash lists, per thread, the labels in program order with
+their kind, location, size, value, ordering, reads-from source,
+position in the coherence order of the location, and the created or
+joined thread; threads are named by their creation path (the index of
+the create event in the parent, recursively), not by their id, since
+ids are assigned in creation order and two runs reaching the same graph
+through different schedules may number nested threads differently.
+
+The mode is for small programs: memory grows with the visited graphs,
+and the exploration repeats work the maximality check avoids. It runs
+single-threaded. `scripts/oracle-diff.sh` compares the default
+exploration with it over the test suite, and `scripts/fuzz-c11.py` over
+random C11 programs; every disagreement is a bug, in the reference or
+in the exploration. Under `-lkmm` the mode runs too (kept events are
+relocated as in the default exploration), and agrees with herd7 on the
+kernel's litmus tests.
+
 ## Checking Liveness
 
 GenMC can also check for liveness violations in programs with

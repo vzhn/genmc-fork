@@ -56,6 +56,9 @@ struct Config {
 	bool disableBAM{};
 	bool blindRMWReduction{};
 	bool ipr{};
+	/* Reference exploration: every consistent backward revisit, graphs
+	 * deduplicated by a canonical hash, no reduction (see GenMCDriver) */
+	bool exhaustive{};
 	/* How many runtime states forward revisits may resume from (0: always replay) */
 	unsigned int resumePoints{};
 	bool warnUnfreedMemory{};

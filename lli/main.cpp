@@ -175,6 +175,12 @@ static llvm::cl::opt<bool> clBlindRMWReduction(
 		       "(RC11 only)"));
 static llvm::cl::opt<bool> clDisableIPR("disable-ipr", llvm::cl::cat(clGeneral),
 					llvm::cl::desc("Disable in-place revisiting"));
+static llvm::cl::opt<bool> clExhaustive(
+	"exhaustive", llvm::cl::cat(clGeneral),
+	llvm::cl::desc("Reference exploration for small programs: explore every consistent "
+		       "backward revisit, deduplicate graphs by a canonical hash, and disable "
+		       "every reduction (SR, IPR, BAM, helper, blind RMWs, load annotations, "
+		       "resume points, estimation). Slow; memory grows with the visited graphs"));
 static llvm::cl::opt<unsigned int> clResumePoints(
 	"resume-points", llvm::cl::cat(clGeneral), llvm::cl::init(256),
 	llvm::cl::desc("How many saved program states forward revisits may resume from, "
@@ -487,8 +493,19 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.disableBAM = clDisableBAM;
 	conf.blindRMWReduction = clBlindRMWReduction;
 	conf.ipr = !clDisableIPR;
+	conf.exhaustive = clExhaustive;
 	conf.resumePoints = clResumePoints;
 	conf.checkInvariants = clCheckInvariants;
+	/* The reference runs alone, with the graph as its only guide: no load
+	 * annotations (they prune reads that would block), no BAM runtime, one
+	 * worker (the visited set is the driver's) */
+	if (clExhaustive) {
+		lliConfig.loadAnnot = false;
+		lliConfig.bam = false;
+		if (lliConfig.threads != 1)
+			WARN("-exhaustive runs single-threaded (-nthreads ignored)");
+		lliConfig.threads = 1;
+	}
 
 	conf.warnUnfreedMemory = !clDisableWarnUnfreedMemory;
 	conf.collectLinSpec = lliConfig.collectLinSpec;
@@ -581,6 +598,13 @@ static void parseConfig(int argc, char **argv, Config &conf, LLIConfig &lliConfi
 
 	/* Transformations follow the validated configuration */
 	lliConfig.helper = conf.helper;
+
+	if (conf.exhaustive)
+		PRINT(VerbosityLevel::Error,
+		      "*** Exhaustive mode: every consistent backward revisit is taken and "
+		      "graphs are deduplicated by a canonical hash. Off: symmetry reduction, "
+		      "in-place revisiting, BAM, helper, blind-RMW reduction, load annotations, "
+		      "resume points, estimation.\n");
 
 	/* Set (global) log state */
 	logLevel = clVLevel;
@@ -850,6 +874,14 @@ static void printVerificationResults(const std::shared_ptr<const Config> &conf,
 	PRINT(VerbosityLevel::Error, "Number of complete executions explored: {}", res.explored);
 	GENMC_DEBUG(if (conf->countDuplicateExecs)
 			    PRINT(VerbosityLevel::Error, " ({} duplicates)", res.duplicates););
+	/* -exhaustive: the count above is of distinct executions (keep the raw
+	 * one out of the "explored" line: the test drivers parse it) */
+	if (conf->exhaustive)
+		PRINT(VerbosityLevel::Error,
+		      "\nExhaustive: {} complete executions reached ({} repeated), {} graphs "
+		      "visited, {} revisits to a visited graph skipped",
+		      res.explored + res.exploredDuplicates, res.exploredDuplicates,
+		      res.graphsVisited, res.revisitsRepeated);
 	if (res.boundExceeding) {
 		VERIFY(conf->boundType != BoundType::round);
 		PRINT(VerbosityLevel::Error, " ({} exceeded bound)", res.boundExceeding);

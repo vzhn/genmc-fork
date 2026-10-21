@@ -523,6 +523,12 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		return err;
 	if (const auto err = checkLkmmRace())
 		return err;
+
+	/* -exhaustive reaches an execution by every path to it: count each once */
+	if (getConf()->exhaustive && !countedExecutions_.insert(canonicalGraphHash(g)).second) {
+		++result.exploredDuplicates;
+		return {};
+	}
 	if (getConf()->printExecGraphs)
 		printGraph(g, dbgInfo_);
 
@@ -643,9 +649,33 @@ auto GenMCDriver::done() -> bool
 				continue;
 			return true;
 		}
-		validExecution = restrictAndRevisit(item) && isRevisitValid(*item);
+		validExecution = restrictAndRevisit(item) && isRevisitValid(*item) &&
+				 visitRevisitedGraph(*item);
 	}
 	return isHalting();
+}
+
+/* Without the maximality check (-exhaustive), TruSt may produce a graph it
+ * produced before: w1 revisits r; w2, re-added, revisits r back to the graph
+ * where r read from w2. The exploration from a graph depends on the graph
+ * alone (every read is revisitable, no flag set on the way matters), so a
+ * repeated graph adds nothing, and skipping it is what makes the exploration
+ * terminate. Error replays re-execute a graph on purpose. */
+auto GenMCDriver::visitRevisitedGraph(const Revisit &item) -> bool
+{
+	if (!getConf()->exhaustive || genmc::isa<ReplayForwardRevisit>(&item) ||
+	    genmc::isa<RerunForwardRevisit>(&item))
+		return true;
+	if (visitedGraphs_.insert(canonicalGraphHash(getExec().getGraph())).second) {
+		++result.graphsVisited;
+		return true;
+	}
+	++result.revisitsRepeated;
+	/* A backward revisit pushed an execution of its own: drop the work its
+	 * RMW completion may have queued, so that the execution is popped */
+	if (genmc::isa<BackwardRevisit>(&item))
+		getExec().getWorkqueue().truncate(0);
+	return false;
 }
 
 auto GenMCDriver::isHalting() const -> bool
@@ -1055,6 +1085,24 @@ auto GenMCDriver::toCasResult(HandleResult<SVal> res, Event pos) -> HandleResult
 	if (std::holds_alternative<Reset>(res.result))
 		return {.result = Reset{}, .count = res.count};
 	return {.result = Invalid{}, .count = res.count};
+}
+
+/* The rfs getRfsApproximation() drops are the writes whose successful RMW
+ * would violate atomicity (a settled RMW reads them already). A weak CAS can
+ * still read such a write and fail spuriously: that execution has no write to
+ * violate anything, and no other path explores it */
+void GenMCDriver::pushWeakCasFailuresOnDroppedRfs(ReadLabel *lab,
+						  const std::vector<EventLabel *> &kept)
+{
+	const auto *cLab = genmc::dyn_cast<CasReadLabel>(lab);
+	if (!cLab || !cLab->isWeak())
+		return;
+	for (auto *sLab : getConsChecker().getCoherentStores(lab)) {
+		if (std::ranges::find(kept, sLab) != kept.end())
+			continue;
+		getExec().getWorkqueue().add(
+			std::make_unique<WeakCasFailureRevisit>(lab->getPos(), sLab->getPos()));
+	}
 }
 
 void GenMCDriver::maybePushWeakCasFailure(const CasReadLabel *cLab)
@@ -2334,8 +2382,10 @@ void GenMCDriver::filterOptimizeRfs(const ReadLabel *lab, std::vector<EventLabel
 	if (getConf()->blindRMWReduction)
 		filterCommutingBlindRMWs(lab, stores);
 
-	/* Keep values that do not lead to blocking */
-	filterValuesFromAnnotSAVER(lab, stores);
+	/* Keep values that do not lead to blocking (-exhaustive explores the
+	 * blocked executions too: the annotations are not trusted) */
+	if (!getConf()->exhaustive)
+		filterValuesFromAnnotSAVER(lab, stores);
 }
 
 void GenMCDriver::filterAtomicityViolations(const ReadLabel *rLab,
@@ -2446,6 +2496,8 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 	auto stores = getRfsApproximation(lab);
 	VERIFY(!stores.empty());
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Rfs: {}", stores););
+	if (inVerificationMode())
+		pushWeakCasFailuresOnDroppedRfs(lab, stores);
 	filterOptimizeRfs(lab, stores);
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Rfs (optimized): {}", stores););
 
@@ -2475,6 +2527,11 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 		moot();
 		return {.result = Invalid{}, .count = 1U};
 	}
+
+	/* The read's write part may have been kept while the read is executed
+	 * anew (see completeRevisitedRMW()): it follows the read's rf */
+	if (lab->isRMW())
+		updateKeptRMWWrite(lab);
 
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug2, "--- Added load {}\n{}", lab->getPos(),
 			getExec().getGraph()););
@@ -2785,18 +2842,30 @@ auto GenMCDriver::handleNAStore(const EventDbgInfo *dbg, Event pos, SAddr loc, A
 	return handleNAStore(pos, loc, size, naVal, deps);
 }
 
-static auto getRevisitable(WriteLabel *sLab, const VectorClock &before) -> std::vector<ReadLabel *>
+/* The reads SLAB may revisit: same-location reads outside its prefix BEFORE.
+ * TruSt skips the stable ones (in a revisit's prefix, or not reading
+ * maximally: their revisits are explored from the maximal path), and the
+ * reads added after an RMW that conflicts with SLAB. With ALL (-exhaustive),
+ * every such read is a candidate, and GenMCDriver::keepsConflictingRMW()
+ * drops the revisits whose graph would violate atomicity */
+static auto getRevisitable(WriteLabel *sLab, const VectorClock &before, bool all)
+	-> std::vector<ReadLabel *>
 {
 	auto &g = *sLab->getParent();
 	std::vector<ReadLabel *> loads;
 
 	/* Helper function to erase loads in between conflicting RMWs */
-	auto eraseConflictingLoads = [](auto &sLab, auto &loads) {
+	auto eraseConflictingLoads = [all](auto &sLab, auto &loads) {
+		if (all)
+			return;
 		auto *confLab = findPendingRMW(sLab);
 		if (!confLab)
 			return;
 		std::erase_if(loads,
 			      [&](auto &eLab) { return eLab->getStamp() > confLab->getStamp(); });
+	};
+	auto candidate = [all, &before](const ReadLabel &rLab) {
+		return (all || !rLab.isStable()) && !before.contains(rLab.getPos());
 	};
 
 	/* Fastpath: previous co-max is ppo-before SLAB */
@@ -2805,7 +2874,7 @@ static auto getRevisitable(WriteLabel *sLab, const VectorClock &before) -> std::
 	if (prevCoMaxIt != std::ranges::end(g.rco(sLab->getAddr())) &&
 	    before.contains(prevCoMaxIt->getPos())) {
 		for (auto &rLab : prevCoMaxIt->readers()) {
-			if (!rLab.isStable() && !before.contains(rLab.getPos()))
+			if (candidate(rLab))
 				loads.push_back(&rLab);
 		}
 		eraseConflictingLoads(sLab, loads);
@@ -2816,8 +2885,7 @@ static auto getRevisitable(WriteLabel *sLab, const VectorClock &before) -> std::
 	for (auto it = ++ExecutionGraph::reverse_label_iterator(sLab);
 	     it != ExecutionGraph::reverse_label_iterator(g.getInitLabel()); ++it) {
 		auto *rLab = genmc::dyn_cast<ReadLabel>(&*it);
-		if (rLab && rLab->getAddr() == sLab->getAddr() && !rLab->isStable() &&
-		    !before.contains(rLab->getPos()))
+		if (rLab && rLab->getAddr() == sLab->getAddr() && candidate(*rLab))
 			loads.push_back(rLab);
 	}
 	eraseConflictingLoads(sLab, loads);
@@ -2846,7 +2914,7 @@ auto GenMCDriver::getRevisitableApproximation(WriteLabel *sLab) -> std::vector<R
 	/* (Computed for the other models' checkers, see above) */
 	getPrefixView(sLab);
 	auto prefix = getRevisitPrefixView(sLab);
-	auto loads = getRevisitable(sLab, *prefix);
+	auto loads = getRevisitable(sLab, *prefix, getConf()->exhaustive);
 	getConsChecker().filterCoherentRevisits(sLab, loads);
 	std::ranges::sort(
 		loads, [](auto &lab1, auto &lab2) { return lab1->getStamp() > lab2->getStamp(); });
@@ -3226,6 +3294,11 @@ void GenMCDriver::mootExecutionIfFullyBlocked(EventLabel *bLab)
 {
 	auto &g = getExec().getGraph();
 
+	/* -exhaustive: the read before the block is revisitable whatever its
+	 * flags say, so the other threads may still unblock it */
+	if (getConf()->exhaustive)
+		return;
+
 	const auto *lab = getPreviousVisibleAccessLabel(bLab);
 	/* This part tries to match original check when NA are not present
 	 * (but both checks are likely not sound when Local/Final attributes are present)
@@ -3538,8 +3611,10 @@ void GenMCDriver::tryOptimizeIPRs(const WriteLabel *sLab, std::vector<ReadLabel 
 auto GenMCDriver::removeCASReadIfBlocks(const ReadLabel *rLab, const EventLabel *sLab) -> bool
 {
 	auto &g = getExec().getGraph();
-	/* This only affects annotated CASes */
-	if (!rLab->getAnnot() || !genmc::isa<CasReadLabel>(rLab) ||
+	/* This only affects annotated CASes (-exhaustive adds the read and lets
+	 * the thread block on its value, like any other read: a blocked read
+	 * stays a read, which its revisits expect) */
+	if (getConf()->exhaustive || !rLab->getAnnot() || !genmc::isa<CasReadLabel>(rLab) ||
 	    (!getConf()->ipr && !genmc::isa<LockCasReadLabel>(rLab)))
 		return false;
 	/* Skip if bounding is enabled */
@@ -3872,7 +3947,11 @@ auto GenMCDriver::copyGraph(const BackwardRevisit *br, VectorClock *v) const
 
 	/** Ensure the prefix of the write will not be revisitable.
 	 * This is also used to check whether a write has revisited,
-	 * and appropriately prevent some revisits */
+	 * and appropriately prevent some revisits
+	 * (-exhaustive: every read stays revisitable, so that the exploration
+	 * from a graph does not depend on the path that reached it) */
+	if (getConf()->exhaustive)
+		return og;
 	for (auto &lab : og->labels()) {
 		if (prefix->contains(lab.getPos()))
 			lab.setRevisitStatus(false);
@@ -3904,6 +3983,13 @@ void GenMCDriver::calcRevisits(WriteLabel *sLab)
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Revisitable (optimized): {}", loads););
 	for (auto *rLab : loads) {
 		auto br = constructBackwardRevisit(rLab, sLab);
+		/* -exhaustive: every revisit whose graph is well formed and can be
+		 * consistent (the visited set, not maximality, bounds the exploration) */
+		if (getConf()->exhaustive) {
+			if (isRevisitViewClosed(*br) && !keepsConflictingRMW(*br))
+				getExec().getWorkqueue().add(std::move(br));
+			continue;
+		}
 		if (!isMaximalExtension(*br))
 			break;
 
@@ -3911,11 +3997,58 @@ void GenMCDriver::calcRevisits(WriteLabel *sLab)
 	}
 }
 
+/* The revisit keeps the events added before the read and the write's prefix.
+ * A kept read may read from a write the revisit deletes: one added after the
+ * read that revisited it earlier (the read's thread may have kept events in
+ * between, through that write's prefix). TruSt rejects such a revisit by the
+ * revisitable flag it set on that write's prefix; -exhaustive ignores the
+ * flags, so it checks the graph: every kept read keeps its write */
+auto GenMCDriver::isRevisitViewClosed(const BackwardRevisit &r) -> bool
+{
+	auto &g = getExec().getGraph();
+	const auto &v = r.getViewNoRel();
+	return std::ranges::all_of(g.labels(), [&](auto &lab) {
+		const auto *rLab = genmc::dyn_cast<ReadLabel>(&lab);
+		if (!rLab || rLab->getPos() == r.getPos() || !v->contains(rLab->getPos()) ||
+		    !rLab->getRf())
+			return true;
+		return v->contains(rLab->getRf()->getPos());
+	});
+}
+
+/* The revisiting RMW's read keeps its write W; another RMW reading from W in
+ * the revisit's view would make both RMWs read W, a graph no extension
+ * repairs (and backwardRevisit() requires its absence) */
+auto GenMCDriver::keepsConflictingRMW(const BackwardRevisit &r) -> bool
+{
+	auto &g = getExec().getGraph();
+	const auto *sLab = g.getWriteLabel(r.getRev());
+	if (!sLab->isRMW())
+		return false;
+	const auto *pLab = genmc::dyn_cast<ReadLabel>(g.po_imm_pred(sLab));
+	VERIFY(pLab && pLab->getRf());
+	/* (The revisited read is in its own view, but it will read from SLAB) */
+	const auto &v = r.getViewNoRel();
+	auto conflicts = [&](const ReadLabel &rLab) {
+		return &rLab != pLab && rLab.getPos() != r.getPos() && rLab.isRMW() &&
+		       v->contains(rLab.getPos());
+	};
+	if (const auto *wLab = genmc::dyn_cast<WriteLabel>(pLab->getRf()))
+		return std::ranges::any_of(wLab->readers(), conflicts);
+	return std::ranges::any_of(g.getInitLabel()->rfs(pLab->getAddr()), conflicts);
+}
+
 auto GenMCDriver::completeRevisitedRMW(const ReadLabel *rLab) -> WriteLabel *
 {
 	auto wLab = createRMWWriteLabel(getExec().getGraph(), rLab);
 	if (!wLab)
 		return nullptr;
+
+	/* The read's own write part may have been kept while the read was not
+	 * (a dependency-tracking model's revisit keeps the write its prefix
+	 * depends on, and the read is re-executed): the write stays */
+	if (rLab->isRMW())
+		return updateKeptRMWWrite(rLab);
 
 	/* The read was followed by kept events (a failed CAS has no write, and
 	 * the events after it may not depend on it): make room for the write */
@@ -3930,6 +4063,24 @@ auto GenMCDriver::completeRevisitedRMW(const ReadLabel *rLab) -> WriteLabel *
 	VERIFY(rLab->getRf());
 	lab->addCo(rLab->getRf());
 	return lab;
+}
+
+/* RLAB's write part, kept through a revisit while the read was not, takes
+ * the value and the coherence position the read's rf now gives it, and its
+ * views and revisits are computed anew, as for a write just added. (A CAS
+ * that now fails keeps its write: the write stays as kept.) */
+auto GenMCDriver::updateKeptRMWWrite(const ReadLabel *rLab) -> WriteLabel *
+{
+	auto &g = getExec().getGraph();
+	auto *kLab = g.getWriteLabel(rLab->getPos().next());
+	VERIFY(kLab && kLab->isRMW() && rLab->getRf());
+	auto wLab = createRMWWriteLabel(g, rLab);
+	if (!wLab)
+		return nullptr;
+	kLab->setVal(wLab->getVal());
+	kLab->moveCo(rLab->getRf());
+	updateLabelViews(kLab);
+	return kLab;
 }
 
 auto GenMCDriver::revisitWrite(const WriteForwardRevisit &ri) -> bool
@@ -3966,6 +4117,12 @@ auto GenMCDriver::revisitRead(const Revisit &ri) -> bool
 
 	rLab->setRf(revLab);
 	updateLabelViews(rLab);
+	/* A revisited weak CAS is a fresh instance of the read: whether it
+	 * fails spuriously is decided again (see maybePushWeakCasFailure()).
+	 * The flag of the failing instance explored before it would otherwise
+	 * turn the new one into a failure too, whatever it reads */
+	if (auto *cLab = genmc::dyn_cast<CasReadLabel>(rLab))
+		cLab->setSpuriousFailure(false);
 	const auto *fri = genmc::dyn_cast<ReadForwardRevisit>(&ri);
 
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug1, "--- {} revisiting {} <-- {}\n{}",
@@ -4069,6 +4226,11 @@ auto GenMCDriver::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 	auto &g = getExec().getGraph();
 	auto *br = genmc::dyn_cast<BackwardRevisit>(&*item);
 	auto stamp = g.getEventLabel(br ? br->getRev() : item->getPos())->getStamp();
+	/* A weak CAS that a backward revisit made succeed reads from a write
+	 * added after it: its spurious failure keeps that write (and the graph
+	 * of the revisit), not just what preceded the read */
+	if (const auto *wcf = genmc::dyn_cast<WeakCasFailureRevisit>(&*item))
+		stamp = std::max(stamp, g.getEventLabel(wcf->getRev())->getStamp());
 	restrictExecution(stamp, "restricting the graph for a revisit");
 	/* Cutting the graph bypasses the incremental counter updates */
 	getConsChecker().recomputeCacheCounters(getExec().getGraph());

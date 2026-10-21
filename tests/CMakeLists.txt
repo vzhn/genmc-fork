@@ -47,6 +47,27 @@ if(SANITIZE MATCHES "thread")
       ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 endif()
 
+# The default exploration against the -exhaustive reference, on a small subset
+# of the suite (scripts/oracle-diff.sh runs any directories)
+set(ORACLE_DIFF_TESTS
+    tests/correct/litmus/MP tests/correct/litmus/SB tests/correct/litmus/LB
+    tests/correct/litmus/2+2W tests/correct/litmus/CoRR tests/correct/litmus/isa2
+    tests/correct/litmus/Z6.U
+    tests/correct/infr/weak-cas-revisit-after-failure
+    tests/correct/infr/weak-cas-backward-revisit-failure
+    tests/correct/infr/weak-cas-fail-on-settled-rmw
+    tests/correct/infr/join-retval tests/correct/infr/lock-inplace
+    tests/correct/saver/assume-cas tests/correct/saver/spin-cas1
+    tests/correct/ipr/lock-nested
+    tests/correct/classic/dcl tests/correct/classic/counter
+    tests/correct/data-structures/lamport-spsc)
+string(REPLACE ";" " " ORACLE_DIFF_TESTS_ARGS "${ORACLE_DIFF_TESTS}")
+add_test(NAME oracle-diff
+    COMMAND bash -c "${SCRIPT_DIR}/oracle-diff.sh -j 2 ${CMAKE_BINARY_DIR}/bin/genmc ${ORACLE_DIFF_TESTS_ARGS} > ${SCRIPT_DIR}/oracle-diff.log"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(oracle-diff PROPERTIES LABELS "integration;fast" TIMEOUT 600)
+
 add_test(NAME liveness-tip
     COMMAND bash -c "${SCRIPT_DIR}/check-liveness-tip.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
