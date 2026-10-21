@@ -286,6 +286,7 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	unmoot();
 	addedBeforeKept_ = false;
 	keptCheckPending_ = false;
+	droppedBeforeKept_ = false;
 	g.setKeptEventsUnreachable(false);
 	runStartStamp_ = g.getMaxStamp();
 	runStartWork_ = getExec().getWorkqueue().size();
@@ -715,6 +716,17 @@ auto GenMCDriver::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 	auto isOwn = [&](const EventLabel *oLab) {
 		return oLab->getKey() && *oLab->getKey() == *currKey && oLab->getKeySub() == sub;
 	};
+	/* No such run: it is dropped, and the event being aligned is not added
+	 * (handleLoad(), handleStore() and handleThreadFinish() reset their
+	 * instruction; the other kinds go into the hole, harmlessly). Before,
+	 * the run went on with the event: a second event of the instance,
+	 * placed in coherence against the kept ones and so contradicting it,
+	 * and the revisits and warnings computed from that graph */
+	auto dropRun = [&] {
+		++result.relocationsLost;
+		droppedBeforeKept_ = true;
+		moot();
+	};
 	auto later = [&g, curr] {
 		auto size = g.getThreadSize(curr.thread);
 		return std::views::iota(std::min(curr.index + 1, size), size) |
@@ -734,9 +746,8 @@ auto GenMCDriver::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 		 * instance's, the ones in between would be skipped: no such run */
 		auto skipsKept = std::ranges::any_of(later(), isOwn);
 		if (skipsKept) {
-			++result.relocationsLost;
 			relocateExecution(curr.thread, curr.index, 1);
-			moot();
+			dropRun();
 			return false;
 		}
 		/* Open a gap (doubling on repeats; the surplus is closed later) */
@@ -744,13 +755,18 @@ auto GenMCDriver::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 		return false;
 	}
 
-	/* A hole: fill it, unless this instance's event is kept further on,
-	 * after holes only (the old path was longer): move it here */
+	/* A hole: fill it, unless this instance's event is kept further on:
+	 * after holes only (the old path was longer), move it here; after other
+	 * kept events, those would be skipped: no such run, as above */
 	auto rest = later();
 	auto first = std::ranges::begin(rest);
 	if (first == std::ranges::end(rest))
 		return false;
 	if (!isOwn(*first)) {
+		if (std::ranges::any_of(rest, isOwn)) {
+			dropRun();
+			return false;
+		}
 		addedBeforeKept_ = true;
 		return false;
 	}
@@ -2011,6 +2027,10 @@ auto GenMCDriver::handleThreadFinish(std::unique_ptr<ThreadFinishLabel> eLab)
 {
 	auto &g = getExec().getGraph();
 
+	/* The run was dropped while aligning this event (alignKeptEvents()) */
+	if (droppedBeforeKept_)
+		return {.result = Reset{}, .count = 0U};
+
 	auto *lab = addLabelToGraph(std::move(eLab));
 
 	/* Kept events after the end (see alignKeptEvents()) are never reached */
@@ -2301,6 +2321,10 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 {
 	auto &g = getExec().getGraph();
 	auto &frontier = g.getState();
+
+	/* The run was dropped while aligning this event (alignKeptEvents()) */
+	if (droppedBeforeKept_)
+		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = genmc::dyn_cast<ReadLabel>(addLabelToGraph(std::move(rLab)));
 	auto err = checkAccessValidity(lab->getPos(), lab->getAccess())
@@ -2818,6 +2842,10 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 	-> HandleResult<bool>
 {
 	auto &g = getExec().getGraph();
+
+	/* The run was dropped while aligning this event (alignKeptEvents()) */
+	if (droppedBeforeKept_)
+		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = genmc::dyn_cast<WriteLabel>(addLabelToGraph(std::move(wLab)));
 

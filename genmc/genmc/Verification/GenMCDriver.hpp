@@ -913,6 +913,11 @@ private:
 	bool eagerKeptChecks_ = false;
 	bool rerunEagerly_ = false;
 
+	/* The run was dropped while an event was aligned with kept ones
+	 * (alignKeptEvents()): the event is not added, so that nothing is
+	 * computed from a graph that is no execution's prefix */
+	bool droppedBeforeKept_ = false;
+
 	/** Opt: Whether this execution is moot (locking) */
 	bool isMootExecution = false;
 
