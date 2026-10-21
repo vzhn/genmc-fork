@@ -305,8 +305,10 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 				state.onZeroedAlloc(aLab->getPos(), aLab->getAccess(),
 						    g.getConsChecker()->getHbView(aLab));
 		} else if (const auto *dLab = genmc::dyn_cast<FreeLabel>(lab)) {
-			state.onFree(dLab->getPos(), dLab->getAddr(),
-				     genmc::isa<HpRetireLabel>(dLab));
+			/* An invalid free (an error event) frees no block */
+			auto addr = dLab->getAddr();
+			if (state.isAllocated(addr) && state.getAllocAccess(addr).addr == addr)
+				state.onFree(dLab->getPos(), addr, genmc::isa<HpRetireLabel>(dLab));
 		} else if (const auto *ssLab = genmc::dyn_cast<SpinStartLabel>(lab)) {
 			state.onSpinStart(ssLab->getPos());
 		} else if (const auto *lbLab = genmc::dyn_cast<LoopBeginLabel>(lab)) {
@@ -1113,6 +1115,21 @@ void GenMCDriver::maybePushWeakCasFailure(const CasReadLabel *cLab)
 		return;
 	getExec().getWorkqueue().add(
 		std::make_unique<WeakCasFailureRevisit>(cLab->getPos(), cLab->getRf()->getPos()));
+}
+
+auto GenMCDriver::getInvalidFreeReason(SAddr loc, StorageDuration sdur) const
+	-> std::optional<std::string>
+{
+	const auto &state = getExec().getGraph().getState();
+	if (loc.isStatic())
+		return "The freed address is a global, not a heap block\n";
+	if (sdur == StorageDuration::SD_Heap && loc.isAutomatic())
+		return "The freed address is a stack variable, not a heap block\n";
+	if (!state.isAllocated(loc))
+		return "The freed address is not in an allocated block\n";
+	if (state.getAllocAccess(loc).addr != loc)
+		return "The freed address points into a block, not at its start\n";
+	return std::nullopt;
 }
 
 auto GenMCDriver::checkAccessValidity(Event pos, const AAccess &access)
@@ -3159,15 +3176,22 @@ auto GenMCDriver::handleRetire(Event pos, SAddr loc, const EventDeps &deps)
 {
 	auto &g = getExec().getGraph();
 
+	auto invalid = getInvalidFreeReason(loc, StorageDuration::SD_Heap);
+	auto size = invalid ? ASize(0) : g.getState().getAllocAccess(loc).size;
 	if (!retireProbeLab_)
 		retireProbeLab_ = std::make_unique<HpRetireLabel>(pos, loc, deps);
 
-	configureProbe(retireProbeLab_.get(), pos, loc, g.getState().getAllocAccess(loc).size,
-		       deps);
+	configureProbe(retireProbeLab_.get(), pos, loc, size, deps);
 
 	auto guard = g.addScoped(retireProbeLab_);
 	if constexpr (Config::emitNALabels)
 		guard.commit();
+
+	if (invalid) {
+		guard.commit();
+		reportError(pos, {pos, VerificationError::VE_FreeNonMalloc, *invalid});
+		return {.result = VerificationError::VE_FreeNonMalloc};
+	}
 
 	auto *lab = guard.get();
 	if (auto err = checkForRaces(lab); err) {
@@ -3197,12 +3221,14 @@ auto GenMCDriver::handleRetire(const EventDbgInfo *dbg, Event pos, SAddr loc, co
 	return handleRetire(pos, loc, deps);
 }
 
-auto GenMCDriver::handleFree(Event pos, SAddr loc, const EventDeps &deps)
+auto GenMCDriver::handleFree(Event pos, SAddr loc, StorageDuration sdur, const EventDeps &deps)
 	-> HandleResult<std::monostate>
 {
 	auto &g = getExec().getGraph();
 
-	auto size = g.getState().getAllocAccess(loc).size;
+	/* An invalid free is reported at its event, which has no block to span */
+	auto invalid = getInvalidFreeReason(loc, sdur);
+	auto size = invalid ? ASize(0) : g.getState().getAllocAccess(loc).size;
 	if (!freeProbeLab_)
 		freeProbeLab_ = std::make_unique<FreeLabel>(pos, loc, size, deps);
 
@@ -3211,6 +3237,12 @@ auto GenMCDriver::handleFree(Event pos, SAddr loc, const EventDeps &deps)
 	auto guard = g.addScoped(freeProbeLab_);
 	if constexpr (Config::emitNALabels)
 		guard.commit();
+
+	if (invalid) {
+		guard.commit();
+		reportError(pos, {pos, VerificationError::VE_FreeNonMalloc, *invalid});
+		return {.result = VerificationError::VE_FreeNonMalloc};
+	}
 
 	auto *lab = guard.get();
 	if (auto err = checkForRaces(lab); err) {
@@ -3221,8 +3253,8 @@ auto GenMCDriver::handleFree(Event pos, SAddr loc, const EventDeps &deps)
 	return {.result = std::monostate(), .count = Config::emitNALabels ? 1U : 0U};
 }
 
-auto GenMCDriver::handleFree(const EventDbgInfo *dbg, Event pos, SAddr loc, const EventDeps &deps)
-	-> HandleResult<std::monostate>
+auto GenMCDriver::handleFree(const EventDbgInfo *dbg, Event pos, SAddr loc, StorageDuration sdur,
+			     const EventDeps &deps) -> HandleResult<std::monostate>
 {
 	auto &g = getExec().getGraph();
 
@@ -3234,7 +3266,7 @@ auto GenMCDriver::handleFree(const EventDbgInfo *dbg, Event pos, SAddr loc, cons
 			g.getState().onFree(pos, loc, false);
 		return {.result = std::monostate(), .count = Config::emitNALabels ? 1U : 0U};
 	}
-	return handleFree(pos, loc, deps);
+	return handleFree(pos, loc, sdur, deps);
 }
 
 #if EMIT_NA_LABELS

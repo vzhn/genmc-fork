@@ -93,7 +93,10 @@ public:
 
 	void visitFreeLabel(const FreeLabel &lab)
 	{
-		driver->handleFree(lab.getPos(), lab.getAddr(), lab.getDeps());
+		driver->handleFree(lab.getPos(), lab.getAddr(),
+				   lab.getAddr().isAutomatic() ? StorageDuration::SD_Automatic
+							       : StorageDuration::SD_Heap,
+				   lab.getDeps());
 	}
 	void visitHpRetireLabel(const HpRetireLabel &lab)
 	{
