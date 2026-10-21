@@ -392,19 +392,23 @@ auto InstAnnotator::annotateBBCond(BasicBlock *bb, BasicBlock *pred /* = nullptr
 {
 	auto *bi = dyn_cast<BranchInst>(bb->getTerminator());
 	if (!bi)
-		return ConcreteExpr<Value *>::createFalse();
+		return nullptr;
 	if (bi->isUnconditional())
 		return ConcreteExpr<Value *>::createTrue();
 
 	/* Reset data */
 	reset();
 
-	/* Propagate jump condition backwards to the beginning of the basic block */
+	/* Propagate jump condition backwards to the beginning of the basic block.
+	 * An instruction that reads or writes memory has no expression, and
+	 * neither has the block then: a constant in its place would be taken
+	 * for a proof, of the opposite claim once negated (the loop jump
+	 * threading pass found a CAS loop's header always entering the body) */
 	setAnnot(bi, generateOperandExpr(bi->getModule(), bi->getCondition()));
 	for (auto irit = ++bb->rbegin(); irit != bb->rend(); ++irit) {
-		annotMap[&*irit] = irit->mayReadOrWriteMemory()
-					   ? ConcreteExpr<Value *>::createFalse()
-					   : propagateAnnotFromSucc(&*irit, irit->getNextNode());
+		if (irit->mayReadOrWriteMemory())
+			return nullptr;
+		annotMap[&*irit] = propagateAnnotFromSucc(&*irit, irit->getNextNode());
 	}
 
 	/* If a predecessor is given substitute Φ values too */

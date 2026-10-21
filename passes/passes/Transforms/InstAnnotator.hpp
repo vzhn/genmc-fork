@@ -45,7 +45,9 @@ public:
 	 * mention a register that has no value when the load executes */
 	auto annotate(Instruction *curr) -> IRExprUP;
 
-	/* Returns the condition under which bb jumps to its first successor.
+	/* Returns the condition under which bb jumps to its first successor, or
+	 * nullptr if there is no such expression (bb does not end in a branch, or
+	 * an instruction of it reads or writes memory).
 	 * If PRED is non-null, assumes that the predecessor of the basic block is PRED
 	 * during the calculation of the annotation */
 	auto annotateBBCond(BasicBlock *bb, BasicBlock *pred = nullptr) -> IRExprUP;

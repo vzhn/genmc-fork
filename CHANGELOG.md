@@ -16,7 +16,10 @@ released.
   Loop jump threading never inverted a loop whose header leaves it on the
   true side of its branch (`for (;;) { if (r) break; r = ...; }`), so the
   spin-assume pass did not recognize such a loop and GenMC did not
-  terminate on it.
+  terminate on it. With negations working, the pass took a header it could
+  not annotate (one with a CAS in it) for one that always enters the body,
+  and inverting it broke the module: a header that touches memory now has
+  no annotation, and its loop is left alone.
 - `-lkmm`: a run whose thread reached, at a hole, an instruction whose kept
   event lies behind kept events of a branch the thread does not take went
   on until the thread's end instead of being dropped at once (#109). It added a
