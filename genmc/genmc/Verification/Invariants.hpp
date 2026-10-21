@@ -135,6 +135,11 @@ auto planCopyUpTo(const ExecutionGraph &g, const VectorClock &v) -> RestrictionP
 /** I1: G is well-formed, and (with PLAN) the restriction kept what it had to */
 void checkGraph(const ExecutionGraph &g, const Context &ctx, const RestrictionPlan *plan = nullptr);
 
+/** I1 before a copy: the view V a backward revisit copies names only labels
+ * of G. A view built from a stale prefix view reaches beyond a thread, and
+ * the copy dereferences the missing labels before any check of its result */
+void checkCopyView(const ExecutionGraph &g, const VectorClock &v, const Context &ctx);
+
 /** I3: the allocation map of STATE agrees with the lifecycle labels of G */
 void checkAllocations(const ExecutionGraph &g, const ExecutionState &state, const Context &ctx);
 

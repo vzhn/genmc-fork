@@ -4074,6 +4074,9 @@ auto GenMCDriver::copyGraph(const BackwardRevisit *br, VectorClock *v) const
 
 	/* Adjust the view that will be used for copying */
 	auto prefix = getRevisitPrefixView(g.getEventLabel(br->getRev()));
+	if (checksInvariants())
+		invariants::checkCopyView(g, *v,
+					  invariantContext("copying the graph for a backward revisit"));
 	auto plan = checksInvariants() ? std::optional(invariants::planCopyUpTo(g, *v))
 				       : std::nullopt;
 	auto og = g.getCopyUpTo(*v);
