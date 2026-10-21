@@ -3804,47 +3804,10 @@ auto GenMCDriver::constructBackwardRevisit(const ReadLabel *rLab, const WriteLab
 	return std::make_unique<BackwardRevisit>(rLab, sLab, getRevisitView(rLab, sLab));
 }
 
-/* Find a po-later, same address load, if any, and return where it reads from.
- * A same address store in between (kept or not) ends the search: the later load
- * may read from it, which RLAB cannot (under LKMM, whose prefix has no rfi, the
- * load can be kept and the store not) */
-static auto getFixedPlacement(const ExecutionGraph &g, const ReadLabel *rLab, const DepView &v)
-	-> EventLabel *
-{
-	auto tid = rLab->getThread();
-	for (auto j = rLab->getIndex(); j <= v.getMax(tid); j++) {
-		auto pos = Event(tid, j);
-		if (const auto *wLab = g.getWriteLabel(pos); wLab && wLab->getAddr() == rLab->getAddr())
-			return nullptr;
-		if (!v.contains(pos))
-			continue;
-		if (const auto *mLab = g.getReadLabel(pos))
-			if (mLab->getAddr() == rLab->getAddr())
-				return mLab->getRf();
-	}
-	return nullptr;
-}
-
 static auto isReadInView(const WriteLabel *sLab, const DepView &v) -> bool
 {
 	return std::ranges::any_of(sLab->readers(),
 				   [&v](auto &rLab) { return v.contains(rLab.getPos()); });
-}
-
-/* Returns whether LAB respects the placement fixed by V, or nullopt if V fixes none */
-static auto isPlacementFixed(const ExecutionGraph &g, const EventLabel *lab, const DepView *v)
-	-> std::optional<bool>
-{
-	if (!v)
-		return std::nullopt;
-	if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab)) {
-		if (auto *fixedRf = getFixedPlacement(g, rLab, *v))
-			return rLab->getRf() == fixedRf;
-		return std::nullopt;
-	}
-	if (const auto *sLab = genmc::dyn_cast<WriteLabel>(lab); sLab && isReadInView(sLab, *v))
-		return true;
-	return std::nullopt;
 }
 
 auto GenMCDriver::isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLabel *lab) -> bool
@@ -3861,10 +3824,109 @@ auto GenMCDriver::isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLab
 	auto succs = wLab ? g.co_succs(wLab) : g.co(mLab->getAddr());
 	return std::ranges::any_of(succs, [&](auto &sLab) {
 		/* Exclude the write that revisits from the prefix */
-		return sLab.getPos() != r.getRev() && v->contains(sLab.getPos()) &&
-		       (!getConf()->isDepTrackingModel ||
-			mLab->getIndex() > getPrefixView(&sLab).getMax(mLab->getThread()));
+		return sLab.getPos() != r.getRev() && v->contains(sLab.getPos());
 	});
+}
+
+/* Dependency-tracking models: R deletes LAB, or LAB is the read R revisits.
+ * Whether LAB reads from (a read) or follows in coherence (a write) the
+ * co-latest write it can reach among the writes R keeps, except the revisiting
+ * one, and those added before LAB: TruSt's condition, that LAB made the
+ * maximal choice among the writes present when it was added and that no kept
+ * write could have revisited it (as isCoBeforeSavedPrefix() requires for the
+ * other models), with the kept writes present from the start. If LAB chose
+ * otherwise, the graph where it chose that write is the one R is explored
+ * from.
+ *
+ * R keeps the revisiting write's prefix, which is not po-closed: it may keep
+ * accesses of LAB's thread po-after LAB (LAB is then executed anew into a
+ * hole), and a kept event was not always added after the deleted ones.
+ * Coherence bounds LAB by the first po-later access of its thread to its
+ * location present when LAB is added (kept, or added before LAB): LAB
+ * precedes a write, and precedes or reads the write a read reads, as
+ * coMaxReachable() bounds an access executed into a hole. The writes past
+ * the bound are no alternatives. The added-maximally flag judges LAB against
+ * the graph of the time it was added, which may lack a kept access that
+ * bounds it (#121); and a kept write co-after LAB's is an alternative even
+ * when its prefix reaches LAB's thread past LAB through a hole (#128) */
+auto GenMCDriver::isPlacedMaximallyInRevisit(const BackwardRevisit &r,
+					     const MemAccessLabel *lab) const -> bool
+{
+	const auto &g = getExec().getGraph();
+	const auto &v = r.getViewNoRel();
+
+	/* A weak CAS that failed spuriously is the non-maximal twin of its success */
+	if (const auto *cLab = genmc::dyn_cast<CasReadLabel>(lab); cLab && cLab->failsSpuriously())
+		return false;
+
+	/* An RMW's write part kept while its read is deleted follows the write
+	 * that read gets when it is executed anew (updateKeptRMWWrite()): for a
+	 * write LAB, it is placed when its read is added, not before */
+	auto floats = [&](const EventLabel &eLab) {
+		const auto *sLab = genmc::dyn_cast<WriteLabel>(&eLab);
+		return genmc::isa<WriteLabel>(lab) && sLab && sLab->isRMW() &&
+		       v->contains(eLab.getPos()) && !v->contains(eLab.getPos().prev());
+	};
+	auto isKept = [&](const EventLabel &eLab) {
+		return v->contains(eLab.getPos()) && !floats(eLab);
+	};
+	auto addedAt = [&](const EventLabel &eLab) {
+		return floats(eLab) ? g.getEventLabel(eLab.getPos().prev())->getStamp()
+				    : eLab.getStamp();
+	};
+	auto competes = [&](const WriteLabel &sLab) {
+		return sLab.getPos() != r.getRev() &&
+		       (isKept(sLab) || addedAt(sLab) < lab->getStamp());
+	};
+
+	/* An RMW read's own write goes right after the read's write, wherever
+	 * that is: it is no bound and no alternative, nor are the reads of it */
+	const auto *rLab = genmc::dyn_cast<ReadLabel>(lab);
+	const auto *ownLab = rLab && rLab->isRMW() ? g.getWriteLabel(lab->getPos().next())
+						   : nullptr;
+
+	/* The bound: LAB precedes BOUND, or may read it (BOUND a read's write) */
+	const EventLabel *bound = nullptr;
+	auto mayReadBound = false;
+	for (auto j = lab->getIndex() + 1; j < g.getThreadSize(lab->getThread()); j++) {
+		const auto *mLab = genmc::dyn_cast<MemAccessLabel>(
+			g.getEventLabel(Event(lab->getThread(), j)));
+		if (!mLab || mLab == ownLab || mLab->getAddr() != lab->getAddr())
+			continue;
+		/* An access deleted and added after LAB is re-added after it */
+		if (!isKept(*mLab) && addedAt(*mLab) > lab->getStamp())
+			continue;
+		if (const auto *qLab = genmc::dyn_cast<ReadLabel>(mLab)) {
+			if (!qLab->getRf() || qLab->getRf() == ownLab)
+				continue;
+			bound = qLab->getRf();
+			mayReadBound = true;
+		} else {
+			bound = mLab;
+		}
+		break;
+	}
+
+	const auto *wLab = rLab ? rLab->getRf() : lab;
+	VERIFY(wLab);
+
+	/* A read reads a write added after it only through a revisit by that
+	 * write: deleted, that write is no alternative, and the graph before
+	 * its revisit builds the same graph (TruSt's revisitable flag) */
+	const auto *rfLab = genmc::dyn_cast<WriteLabel>(wLab);
+	if (rLab && rfLab && !competes(*rfLab))
+		return false;
+	if (bound && wLab == bound)
+		return true;
+
+	auto succs = rfLab ? g.co_succs(rfLab) : g.co(lab->getAddr());
+	for (const auto &sLab : succs) {
+		if (bound && &sLab == bound)
+			return !(rLab && mayReadBound && competes(sLab));
+		if (&sLab != ownLab && competes(sLab))
+			return false;
+	}
+	return true;
 }
 
 /* Whether LAB, a write to the location of the revisiting write, follows in
@@ -3875,8 +3937,10 @@ auto GenMCDriver::isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLab
  * revisit of the kept write itself (tests/correct/lkmm/dup-revisit-nested-if).
  * Only when that other path exists: the read is no RMW and could read from the
  * kept write (which follows the read's write in coherence). Otherwise, the
- * graph where the kept write is placed maximally is rejected too, by
- * isCoBeforeSavedPrefix(), and this one is the only path */
+ * graph where the kept write is placed maximally is rejected too (the read's
+ * write precedes the kept one: isPlacedMaximallyInRevisit(), or
+ * isCoBeforeSavedPrefix() for the other models), and this one is the only
+ * path */
 auto GenMCDriver::isCoAfterLaterSavedWrite(const BackwardRevisit &r, const EventLabel *lab) -> bool
 {
 	const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
@@ -3926,6 +3990,24 @@ static auto wasAddedMaximally(const EventLabel *lab) -> bool
 	return true;
 }
 
+/* Whether LAB, not revisitable, is in the prefix of a write that R keeps and
+ * that revisited a read still reading it (the read's stamp is below the
+ * write's) */
+auto GenMCDriver::isKeptByKeptRevisit(const BackwardRevisit &r, const EventLabel *lab) const -> bool
+{
+	const auto &g = getExec().getGraph();
+	const auto &v = r.getViewNoRel();
+	return std::ranges::any_of(g.labels(), [&](auto &oLab) {
+		const auto *uLab = genmc::dyn_cast<WriteLabel>(&oLab);
+		if (!uLab || uLab->getPos() == r.getRev() || !v->contains(uLab->getPos()))
+			return false;
+		auto revisited = std::ranges::any_of(uLab->readers(), [&](auto &qLab) {
+			return qLab.getStamp() < uLab->getStamp();
+		});
+		return revisited && getRevisitPrefixView(uLab)->contains(lab->getPos());
+	});
+}
+
 auto GenMCDriver::isMaximalExtension(const BackwardRevisit &r) -> bool
 {
 	/* Only revisit when the write's direct successor (if any) remains in the graph;
@@ -3940,14 +4022,35 @@ auto GenMCDriver::isMaximalExtension(const BackwardRevisit &r) -> bool
 		getConf()->isDepTrackingModel
 			? genmc::dyn_cast<DepView>(&getPrefixView(g.getEventLabel(r.getRev())))
 			: nullptr;
+
+	/* Dependency-tracking models judge the accesses the revisit deletes
+	 * against the writes they can reach (isPlacedMaximallyInRevisit()), not
+	 * by their flags. A deleted event that an earlier revisit kept (not
+	 * revisitable) still rejects the revisit, since the graph before that
+	 * revisit leads to the same one, unless this revisit keeps the earlier
+	 * revisiting write: that write is then an alternative for the read it
+	 * revisited, and the other graph is the one rejected */
 	for (const auto &lab : g.labels()) {
 		/* Exclude events unaffected by the revisit */
 		if (lab.getPos() != r.getPos() && v->contains(lab.getPos()))
 			continue;
 
-		/* Respect placements fixed by the revisiter's prefix */
-		if (auto fixed = isPlacementFixed(g, &lab, depV)) {
-			if (!*fixed)
+		if (depV) {
+			if (const auto *sLab = genmc::dyn_cast<WriteLabel>(&lab);
+			    sLab && isReadInView(sLab, *depV))
+				continue;
+			if (!lab.isRevisitable() && !isKeptByKeptRevisit(r, &lab))
+				return false;
+			/* (Under BAM, a barrier wait reads its round's last increment,
+			 * revisited in place: no choice of its own to judge) */
+			const auto *mLab = genmc::dyn_cast<MemAccessLabel>(&lab);
+			if (mLab && (getConf()->disableBAM || !genmc::isa<BWaitReadLabel>(mLab))) {
+				if (!isPlacedMaximallyInRevisit(r, mLab))
+					return false;
+			} else if (!wasAddedMaximally(&lab)) {
+				return false;
+			}
+			if (isCoAfterLaterSavedWrite(r, &lab))
 				return false;
 			continue;
 		}
