@@ -3006,10 +3006,18 @@ void Interpreter::callOptBegin(Function *F, const std::vector<GenericValue> &Arg
 	return;
 }
 
+/* The loop that the call to __VERIFIER_loop_begin() or __VERIFIER_spin_start()
+ * being interpreted belongs to */
+static auto getCurrLoop(const Thread &thr) -> LoopKey
+{
+	auto &I = *thr.ECStack.back().CurInst->getPrevNode();
+	return {.id = getLoopId(I), .depth = static_cast<uint32_t>(thr.ECStack.size())};
+}
+
 void Interpreter::callLoopBegin(Function *F, const std::vector<GenericValue> &ArgVals,
 				const std::unique_ptr<EventDeps> &specialDeps)
 {
-	auto ret = CALL_DRIVER(handleLoopBegin, currDbgInfo(), currPos());
+	auto ret = CALL_DRIVER(handleLoopBegin, currDbgInfo(), currPos(), getCurrLoop(getCurThr()));
 	VERIFY(std::holds_alternative<std::monostate>(ret));
 	updateCtrlDeps(getCurThr().id, currPos()); /* add a ctrl dep on spin markers */
 }
@@ -3025,7 +3033,7 @@ void Interpreter::callAwaitStart(Function *F, const std::vector<GenericValue> &A
 void Interpreter::callSpinStart(Function *F, const std::vector<GenericValue> &ArgVals,
 				const std::unique_ptr<EventDeps> &specialDeps)
 {
-	auto ret = CALL_DRIVER(handleSpinStart, currDbgInfo(), currPos());
+	auto ret = CALL_DRIVER(handleSpinStart, currDbgInfo(), currPos(), getCurrLoop(getCurThr()));
 	VERIFY(std::holds_alternative<std::monostate>(ret));
 	updateCtrlDeps(getCurThr().id, currPos());
 }

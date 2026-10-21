@@ -378,6 +378,25 @@ static auto isStoreLocal(StoreInst *si, EscapeAnalysisResult &EAR, DominatorTree
 	return (alloc && EAR.escapesAfter(alloc, si, DT)) || !!(attr & WriteAttr::Local);
 }
 
+/*
+ * Whether I marks the beginning of a loop or of an iteration. A spin end
+ * that blocks at the end of an iteration (or a ZNE one) is judged by the
+ * iteration since the last spin start, which must be its own loop's: a path
+ * that runs an instrumented inner loop cannot have one, and is checked
+ * dynamically (a spin start knows its loop)
+ */
+static auto isLoopMarker(Instruction &i) -> bool
+{
+	auto *ci = dyn_cast<CallInst>(&i);
+	if (!ci)
+		return false;
+	auto name = getCalledFunOrStripValName(*ci);
+	if (!isInternalFunction(name))
+		return false;
+	auto icode = internalFunNames.at(name);
+	return icode == InternalFunctions::LoopBegin || icode == InternalFunctions::SpinStart;
+}
+
 static auto isPathToHeaderEffectFree(BasicBlock *latch, Loop *l, ModuleAnalysisManager &MAM,
 				     bool &checkDynamically) -> bool
 {
@@ -403,7 +422,7 @@ static auto isPathToHeaderEffectFree(BasicBlock *latch, Loop *l, ModuleAnalysisM
 			if (isStoreLocal(si, EAR[latch->getParent()], DT))
 				return;
 		}
-		effects |= hasSideEffects(&i, &cleanSet);
+		effects |= hasSideEffects(&i, &cleanSet) || isLoopMarker(i);
 	});
 	if (effects) {
 		checkDynamically = true;
@@ -492,7 +511,7 @@ static auto isPathToHeaderFAIZNE(BasicBlock *latch, Loop *l, ModuleAnalysisManag
 			cass.insert(casi);
 			return;
 		}
-		effects |= hasSideEffects(&i, &cleanSet);
+		effects |= hasSideEffects(&i, &cleanSet) || isLoopMarker(i);
 	});
 
 	if (effects || fais.size() != 2)
@@ -560,7 +579,7 @@ static auto isPathToHeaderLockZNE(BasicBlock *latch, Loop *l, ModuleAnalysisMana
 				phis.insert(phi);
 			return;
 		}
-		effects |= hasSideEffects(&i, &cleanSet);
+		effects |= hasSideEffects(&i, &cleanSet) || isLoopMarker(i);
 	});
 
 	if (effects || locks.size() != 1 || unlocks.size() != 1 || !phis.empty())
@@ -589,7 +608,12 @@ static auto getOrCreateExitingCondition(BasicBlock *header, Instruction *term) -
 	return BinaryOperator::CreateNot(bi->getCondition(), "", term->getIterator());
 }
 
-static void addLoopBeginCallBeforeTerm(BasicBlock *preheader)
+/*
+ * The calls that mark a loop's begin and its iterations' starts carry the
+ * loop's number (see getLoopId()), which tells nested loops apart: the
+ * iteration of an outer loop includes the iterations of the inner ones
+ */
+static void addLoopBeginCallBeforeTerm(BasicBlock *preheader, unsigned loopId)
 {
 	auto *term = preheader->getTerminator();
 	auto *beginFun = preheader->getParent()->getParent()->getFunction("__VERIFIER_loop_begin");
@@ -597,6 +621,7 @@ static void addLoopBeginCallBeforeTerm(BasicBlock *preheader)
 
 	auto *ci = CallInst::Create(beginFun, {}, "", term->getIterator());
 	ci->setMetadata("dbg", term->getMetadata("dbg"));
+	annotateInstruction(ci, "genmc.loop", loopId);
 }
 
 /* Whether the header PHIs can be compared for createHeaderChangeCondition() */
@@ -652,7 +677,8 @@ static auto createHeaderChangeCondition(BasicBlock *header, BasicBlock *pred,
  * loop's reads, which decides whether a store to thread-local memory counts as a
  * side effect; a blocked iteration repeats the previous one, stores included.)
  */
-static void addLoopBeginOnHeaderChange(BasicBlock *latch, Loop *l, DominatorTree &DT, LoopInfo &LI)
+static void addLoopBeginOnHeaderChange(BasicBlock *latch, Loop *l, DominatorTree &DT, LoopInfo &LI,
+				       unsigned loopId)
 {
 	auto *header = l->getHeader();
 	if (!canBackedgeChangeHeader(header, latch))
@@ -665,7 +691,7 @@ static void addLoopBeginOnHeaderChange(BasicBlock *latch, Loop *l, DominatorTree
 	auto *begin = BasicBlock::Create(header->getContext(), "spin.changed", header->getParent(),
 					 header);
 	BranchInst::Create(header, begin)->setMetadata("dbg", dbg);
-	addLoopBeginCallBeforeTerm(begin);
+	addLoopBeginCallBeforeTerm(begin, loopId);
 	edge->getTerminator()->eraseFromParent();
 	BranchInst::Create(begin, header, changed, edge)->setMetadata("dbg", dbg);
 	for (auto &phi : header->phis())
@@ -794,7 +820,7 @@ static void addPotentialSpinEndCallBeforeUnlock(Instruction *lastEffect, Value *
 	addPotentialSpinEndCall("__VERIFIER_lockZNE_spin_end", lastEffect, cont);
 }
 
-static void addSpinStartCall(Loop *l)
+static void addSpinStartCall(Loop *l, unsigned loopId)
 {
 	auto *startFun =
 		l->getHeader()->getParent()->getParent()->getFunction("__VERIFIER_spin_start");
@@ -811,7 +837,8 @@ static void addSpinStartCall(Loop *l)
 		    internalFunNames.at(name) == InternalFunctions::MutexUnlock)
 			i = std::next(i);
 	}
-	CallInst::Create(startFun, {}, "", i);
+	auto *ci = CallInst::Create(startFun, {}, "", i);
+	annotateInstruction(ci, "genmc.loop", loopId);
 }
 
 /*
@@ -934,7 +961,8 @@ static auto hasLockAndUnlock(const Loop *l) -> bool
 	return lock && unlock;
 }
 
-static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> bool
+static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts, unsigned &lastLoopId)
+	-> bool
 {
 	auto *header = l->getHeader();
 
@@ -990,7 +1018,8 @@ static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> b
 
 	/* Mark spinloop start if we have to */
 	if (checkDynamically || (modified && markStarts)) {
-		addSpinStartCall(l);
+		auto loopId = ++lastLoopId;
+		addSpinStartCall(l, loopId);
 		/* DSA also requires us to know when we actually enter the loop;
 		 * mark the beginning anyway to compose with liveness checks and nested loops */
 		auto &FAM = MAM.getResult<FunctionAnalysisManagerModuleProxy>(
@@ -999,10 +1028,10 @@ static auto checkLoop(Loop *l, ModuleAnalysisManager &MAM, bool markStarts) -> b
 		auto &DT = FAM.getResult<DominatorTreeAnalysis>(*header->getParent());
 		auto &LI = FAM.getResult<LoopAnalysis>(*header->getParent());
 		auto *preheader = llvm::InsertPreheaderForLoop(l, &DT, &LI, nullptr, false);
-		addLoopBeginCallBeforeTerm(preheader);
+		addLoopBeginCallBeforeTerm(preheader, loopId);
 		if (hasPHIs) {
 			for (auto *latch : latches)
-				addLoopBeginOnHeaderChange(latch, l, DT, LI);
+				addLoopBeginOnHeaderChange(latch, l, DT, LI, loopId);
 		}
 	}
 
@@ -1016,10 +1045,11 @@ auto SpinAssumePass::run(Module &M, ModuleAnalysisManager &MAM) const -> Preserv
 {
 	auto &FAM = MAM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
 	auto modified = false;
+	auto lastLoopId = 0U;
 	for (auto &F : M | std::views::filter([&](auto &F) { return !F.isDeclaration(); })) {
 		auto &LI = FAM.getResult<LoopAnalysis>(F);
 		for (auto &L : std::views::reverse(LI.getLoopsInPreorder())) {
-			modified |= checkLoop(L, MAM, markStarts_);
+			modified |= checkLoop(L, MAM, markStarts_, lastLoopId);
 		}
 	}
 	return modified ? PreservedAnalyses::none() : PreservedAnalyses::all();

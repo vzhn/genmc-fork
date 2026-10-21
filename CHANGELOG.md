@@ -11,6 +11,15 @@ released.
 
 ### Fixed
 
+- A spinloop nested in another one restarted the outer loop's spinloop
+  detection: the outer loop's next iteration was judged by what followed
+  the inner loop's last spin start only (#147). An outer iteration whose
+  side effects came before the inner loop was pruned as a repeat, which
+  hid executions (with `-check-liveness`, or with an inner loop checked at
+  run time, e.g. one that polls under a mutex), and `-check-liveness`
+  reported a non-terminating spinloop for a retry loop around a wait loop
+  that ends. Each loop is now tracked on its own, and its iteration
+  includes those of the loops nested in it.
 - A spin loop whose check before the loop reads with a different memory
   order than the loop's read (`w = load_relaxed(&f); while (w) w =
   load_acquire(&f);`) was not recognized as spinning, and GenMC did not

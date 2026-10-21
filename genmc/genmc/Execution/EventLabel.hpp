@@ -23,6 +23,7 @@
 #include "genmc/Execution/EventAttr.hpp"
 #include "genmc/Execution/EventKey.hpp"
 #include "genmc/Execution/LoadAnnotation.hpp"
+#include "genmc/Execution/LoopKey.hpp"
 #include "genmc/Execution/Stamp.hpp"
 #include "genmc/Support/ActionEnums.hpp"
 #include "genmc/Support/Cast.hpp"
@@ -552,7 +553,23 @@ private:
 		DEFINE_STANDARD_MEMBERS(name)                                                      \
 	};
 
-BLOCK_PURE_SUBCLASS(SpinloopBlock);
+/** A thread blocked in a spinloop iteration that repeats the previous one */
+class SpinloopBlockLabel : public BlockLabel {
+
+public:
+	SpinloopBlockLabel(Event pos, std::optional<LoopKey> loop = std::nullopt)
+		: BlockLabel(SpinloopBlock, pos), loop_(loop)
+	{}
+
+	/** The loop whose spin start blocked (none if a spin end blocked: its
+	 * iteration started at the last spin start) */
+	auto getLoop() const -> std::optional<LoopKey> { return loop_; }
+
+	DEFINE_STANDARD_MEMBERS(SpinloopBlock)
+
+private:
+	std::optional<LoopKey> loop_;
+};
 BLOCK_PURE_SUBCLASS(FaiZNEBlock);
 BLOCK_PURE_SUBCLASS(LockZNEBlock);
 BLOCK_PURE_SUBCLASS(HelpedCASBlock);
@@ -2117,8 +2134,41 @@ private:
 		DEFINE_STANDARD_MEMBERS(_class_kind)                                               \
 	};
 
-DEFINE_DUMMY_SUBCLASS(LoopBegin)
-DEFINE_DUMMY_SUBCLASS(SpinStart)
+/** A label that marks the beginning of a loop, or of an iteration of a loop
+ * that has to be judged on its own (see ExecutionState::onLoopBegin()) */
+class LoopBeginLabel : public EventLabel {
+
+public:
+	LoopBeginLabel(Event pos, LoopKey loop, const EventDeps &deps = EventDeps())
+		: EventLabel(LoopBegin, pos, MemOrdering::NotAtomic, deps), loop_(loop)
+	{}
+
+	/** The loop that begins */
+	auto getLoop() const -> LoopKey { return loop_; }
+
+	DEFINE_STANDARD_MEMBERS(LoopBegin)
+
+private:
+	LoopKey loop_;
+};
+
+/** A label that marks the beginning of an iteration of a spinloop */
+class SpinStartLabel : public EventLabel {
+
+public:
+	SpinStartLabel(Event pos, LoopKey loop, const EventDeps &deps = EventDeps())
+		: EventLabel(SpinStart, pos, MemOrdering::NotAtomic, deps), loop_(loop)
+	{}
+
+	/** The loop whose iteration starts */
+	auto getLoop() const -> LoopKey { return loop_; }
+
+	DEFINE_STANDARD_MEMBERS(SpinStart)
+
+private:
+	LoopKey loop_;
+};
+
 /* Start of a __VERIFIER_await() (its condition's reads follow) */
 DEFINE_DUMMY_SUBCLASS(AwaitStart)
 DEFINE_DUMMY_SUBCLASS(FaiZNESpinEnd)

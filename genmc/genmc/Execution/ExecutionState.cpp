@@ -103,12 +103,8 @@ void ExecutionState::clear()
 	lastAWriteView_.clear();
 
 	/* spinloop detection */
-	currentLoop_.clear();
-	loopAccess_.clear();
-	loopSideEffects_.clear();
+	loops_.clear();
 	lastReleaseIdx_.clear();
-	loopLockBalance_.clear();
-	loopAwaited_.clear();
 
 	/* symmetry reduction */
 	lastMemAccess_.clear();
@@ -315,15 +311,8 @@ auto ExecutionState::reconstructMemValue(const AAccess &access, const View &atom
 
 auto ExecutionState::isInLoop(int thread) const -> bool
 {
-	auto it = currentLoop_.find(thread);
-	return it != currentLoop_.end() && !it->second.isInitializer();
-}
-
-auto ExecutionState::doesCurrLoopHaveSideEffects(int thread) const -> bool
-{
-	if (!isInLoop(thread))
-		return false;
-	return loopSideEffects_.contains(currentLoop_.at(thread));
+	auto it = loops_.find(thread);
+	return it != loops_.end() && !it->second.empty();
 }
 
 auto ExecutionState::isProtected(const AAccess &access) const -> bool
@@ -360,50 +349,79 @@ void ExecutionState::onNALoad(Event pos, const AAccess &access, const View &view
 	recordMemAccess(lastNAReadView_, access, pos, view);
 	previousNA_[pos.thread] = std::make_pair(pos.index, true);
 
-	/* Caveat here: some reads are not recorded for efficiency reason */
-	if (isInLoop(pos.thread) && !doesCurrLoopHaveSideEffects(pos.thread))
-		loopAccess_[currentLoop_[pos.thread]].add(makeInterval(access));
+	recordLoopRead(pos.thread, access);
 }
 
 void ExecutionState::onATLoad(Event pos, const AAccess &access, const View &view)
 {
 	recordMemAccess(lastAReadView_, access, pos, view);
 
-	if (isInLoop(pos.thread) && !doesCurrLoopHaveSideEffects(pos.thread))
-		loopAccess_[currentLoop_[pos.thread]].add(makeInterval(access));
+	recordLoopRead(pos.thread, access);
 }
 
-auto ExecutionState::onSpinStart(Event pos) -> bool
+void ExecutionState::recordLoopRead(int thread, const AAccess &access)
+{
+	/* Caveat here: some reads are not recorded for efficiency reason */
+	if (!isInLoop(thread))
+		return;
+	for (auto &frame : loops_.at(thread)) {
+		if (!frame.sideEffects)
+			frame.reads.add(makeInterval(access));
+	}
+}
+
+auto ExecutionState::findLoop(std::vector<LoopFrame> &loops, LoopKey loop)
+	-> std::vector<LoopFrame>::iterator
+{
+	auto it = std::find_if(loops.rbegin(), loops.rend(),
+			       [&](const LoopFrame &frame) { return frame.loop == loop; });
+	return it == loops.rend() ? loops.end() : std::prev(it.base());
+}
+
+auto ExecutionState::onSpinStart(Event pos, LoopKey loop) -> bool
 {
 	/* If there's no loop-begin, this is a manual instrumentation(?); report to user */
-	ERROR_ON(!isInLoop(pos.thread), "No loop-beginning found!");
+	auto &loops = loops_[pos.thread];
+	auto it = findLoop(loops, loop);
+	ERROR_ON(it == loops.end(), "No loop-beginning found!");
+
+	/* The loops above it ran in this iteration and have exited (their
+	 * events count for this iteration too) */
+	loops.erase(std::next(it), loops.end());
 
 	/* Next iteration needs to recheck for side-effects */
 	/* An iteration that took a mutex counts as effect-free only if it did not
 	 * wait in an await (e.g., for a condition variable): such a wait lets
 	 * the next iteration see what the signaller did */
-	auto &balance = loopLockBalance_[pos.thread];
-	auto effects = doesCurrLoopHaveSideEffects(pos.thread) ||
+	auto &frame = loops.back();
+	auto &balance = frame.lockBalance;
+	auto effects = frame.sideEffects ||
 		       std::ranges::any_of(balance, [](auto &kv) { return kv.second != 0; }) ||
-		       (!balance.empty() && loopAwaited_.contains(pos.thread));
-	loopSideEffects_.erase(currentLoop_.at(pos.thread));
+		       (!balance.empty() && frame.awaited);
+	frame.sideEffects = false;
 	balance.clear();
-	loopAwaited_.erase(pos.thread);
+	frame.awaited = false;
 	return effects;
 }
 
-/* FIXME: nested loop */
-void ExecutionState::onLoopBegin(Event pos)
+/*
+ * A loop begins afresh: it is entered (anew, if it ran before and exited, so
+ * that it is still among the thread's loops, along with the loops it ran),
+ * or one of its iterations changed the loop's state (see SpinAssumePass)
+ */
+void ExecutionState::onLoopBegin(Event pos, LoopKey loop)
 {
-	currentLoop_[pos.thread] = pos;
-	loopLockBalance_[pos.thread].clear();
-	loopAwaited_.erase(pos.thread);
+	auto &loops = loops_[pos.thread];
+	loops.erase(findLoop(loops, loop), loops.end());
+	loops.push_back({.loop = loop});
 }
 
 void ExecutionState::onAwaitStart(Event pos)
 {
-	if (isInLoop(pos.thread))
-		loopAwaited_.insert(pos.thread);
+	if (!isInLoop(pos.thread))
+		return;
+	for (auto &frame : loops_.at(pos.thread))
+		frame.awaited = true;
 }
 
 /* Returns a fresh address to be used from the interpreter */
@@ -514,52 +532,40 @@ void ExecutionState::onProtect(SAddr hpAddr, SAddr protAddr)
 		updateHpCount(hpAddr, 1);
 }
 
-auto ExecutionState::isLocReadInLoop(int thread, const AAccess &access) const -> bool
-{
-	if (!isInLoop(thread))
-		return false;
-
-	auto loopId = currentLoop_.at(thread);
-	auto it = loopAccess_.find(loopId);
-	if (it == loopAccess_.end())
-		return false;
-
-	auto interval = makeInterval(access);
-	return it->second.overlaps(interval);
-}
-
 void ExecutionState::updateSideEffects(Event pos)
 {
 	VERIFY(isInLoop(pos.thread));
-	loopSideEffects_.insert(currentLoop_[pos.thread]);
+	for (auto &frame : loops_.at(pos.thread))
+		frame.sideEffects = true;
+}
+
+auto ExecutionState::isLoopSideEffect(const LoopFrame &frame, Event pos, const AAccess &access,
+				      bool isRelease) const -> bool
+{
+	if (isRelease || !access.addr.isDynamic())
+		return true;
+
+	auto allocPos = getAllocPos(access.addr);
+	if (allocPos.thread != pos.thread)
+		return true;
+	auto it = lastReleaseIdx_.find(pos.thread);
+	auto lastRelIdx = it != lastReleaseIdx_.end() ? it->second : 0;
+	if (lastRelIdx > allocPos.index && lastRelIdx < pos.index)
+		return true;
+
+	return frame.reads.overlaps(makeInterval(access));
 }
 
 void ExecutionState::checkLoopSideEffects(Event pos, const AAccess &access, bool isRelease)
 {
 	if (isRelease)
 		lastReleaseIdx_[pos.thread] = pos.index;
-	if (!isInLoop(pos.thread) || doesCurrLoopHaveSideEffects(pos.thread))
+	if (!isInLoop(pos.thread))
 		return;
 
-	if (isRelease || !access.addr.isDynamic()) {
-		updateSideEffects(pos);
-		return;
-	}
-
-	auto allocPos = getAllocPos(access.addr);
-	if (allocPos.thread != pos.thread) {
-		updateSideEffects(pos);
-		return;
-	}
-	auto lastRelIdx = lastReleaseIdx_[pos.thread];
-	if (lastRelIdx > allocPos.index && lastRelIdx < pos.index) {
-		updateSideEffects(pos);
-		return;
-	}
-
-	if (isLocReadInLoop(pos.thread, access)) {
-		updateSideEffects(pos);
-		return;
+	for (auto &frame : loops_.at(pos.thread)) {
+		if (!frame.sideEffects && isLoopSideEffect(frame, pos, access, isRelease))
+			frame.sideEffects = true;
 	}
 }
 
@@ -631,19 +637,26 @@ void ExecutionState::onATStore(Event pos, const AAccess &access, const View &vie
 	 * iteration did not take (e.g., in a condition-variable wait, or after
 	 * loop rotation): the thread would be blocked holding it, while each
 	 * iteration lets other threads take it */
-	if (lockRole != LockRole::None && isInLoop(pos.thread)) {
-		auto &taken = loopLockBalance_[pos.thread][access.addr];
+	if (lockRole == LockRole::None || !isInLoop(pos.thread)) {
+		checkLoopSideEffects(pos, access, isRelease);
+		return;
+	}
+	/* (Per loop: an inner loop's iteration may release a mutex that an
+	 * outer loop's iteration took) */
+	auto released = false;
+	for (auto &frame : loops_.at(pos.thread)) {
+		auto &taken = frame.lockBalance[access.addr];
 		if (lockRole == LockRole::Acquire) {
 			++taken;
-			return;
-		}
-		if (taken > 0) {
+		} else if (taken > 0) {
 			--taken;
-			lastReleaseIdx_[pos.thread] = pos.index;
-			return;
+			released = true;
+		} else if (!frame.sideEffects && isLoopSideEffect(frame, pos, access, isRelease)) {
+			frame.sideEffects = true;
 		}
 	}
-	checkLoopSideEffects(pos, access, isRelease);
+	if (lockRole == LockRole::Release && (released || isRelease))
+		lastReleaseIdx_[pos.thread] = pos.index;
 }
 
 void ExecutionState::onFence(Event pos, bool isRelease)

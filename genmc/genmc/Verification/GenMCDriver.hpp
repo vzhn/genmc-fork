@@ -322,8 +322,9 @@ public:
 	 * Returns whether the block should expand */
 	auto handleOptional(const EventDbgInfo *dbg, Event pos) -> HandleResult<bool>;
 
-	/** A call to __VERIFIER_spin_start() has been interpreted */
-	auto handleSpinStart(const EventDbgInfo *dbg, Event pos) -> HandleResult<std::monostate>;
+	/** A call to __VERIFIER_spin_start() of LOOP has been interpreted */
+	auto handleSpinStart(const EventDbgInfo *dbg, Event pos, LoopKey loop)
+		-> HandleResult<std::monostate>;
 	auto handleAwaitStart(const EventDbgInfo *dbg, Event pos) -> HandleResult<std::monostate>;
 
 	/** A call to __VERIFIER_faiZNE_spin_end() has been interpreted */
@@ -335,7 +336,8 @@ public:
 		-> HandleResult<std::monostate>;
 
 	/** Helpers for dummy events */
-	auto handleLoopBegin(const EventDbgInfo *dbg, Event pos) -> HandleResult<std::monostate>;
+	auto handleLoopBegin(const EventDbgInfo *dbg, Event pos, LoopKey loop)
+		-> HandleResult<std::monostate>;
 	auto handleHpProtect(const EventDbgInfo *dbg, Event pos, SAddr hpAddr, SAddr protAddr)
 		-> HandleResult<std::monostate>;
 	auto handleMethodBegin(const EventDbgInfo *dbg, Event pos, const std::string &methodName,

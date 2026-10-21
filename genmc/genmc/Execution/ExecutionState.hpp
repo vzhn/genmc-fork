@@ -20,6 +20,7 @@
 #include "genmc/ADT/VSet.hpp"
 #include "genmc/ADT/View.hpp"
 #include "genmc/Execution/Event.hpp"
+#include "genmc/Execution/LoopKey.hpp"
 #include "genmc/Support/ActionEnums.hpp"
 #include "genmc/Support/MemAccess.hpp"
 #include "genmc/Support/SAddrAllocator.hpp"
@@ -30,8 +31,9 @@
 #include <algorithm>
 #include <cstdint>
 #include <optional>
-#include <unordered_set>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 /** Wraps a raw pointer to static-variable initial data.
  *  Satisfies IVal so it can be stored in an IntervalMap. */
@@ -142,11 +144,11 @@ public:
 	void onATStore(Event pos, const AAccess &access, const View &view, bool isEffectful,
 		       bool isRelease, LockRole lockRole = LockRole::None);
 	void onFence(Event pos, bool isRelease);
-	void onLoopBegin(Event pos);
+	void onLoopBegin(Event pos, LoopKey loop);
 	/** A thread was created at POS (a side effect of the current loop iteration) */
 	void onThreadCreate(Event pos);
 	void onAwaitStart(Event pos);
-	auto onSpinStart(Event pos) -> bool;
+	auto onSpinStart(Event pos, LoopKey loop) -> bool;
 	auto onAlloc(Event pos, ASize size, uint64_t alignment, StorageDuration sdur,
 		     StorageType styp, AddressSpace spc) -> SAddr;
 	/** A zero-initializing allocation (calloc()) at POS, with hb view VIEW:
@@ -214,16 +216,35 @@ private:
 
 	using NASValMap = genmc::IntervalMap<SAddr, NonRevertibleOptional<SVal>>;
 	using NAEventMap = genmc::IntervalMap<SAddr, NonRevertibleOptional<Event>>;
-	using LoopId = Event;
-	using LoopAccessMap = std::unordered_map<LoopId, genmc::IntervalSet<SAddr>>;
 	using HpCountMap = genmc::IntervalMap<SAddr, int>;
 
 	auto getAllocator() const -> const SAddrAllocator & { return alloctor_; }
 	auto getAllocator() -> SAddrAllocator & { return alloctor_; }
 
+	/** The current iteration of a loop that a thread is in, since the
+	 * iteration's spin start (or the loop's begin). Loops nest: the
+	 * iterations of an inner loop are part of the outer loop's iteration */
+	struct LoopFrame {
+		LoopKey loop;
+		/* The locations read since the loop began, while the iteration
+		 * had no side effects */
+		genmc::IntervalSet<SAddr> reads;
+		bool sideEffects = false;
+		/* Per mutex, how many times the iteration took it and has not
+		 * released it yet */
+		std::unordered_map<SAddr, int> lockBalance;
+		/* Whether the iteration waited in an await */
+		bool awaited = false;
+	};
+
+	/** Returns the innermost of LOOPS that is LOOP, or LOOPS.end() */
+	static auto findLoop(std::vector<LoopFrame> &loops, LoopKey loop)
+		-> std::vector<LoopFrame>::iterator;
+
 	[[nodiscard]] auto isInLoop(int thread) const -> bool;
-	[[nodiscard]] auto doesCurrLoopHaveSideEffects(int thread) const -> bool;
-	[[nodiscard]] auto isLocReadInLoop(int thread, const AAccess &access) const -> bool;
+	void recordLoopRead(int thread, const AAccess &access);
+	[[nodiscard]] auto isLoopSideEffect(const LoopFrame &frame, Event pos,
+					    const AAccess &access, bool isRelease) const -> bool;
 	[[nodiscard]] auto isProtected(const AAccess &access) const -> bool;
 
 	void checkLoopSideEffects(Event pos, const AAccess &access, bool isRelease);
@@ -258,15 +279,9 @@ private:
 	AdaptiveViewMap lastAWriteView_;
 
 	/* spinloop detection */
-	std::unordered_map<int, LoopId> currentLoop_; /* thread id -> loop id */
-	LoopAccessMap loopAccess_;
-	std::unordered_set<LoopId> loopSideEffects_;
+	/* The loops each thread is in, innermost last */
+	std::unordered_map<int, std::vector<LoopFrame>> loops_; /* by thread */
 	std::unordered_map<int, int> lastReleaseIdx_;
-	/* Per mutex, how many times the current loop iteration took it and has
-	 * not released it yet */
-	std::unordered_map<int, std::unordered_map<SAddr, int>> loopLockBalance_; /* by thread */
-	/* Threads whose current loop iteration waited in an await */
-	std::unordered_set<int> loopAwaited_;
 
 	/* symmetry reduction */
 	View lastMemAccess_;
