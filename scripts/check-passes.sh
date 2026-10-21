@@ -56,6 +56,10 @@ ALIVE_FLAGS="--src-unroll=2 --tgt-unroll=2 --smt-to=20000"
 # GenMC's inputs are never undef
 ALIVE_DEPS_FLAGS="--src-unroll=2 --tgt-unroll=2 --smt-to=60000 --disable-undef-input"
 INTENDED="SpinAssumePass LoopUnrollPass StrengthenCASPass PropagateAssumesPass"
+# Passes that change dependencies on purpose: EliminateCASPHIs makes a
+# cmpxchg's result the source of the value it chose (data from the cmpxchg
+# instead of from the expected value's read)
+DEPS_INTENDED="EliminateCASPHIsPass"
 
 while getopts "g:o:j:t:f:" opt; do
 	case $opt in
@@ -166,25 +170,31 @@ awk -F'\t' '
 	}' "$OUT/alive.tsv" | sort >"$OUT/deps.tsv"
 if [ -s "$OUT/deps.tsv" ]; then
 	echo
-	echo "Dependency changes per pass (the +deps pairs; see the header):"
-	awk -F'\t' '
-		BEGIN { split("kept added dropped changed unproved error", vs, " ") }
+	echo "Dependency changes per pass (the +deps pairs; see the header; passes marked *"
+	echo "change dependencies on purpose):"
+	awk -F'\t' -v intended="$DEPS_INTENDED" '
+		BEGIN { split("kept added dropped changed unproved error", vs, " ")
+			split(intended, a, " "); for (i in a) mark[a[i]] = 1 }
 		{ n[$2][$1]++; passes[$2] = 1 }
 		END {
 			printf "%-32s", "pass"; for (i in vs) printf " %9s", vs[i]; print ""
 			for (p in passes) {
-				printf "%-32s", p
+				printf "%-32s", p (p in mark ? " *" : "")
 				for (i in vs) printf " %9d", n[p][vs[i]]
 				print ""
 			}
 		}' "$OUT/deps.tsv"
 	echo
 	echo "Passes that add dependencies (GenMC orders more than the model: lost executions):"
-	awk -F'\t' '$1 == "added" { print "  " $2 " " $3 ": " $4 }' "$OUT/deps.tsv"
+	awk -F'\t' -v intended="$DEPS_INTENDED" '
+		BEGIN { split(intended, a, " "); for (i in a) mark[a[i]] = 1 }
+		$1 == "added" && !($2 in mark) { print "  " $2 " " $3 ": " $4 }' "$OUT/deps.tsv"
 	echo
 	echo "Passes that drop or change dependencies (GenMC orders less: more executions, possible"
 	echo "false alarms; a changed one may be a control dependency turned into a data one):"
-	awk -F'\t' '$1 == "dropped" || $1 == "changed" { print "  " $1 " " $2 " " $3 ": " $4 }' "$OUT/deps.tsv"
+	awk -F'\t' -v intended="$DEPS_INTENDED" '
+		BEGIN { split(intended, a, " "); for (i in a) mark[a[i]] = 1 }
+		($1 == "dropped" || $1 == "changed") && !($2 in mark) { print "  " $1 " " $2 " " $3 ": " $4 }' "$OUT/deps.tsv"
 fi
 echo
 echo "Results in $OUT"

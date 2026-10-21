@@ -421,7 +421,7 @@ void restrictMemoryEffects(llvm::Module &mod)
  *    for accesses to locals that do not escape, which become plain;
  *  - annotations become observable calls (exposeAnnotations);
  *  - the calls GenMC interprets touch only their location (restrictMemoryEffects);
- *  - GenMC's allocation functions return fresh memory (noalias);
+ *  - GenMC's allocation functions return fresh memory (noalias, noundef);
  *  - debug information and alias-scope metadata go (Alive2 rejects them,
  *    and dropping them only drops facts).
  */
@@ -444,8 +444,10 @@ void makeCheckable(llvm::Module *clone, const AnnotationKinds &kinds, bool inlin
 	for (const auto *name :
 	     {"__VERIFIER_malloc", "__VERIFIER_malloc_aligned", "__VERIFIER_palloc",
 	      "__VERIFIER_hazptr_alloc", "__VERIFIER_calloc"})
-		if (auto *fun = clone->getFunction(name))
+		if (auto *fun = clone->getFunction(name)) {
 			fun->addRetAttr(llvm::Attribute::NoAlias);
+			fun->addRetAttr(llvm::Attribute::NoUndef); /* never poison */
+		}
 	exposeAnnotations(*clone, kinds);
 
 	llvm::SmallVector<llvm::Instruction *, 16> worklist;
@@ -901,15 +903,18 @@ auto printDepsModule(const llvm::Module &mod, const SourceBits &sources, bool sc
 
 /* The passes whose dependencies are compared: those that keep the module's
  * memory layout and stay within functions (promoting locals to registers
- * and inlining change what GenMC's dependencies are on; spin-assume and
- * assume propagation add assumptions on purpose, checked elsewhere) */
+ * and inlining change what GenMC's dependencies are on), and change
+ * neither the events nor their orderings on purpose (spin-assume and
+ * assume propagation add assumptions, checked elsewhere; StrengthenCAS
+ * changes the orderings the opaque calls are named after) */
 auto checksDeps(llvm::StringRef passID) -> bool
 {
 	static const std::set<llvm::StringRef> skipped = {
 		"SROAPass",	       "PromotePass",	       "PromoteMemIntrinsicPass",
 		"IntrinsicLoweringPass", "FunctionInlinerPass",   "DeadArgumentEliminationPass",
 		"DeclareInternalsPass",	 "DefineLibcFunsPass",	   "MDataCollectionPass",
-		"RustPrepPass",		 "SpinAssumePass",	   "PropagateAssumesPass"};
+		"RustPrepPass",		 "SpinAssumePass",	   "PropagateAssumesPass",
+		"StrengthenCASPass"};
 	return !skipped.contains(passID);
 }
 
