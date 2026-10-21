@@ -273,10 +273,24 @@ auto convert(llvm::Value *v, llvm::Type *to, llvm::Instruction *pos) -> llvm::Va
 	return new llvm::PtrToIntInst(v, to, "", pos->getIterator());
 }
 
-/* Replace the atomic instruction I by a call to an external function */
+/* Whether I is a volatile plain access (Alive2 has no volatile either) */
+auto isVolatileAccess(const llvm::Instruction &I) -> bool
+{
+	if (const auto *L = llvm::dyn_cast<llvm::LoadInst>(&I))
+		return L->isVolatile() && !L->isAtomic();
+	if (const auto *S = llvm::dyn_cast<llvm::StoreInst>(&I))
+		return S->isVolatile() && !S->isAtomic();
+	return false;
+}
+
+/* Replace the atomic (or volatile) instruction I by a call to an external
+ * function */
 void lowerAtomic(llvm::Instruction *I)
 {
-	auto ord = [](llvm::AtomicOrdering o) { return std::string(llvm::toIRString(o)); };
+	auto ord = [](llvm::AtomicOrdering o) {
+		return o == llvm::AtomicOrdering::NotAtomic ? std::string("volatile")
+							    : std::string(llvm::toIRString(o));
+	};
 	auto &ctx = I->getContext();
 	const auto &DL = I->getModule()->getDataLayout();
 	auto *voidTy = llvm::Type::getVoidTy(ctx);
@@ -341,14 +355,55 @@ void lowerAtomic(llvm::Instruction *I)
 	I->eraseFromParent();
 }
 
+/* Whether an internal function of code CODE orders nothing (an assume, a
+ * marker, an annotation...) */
+auto isPureCode(InternalFunctions code) -> bool
+{
+	auto codeI = static_cast<std::underlying_type_t<InternalFunctions>>(code);
+	return
+#define FIRST_PURE_FUNCTION(NUM) codeI >= NUM &&
+#define LAST_PURE_FUNCTION(NUM) codeI <= NUM;
+#include "passes/InternalFunction.def"
+}
+
+/*
+ * What the functions GenMC interprets may touch: an access or a lock
+ * operation its location, a fence, marker or assumption nothing (inaccessible
+ * memory keeps them side effects a pass may not drop or reorder). Without
+ * this, Alive2 lets every call write any global, and rejects a pass that
+ * moves a plain access over an atomic one to another location.
+ */
+void restrictMemoryEffects(llvm::Module &mod)
+{
+	auto effects = llvm::MemoryEffects::argMemOnly(llvm::ModRefInfo::ModRef) |
+		       llvm::MemoryEffects::inaccessibleMemOnly(llvm::ModRefInfo::ModRef);
+	for (auto &F : mod) {
+		if (!F.isDeclaration())
+			continue;
+		auto name = F.getName().str();
+		auto restricted = name.starts_with("__alive_");
+		if (isInternalFunction(name)) {
+			auto code = internalFunNames.at(name);
+			restricted = isPureCode(code) || isMutexCode(code) || isCondVarCode(code) ||
+				     code == InternalFunctions::LkmmFence ||
+				     code == InternalFunctions::SrcuReadLock ||
+				     code == InternalFunctions::SrcuReadUnlock ||
+				     code == InternalFunctions::SyncSrcu;
+		}
+		if (restricted)
+			F.setMemoryEffects(effects);
+	}
+}
+
 /*
  * The module as Alive2 can check it:
- *  - each atomic access and fence becomes a call to an external function
- *    named after the operation, ordering and size (Alive2 has no atomics;
- *    calls are side effects a refinement must keep, in number and order, as
- *    a transformation must keep atomic accesses), but for accesses to
- *    locals that do not escape, which become plain;
+ *  - each atomic access, volatile access and fence becomes a call to an
+ *    external function named after the operation, ordering and size (Alive2
+ *    has no atomics; calls are side effects a refinement must keep, in
+ *    number and order, as a transformation must keep such accesses), but
+ *    for accesses to locals that do not escape, which become plain;
  *  - annotations become observable calls (exposeAnnotations);
+ *  - the calls GenMC interprets touch only their location (restrictMemoryEffects);
  *  - GenMC's allocation functions return fresh memory (noalias);
  *  - debug information and alias-scope metadata go (Alive2 rejects them,
  *    and dropping them only drops facts).
@@ -358,6 +413,17 @@ void makeCheckable(llvm::Module *clone, const AnnotationKinds &kinds, bool inlin
 	llvm::StripDebugInfo(*clone);
 	if (inlineCalls)
 		inlineInternalCalls(*clone);
+	/* LLVM 22's one-argument lifetime markers (the inliner adds some) do not
+	 * parse in Alive2 v20's LLVM, and they only let a pass reuse a local's
+	 * memory */
+	for (auto &F : llvm::make_early_inc_range(*clone))
+		if (F.getName().starts_with("llvm.lifetime.")) {
+			for (auto *user : llvm::make_early_inc_range(F.users()))
+				if (auto *ci = llvm::dyn_cast<llvm::CallInst>(user))
+					ci->eraseFromParent();
+			if (F.use_empty())
+				F.eraseFromParent();
+		}
 	for (const auto *name :
 	     {"__VERIFIER_malloc", "__VERIFIER_malloc_aligned", "__VERIFIER_palloc",
 	      "__VERIFIER_hazptr_alloc", "__VERIFIER_calloc"})
@@ -376,7 +442,8 @@ void makeCheckable(llvm::Module *clone, const AnnotationKinds &kinds, bool inlin
 				else
 					llvm::cast<llvm::StoreInst>(&I)->setAtomic(
 						llvm::AtomicOrdering::NotAtomic);
-			} else if (I.isAtomic() || llvm::isa<llvm::FenceInst>(I)) {
+			} else if (I.isAtomic() || llvm::isa<llvm::FenceInst>(I) ||
+				   isVolatileAccess(I)) {
 				worklist.push_back(&I);
 			} else if (auto *II = llvm::dyn_cast<llvm::IntrinsicInst>(&I);
 				   II && II->getIntrinsicID() ==
@@ -390,6 +457,7 @@ void makeCheckable(llvm::Module *clone, const AnnotationKinds &kinds, bool inlin
 		else
 			lowerAtomic(I);
 	}
+	restrictMemoryEffects(*clone);
 }
 
 auto printCheckableModule(const llvm::Module &mod, const AnnotationKinds &kinds,
