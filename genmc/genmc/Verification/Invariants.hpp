@@ -63,6 +63,16 @@
  *    tasks it took); a kill event reached while driven by the graph is a
  *    kill label and is only re-executed by a replay that targets it or that
  *    keeps non-atomic events (PR #31).
+ *
+ * I3 Allocation map (checkAllocations()). After reconstructState() and after
+ *    every allocation: the registered blocks are exactly the MALLOC labels
+ *    of the graph (a null address is a failed allocation), each at its
+ *    label's address and size, with the label's thread in the address; a
+ *    block is marked freed exactly when the graph has a free of it; each
+ *    thread's allocator pool lies past every block of the thread, so that a
+ *    later allocation cannot overlap a block the graph holds (PR #66: the
+ *    map was rebuilt by allocating anew in po order, and two stack variables
+ *    overlapped after a stamp cut under IMM).
  */
 
 #ifndef GENMC_INVARIANTS_HPP
@@ -112,6 +122,9 @@ auto planCopyUpTo(const ExecutionGraph &g, const VectorClock &v) -> RestrictionP
 
 /** I1: G is well-formed, and (with PLAN) the restriction kept what it had to */
 void checkGraph(const ExecutionGraph &g, const Context &ctx, const RestrictionPlan *plan = nullptr);
+
+/** I3: the allocation map of STATE agrees with the lifecycle labels of G */
+void checkAllocations(const ExecutionGraph &g, const ExecutionState &state, const Context &ctx);
 
 /** Reports a violation of INVARIANT (WHAT describes it) and aborts; G is printed if given */
 [[noreturn]] void fail(std::string_view invariant, const std::string &what, const ExecutionGraph *g,

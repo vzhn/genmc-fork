@@ -168,6 +168,14 @@ void GenMCDriver::checkGraphInvariants(const ExecutionGraph &g, std::string_view
 	invariants::checkGraph(g, invariantContext(where), plan);
 }
 
+void GenMCDriver::checkAllocationInvariants(std::string_view where) const
+{
+	if (!checksInvariants())
+		return;
+	const auto &g = getExec().getGraph();
+	invariants::checkAllocations(g, g.getState(), invariantContext(where));
+}
+
 void GenMCDriver::restrictExecution(Stamp stamp, std::string_view where)
 {
 	if (!checksInvariants()) {
@@ -337,6 +345,8 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	state.clear();
 	if constexpr (Config::emitNALabels)
 		reconstructState(g, state);
+	if constexpr (Config::emitNALabels)
+		checkAllocationInvariants("reconstructing the state");
 	/* An error replay replays to its target, which the graph holds (I2) */
 	if (checksInvariants() && getScheduler().inErrorReplay()) {
 		auto target = *getScheduler().getErrorReplayEvent();
@@ -2996,6 +3006,7 @@ auto GenMCDriver::handleMalloc(Event pos, ASize size, uint64_t alignment, Storag
 
 	auto guard = g.addScoped(mallocProbeLab_);
 	auto *lab = guard.get();
+	checkAllocationInvariants("allocating a block");
 	/* calloc(): the block is initialized (to zero) by the allocation itself,
 	 * so no store events are needed before it may be read */
 	if (zeroed && addr != SAddr())

@@ -952,6 +952,9 @@ private:
 	void checkGraphInvariants(const ExecutionGraph &g, std::string_view where,
 				  const invariants::RestrictionPlan *plan = nullptr) const;
 
+	/** -check-invariants: checks I3 on the current graph and state after WHERE */
+	void checkAllocationInvariants(std::string_view where) const;
+
 	/** Restricts the current execution to STAMP (see Execution::restrict()),
 	 * checking I1 under -check-invariants */
 	void restrictExecution(Stamp stamp, std::string_view where);

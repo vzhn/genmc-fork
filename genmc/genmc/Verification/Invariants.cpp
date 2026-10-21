@@ -59,12 +59,23 @@ void fail(std::string_view invariant, const std::string &what, const ExecutionGr
 namespace {
 
 constexpr std::string_view kI1 = "I1 (restriction)";
+constexpr std::string_view kI3 = "I3 (allocation map)";
 
 /** Whether LAB, a pointer another label stores, is a label of G */
 auto inGraph(const ExecutionGraph &g, const EventLabel *lab) -> bool
 {
 	return lab != nullptr && g.containsLab(lab);
 }
+
+/** The thread an address was allocated by, and the offset in its pool */
+auto addrThread(SAddr addr) -> int
+{
+	return static_cast<int>((addr.get() & SAddr::threadMask) >> SAddr::threadStartBit);
+}
+auto addrIndex(SAddr addr) -> SAddr::Width { return addr.get() & SAddr::indexMask; }
+
+/** Address space a block takes (a zero-size block takes a byte) */
+auto blockSpan(const MallocLabel *aLab) -> uint64_t { return std::max(aLab->getSize().get(), 1UL); }
 
 /*******************************************************************************
  **                        I1: the restricted graph
@@ -462,6 +473,84 @@ void checkGraph(const ExecutionGraph &g, const Context &ctx, const RestrictionPl
 	checkViews(g, ctx);
 	if (plan != nullptr)
 		checkPlan(g, ctx, *plan);
+}
+
+/*******************************************************************************
+ **                        I3: the allocation map
+ ******************************************************************************/
+
+void checkAllocations(const ExecutionGraph &g, const ExecutionState &state, const Context &ctx)
+{
+	auto failI3 = [&](std::string what) { fail(kI3, what, &g, ctx); };
+
+	std::unordered_map<SAddr, const MallocLabel *> blocks;
+	for (const auto &lab : g.labels()) {
+		if (const auto *aLab = genmc::dyn_cast<MallocLabel>(&lab)) {
+			auto addr = aLab->getAddr();
+			if (addr == SAddr()) /* a failed allocation */
+				continue;
+			if (auto [it, fresh] = blocks.emplace(addr, aLab); !fresh)
+				failI3(std::format("allocations {} and {} have the same address {}",
+						   it->second->getPos(), aLab->getPos(), addr));
+			if (!state.isAllocated(addr))
+				failI3(std::format("the block {} of {} is not registered", addr,
+						   aLab->getPos()));
+			if (state.getAllocPos(addr) != aLab->getPos())
+				failI3(std::format(
+					"the block {} is registered for {} instead of {}", addr,
+					state.getAllocPos(addr), aLab->getPos()));
+			auto access = state.getAllocAccess(addr);
+			if (access.addr != addr || access.size != aLab->getSize())
+				failI3(std::format("the block of {} is registered as [{}, +{}) "
+						   "instead of [{}, +{})",
+						   aLab->getPos(), access.addr, access.size.get(),
+						   addr, aLab->getSize().get()));
+			if (!addr.isDynamic())
+				failI3(std::format("allocation {} has a static address {}",
+						   aLab->getPos(), addr));
+			if (addrThread(addr) != aLab->getThread())
+				failI3(std::format("allocation {} has an address of thread {}: {}",
+						   aLab->getPos(), addrThread(addr), addr));
+			auto end = addrIndex(addr) + blockSpan(aLab);
+			if (state.allocatorPoolEnd(aLab->getThread()) < end)
+				failI3(std::format("thread {}'s allocator pool ({:#x}) lies before "
+						   "the end of its block {} of {} ({:#x})",
+						   aLab->getThread(),
+						   state.allocatorPoolEnd(aLab->getThread()), addr,
+						   aLab->getPos(), end));
+		}
+		if (const auto *dLab = genmc::dyn_cast<FreeLabel>(&lab)) {
+			auto addr = dLab->getAddr();
+			if (!state.isAllocated(addr) || !state.isFreed(addr))
+				failI3(std::format(
+					"free {} of {}, which is not registered as freed",
+					dLab->getPos(), addr));
+		}
+	}
+	for (const auto &entry : state.allocations()) {
+		const auto &info = entry.second;
+		const auto *aLab =
+			genmc::dyn_cast_if_present<MallocLabel>(g.getEventLabelIfPresent(info.pos));
+		if (aLab == nullptr)
+			failI3(std::format("a block at {} is registered for {}, which is not an "
+					   "allocation of the graph",
+					   entry.first.start, info.pos));
+		auto start = aLab->getAddr();
+		auto end = start + ASize(blockSpan(aLab));
+		if (entry.first.start != start || entry.first.end != end)
+			failI3(std::format("the block of {} spans [{}, {}) in the allocation map "
+					   "but [{}, {}) in the graph",
+					   info.pos, entry.first.start, entry.first.end, start,
+					   end));
+		if (!info.freePos)
+			continue;
+		const auto *dLab = genmc::dyn_cast_if_present<FreeLabel>(
+			g.getEventLabelIfPresent(*info.freePos));
+		if (dLab == nullptr || dLab->getAddr() != start)
+			failI3(std::format("the block of {} is marked freed by {}, which is not a "
+					   "free of it",
+					   info.pos, *info.freePos));
+	}
 }
 
 } // namespace invariants
