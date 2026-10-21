@@ -20,6 +20,7 @@
 #include "genmc/Support/MemAccess.hpp"
 #include "genmc/Support/ModuleVarID.hpp"
 #include "genmc/Support/SExpr.hpp"
+#include "genmc/Support/SExprOps.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -312,25 +313,6 @@ public:
 	auto visitSExpr(SExpr<T> & /*e*/) -> RetTy { UNREACHABLE(); }
 
 private:
-	/*
-	 * Values are kept zero-extended to the width of their expression (as
-	 * loaded values are), so arithmetic results are wrapped to that width
-	 * and signed operations sign-extend their operands first. Expressions
-	 * wider than an SVal are evaluated at the SVal's width.
-	 */
-	static auto wrap(SVal v, unsigned w) -> SVal
-	{
-		return w < SVal::width ? v.truncate(w) : v;
-	}
-	static auto sext(SVal v, unsigned w) -> SVal
-	{
-		return w < SVal::width ? v.signExtendBottom(w) : v;
-	}
-	auto visitSigned(SExpr<T> *e) -> SVal
-	{
-		return sext(this->visit(e), e->getWidth());
-	}
-
 	/** NBFE: Checks whether a symbolic variable has a mapping */
 	[[nodiscard]] auto hasKnownMapping(const T &reg) const -> bool
 	{
@@ -793,186 +775,151 @@ template <typename T> auto SExprEvaluator<T>::visitDisjunctionExpr(DisjunctionEx
 	IMPLEMENT_LOGOP(std::any_of);
 }
 
-/* A zero-extended value needs no extending */
+/*
+ * The arithmetic is in SExprOps (genmc/Support/SExprOps.hpp): each visit
+ * evaluates the kids and applies the operation to their values at the
+ * kids' width
+ */
+
 template <typename T> auto SExprEvaluator<T>::visitZExtExpr(ZExtExpr<T> &e) -> RetTy
 {
-	return this->visit(e.getKid(0));
+	return SExprOps::zext(this->visit(e.getKid(0)));
 }
 
 template <typename T> auto SExprEvaluator<T>::visitSExtExpr(SExtExpr<T> &e) -> RetTy
 {
-	return wrap(visitSigned(e.getKid(0)), e.getWidth());
+	return SExprOps::sextTo(this->visit(e.getKid(0)), e.getKid(0)->getWidth(), e.getWidth());
 }
 
 template <typename T> auto SExprEvaluator<T>::visitTruncExpr(TruncExpr<T> &e) -> RetTy
 {
-	return wrap(this->visit(e.getKid(0)), e.getWidth());
+	return SExprOps::trunc(this->visit(e.getKid(0)), e.getWidth());
 }
 
 template <typename T> auto SExprEvaluator<T>::visitNotExpr(NotExpr<T> &e) -> RetTy
 {
-	return SVal(!this->visit(e.getKid(0)).getBool());
+	return SExprOps::lnot(this->visit(e.getKid(0)));
 }
 
-#define IMPLEMENT_BINOP_NONMEM(op) return this->visit(e.getKid(0)) op this->visit(e.getKid(1))
+#define IMPLEMENT_BINOP(op) return SExprOps::op(this->visit(e.getKid(0)), this->visit(e.getKid(1)))
 
-#define IMPLEMENT_BINOP_WRAP(op)                                                                   \
-	return wrap(this->visit(e.getKid(0)) op this->visit(e.getKid(1)), e.getWidth())
-
-/*
- * Division by zero, signed overflow and shifts by at least the width are
- * undefined (poison in LLVM); as brute-force evaluation can feed any value
- * to an expression, they evaluate to 0 rather than trap
- */
+#define IMPLEMENT_BINOP_W(op)                                                                      \
+	return SExprOps::op(this->visit(e.getKid(0)), this->visit(e.getKid(1)),                    \
+			    e.getKid(0)->getWidth())
 
 template <typename T> auto SExprEvaluator<T>::visitAddExpr(AddExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_BINOP_WRAP(+);
+	IMPLEMENT_BINOP_W(add);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitSubExpr(SubExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_BINOP_WRAP(-);
+	IMPLEMENT_BINOP_W(sub);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitMulExpr(MulExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_BINOP_WRAP(*);
+	IMPLEMENT_BINOP_W(mul);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitUDivExpr(UDivExpr<T> &e) -> RetTy
 {
-	auto l = this->visit(e.getKid(0));
-	auto r = this->visit(e.getKid(1));
-	return r.get() == 0 ? SVal(0) : l / r;
+	IMPLEMENT_BINOP(udiv);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitSDivExpr(SDivExpr<T> &e) -> RetTy
 {
-	auto l = visitSigned(e.getKid(0)).getSigned();
-	auto r = visitSigned(e.getKid(1)).getSigned();
-	/* The signed minimum of the expression's width, divided by -1, overflows */
-	auto w = std::min(e.getWidth(), SVal::width);
-	auto min = w == SVal::width ? std::numeric_limits<int64_t>::min()
-				    : -(static_cast<int64_t>(1) << (w - 1));
-	if (r == 0 || (r == -1 && l == min))
-		return SVal(0);
-	return wrap(SVal(static_cast<uint64_t>(l / r)), e.getWidth());
+	IMPLEMENT_BINOP_W(sdiv);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitURemExpr(URemExpr<T> &e) -> RetTy
 {
-	auto l = this->visit(e.getKid(0));
-	auto r = this->visit(e.getKid(1));
-	return r.get() == 0 ? SVal(0) : l % r;
+	IMPLEMENT_BINOP(urem);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitSRemExpr(SRemExpr<T> &e) -> RetTy
 {
-	auto l = visitSigned(e.getKid(0)).getSigned();
-	auto r = visitSigned(e.getKid(1)).getSigned();
-	if (r == 0 || r == -1)
-		return SVal(0);
-	return wrap(SVal(static_cast<uint64_t>(l % r)), e.getWidth());
+	IMPLEMENT_BINOP_W(srem);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitAndExpr(AndExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_BINOP_NONMEM(&);
+	IMPLEMENT_BINOP(band);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitOrExpr(OrExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_BINOP_NONMEM(|);
+	IMPLEMENT_BINOP(bor);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitXorExpr(XorExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_BINOP_NONMEM(^);
+	IMPLEMENT_BINOP(bxor);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitShlExpr(ShlExpr<T> &e) -> RetTy
 {
-	auto l = this->visit(e.getKid(0));
-	auto r = this->visit(e.getKid(1));
-	return r.get() >= std::min(e.getWidth(), SVal::width) ? SVal(0) : wrap(l << r, e.getWidth());
+	IMPLEMENT_BINOP_W(shl);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitLShrExpr(LShrExpr<T> &e) -> RetTy
 {
-	auto l = this->visit(e.getKid(0));
-	auto r = this->visit(e.getKid(1));
-	return r.get() >= std::min(e.getWidth(), SVal::width) ? SVal(0) : l >> r;
+	IMPLEMENT_BINOP_W(lshr);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitAShrExpr(AShrExpr<T> &e) -> RetTy
 {
-	auto l = visitSigned(e.getKid(0)).getSigned();
-	auto r = this->visit(e.getKid(1)).get();
-	if (r >= std::min(e.getWidth(), SVal::width))
-		return SVal(0);
-	return wrap(SVal(static_cast<uint64_t>(l >> r)), e.getWidth());
+	IMPLEMENT_BINOP_W(ashr);
 }
-
-#define IMPLEMENT_EQOP(op)                                                                         \
-	if (this->visit(e.getKid(0)) op(this->visit(e.getKid(1))))                                 \
-		return SVal(1);                                                                    \
-	return SVal(0);
 
 template <typename T> auto SExprEvaluator<T>::visitEqExpr(EqExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_EQOP(==);
+	IMPLEMENT_BINOP(eq);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitNeExpr(NeExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_EQOP(!=);
+	IMPLEMENT_BINOP(ne);
 }
-
-#define IMPLEMENT_CMPOP(op)                                                                        \
-	return (this->visit(e.getKid(0)).op(this->visit(e.getKid(1)))) ? SVal(1) : SVal(0);
-
-#define IMPLEMENT_SCMPOP(op)                                                                       \
-	return visitSigned(e.getKid(0)).op(visitSigned(e.getKid(1))) ? SVal(1) : SVal(0);
 
 template <typename T> auto SExprEvaluator<T>::visitUltExpr(UltExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_CMPOP(ult);
+	IMPLEMENT_BINOP(ult);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitUleExpr(UleExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_CMPOP(ule);
+	IMPLEMENT_BINOP(ule);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitUgtExpr(UgtExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_CMPOP(ugt);
+	IMPLEMENT_BINOP(ugt);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitUgeExpr(UgeExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_CMPOP(uge);
+	IMPLEMENT_BINOP(uge);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitSltExpr(SltExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_SCMPOP(slt);
+	IMPLEMENT_BINOP_W(slt);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitSleExpr(SleExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_SCMPOP(sle);
+	IMPLEMENT_BINOP_W(sle);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitSgtExpr(SgtExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_SCMPOP(sgt);
+	IMPLEMENT_BINOP_W(sgt);
 }
 
 template <typename T> auto SExprEvaluator<T>::visitSgeExpr(SgeExpr<T> &e) -> RetTy
 {
-	IMPLEMENT_SCMPOP(sge);
+	IMPLEMENT_BINOP_W(sge);
 }
 
 /*******************************************************************************

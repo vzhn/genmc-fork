@@ -27,6 +27,9 @@ released.
 
 ### Added
 
+- The expression evaluator's arithmetic is in `genmc/Support/SExprOps.hpp`,
+  as functions of the operands' values and width; `scripts/prove-sexpr-ops.sh`
+  proves them equal to LLVM's integer semantics for all inputs with Alive2.
 - Debugging options for the transformation passes: `-output-llvm-passes=<dir>`
   writes the module before and after each pass that changes it, in a form
   Alive2 can check (and, for spin-assume and the load annotations, with
