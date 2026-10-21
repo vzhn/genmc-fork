@@ -68,12 +68,13 @@ The fixed configuration also passes with two accesses per thread (see the
 PR for the state counts).
 
 What the model leaves out: reads-from and coherence (the linearization is
-per thread, which is enough for these properties), resume points (a resumed
-execution has no replay schedule and is never an error replay), the eager
-pop of a blocked assume read in `scheduleReplay()`, error replays with
-`-disable-race-detection` (non-atomic labels kept), and errors found during
-a replay at events other than the target (ignored by `reportError()`, as in
-the code).
+per thread, which is enough for these properties), resume points (PR #104:
+a resumed execution is never an error replay; since PR #126 it gets a
+replay schedule for the holes before its kept events, which the model has
+no notion of), the eager pop of a blocked assume read in
+`scheduleReplay()`, error replays with `-disable-race-detection`
+(non-atomic labels kept), and errors found during a replay at events other
+than the target (ignored by `reportError()`, as in the code).
 
 ## Pool.tla: the worker pool
 
