@@ -287,8 +287,8 @@ public:
 			  bool zeroed = false, bool threadPrivate = false) -> HandleResult<SVal>;
 
 	/** A call to free() has been interpreted, nothing for the intepreter */
-	auto handleFree(const EventDbgInfo *dbg, Event pos, SAddr loc, const EventDeps &deps)
-		-> HandleResult<std::monostate>;
+	auto handleFree(const EventDbgInfo *dbg, Event pos, SAddr loc, StorageDuration sdur,
+			const EventDeps &deps) -> HandleResult<std::monostate>;
 	auto handleRetire(const EventDbgInfo *dbg, Event pos, SAddr loc, const EventDeps &deps)
 		-> HandleResult<std::monostate>;
 
@@ -509,7 +509,7 @@ private:
 			  StorageType styp, AddressSpace spc, const NameInfo *info,
 			  const std::string &name, const EventDeps &deps, bool zeroed = false,
 			  bool threadPrivate = false) -> HandleResult<SVal>;
-	auto handleFree(Event pos, SAddr loc, const EventDeps &deps)
+	auto handleFree(Event pos, SAddr loc, StorageDuration sdur, const EventDeps &deps)
 		-> HandleResult<std::monostate>;
 	auto handleRetire(Event pos, SAddr loc, const EventDeps &deps)
 		-> HandleResult<std::monostate>;
@@ -541,6 +541,11 @@ private:
 
 	/** Blocks thread at POS with type T. Tries to moot afterward */
 	void blockThreadTryMoot(std::unique_ptr<BlockLabel> bLab);
+
+	/** If LOC is not the start of a live block of duration SDUR (i.e.,
+	 * cannot be freed), returns why */
+	auto getInvalidFreeReason(SAddr loc, StorageDuration sdur) const
+		-> std::optional<std::string>;
 
 	/** If LAB accesses a valid location, reports an error  */
 	auto checkAccessValidity(Event pos, const AAccess &access)

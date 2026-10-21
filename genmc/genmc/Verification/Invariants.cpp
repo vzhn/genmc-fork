@@ -558,8 +558,11 @@ void checkAllocations(const ExecutionGraph &g, const ExecutionState &state, cons
 						   aLab->getPos(), end));
 		}
 		if (const auto *dLab = genmc::dyn_cast<FreeLabel>(&lab)) {
+			/* An invalid free (an error event) frees no block */
 			auto addr = dLab->getAddr();
-			if (!state.isAllocated(addr) || !state.isFreed(addr))
+			auto isBlockStart = state.isAllocated(addr) &&
+					    state.getAllocAccess(addr).addr == addr;
+			if (isBlockStart && !state.isFreed(addr))
 				failI3(std::format(
 					"free {} of {}, which is not registered as freed",
 					dLab->getPos(), addr));

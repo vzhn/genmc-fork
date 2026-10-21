@@ -1227,7 +1227,8 @@ void Interpreter::freeAllocas(const AllocaHolder &allocas)
 	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id),
 				  getAddrPoDeps(getCurThr().id), nullptr);
 	for (auto it = allocas.get().begin(), ie = allocas.get().end(); it != ie; ++it)
-		CALL_DRIVER(handleFree, currDbgInfo(), currPos(), *it, GET_DEPS(deps));
+		CALL_DRIVER(handleFree, currDbgInfo(), currPos(), *it,
+			    StorageDuration::SD_Automatic, GET_DEPS(deps));
 }
 
 void Interpreter::exitCalled(GenericValue GV)
@@ -3174,7 +3175,8 @@ void Interpreter::callFree(Function *F, const std::vector<GenericValue> &ArgVals
 	if (!ptr)
 		return;
 
-	CALL_DRIVER(handleFree, currDbgInfo(), currPos(), ptr, GET_DEPS(deps));
+	CALL_DRIVER(handleFree, currDbgInfo(), currPos(), ptr, StorageDuration::SD_Heap,
+		    GET_DEPS(deps));
 }
 
 void Interpreter::callThreadSelf(Function *F, const std::vector<GenericValue> &ArgVals,
@@ -3505,7 +3507,8 @@ void Interpreter::callHazptrFree(Function *F, const std::vector<GenericValue> &A
 {
 	auto deps = makeEventDeps(nullptr, nullptr, getCtrlDeps(getCurThr().id),
 				  getAddrPoDeps(getCurThr().id), nullptr);
-	CALL_DRIVER(handleFree, currDbgInfo(), currPos(), GVTOP(ArgVals[0]), GET_DEPS(deps));
+	CALL_DRIVER(handleFree, currDbgInfo(), currPos(), GVTOP(ArgVals[0]),
+		    StorageDuration::SD_Heap, GET_DEPS(deps));
 
 	/* Handle invoke-instruction */
 	returnValueToCaller(F->getReturnType() /* void */, PTOGV(nullptr));
