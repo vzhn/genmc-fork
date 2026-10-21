@@ -330,6 +330,11 @@ void InstAnnotator::annotateDFS(Instruction *curr)
 	std::vector<Instruction *> succs = getNextOrBranchSuccessors(curr);
 	VERIFY(succs.size() <= 2);
 
+	/* A load annotation says which values of the load fail the next assume
+	 * (those are not explored), so TRUE is the safe constant: it claims
+	 * nothing. It stands in for a cycle (the path goes round a loop before
+	 * the assume) and for a dead end (no assume is reached). Negating an
+	 * annotation would turn these into claims; no caller does */
 	for (auto *succ : succs) {
 		if (statusMap[succ] == InstAnnotator::unseen)
 			annotateDFS(succ);
@@ -502,6 +507,12 @@ void InstAnnotator::annotateCASWithBackedgeCondDFS(Instruction *curr,
 		getNextOrBranchSuccessorsInLoop(curr, backedgePaths, l, cleanSet);
 	VERIFY(succs.size() <= 2);
 
+	/* The condition says when the path from the CAS goes round the latch
+	 * to the header. Its consumer (failedCASesLeadToHeader) adds a spin-end
+	 * only if the condition is false whenever some CAS succeeds, so TRUE is
+	 * the safe constant here: it stands in for a cycle (an inner loop on the
+	 * way to the latch). FALSE is only used where the path has left the
+	 * backedge paths, from which the latch is unreachable by construction */
 	for (auto *succ : succs) {
 		if (statusMap[succ] == InstAnnotator::unseen)
 			annotateCASWithBackedgeCondDFS(succ, backedgePaths, l, cleanSet);
