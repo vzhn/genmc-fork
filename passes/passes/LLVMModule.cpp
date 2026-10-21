@@ -286,7 +286,8 @@ auto transformLLVMModule(llvm::Module &mod, ModuleInfo &MI, const LLIConfig *con
 	{
 		llvm::FunctionPassManager fpm;
 		fpm.addPass(EliminateCASPHIsPass());
-		fpm.addPass(llvm::JumpThreadingPass());
+		if (conf->jumpThreading)
+			fpm.addPass(llvm::JumpThreadingPass());
 		fpm.addPass(EliminateUnusedCodePass());
 		if (conf->codeCondenser && !conf->liveness)
 			fpm.addPass(CodeCondenserPass());

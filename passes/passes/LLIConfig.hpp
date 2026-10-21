@@ -39,6 +39,7 @@ struct LLIConfig {
 	VSet<std::string> noUnrollFuns;
 	bool castElimination{};
 	bool inlineFunctions{};
+	bool jumpThreading{};
 	bool loopJumpThreading{};
 	bool spinAssume{};
 	bool codeCondenser{};
