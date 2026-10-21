@@ -17,7 +17,8 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 GenMC="${GenMC:-$DIR/../RelWithDebInfo/bin/genmc}"
 GENMCFLAGS="${GENMCFLAGS:-}"
-MODELS=(rc11 imm lkmm)
+# The models to test (space-separated in the MODELS environment variable, e.g. MODELS="sc rc11")
+MODELS=(${MODELS:-rc11 imm lkmm})
 
 CONFIG_FILE="$(dirname "$(dirname "${GenMC}")")/include/genmc/config.h"
 

@@ -34,6 +34,7 @@ set(LIB_SOURCES
   genmc/Verification/Config.cpp
   genmc/Verification/GenMCDriver.cpp
   genmc/Verification/GraphPrinting.cpp
+  genmc/Verification/Invariants.cpp
   genmc/Verification/Relinche/LinearizabilityChecker.cpp
   genmc/Verification/Relinche/Linearization.cpp
   genmc/Verification/Relinche/Observation.cpp

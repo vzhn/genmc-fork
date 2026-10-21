@@ -68,6 +68,13 @@ add_test(NAME liveness-report
 set_tests_properties(liveness-report PROPERTIES LABELS "integration;fast" TIMEOUT 300
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME invariants-fast
+    COMMAND bash -c "${SCRIPT_DIR}/check-invariants-fast.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(invariants-fast PROPERTIES LABELS "integration;fast" TIMEOUT 600
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 # Unit tests
 add_subdirectory(unit)
 

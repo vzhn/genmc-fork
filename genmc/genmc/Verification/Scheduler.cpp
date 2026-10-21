@@ -20,6 +20,7 @@
 #include "genmc/Support/Cast.hpp"
 #include "genmc/Support/Error.hpp"
 #include "genmc/Verification/Config.hpp"
+#include "genmc/Verification/Invariants.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -121,18 +122,33 @@ static auto calculateReplaySchedule(const ExecutionGraph &g, const Config *conf,
 		});
 	}
 
+	/* The target must have survived the erasures above: a replay that
+	 * does not reach it loses the error (see -check-invariants, I2) */
+	if (conf->checkInvariants && errorEvent &&
+	    std::ranges::find(result, *errorEvent) == result.end())
+		invariants::fail(
+			"I2 (error replay)",
+			std::format("the replay target {} is not in the replay schedule {}",
+				    *errorEvent, result),
+			&g, {.where = "calculating the replay schedule"});
+
 	/* The schedule is still reversed, need to fix that. */
 	std::ranges::reverse(result);
 	// GENMC_DEBUG(LOG(VerbosityLevel::Tip, "{}\n", std::ranges::reverse_view(result)););
 	return result;
 }
 
-void Scheduler::resetExplorationOptions(const ExecutionGraph &g, bool replay)
+void Scheduler::resetExplorationOptions(const ExecutionGraph &g)
 {
 	setRescheduledRead(Event::getInit());
 	threadPrios_.clear();
-	replaySchedule_ = replay ? calculateReplaySchedule(g, getConf(), eventToReexecute_)
-				 : std::vector<Event>{};
+	/* Also for an execution resuming from a saved state: its threads have
+	 * passed most of the schedule (scheduleReplay() skips that), but a
+	 * thread with holes before kept events (a non-po-closed prefix a
+	 * backward revisit copied) must fill them before the policy lets the
+	 * others run, as it would in a replay; otherwise the events the others
+	 * add first make the kept events' revisits non-maximal (issue #111) */
+	replaySchedule_ = calculateReplaySchedule(g, getConf(), eventToReexecute_);
 
 	/* Check whether the event that led to this execs needs thread prioritization */
 	for (auto tid : g.thr_ids()) {

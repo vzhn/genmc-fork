@@ -14,6 +14,12 @@
 #ifndef GENMC_RESUME_POINT_HPP
 #define GENMC_RESUME_POINT_HPP
 
+#include "genmc/Execution/Event.hpp"
+#include "genmc/Verification/GraphFingerprint.hpp"
+
+#include <optional>
+#include <vector>
+
 /**
  * The runtime's state at an event, saved when the event's forward revisits
  * are queued. A forward revisit restricts the graph to what existed when the
@@ -31,6 +37,14 @@ public:
 	/** How many queued revisits still refer to this state (the driver
 	 * drops a state nothing refers to, see GenMCDriver::saveResumePoint()) */
 	unsigned pending = 0;
+
+	/** With -check-invariants: the graph at the time of the save, to compare
+	 * with the graph a revisit resumes from (see Invariants.hpp, I4) */
+	std::optional<GraphFingerprint> fingerprint;
+
+	/** Each thread's position (its last event) in the saved state, for the
+	 * same check; empty if the runtime does not tell */
+	[[nodiscard]] virtual auto threadPositions() const -> std::vector<Event> { return {}; }
 };
 
 #endif /* GENMC_RESUME_POINT_HPP */

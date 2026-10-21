@@ -97,6 +97,11 @@ public:
 	[[nodiscard]] auto getAllocPos(SAddr addr) const -> Event;
 	[[nodiscard]] auto getAllocAccess(SAddr addr) const -> AAccess;
 	[[nodiscard]] auto getFreePos(SAddr addr) const -> std::optional<Event>;
+	/** The end of THREAD's dynamic allocation pool (see -check-invariants) */
+	[[nodiscard]] auto allocatorPoolEnd(int thread) const -> uint64_t
+	{
+		return alloctor_.dynamicPoolEnd(thread);
+	}
 
 	[[nodiscard]] auto getMaxNAReadView(const AAccess &access) const -> AdaptiveView;
 	[[nodiscard]] auto getMaxNAWriteEvent(const AAccess &access) const -> AdaptiveView;

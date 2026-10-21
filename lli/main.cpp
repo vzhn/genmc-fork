@@ -179,6 +179,13 @@ static llvm::cl::opt<unsigned int> clResumePoints(
 	"resume-points", llvm::cl::cat(clGeneral), llvm::cl::init(256),
 	llvm::cl::desc("How many saved program states forward revisits may resume from, "
 		       "instead of re-executing the graph (default: 256; 0 disables)"));
+static llvm::cl::opt<bool> clCheckInvariants(
+	"check-invariants", llvm::cl::cat(clDebugging),
+#ifdef ENABLE_GENMC_DEBUG
+	llvm::cl::init(true),
+#endif
+	llvm::cl::desc("Check the invariants of graph restriction, error replay, the allocation "
+		       "map and resume points at run time (internal failure on a violation)"));
 static llvm::cl::opt<bool>
 	clDisableStopOnSystemError("disable-stop-on-system-error", llvm::cl::cat(clGeneral),
 				   llvm::cl::desc("Do not stop verification on system errors"));
@@ -481,6 +488,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.blindRMWReduction = clBlindRMWReduction;
 	conf.ipr = !clDisableIPR;
 	conf.resumePoints = clResumePoints;
+	conf.checkInvariants = clCheckInvariants;
 
 	conf.warnUnfreedMemory = !clDisableWarnUnfreedMemory;
 	conf.collectLinSpec = lliConfig.collectLinSpec;
@@ -963,8 +971,6 @@ void run(GenMCDriver *driver, llvm::Interpreter *EE)
 		auto resumed = rp && !errorReplay &&
 			       EE->resumeFrom(*rp, createExecutionContext(g), lastIndices(g));
 		if (!resumed) {
-			if (rp)
-				driver->prepareReplay();
 			EE->reset();
 			EE->setExecutionContext(createExecutionContext(g));
 			EE->runMain(errorReplay);

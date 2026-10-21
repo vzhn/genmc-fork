@@ -41,6 +41,7 @@
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/DriverHandlerDispatcher.hpp"
 #include "genmc/Verification/GraphPrinting.hpp"
+#include "genmc/Verification/Invariants.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/Relinche/Specification.hpp"
 #include "genmc/Verification/Revisit.hpp"
@@ -152,6 +153,40 @@ void GenMCDriver::pushExecution(Execution &&e)
 	getConsChecker().recomputeCacheCounters(getExec().getGraph());
 }
 
+auto GenMCDriver::invariantContext(std::string_view where) const -> invariants::Context
+{
+	return {.where = where,
+		.dbgInfo = &dbgInfo_,
+		.holesAllowed = getConf()->isDepTrackingModel};
+}
+
+void GenMCDriver::checkGraphInvariants(const ExecutionGraph &g, std::string_view where,
+				       const invariants::RestrictionPlan *plan) const
+{
+	if (!checksInvariants())
+		return;
+	invariants::checkGraph(g, invariantContext(where), plan);
+}
+
+void GenMCDriver::checkAllocationInvariants(std::string_view where) const
+{
+	if (!checksInvariants())
+		return;
+	const auto &g = getExec().getGraph();
+	invariants::checkAllocations(g, g.getState(), invariantContext(where));
+}
+
+void GenMCDriver::restrictExecution(Stamp stamp, std::string_view where)
+{
+	if (!checksInvariants()) {
+		getExec().restrict(stamp);
+		return;
+	}
+	auto plan = invariants::planCutToStamp(getExec().getGraph(), stamp);
+	getExec().restrict(stamp);
+	checkGraphInvariants(getExec().getGraph(), where, &plan);
+}
+
 /* The role of a write in a mutex, for spinloop detection */
 static auto getLockRole(const WriteLabel *wLab) -> ExecutionState::LockRole
 {
@@ -175,6 +210,22 @@ auto GenMCDriver::popExecution() -> bool
 
 void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 {
+	/* A task is only taken once the previous one is done, and a done task
+	 * has reported its errors (or the pool halted and no task is taken):
+	 * a replay still pending here is stale (see -check-invariants, I2) */
+	if (checksInvariants() && (getScheduler().inErrorReplay() || bufferedError_)) {
+		auto target = getScheduler().getErrorReplayEvent();
+		invariants::fail("I2 (error replay)",
+				 std::format("a new task is taken with an error replay pending "
+					     "(target {}, buffered error: {})",
+					     target ? std::format("{}", *target) : "none",
+					     bufferedError_.has_value()),
+				 execStack.empty() ? static_cast<const ExecutionGraph *>(nullptr)
+						   : &getExec().getGraph(),
+				 invariantContext("taking a task from the pool"));
+	}
+	checkGraphInvariants(*exec->graph, "taking a task from the pool");
+
 	/* A replay that collects an error's metadata belongs to the executions
 	 * being replaced: drop it, or the next schedule would replay to an event
 	 * of the old graph. (It is cut short only when the pool halts, and then
@@ -195,8 +246,10 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 
 auto GenMCDriver::extractState() -> std::unique_ptr<GenMCDriver::Execution>
 {
+	auto og = getExec().getGraph().clone();
+	checkGraphInvariants(*og, "copying the graph for another worker");
 	return std::make_unique<Execution>(GenMCDriver::Execution(
-		getExec().getGraph().clone(), LocalQueueT(), ChoiceMap(getExec().getChoiceMap())));
+		std::move(og), LocalQueueT(), ChoiceMap(getExec().getChoiceMap())));
 }
 
 static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state)
@@ -293,13 +346,29 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	state.clear();
 	if constexpr (Config::emitNALabels)
 		reconstructState(g, state);
-	getScheduler().resetExplorationOptions(g, /*replay=*/!pendingResume_);
+	if constexpr (Config::emitNALabels)
+		checkAllocationInvariants("reconstructing the state");
+	/* An error replay replays to its target, which the graph holds (I2) */
+	if (checksInvariants() && getScheduler().inErrorReplay()) {
+		auto target = *getScheduler().getErrorReplayEvent();
+		if (!bufferedError_ || !g.containsPosNonEmpty(target))
+			invariants::fail("I2 (error replay)",
+					 std::format("an execution starts in error replay but its "
+						     "target {} is {} (buffered error: {})",
+						     target,
+						     g.containsPosNonEmpty(target)
+							     ? "in the graph"
+							     : "not in the graph",
+						     bufferedError_.has_value()),
+					 &g, invariantContext("starting an execution"));
+	}
+	getScheduler().resetExplorationOptions(g);
+	/* A resumed execution is driven through the holes before its kept
+	 * events as a replayed one is (I4) */
+	if (pendingResume_ && checksInvariants())
+		invariants::checkResumeSchedule(g, getScheduler().getReplaySchedule(),
+						invariantContext("starting a resumed execution"));
 	return getScheduler().inErrorReplay();
-}
-
-void GenMCDriver::prepareReplay()
-{
-	getScheduler().resetExplorationOptions(getExec().getGraph());
 }
 
 void GenMCDriver::checkHelpingCasAnnotation()
@@ -506,6 +575,7 @@ void GenMCDriver::maybeCutGraph(const EventLabel *lab)
 	if (es.empty())
 		return;
 	g.cutToView(calcSCPrefixClosure(g, es));
+	checkGraphInvariants(g, "pruning the graph");
 }
 
 void GenMCDriver::restartExecution()
@@ -535,7 +605,8 @@ auto GenMCDriver::done() -> bool
 			 "bug report to {}\n",
 			 PACKAGE_BUGREPORT);
 		getExec().getWorkqueue().truncate(runStartWork_);
-		getExec().restrict(runStartStamp_);
+		restrictExecution(runStartStamp_,
+				  "restricting the graph to rerun after a relocation");
 		getConsChecker().recomputeCacheCounters(getExec().getGraph());
 		repairDanglingReads(getExec().getGraph());
 		return false;
@@ -547,7 +618,8 @@ auto GenMCDriver::done() -> bool
 		eagerKeptChecks_ = true;
 		++result.keptCheckReruns;
 		getExec().getWorkqueue().truncate(runStartWork_);
-		getExec().restrict(runStartStamp_);
+		restrictExecution(runStartStamp_,
+				  "restricting the graph to rerun with eager checks");
 		getConsChecker().recomputeCacheCounters(getExec().getGraph());
 		repairDanglingReads(getExec().getGraph());
 		return false;
@@ -779,6 +851,7 @@ void GenMCDriver::relocateExecution(int thread, int from, int delta)
 	getExec().getGraph().relocateThread(thread, from, delta);
 	getExec().getWorkqueue().relocateThread(thread, from, delta);
 	getExec().getChoiceMap().relocateThread(thread, from, delta);
+	checkGraphInvariants(getExec().getGraph(), "relocating a thread's events");
 }
 
 void GenMCDriver::relocateAndRerun(int thread, int from, int delta)
@@ -1757,6 +1830,17 @@ auto GenMCDriver::handleThreadKill(const EventDbgInfo *dbg, Event pos)
 		 * that targets it (updateErrorInfoAndMaybeExit() may have just ended the
 		 * replay), or by a replay with race detection disabled */
 		VERIFY(genmc::isa<ThreadKillLabel>(getExec().getGraph().getEventLabel(pos)));
+		/* (I2: an ongoing error replay only re-executes the kill if it is
+		 * its target, or if non-atomic events stay in its schedule) */
+		if (checksInvariants() && getScheduler().inErrorReplay() &&
+		    !getScheduler().isErrorReplayEvent(pos) && !getConf()->disableRaceDetection &&
+		    !getConf()->replayCompletedThreads)
+			invariants::fail(
+				"I2 (error replay)",
+				std::format("the kill {} is re-executed by an error replay "
+					    "targeting {}",
+					    pos, *getScheduler().getErrorReplayEvent()),
+				&getExec().getGraph(), invariantContext("replaying a kill"));
 		return {.result = std::monostate{}, .count = 1U};
 	}
 	return handleThreadKill(ThreadKillLabel::create(pos));
@@ -2832,6 +2916,8 @@ auto GenMCDriver::saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>
 	auto rp = resumeHook_(pos);
 	if (!rp)
 		return nullptr;
+	if (checksInvariants())
+		rp->fingerprint = invariants::fingerprint(g, pos);
 	resumePoints_.push_back(rp);
 	if (resumePoints_.size() > getConf()->resumePoints)
 		resumePoints_.pop_front();
@@ -2950,6 +3036,7 @@ auto GenMCDriver::handleMalloc(Event pos, ASize size, uint64_t alignment, Storag
 
 	auto guard = g.addScoped(mallocProbeLab_);
 	auto *lab = guard.get();
+	checkAllocationInvariants("allocating a block");
 	/* calloc(): the block is initialized (to zero) by the allocation itself,
 	 * so no store events are needed before it may be read */
 	if (zeroed && addr != SAddr())
@@ -3777,7 +3864,11 @@ auto GenMCDriver::copyGraph(const BackwardRevisit *br, VectorClock *v) const
 
 	/* Adjust the view that will be used for copying */
 	auto prefix = getRevisitPrefixView(g.getEventLabel(br->getRev()));
+	auto plan = checksInvariants() ? std::optional(invariants::planCopyUpTo(g, *v))
+				       : std::nullopt;
 	auto og = g.getCopyUpTo(*v);
+	checkGraphInvariants(*og, "copying the graph for a backward revisit",
+			     plan ? &*plan : nullptr);
 
 	/** Ensure the prefix of the write will not be revisitable.
 	 * This is also used to check whether a write has revisited,
@@ -3978,7 +4069,7 @@ auto GenMCDriver::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 	auto &g = getExec().getGraph();
 	auto *br = genmc::dyn_cast<BackwardRevisit>(&*item);
 	auto stamp = g.getEventLabel(br ? br->getRev() : item->getPos())->getStamp();
-	getExec().restrict(stamp);
+	restrictExecution(stamp, "restricting the graph for a revisit");
 	/* Cutting the graph bypasses the incremental counter updates */
 	getConsChecker().recomputeCacheCounters(getExec().getGraph());
 	repairDanglingReads(g);
@@ -3990,6 +4081,11 @@ auto GenMCDriver::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 		pendingResume_ = fr->getResumePoint();
 		if (pendingResume_ && --pendingResume_->pending == 0)
 			std::erase(resumePoints_, pendingResume_); /* its last revisit */
+		if (pendingResume_ && checksInvariants() && pendingResume_->fingerprint)
+			invariants::checkResume(g, *pendingResume_->fingerprint,
+						pendingResume_->threadPositions(),
+						invariantContext("restricting the graph for a "
+								 "resumed revisit"));
 		return forwardRevisit(*fr);
 	}
 	if (auto *br = genmc::dyn_cast<BackwardRevisit>(&*item)) {

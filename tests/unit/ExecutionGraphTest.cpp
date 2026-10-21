@@ -10,6 +10,7 @@
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Execution/GraphUtils.hpp"
 #include "genmc/Verification/Config.hpp"
+#include "genmc/Verification/Invariants.hpp"
 #include "genmc/Verification/MemoryModel.hpp"
 
 struct TestGraph {
@@ -425,4 +426,42 @@ TEST(ExecutionGraphTest, CopyUnsharesDepViewPrefixes)
 	EXPECT_FALSE(copied.sharesStorageWith(orig));
 	for (auto t = 0; t < 3; t++)
 		EXPECT_EQ(copied.getMax(t), orig.getMax(t));
+}
+
+/* -check-invariants (I1): a begin whose create a restriction cut must be
+ * terminated, and a trailing one erased (see ExecutionGraph::removeOrphanBegins()).
+ *
+ * TC
+ *     B      (the create is removed, the begin stays)
+ */
+TEST(ExecutionGraphTest, InvariantRejectsBeginWithCutCreate)
+{
+	TestGraph g;
+	auto tinfo = ThreadInfo{1, 0, 0, SVal(0), "t1"};
+	auto *tcLab = genmc::cast<ThreadCreateLabel>(
+		g.graph.add(ThreadCreateLabel::create(Event(0, 1), tinfo)));
+	g.graph.addNewThread();
+	auto *bLab =
+		g.graph.add(ThreadStartLabel::create(Event(1, 0), tcLab->getPos(), tcLab, tinfo));
+	const invariants::Context ctx{.where = "a unit test"};
+
+	/* Linked create and begin: well-formed */
+	invariants::checkGraph(g.graph, ctx);
+
+	/* Removing the create unlinks the begin (see removeLast()); a begin
+	 * without its create has to be terminated... */
+	g.graph.removeLast(0);
+	ASSERT_EQ(bLab->getCreate(), nullptr);
+	EXPECT_DEATH(invariants::checkGraph(g.graph, ctx), "lost its create");
+
+	/* ...and, being the last thread, erased */
+	bLab->setTerminated();
+	EXPECT_DEATH(invariants::checkGraph(g.graph, ctx), "should have been erased");
+
+	/* A cut does both: the thread is gone and the graph is well-formed again */
+	g.graph.add(ThreadCreateLabel::create(Event(0, 1), tinfo));
+	bLab->setCreate(genmc::cast<ThreadCreateLabel>(g.graph.getEventLabel(Event(0, 1))));
+	g.graph.cutToStamp(g.graph.getEventLabel(Event(0, 0))->getStamp());
+	EXPECT_EQ(g.graph.getNumThreads(), 1);
+	invariants::checkGraph(g.graph, ctx);
 }

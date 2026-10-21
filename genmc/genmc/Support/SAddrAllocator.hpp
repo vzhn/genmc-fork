@@ -88,6 +88,9 @@ public:
 	 * thread's later allocations come after it */
 	void reserve(SAddr addr, uint64_t size);
 
+	/** The end of THREAD's dynamic pool: the offset its next block starts at */
+	[[nodiscard]] auto dynamicPoolEnd(int thread) const -> SAddr::Width;
+
 	friend struct std::formatter<SAddrAllocator>;
 
 private:
