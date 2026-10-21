@@ -631,13 +631,21 @@ auto assignSourceBits(std::initializer_list<const llvm::Module *> mods) -> Sourc
 	return sources;
 }
 
-/* The condition a terminator branches on, if any */
+/* The condition a terminator branches on, if it makes a choice (as the
+ * interpreter: a branch whose targets are one block has no control
+ * dependency, #125) */
 auto branchCondition(llvm::Instruction &I) -> llvm::Value *
 {
+	auto oneTarget = [&] {
+		for (auto i = 1U; i < I.getNumSuccessors(); i++)
+			if (I.getSuccessor(i) != I.getSuccessor(0))
+				return false;
+		return true;
+	};
 	if (auto *br = llvm::dyn_cast<llvm::BranchInst>(&I))
-		return br->isConditional() ? br->getCondition() : nullptr;
+		return br->isConditional() && !oneTarget() ? br->getCondition() : nullptr;
 	if (auto *sw = llvm::dyn_cast<llvm::SwitchInst>(&I))
-		return sw->getCondition();
+		return oneTarget() ? nullptr : sw->getCondition();
 	if (auto *ib = llvm::dyn_cast<llvm::IndirectBrInst>(&I))
 		return ib->getAddress();
 	return nullptr;

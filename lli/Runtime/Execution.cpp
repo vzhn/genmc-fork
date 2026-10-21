@@ -1342,6 +1342,18 @@ void Interpreter::visitUnreachableInst(UnreachableInst &I)
 	report_fatal_error("Program executed an 'unreachable' instruction!");
 }
 
+/* Whether the terminator I has a single target block: such a branch makes no
+ * choice and no control dependency (JumpThreadingPass leaves one where it
+ * folds a cmpxchg's dead expected-value store, #125) */
+static bool hasOneTarget(const Instruction &I)
+{
+	const auto *first = I.getSuccessor(0);
+	for (auto i = 1U; i < I.getNumSuccessors(); i++)
+		if (I.getSuccessor(i) != first)
+			return false;
+	return true;
+}
+
 void Interpreter::visitBranchInst(BranchInst &I)
 {
 	ExecutionContext &SF = ECStack().back();
@@ -1352,7 +1364,8 @@ void Interpreter::visitBranchInst(BranchInst &I)
 		Value *Cond = I.getCondition();
 		if (getOperandValue(Cond, SF).IntVal == 0) // If false cond...
 			Dest = I.getSuccessor(1);
-		updateBranchCtrlDeps(I.getParent(), Cond);
+		if (!hasOneTarget(I))
+			updateBranchCtrlDeps(I.getParent(), Cond);
 	}
 	SwitchToNewBasicBlock(Dest, SF);
 }
@@ -1375,7 +1388,8 @@ void Interpreter::visitSwitchInst(SwitchInst &I)
 	}
 	if (!Dest)
 		Dest = I.getDefaultDest(); // No cases matched: use default
-	updateBranchCtrlDeps(I.getParent(), Cond);
+	if (!hasOneTarget(I))
+		updateBranchCtrlDeps(I.getParent(), Cond);
 	SwitchToNewBasicBlock(Dest, SF);
 }
 
