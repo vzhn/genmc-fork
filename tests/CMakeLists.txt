@@ -70,3 +70,15 @@ set_tests_properties(liveness-report PROPERTIES LABELS "integration;fast" TIMEOU
 
 # Unit tests
 add_subdirectory(unit)
+
+# TLA+ models of the error replay and the worker pool (models/tla): the fixed
+# configurations must pass, the bug configurations must reproduce their bug
+find_program(TLC_EXECUTABLE tlc)
+if(TLC_EXECUTABLE)
+  add_test(NAME tla-models
+      COMMAND bash -c "${SCRIPT_DIR}/check-tla.sh -j 2"
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  )
+  set_tests_properties(tla-models PROPERTIES LABELS "models" TIMEOUT 1800
+      ENVIRONMENT "TLC=${TLC_EXECUTABLE}")
+endif()
