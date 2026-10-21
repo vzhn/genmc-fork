@@ -178,7 +178,10 @@ public:
 	}
 
 	/** Under LKMM, a control dependency ends at the join of its branch */
-	auto scopesCtrlDeps() const -> bool { return relocatesKeptEvents(); }
+	auto scopesCtrlDeps() const -> bool
+	{
+		return getConf()->checkReplayKeys && getConf()->model == ModelType::LKMM;
+	}
 
 	/** Attemps to complete the execution by inspecting the cache.
 	 * Returns whether it succeeded. */
@@ -595,10 +598,14 @@ private:
 	/** relocateExecution(), and schedules a repeat of the run */
 	void relocateAndRerun(int thread, int from, int delta);
 
-	/** Whether kept events are moved to their instruction (see alignKeptEvents()) */
+	/** Whether kept events are moved to their instruction (see alignKeptEvents()):
+	 * under LKMM, and under IMM with -exhaustive, where a revisit can keep
+	 * events after a CAS whose outcome changes, and so whether it writes */
 	auto relocatesKeptEvents() const -> bool
 	{
-		return getConf()->checkReplayKeys && getConf()->model == ModelType::LKMM;
+		return getConf()->checkReplayKeys &&
+		       (getConf()->model == ModelType::LKMM ||
+			(getConf()->exhaustive && getConf()->model == ModelType::IMM));
 	}
 
 	/** Stops with an internal error unless @p lab, reused on replay, comes

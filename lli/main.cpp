@@ -152,7 +152,7 @@ static llvm::cl::opt<bool> clLkmmReference(
 static llvm::cl::opt<bool> clCheckReplayKeys(
 	"check-replay-keys", llvm::cl::cat(clDebugging),
 	llvm::cl::desc("Check that every event reused when re-running a thread was produced by "
-		       "the same instruction instance (always on under -lkmm)"));
+		       "the same instruction instance (always on under -lkmm and under -exhaustive -imm)"));
 
 static llvm::cl::opt<bool> clCheckLiveness("check-liveness", llvm::cl::cat(clGeneral),
 					   llvm::cl::desc("Check for liveness violations"));
@@ -492,7 +492,10 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.printErrorTrace = clPrintErrorTrace;
 	conf.checkLiveness = clCheckLiveness;
 	conf.lkmmReference = clLkmmReference;
-	conf.checkReplayKeys = clCheckReplayKeys || clModelType == ModelType::LKMM;
+	/* (-exhaustive under IMM relocates kept events, see
+	 * GenMCDriver::relocatesKeptEvents()) */
+	conf.checkReplayKeys = clCheckReplayKeys || clModelType == ModelType::LKMM ||
+			       (clExhaustive && clModelType == ModelType::IMM);
 #if EMIT_NA_LABELS
 	conf.instructionCaching = clCacheInstructions;
 #endif
