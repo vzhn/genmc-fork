@@ -729,6 +729,10 @@ private:
 	 * if the event was not an RMW, or was an unsuccessful one */
 	auto completeRevisitedRMW(const ReadLabel *rLab) -> WriteLabel *;
 
+	/** Updates the kept write part of RLAB, an RMW read executed anew,
+	 * from the read's rf (null if the RMW no longer writes) */
+	auto updateKeptRMWWrite(const ReadLabel *rLab) -> WriteLabel *;
+
 	/** Copies the current EG according to BR's view V.
 	 * May modify V but will not execute BR in the copy. */
 	auto copyGraph(const BackwardRevisit *br, VectorClock *v) const

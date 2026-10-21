@@ -2528,6 +2528,11 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 		return {.result = Invalid{}, .count = 1U};
 	}
 
+	/* The read's write part may have been kept while the read is executed
+	 * anew (see completeRevisitedRMW()): it follows the read's rf */
+	if (lab->isRMW())
+		updateKeptRMWWrite(lab);
+
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug2, "--- Added load {}\n{}", lab->getPos(),
 			getExec().getGraph()););
 
@@ -4039,6 +4044,12 @@ auto GenMCDriver::completeRevisitedRMW(const ReadLabel *rLab) -> WriteLabel *
 	if (!wLab)
 		return nullptr;
 
+	/* The read's own write part may have been kept while the read was not
+	 * (a dependency-tracking model's revisit keeps the write its prefix
+	 * depends on, and the read is re-executed): the write stays */
+	if (rLab->isRMW())
+		return updateKeptRMWWrite(rLab);
+
 	/* The read was followed by kept events (a failed CAS has no write, and
 	 * the events after it may not depend on it): make room for the write */
 	if (const auto *nLab = getExec().getGraph().getEventLabelIfPresent(wLab->getPos());
@@ -4052,6 +4063,24 @@ auto GenMCDriver::completeRevisitedRMW(const ReadLabel *rLab) -> WriteLabel *
 	VERIFY(rLab->getRf());
 	lab->addCo(rLab->getRf());
 	return lab;
+}
+
+/* RLAB's write part, kept through a revisit while the read was not, takes
+ * the value and the coherence position the read's rf now gives it, and its
+ * views and revisits are computed anew, as for a write just added. (A CAS
+ * that now fails keeps its write: the write stays as kept.) */
+auto GenMCDriver::updateKeptRMWWrite(const ReadLabel *rLab) -> WriteLabel *
+{
+	auto &g = getExec().getGraph();
+	auto *kLab = g.getWriteLabel(rLab->getPos().next());
+	VERIFY(kLab && kLab->isRMW() && rLab->getRf());
+	auto wLab = createRMWWriteLabel(g, rLab);
+	if (!wLab)
+		return nullptr;
+	kLab->setVal(wLab->getVal());
+	kLab->moveCo(rLab->getRf());
+	updateLabelViews(kLab);
+	return kLab;
 }
 
 auto GenMCDriver::revisitWrite(const WriteForwardRevisit &ri) -> bool
