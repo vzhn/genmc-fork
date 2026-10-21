@@ -673,6 +673,16 @@ private:
 
 	auto isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLabel *lab) -> bool;
 
+	/** Dependency-tracking models: whether LAB, an access the revisit R
+	 * deletes (or the read it revisits), reads from or follows the co-latest
+	 * write it can reach among the writes R keeps and those added before LAB */
+	auto isPlacedMaximallyInRevisit(const BackwardRevisit &r, const MemAccessLabel *lab) const
+		-> bool;
+
+	/** Whether LAB is in the prefix of a write that R keeps and that
+	 * revisited a read still reading it */
+	auto isKeptByKeptRevisit(const BackwardRevisit &r, const EventLabel *lab) const -> bool;
+
 	/** Whether LAB is a write that a write of the saved prefix, added after LAB
 	 * and to the same location, precedes in coherence */
 	auto isCoAfterLaterSavedWrite(const BackwardRevisit &r, const EventLabel *lab) -> bool;
