@@ -19,9 +19,14 @@
 #include "passes/LLVMUtils.hpp"
 
 #include <llvm/Analysis/CaptureTracking.h>
+#include <llvm/ADT/MapVector.h>
+#include <llvm/ADT/PostOrderIterator.h>
 #include <llvm/Analysis/LoopInfo.h>
+#include <llvm/Analysis/PostDominators.h>
+#include <llvm/IR/CFG.h>
 #include <llvm/Analysis/ValueTracking.h>
 #include <llvm/AsmParser/Parser.h>
+#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/Dominators.h>
@@ -37,10 +42,13 @@
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/Utils/Cloning.h>
+#include <llvm/Transforms/Utils/PromoteMemToReg.h>
 
 #include <cctype>
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <set>
 
 /* Which annotations EliminateAnnotationsPass turns into attributes */
 struct PassChecker::AnnotationKinds {
@@ -139,7 +147,16 @@ auto isPrivateAccess(const llvm::Instruction &I) -> bool
 	if (!ptr)
 		return false;
 	const auto *obj = llvm::dyn_cast<llvm::AllocaInst>(llvm::getUnderlyingObject(ptr));
-	return obj && !llvm::PointerMayBeCaptured(obj, /*ReturnCaptures=*/true);
+	if (!obj)
+		return false;
+#if LLVM_VERSION_MAJOR >= 21
+	/* As the interpreter (isThreadPrivateAlloca): a comparison captures only
+	 * the address, which gives no other thread a pointer to the memory */
+	return !llvm::capturesAnyProvenance(llvm::PointerMayBeCaptured(
+		obj, /*ReturnCaptures=*/true, llvm::CaptureComponents::Provenance));
+#else
+	return !llvm::PointerMayBeCaptured(obj, /*ReturnCaptures=*/true, /*StoreCaptures=*/true);
+#endif
 }
 
 /*
@@ -273,10 +290,24 @@ auto convert(llvm::Value *v, llvm::Type *to, llvm::Instruction *pos) -> llvm::Va
 	return new llvm::PtrToIntInst(v, to, "", pos->getIterator());
 }
 
-/* Replace the atomic instruction I by a call to an external function */
+/* Whether I is a volatile plain access (Alive2 has no volatile either) */
+auto isVolatileAccess(const llvm::Instruction &I) -> bool
+{
+	if (const auto *L = llvm::dyn_cast<llvm::LoadInst>(&I))
+		return L->isVolatile() && !L->isAtomic();
+	if (const auto *S = llvm::dyn_cast<llvm::StoreInst>(&I))
+		return S->isVolatile() && !S->isAtomic();
+	return false;
+}
+
+/* Replace the atomic (or volatile) instruction I by a call to an external
+ * function */
 void lowerAtomic(llvm::Instruction *I)
 {
-	auto ord = [](llvm::AtomicOrdering o) { return std::string(llvm::toIRString(o)); };
+	auto ord = [](llvm::AtomicOrdering o) {
+		return o == llvm::AtomicOrdering::NotAtomic ? std::string("volatile")
+							    : std::string(llvm::toIRString(o));
+	};
 	auto &ctx = I->getContext();
 	const auto &DL = I->getModule()->getDataLayout();
 	auto *voidTy = llvm::Type::getVoidTy(ctx);
@@ -341,15 +372,56 @@ void lowerAtomic(llvm::Instruction *I)
 	I->eraseFromParent();
 }
 
+/* Whether an internal function of code CODE orders nothing (an assume, a
+ * marker, an annotation...) */
+auto isPureCode(InternalFunctions code) -> bool
+{
+	auto codeI = static_cast<std::underlying_type_t<InternalFunctions>>(code);
+	return
+#define FIRST_PURE_FUNCTION(NUM) codeI >= NUM &&
+#define LAST_PURE_FUNCTION(NUM) codeI <= NUM;
+#include "passes/InternalFunction.def"
+}
+
+/*
+ * What the functions GenMC interprets may touch: an access or a lock
+ * operation its location, a fence, marker or assumption nothing (inaccessible
+ * memory keeps them side effects a pass may not drop or reorder). Without
+ * this, Alive2 lets every call write any global, and rejects a pass that
+ * moves a plain access over an atomic one to another location.
+ */
+void restrictMemoryEffects(llvm::Module &mod)
+{
+	auto effects = llvm::MemoryEffects::argMemOnly(llvm::ModRefInfo::ModRef) |
+		       llvm::MemoryEffects::inaccessibleMemOnly(llvm::ModRefInfo::ModRef);
+	for (auto &F : mod) {
+		if (!F.isDeclaration())
+			continue;
+		auto name = F.getName().str();
+		auto restricted = name.starts_with("__alive_");
+		if (isInternalFunction(name)) {
+			auto code = internalFunNames.at(name);
+			restricted = isPureCode(code) || isMutexCode(code) || isCondVarCode(code) ||
+				     code == InternalFunctions::LkmmFence ||
+				     code == InternalFunctions::SrcuReadLock ||
+				     code == InternalFunctions::SrcuReadUnlock ||
+				     code == InternalFunctions::SyncSrcu;
+		}
+		if (restricted)
+			F.setMemoryEffects(effects);
+	}
+}
+
 /*
  * The module as Alive2 can check it:
- *  - each atomic access and fence becomes a call to an external function
- *    named after the operation, ordering and size (Alive2 has no atomics;
- *    calls are side effects a refinement must keep, in number and order, as
- *    a transformation must keep atomic accesses), but for accesses to
- *    locals that do not escape, which become plain;
+ *  - each atomic access, volatile access and fence becomes a call to an
+ *    external function named after the operation, ordering and size (Alive2
+ *    has no atomics; calls are side effects a refinement must keep, in
+ *    number and order, as a transformation must keep such accesses), but
+ *    for accesses to locals that do not escape, which become plain;
  *  - annotations become observable calls (exposeAnnotations);
- *  - GenMC's allocation functions return fresh memory (noalias);
+ *  - the calls GenMC interprets touch only their location (restrictMemoryEffects);
+ *  - GenMC's allocation functions return fresh memory (noalias, noundef);
  *  - debug information and alias-scope metadata go (Alive2 rejects them,
  *    and dropping them only drops facts).
  */
@@ -358,11 +430,24 @@ void makeCheckable(llvm::Module *clone, const AnnotationKinds &kinds, bool inlin
 	llvm::StripDebugInfo(*clone);
 	if (inlineCalls)
 		inlineInternalCalls(*clone);
+	/* LLVM 22's one-argument lifetime markers (the inliner adds some) do not
+	 * parse in Alive2 v20's LLVM, and they only let a pass reuse a local's
+	 * memory */
+	for (auto &F : llvm::make_early_inc_range(*clone))
+		if (F.getName().starts_with("llvm.lifetime.")) {
+			for (auto *user : llvm::make_early_inc_range(F.users()))
+				if (auto *ci = llvm::dyn_cast<llvm::CallInst>(user))
+					ci->eraseFromParent();
+			if (F.use_empty())
+				F.eraseFromParent();
+		}
 	for (const auto *name :
 	     {"__VERIFIER_malloc", "__VERIFIER_malloc_aligned", "__VERIFIER_palloc",
 	      "__VERIFIER_hazptr_alloc", "__VERIFIER_calloc"})
-		if (auto *fun = clone->getFunction(name))
+		if (auto *fun = clone->getFunction(name)) {
 			fun->addRetAttr(llvm::Attribute::NoAlias);
+			fun->addRetAttr(llvm::Attribute::NoUndef); /* never poison */
+		}
 	exposeAnnotations(*clone, kinds);
 
 	llvm::SmallVector<llvm::Instruction *, 16> worklist;
@@ -376,7 +461,8 @@ void makeCheckable(llvm::Module *clone, const AnnotationKinds &kinds, bool inlin
 				else
 					llvm::cast<llvm::StoreInst>(&I)->setAtomic(
 						llvm::AtomicOrdering::NotAtomic);
-			} else if (I.isAtomic() || llvm::isa<llvm::FenceInst>(I)) {
+			} else if (I.isAtomic() || llvm::isa<llvm::FenceInst>(I) ||
+				   isVolatileAccess(I)) {
 				worklist.push_back(&I);
 			} else if (auto *II = llvm::dyn_cast<llvm::IntrinsicInst>(&I);
 				   II && II->getIntrinsicID() ==
@@ -390,6 +476,7 @@ void makeCheckable(llvm::Module *clone, const AnnotationKinds &kinds, bool inlin
 		else
 			lowerAtomic(I);
 	}
+	restrictMemoryEffects(*clone);
 }
 
 auto printCheckableModule(const llvm::Module &mod, const AnnotationKinds &kinds,
@@ -398,6 +485,437 @@ auto printCheckableModule(const llvm::Module &mod, const AnnotationKinds &kinds,
 	auto clone = llvm::CloneModule(mod);
 	makeCheckable(&*clone, kinds, inlineCalls);
 	return printModule(*clone);
+}
+
+/*
+ * Dependencies, as GenMC's interpreter tracks them (lli/Runtime/Execution.cpp),
+ * replayed in the module so that Alive2 can compare them across a pass.
+ *
+ * Sources. A dependency is on an event of the thread: a read (load, RMW,
+ * cmpxchg), an allocation (alloca, __VERIFIER_malloc...), the thread join or
+ * SRCU lock a value comes from, a spin or optional marker. Each source is a
+ * bit of a mask (the smallest multiple of 64 bits that fits them, at most
+ * MaxMaskBits), named by its source location (code a pass duplicates keeps
+ * its bits), or by its value name without one; sources past the mask's
+ * width, and anonymous ones, share the last bit. A function's arguments are
+ * sources too: their dependencies come from the caller, which Alive2 does
+ * not see, and a pass may not change what depends on them.
+ *
+ * Values. A source depends on itself. Any other value depends on what its
+ * operands depend on (the interpreter: binary operators, comparisons, casts,
+ * select on all three operands, GEP on the pointer and the indices, freeze,
+ * extractvalue; insertvalue on the aggregate only, as the interpreter has
+ * it); a PHI on the value it chooses, plus, under LKMM, the conditions of the
+ * branches joining at its block. The result of a call to another function
+ * has no dependencies here (the interpreter gives it the return value's; a
+ * callee is checked on its own). GenMC does not carry data dependencies
+ * through memory, the LKMM checker does (carry-dep = data ; rfi, and IMM has
+ * rfi in ppo): a plain load of a global or local that the function stored to
+ * before reads that store, and depends on what the stored value depended on,
+ * so that a pass forwarding the stored value keeps the dependencies.
+ *
+ * Control. A conditional branch, switch or indirect branch makes what runs
+ * after it depend on its condition: to the end of the function without
+ * scoping (IMM), and under LKMM (scoped) until its join, the block's
+ * immediate post-dominator, is entered, after which only the join's PHIs
+ * carry the dependency; a branch without a join (an early return, an endless
+ * loop) is not scoped. Permanent control dependencies also come from the
+ * argument of an assume, from a spin or optional marker (on the marker's
+ * event) and, under LKMM, from a cmpxchg that acquires on success only (on
+ * the cmpxchg), as the interpreter adds them.
+ *
+ * Obligations. Before each event that carries dependencies, the module calls
+ * __alive_deps(addr, data, ctrl): atomic loads, stores, RMWs and cmpxchgs
+ * (addr: the pointer; data: the value stored, the RMW operand, the cmpxchg
+ * new value), plain stores to memory another thread may see, mutex and
+ * condition-variable calls and SRCU locks (addr: the first argument; the
+ * SRCU unlock's data: the second), thread creation (data: the argument
+ * passed), fences, and the other internal calls that make events (ctrl
+ * only), and calls to the module's own functions (ctrl only: the callee's
+ * events run under the caller's open branches). The masks are passed as
+ * vectors of bits, and a pass that changes one is reported by alive-tv in
+ * the direction the source module allows (a poison lane is refined by
+ * anything): with the source's set bits poison, a target bit the source
+ * lacks is an added dependency (the "+deps-add" pair); with its clear bits
+ * poison, a missing one is a dropped dependency ("+deps-drop"). A
+ * dependency that changes kind (a branch that becomes a select: control to
+ * data) fails both.
+ *
+ * Not modelled: the cmpxchg's expected value and the addr;po dependencies
+ * (tracked, but no checker reads them); the prefix-only control dependencies
+ * of LKMM (pctrl: what a branch's accesses can order after their join, which
+ * depends on the branch's locations); the dependencies a callee's events get
+ * from an indirect call's function pointer; accesses to thread-local storage;
+ * a plain load's own event when it reads a store of the function (its
+ * dependencies are the stored value's, so that forwarding is no change).
+ */
+constexpr unsigned MaxMaskBits = 256;
+struct SourceBits {
+	std::map<std::string, unsigned> bits;
+	unsigned width;
+};
+
+/* What the source module's masks tolerate, so that alive-tv reports a change
+ * in one direction only */
+enum class DepCheck : std::uint8_t { Added, Dropped };
+
+auto internalCode(const llvm::Instruction &I) -> std::optional<InternalFunctions>
+{
+	auto *ci = llvm::dyn_cast<llvm::CallInst>(&I);
+	if (!ci)
+		return std::nullopt;
+	auto name = getCalledFunOrStripValName(*ci);
+	if (!isInternalFunction(name))
+		return std::nullopt;
+	return internalFunNames.at(name);
+}
+
+/* Calls whose result depends on their own event */
+auto isEventValuedCode(InternalFunctions code) -> bool
+{
+	return isAllocCode(code) || code == InternalFunctions::ThreadJoin ||
+	       code == InternalFunctions::SrcuReadLock;
+}
+
+/* Markers that put a control dependency on their own event */
+auto isCtrlMarkerCode(InternalFunctions code) -> bool
+{
+	using IF = InternalFunctions;
+	return code == IF::OptBegin || code == IF::LoopBegin || code == IF::SpinStart ||
+	       code == IF::AwaitStart || code == IF::FaiZNESpinEnd || code == IF::LockZNESpinEnd;
+}
+
+auto isSource(const llvm::Instruction &I) -> bool
+{
+	if (llvm::isa<llvm::LoadInst, llvm::AtomicRMWInst, llvm::AtomicCmpXchgInst,
+		      llvm::AllocaInst>(I))
+		return true;
+	auto code = internalCode(I);
+	return code && (isEventValuedCode(*code) || isCtrlMarkerCode(*code));
+}
+
+/* A source's name across a pass: its source location, with where it was
+ * inlined, or its value name */
+auto sourceName(const llvm::Instruction &I) -> std::string
+{
+	std::string s;
+	for (const auto *loc = I.getDebugLoc().get(); loc; loc = loc->getInlinedAt())
+		s += std::to_string(loc->getLine()) + ":" + std::to_string(loc->getColumn()) + "/";
+	if (s.empty() && I.hasName())
+		s = "%" + I.getName().str();
+	return s;
+}
+
+auto sourceName(const llvm::Argument &A) -> std::string
+{
+	return "arg:" + A.getParent()->getName().str() + ":" + std::to_string(A.getArgNo());
+}
+
+/* Bits for the sources of the modules: one per name, the last for the
+ * anonymous ones and those past the mask's width */
+auto assignSourceBits(std::initializer_list<const llvm::Module *> mods) -> SourceBits
+{
+	SourceBits sources;
+	auto &bits = sources.bits;
+	for (const auto *mod : mods)
+		for (const auto &F : *mod) {
+			for (const auto &A : F.args())
+				bits.try_emplace(sourceName(A), 0);
+			for (const auto &I : llvm::instructions(F))
+				if (isSource(I))
+					bits.try_emplace(sourceName(I), 0);
+		}
+	auto named = bits.size() - bits.count("");
+	sources.width = std::min(MaxMaskBits, 64 * static_cast<unsigned>((named + 1 + 63) / 64));
+	auto i = 0U;
+	for (auto &[name, bit] : bits)
+		bit = name.empty() ? sources.width - 1 : std::min(i++, sources.width - 1);
+	return sources;
+}
+
+/* The condition a terminator branches on, if it makes a choice (as the
+ * interpreter: a branch whose targets are one block has no control
+ * dependency, #125) */
+auto branchCondition(llvm::Instruction &I) -> llvm::Value *
+{
+	auto oneTarget = [&] {
+		for (auto i = 1U; i < I.getNumSuccessors(); i++)
+			if (I.getSuccessor(i) != I.getSuccessor(0))
+				return false;
+		return true;
+	};
+	if (auto *br = llvm::dyn_cast<llvm::BranchInst>(&I))
+		return br->isConditional() && !oneTarget() ? br->getCondition() : nullptr;
+	if (auto *sw = llvm::dyn_cast<llvm::SwitchInst>(&I))
+		return oneTarget() ? nullptr : sw->getCondition();
+	if (auto *ib = llvm::dyn_cast<llvm::IndirectBrInst>(&I))
+		return ib->getAddress();
+	return nullptr;
+}
+
+void instrumentDeps(llvm::Function &F, const SourceBits &sources, bool scoped,
+		    std::optional<DepCheck> check)
+{
+	auto &ctx = F.getContext();
+	auto width = sources.width;
+	auto *maskTy = llvm::IntegerType::get(ctx, width);
+	auto *i1 = llvm::Type::getInt1Ty(ctx);
+	auto *lanesTy = llvm::FixedVectorType::get(i1, width);
+	auto *zero = llvm::ConstantInt::get(maskTy, 0);
+	auto depsFun = F.getParent()->getOrInsertFunction(
+		"__alive_deps", llvm::FunctionType::get(llvm::Type::getVoidTy(ctx),
+							{lanesTy, lanesTy, lanesTy}, false));
+	auto bitOf = [&](const std::string &name) -> llvm::Constant * {
+		auto it = sources.bits.find(name);
+		auto bit = it != sources.bits.end() ? it->second : width - 1;
+		return llvm::ConstantInt::get(maskTy, llvm::APInt::getOneBitSet(width, bit));
+	};
+
+	/* The original blocks and instructions, before anything goes in */
+	llvm::ReversePostOrderTraversal<llvm::Function *> RPO(&F);
+	const std::vector<llvm::BasicBlock *> blocks(RPO.begin(), RPO.end());
+	llvm::DenseMap<llvm::BasicBlock *, llvm::SmallVector<llvm::Instruction *, 16>> orig;
+	llvm::SmallVector<llvm::PHINode *, 16> origPhis;
+	for (auto *BB : blocks)
+		for (auto &I : *BB) {
+			if (auto *phi = llvm::dyn_cast<llvm::PHINode>(&I))
+				origPhis.push_back(phi);
+			else
+				orig[BB].push_back(&I);
+		}
+
+	/* The state slots, promoted to registers at the end */
+	auto entryPos = F.getEntryBlock().getFirstInsertionPt();
+	std::vector<llvm::AllocaInst *> slots;
+	auto newSlot = [&](llvm::Type *ty, llvm::Constant *init, const char *name) {
+		auto *slot = new llvm::AllocaInst(ty, 0, name, entryPos);
+		new llvm::StoreInst(init, slot, entryPos);
+		slots.push_back(slot);
+		return slot;
+	};
+	auto load = [&](llvm::AllocaInst *slot, llvm::BasicBlock::iterator pos) -> llvm::Value * {
+		return new llvm::LoadInst(slot->getAllocatedType(), slot, "", pos);
+	};
+	auto orInto = [&](llvm::AllocaInst *slot, llvm::Value *v, llvm::BasicBlock::iterator pos) {
+		if (v == zero)
+			return;
+		new llvm::StoreInst(llvm::BinaryOperator::CreateOr(load(slot, pos), v, "", pos), slot,
+				    pos);
+	};
+
+	/* The dependencies that never end, and those open until a join */
+	auto *perm = newSlot(maskTy, zero, "deps.perm");
+	llvm::PostDominatorTree PDT(F);
+	auto joinOf = [&](llvm::BasicBlock *BB) -> llvm::BasicBlock * {
+		auto *node = PDT.getNode(BB);
+		auto *idom = node ? node->getIDom() : nullptr;
+		return idom ? idom->getBlock() : nullptr;
+	};
+	llvm::MapVector<llvm::BasicBlock *, llvm::AllocaInst *> joinSlots;
+	if (scoped)
+		for (auto *BB : blocks)
+			if (branchCondition(*BB->getTerminator()))
+				if (auto *join = joinOf(BB); join && !joinSlots.contains(join))
+					joinSlots[join] = newSlot(maskTy, zero, "deps.join");
+	auto ctrlAt = [&](llvm::BasicBlock::iterator pos) -> llvm::Value * {
+		auto *acc = load(perm, pos);
+		for (auto &[join, slot] : joinSlots)
+			acc = llvm::BinaryOperator::CreateOr(acc, load(slot, pos), "", pos);
+		return acc;
+	};
+
+	/* What each value depends on */
+	llvm::DenseMap<llvm::Value *, llvm::Value *> shadow;
+	for (auto &A : F.args())
+		shadow[&A] = bitOf(sourceName(A));
+	auto shadowOf = [&](llvm::Value *v) -> llvm::Value * {
+		auto it = shadow.find(v);
+		return it != shadow.end() ? it->second : zero;
+	};
+	auto orAll = [&](llvm::ArrayRef<llvm::Value *> vs,
+			 llvm::BasicBlock::iterator pos) -> llvm::Value * {
+		llvm::Value *acc = zero;
+		for (auto *v : vs)
+			if (v != zero)
+				acc = acc == zero ? v : llvm::BinaryOperator::CreateOr(acc, v, "", pos);
+		return acc;
+	};
+	/* Shadow PHIs first: a PHI's operands may come later */
+	llvm::SmallVector<std::pair<llvm::PHINode *, llvm::PHINode *>, 16> phis;
+	for (auto *phi : origPhis) {
+		auto *sp = llvm::PHINode::Create(maskTy, phi->getNumIncomingValues(), "deps.phi",
+						 phi->getParent()->begin());
+		phis.push_back({phi, sp});
+		shadow[phi] = sp;
+	}
+
+	/* Per global or local the function stores to plainly: the dependencies of
+	 * the last value stored, and whether there was one (carry-dep) */
+	struct Carried {
+		llvm::AllocaInst *mask;
+		llvm::AllocaInst *set;
+	};
+	llvm::DenseMap<const llvm::Value *, Carried> carried;
+	auto objectOf = [](llvm::Value *ptr) -> const llvm::Value * {
+		const auto *obj = llvm::getUnderlyingObject(ptr);
+		return llvm::isa<llvm::GlobalVariable, llvm::AllocaInst>(obj) ? obj : nullptr;
+	};
+	for (auto *BB : blocks)
+		for (auto *I : orig[BB])
+			if (auto *S = llvm::dyn_cast<llvm::StoreInst>(I); S && !S->isAtomic())
+				if (const auto *obj = objectOf(S->getPointerOperand());
+				    obj && !carried.contains(obj))
+					carried[obj] = {
+						newSlot(maskTy, zero, "deps.carried"),
+						newSlot(i1, llvm::ConstantInt::getFalse(ctx), "deps.set")};
+
+	/* A mask as lanes; in the source module, with the lanes the check
+	 * leaves free poison */
+	auto encode = [&](llvm::Value *m, llvm::BasicBlock::iterator pos) -> llvm::Value * {
+		llvm::Value *lanes = new llvm::BitCastInst(m, lanesTy, "", pos);
+		if (!check)
+			return lanes;
+		auto *poison = llvm::PoisonValue::get(lanesTy);
+		return *check == DepCheck::Added
+			       ? llvm::SelectInst::Create(lanes, poison,
+							  llvm::Constant::getNullValue(lanesTy), "", pos)
+			       : llvm::SelectInst::Create(lanes, llvm::Constant::getAllOnesValue(lanesTy),
+							  poison, "", pos);
+	};
+	auto obligation = [&](llvm::Value *addr, llvm::Value *data, llvm::BasicBlock::iterator pos) {
+		llvm::CallInst::Create(depsFun,
+				       {encode(addr, pos), encode(data, pos), encode(ctrlAt(pos), pos)},
+				       "", pos);
+	};
+	auto arg = [&](llvm::Instruction &I, unsigned i) -> llvm::Value * {
+		auto &cb = llvm::cast<llvm::CallBase>(I);
+		return i < cb.arg_size() ? shadowOf(cb.getArgOperand(i)) : zero;
+	};
+
+	for (auto *BB : blocks) {
+		/* Entering a join ends its branches' dependencies; its PHIs carry them */
+		auto pos = BB->getFirstInsertionPt();
+		if (auto it = joinSlots.find(BB); it != joinSlots.end()) {
+			auto *joined = load(it->second, pos);
+			new llvm::StoreInst(zero, it->second, pos);
+			for (auto &[phi, sp] : phis)
+				if (phi->getParent() == BB)
+					shadow[phi] = llvm::BinaryOperator::CreateOr(sp, joined, "", pos);
+		}
+
+		for (auto *IP : orig[BB]) {
+			auto &I = *IP;
+			auto it = I.getIterator();
+			auto next = std::next(it);
+
+			/* The event's obligation */
+			if (auto *L = llvm::dyn_cast<llvm::LoadInst>(&I)) {
+				if (L->isAtomic() && !isPrivateAccess(I))
+					obligation(shadowOf(L->getPointerOperand()), zero, it);
+			} else if (auto *S = llvm::dyn_cast<llvm::StoreInst>(&I)) {
+				if (!isPrivateAccess(I))
+					obligation(shadowOf(S->getPointerOperand()),
+						   shadowOf(S->getValueOperand()), it);
+			} else if (auto *A = llvm::dyn_cast<llvm::AtomicRMWInst>(&I)) {
+				obligation(shadowOf(A->getPointerOperand()), shadowOf(A->getValOperand()),
+					   it);
+			} else if (auto *C = llvm::dyn_cast<llvm::AtomicCmpXchgInst>(&I)) {
+				obligation(shadowOf(C->getPointerOperand()),
+					   shadowOf(C->getNewValOperand()), it);
+			} else if (llvm::isa<llvm::FenceInst>(I)) {
+				obligation(zero, zero, it);
+			} else if (auto code = internalCode(I)) {
+				using IF = InternalFunctions;
+				if (isMutexCode(*code) || isCondVarCode(*code) || *code == IF::SrcuReadLock)
+					obligation(arg(I, 0), zero, it);
+				else if (*code == IF::SrcuReadUnlock)
+					obligation(arg(I, 0), arg(I, 1), it);
+				else if (*code == IF::ThreadCreate || *code == IF::ThreadCreateSymmetric)
+					obligation(zero, arg(I, 2), it);
+				else if (*code == IF::Assume)
+					orInto(perm, arg(I, 0), it);
+				else if (isCtrlMarkerCode(*code))
+					orInto(perm, bitOf(sourceName(I)), it);
+				else if (!isPureCode(*code))
+					obligation(zero, zero, it);
+			} else if (auto *ci = llvm::dyn_cast<llvm::CallInst>(&I)) {
+				auto *callee = ci->getCalledFunction();
+				if (callee && !callee->isDeclaration())
+					obligation(zero, zero, it);
+			}
+
+			/* A plain store leaves its value's dependencies for the loads after it */
+			if (auto *S = llvm::dyn_cast<llvm::StoreInst>(&I); S && !S->isAtomic())
+				if (const auto *obj = objectOf(S->getPointerOperand())) {
+					auto &c = carried[obj];
+					new llvm::StoreInst(shadowOf(S->getValueOperand()), c.mask, it);
+					new llvm::StoreInst(llvm::ConstantInt::getTrue(ctx), c.set, it);
+				}
+
+			/* The value's dependencies */
+			auto *L = llvm::dyn_cast<llvm::LoadInst>(&I);
+			const auto *obj = L && !L->isAtomic() ? objectOf(L->getPointerOperand()) : nullptr;
+			if (auto cit = obj ? carried.find(obj) : carried.end(); cit != carried.end()) {
+				shadow[&I] = llvm::SelectInst::Create(load(cit->second.set, next),
+								      load(cit->second.mask, next),
+								      bitOf(sourceName(I)), "", next);
+			} else if (isSource(I)) {
+				shadow[&I] = bitOf(sourceName(I));
+				/* A cmpxchg acquiring on success only: what follows depends on it */
+				if (auto *C = llvm::dyn_cast<llvm::AtomicCmpXchgInst>(&I);
+				    C && scoped && C->getSuccessOrdering() != C->getFailureOrdering())
+					orInto(perm, bitOf(sourceName(I)), next);
+			} else if (auto *IV = llvm::dyn_cast<llvm::InsertValueInst>(&I)) {
+				shadow[&I] = shadowOf(IV->getAggregateOperand());
+			} else if (!I.getType()->isVoidTy() && !llvm::isa<llvm::CallBase>(I)) {
+				llvm::SmallVector<llvm::Value *, 4> ops;
+				for (auto &op : I.operands())
+					ops.push_back(shadowOf(op.get()));
+				shadow[&I] = orAll(ops, it);
+			}
+
+			/* A branch opens a scope until its join, or never ends */
+			if (auto *cond = branchCondition(I)) {
+				auto *join = scoped ? joinOf(BB) : nullptr;
+				orInto(join ? joinSlots[join] : perm, shadowOf(cond), it);
+			}
+		}
+	}
+
+	for (auto &[phi, sp] : phis)
+		for (auto i = 0U; i < phi->getNumIncomingValues(); i++)
+			sp->addIncoming(shadowOf(phi->getIncomingValue(i)), phi->getIncomingBlock(i));
+
+	llvm::DominatorTree DT(F);
+	llvm::PromoteMemToReg(slots, DT);
+}
+
+auto printDepsModule(const llvm::Module &mod, const SourceBits &sources, bool scoped,
+		     const AnnotationKinds &kinds, std::optional<DepCheck> check) -> std::string
+{
+	auto clone = llvm::CloneModule(mod);
+	for (auto &F : *clone)
+		if (!F.isDeclaration())
+			instrumentDeps(F, sources, scoped, check);
+	makeCheckable(&*clone, kinds);
+	return printModule(*clone);
+}
+
+/* The passes whose dependencies are compared: those that keep the module's
+ * memory layout and stay within functions (promoting locals to registers
+ * and inlining change what GenMC's dependencies are on), and change
+ * neither the events nor their orderings on purpose (spin-assume and
+ * assume propagation add assumptions, checked elsewhere; StrengthenCAS
+ * changes the orderings the opaque calls are named after) */
+auto checksDeps(llvm::StringRef passID) -> bool
+{
+	static const std::set<llvm::StringRef> skipped = {
+		"SROAPass",	       "PromotePass",	       "PromoteMemIntrinsicPass",
+		"IntrinsicLoweringPass", "FunctionInlinerPass",   "DeadArgumentEliminationPass",
+		"DeclareInternalsPass",	 "DefineLibcFunsPass",	   "MDataCollectionPass",
+		"RustPrepPass",		 "SpinAssumePass",	   "PropagateAssumesPass",
+		"StrengthenCASPass"};
+	return !skipped.contains(passID);
 }
 
 /*
@@ -899,6 +1417,25 @@ void PassChecker::after(llvm::StringRef passID, llvm::Any IR, const llvm::Preser
 	       printCheckableModule(*srcMod, kinds(), inlineCalls),
 	       passID == "SpinAssumePass" ? printSpinObligationModule(*mod, kinds())
 					  : printCheckableModule(*mod, kinds(), inlineCalls));
+
+	/* The dependencies of each event, in both directions: a target bit the
+	 * source lacks is an added dependency, a missing one a dropped one */
+	if (depMode != DepMode::None && checksDeps(passID)) {
+		auto bits = assignSourceBits({&*srcMod, mod});
+		auto scoped = depMode == DepMode::Scoped;
+		auto name = fun ? fun->getName().str() : "-";
+		auto tgt = printDepsModule(*mod, bits, scoped, kinds(), std::nullopt);
+		std::string legend;
+		for (const auto &[source, bit] : bits.bits)
+			legend += std::to_string(bit) + " " + (source.empty() ? "?" : source) + "\n";
+		for (auto check : {DepCheck::Added, DepCheck::Dropped}) {
+			auto base = record(passID.str() + (check == DepCheck::Added ? "+deps-add"
+										 : "+deps-drop"),
+					   name, printDepsModule(*srcMod, bits, scoped, kinds(), check),
+					   tgt);
+			writeFile(base + ".bits.txt", legend);
+		}
+	}
 }
 
 void PassChecker::verifyDominatorTree(llvm::StringRef passID, llvm::Function &fun,
@@ -920,8 +1457,8 @@ void PassChecker::verifyDominatorTree(llvm::StringRef passID, llvm::Function &fu
 		      fun.getName().str());
 }
 
-void PassChecker::record(const std::string &pass, const std::string &fun, const std::string &src,
-			 const std::string &tgt)
+auto PassChecker::record(const std::string &pass, const std::string &fun, const std::string &src,
+			 const std::string &tgt) -> std::string
 {
 	auto num = llvm::formatv("{0}", llvm::fmt_align(count++, llvm::AlignStyle::Right, 4, '0'))
 			   .str();
@@ -934,4 +1471,5 @@ void PassChecker::record(const std::string &pass, const std::string &fun, const 
 	ERROR_ON(ec, "Could not write {}/passes.txt: {}\n", outDir, ec.message());
 	manifest << num << " " << pass << " " << fun << " " << base << ".src.ll " << base
 		 << ".tgt.ll\n";
+	return base;
 }

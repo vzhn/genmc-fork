@@ -20,6 +20,7 @@
 #include <llvm/IR/PassInstrumentation.h>
 #include <llvm/IR/PassManager.h>
 
+#include <cstdint>
 #include <map>
 #include <set>
 #include <string>
@@ -39,6 +40,11 @@
  * target is the module with each blocking marker replaced by its claim, and
  * the load annotations get a pair of their own (LoadAnnotations).
  *
+ * Under a model with dependencies (IMM, LKMM), a pass that keeps the memory
+ * layout also gets a "+deps" pair: both modules report the address, data and
+ * control dependencies of each access, as GenMC's interpreter computes them,
+ * so that Alive2 checks the pass keeps them.
+ *
  * With analysis verification, the dominator tree a pass declares preserved
  * is checked against a fresh one: the loop pass adaptor declares the tree
  * preserved whatever a loop pass did to the CFG.
@@ -49,10 +55,15 @@ public:
 	 * (the helper, confirmation and final-write options) */
 	struct AnnotationKinds;
 
+	/* Which dependencies GenMC tracks: none, control dependencies to the
+	 * end of the thread (IMM), or each until its branch's join (LKMM) */
+	enum class DepMode : std::uint8_t { None, Unscoped, Scoped };
+
 	PassChecker(std::string outDir, bool verifyAnalyses, bool annotHelper, bool annotConf,
-		    bool annotFinal, llvm::FunctionAnalysisManager &fam)
+		    bool annotFinal, DepMode depMode, llvm::FunctionAnalysisManager &fam)
 		: outDir(std::move(outDir)), verifyAnalyses(verifyAnalyses),
-		  annotHelper(annotHelper), annotConf(annotConf), annotFinal(annotFinal), fam(fam)
+		  annotHelper(annotHelper), annotConf(annotConf), annotFinal(annotFinal),
+		  depMode(depMode), fam(fam)
 	{}
 
 	void registerCallbacks(llvm::PassInstrumentationCallbacks &PIC);
@@ -70,15 +81,17 @@ private:
 	void verifyDominatorTree(llvm::StringRef passID, llvm::Function &fun,
 				 const llvm::PreservedAnalyses &PA);
 
-	/* Writes a pair of modules and its line in passes.txt */
-	void record(const std::string &pass, const std::string &fun, const std::string &src,
-		    const std::string &tgt);
+	/* Writes a pair of modules and its line in passes.txt; returns the
+	 * pair's path without its .src.ll/.tgt.ll suffix */
+	auto record(const std::string &pass, const std::string &fun, const std::string &src,
+		    const std::string &tgt) -> std::string;
 
 	std::string outDir;
 	bool verifyAnalyses;
 	bool annotHelper;
 	bool annotConf;
 	bool annotFinal;
+	DepMode depMode;
 	llvm::FunctionAnalysisManager &fam;
 
 	/* The module's text before each running pass */

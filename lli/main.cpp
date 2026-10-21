@@ -228,6 +228,11 @@ static llvm::cl::list<std::string> clNoUnrollFuns("no-unroll", llvm::cl::value_d
 						  llvm::cl::cat(clTransformation),
 						  llvm::cl::desc("Do not unroll this function"));
 
+/* Hidden: to tell the executions LLVM's jump threading costs apart (#78) */
+static llvm::cl::opt<bool> clDisableJumpThreading("disable-jump-threading",
+						   llvm::cl::cat(clTransformation), llvm::cl::Hidden,
+						   llvm::cl::desc("Disable LLVM's jump threading pass"));
+
 static llvm::cl::opt<bool>
 	clDisableLoopJumpThreading("disable-loop-jump-threading", llvm::cl::cat(clTransformation),
 				   llvm::cl::desc("Disable loop-jump-threading transformation"));
@@ -427,6 +432,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	lliConfig.unroll = clLoopUnroll >= 0 ? std::optional(clLoopUnroll.getValue())
 					     : std::nullopt;
 	lliConfig.noUnrollFuns.insert(clNoUnrollFuns.begin(), clNoUnrollFuns.end());
+	lliConfig.jumpThreading = !clDisableJumpThreading;
 	lliConfig.loopJumpThreading = !clDisableLoopJumpThreading;
 	lliConfig.castElimination = !clDisableCastElimination;
 	lliConfig.inlineFunctions = !clDisableFunctionInliner;
@@ -460,6 +466,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	}
 	lliConfig.programEntryFun = std::move(clProgramEntryFunction);
 	lliConfig.isDepTrackingModel = isDepTrackingModel(clModelType);
+	lliConfig.scopedCtrlDeps = clModelType == ModelType::LKMM;
 
 	/* Exploration */
 	conf.mode = clExplorationMode;
