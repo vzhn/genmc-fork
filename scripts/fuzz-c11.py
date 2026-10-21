@@ -267,7 +267,11 @@ def fuzz_one(args, seed, model):
         elif rr["status"] == "fail":
             status = "fail"
         elif (rr["count"], rr["verdict"]) != ref:
-            status = "disagree"
+            status = "disagree" if status != "fail" else status
+    # A failed run does not hide a disagreement among the runs that completed
+    # (a seed whose oracle run crashes may be schedule-dependent too)
+    rec["disagree"] = any(rr["status"] == "ok" and (rr["count"], rr["verdict"]) != ref
+                          for rr in rec["runs"].values())
     rec["status"] = status
     return rec
 
@@ -339,7 +343,12 @@ def main():
                 jf.flush()
             if rec["status"] in ("disagree", "fail", "timeout"):
                 disagreements.append(rec)
-                print("%s seed %d %s %s" % (rec["status"].upper(), rec["seed"], rec["model"],
+                if rec["status"] != "disagree" and rec.get("disagree"):
+                    stats["fail+disagree"] = stats.get("fail+disagree", 0) + 1
+                print("%s%s seed %d %s %s" % (rec["status"].upper(),
+                                              " (runs disagree)" if rec["status"] != "disagree"
+                                              and rec.get("disagree") else "",
+                                              rec["seed"], rec["model"],
                                             rec["file"]))
                 for name, rr in rec["runs"].items():
                     print("    %-10s %s" % (name, fmt_run(rr)))
