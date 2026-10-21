@@ -587,7 +587,9 @@ tracking), the reference keeps its graphs well formed and consistent:
 - a complete execution is counted only if it is consistent when checked
   anew; the `Exhaustive:` line says how many were not;
 - kept events are moved to their instruction when a CAS before them
-  gains or loses its write part (as under `-lkmm`, with replay keys).
+  gains or loses its write part (as under `-lkmm`, with replay keys), and
+  a CAS that succeeds is revisitable by a write that would make it fail
+  or change its ordering, even if it is in that write's prefix.
 
 The mode is for small programs: memory grows with the visited graphs,
 and the exploration repeats work the maximality check avoids. It runs

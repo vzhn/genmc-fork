@@ -685,6 +685,11 @@ private:
 	 * false if that includes R or an event the graph does not have */
 	auto keepValueDependencies(Event r, VectorClock &v) const -> bool;
 
+	/** -exhaustive under IMM: adds to LOADS the CAS reads in PREFIX, SLAB's
+	 * prefix, whose ordering or write part reading from SLAB would change */
+	void addRevisitableCases(WriteLabel *sLab, const VectorClock &prefix,
+				 std::vector<ReadLabel *> &loads);
+
 	/** -exhaustive under IMM: computes the views of G's labels anew, in G,
 	 * and drops their cached prefix views. Returns false if they do not
 	 * settle (an hb cycle) */

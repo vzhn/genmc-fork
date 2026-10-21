@@ -2942,6 +2942,49 @@ static auto hasReads(const ExecutionGraph &g, SAddr addr) -> bool
 				   [](auto &wLab) { return !std::ranges::empty(wLab.readers()); });
 }
 
+/* -exhaustive under IMM. Whether a CAS succeeds decides its ordering (that of
+ * its success or of its failure, see ReadLabel::setRf()) and whether it has
+ * a write part. A CAS that succeeds can so be ordered before a write that
+ * it would fail reading from (an acquire read before the write's events,
+ * or its write part, a release one, before a write of its thread to the
+ * location), and be in that write's prefix, where TruSt looks for the reads
+ * the write cannot revisit: since #133 the events after a CAS do not depend
+ * on it, and a load-buffering cycle through a CAS that fails is consistent
+ * (issue #137). Such a CAS is revisitable all the same when the write's
+ * value changes its ordering or makes it fail; the revisit drops its write
+ * part (getRevisitView()), and the consistency of the graph it produces
+ * decides (backwardRevisit()) */
+static auto failsReading(const ReadLabel *rLab, const WriteLabel *sLab) -> bool
+{
+	const auto *cLab = genmc::dyn_cast<CasReadLabel>(rLab);
+	return cLab && cLab->isRMW() &&
+	       !cLab->valueMakesRMWSucceed(sLab->getAccessValue(cLab->getAccess()));
+}
+
+/* Whether reading from SLAB changes the ordering or the write of the CAS RLAB */
+static auto outcomeChanges(const ReadLabel *rLab, const WriteLabel *sLab) -> bool
+{
+	const auto *cLab = genmc::dyn_cast<CasReadLabel>(rLab);
+	if (!cLab || !cLab->getRf())
+		return false;
+	const auto ord = cLab->valueMakesRMWSucceed(sLab->getAccessValue(cLab->getAccess()))
+				 ? cLab->getSuccessOrdering()
+				 : cLab->getFailOrdering();
+	return ord != cLab->getOrdering() || failsReading(rLab, sLab);
+}
+
+void GenMCDriver::addRevisitableCases(WriteLabel *sLab, const VectorClock &prefix,
+				       std::vector<ReadLabel *> &loads)
+{
+	for (auto &lab : getExec().getGraph().labels()) {
+		auto *rLab = genmc::dyn_cast<ReadLabel>(&lab);
+		if (rLab && rLab->getAddr() == sLab->getAddr() && prefix.contains(rLab->getPos()) &&
+		    rLab->getThread() != sLab->getThread() && rLab->getRf() != sLab &&
+		    outcomeChanges(rLab, sLab))
+			loads.push_back(rLab);
+	}
+}
+
 auto GenMCDriver::getRevisitableApproximation(WriteLabel *sLab) -> std::vector<ReadLabel *>
 {
 	/* Without a read of the location, there is nothing to revisit, and the
@@ -2956,6 +2999,8 @@ auto GenMCDriver::getRevisitableApproximation(WriteLabel *sLab) -> std::vector<R
 	auto prefix = getRevisitPrefixView(sLab);
 	auto loads = getRevisitable(sLab, *prefix, getConf()->exhaustive);
 	getConsChecker().filterCoherentRevisits(sLab, loads);
+	if (getConf()->exhaustive && getConf()->model == ModelType::IMM)
+		addRevisitableCases(sLab, *prefix, loads);
 	std::ranges::sort(
 		loads, [](auto &lab1, auto &lab2) { return lab1->getStamp() > lab2->getStamp(); });
 	return loads;
@@ -3826,9 +3871,13 @@ auto GenMCDriver::getRevisitView(const ReadLabel *rLab, const WriteLabel *sLab) 
 		return preds;
 	}
 	updatePredsWithPrefixView(g, *preds, prefix);
-	if (getConf()->exhaustive && getConf()->model == ModelType::IMM &&
-	    !keepValueDependencies(rLab->getPos(), *preds))
-		return nullptr;
+	if (getConf()->exhaustive && getConf()->model == ModelType::IMM) {
+		/* (a CAS that fails reading SLAB loses its write part) */
+		if (failsReading(rLab, sLab) && preds->contains(rLab->getPos().next()))
+			genmc::cast<DepView>(&*preds)->addHole(rLab->getPos().next());
+		if (!keepValueDependencies(rLab->getPos(), *preds))
+			return nullptr;
+	}
 	return preds;
 }
 
