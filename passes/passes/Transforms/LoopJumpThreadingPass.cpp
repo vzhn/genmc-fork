@@ -108,9 +108,11 @@ static auto getPHIConstEntryValueUsedInCond(Loop *l) -> PHINode *
 
 static auto generateExprJumpsToBody(Loop *l) -> std::unique_ptr<SExpr<Value *>>
 {
+	/* No expression for the header (an instruction of it touches memory):
+	 * its first evaluation cannot be skipped */
 	auto condExp = InstAnnotator().annotateBBCond(l->getHeader(), l->getLoopPredecessor());
 	auto *bi = dyn_cast<BranchInst>(l->getHeader()->getTerminator());
-	if (!bi)
+	if (!condExp || !bi)
 		return ConcreteExpr<Value *>::createFalse();
 
 	if (inLoopBody(l, bi->getSuccessor(0)))
