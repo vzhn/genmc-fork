@@ -120,8 +120,10 @@ auto WriteLabel::isEffectful() const -> bool
 {
 	const auto &g = *getParent();
 	const auto *xLab = genmc::dyn_cast<FaiWriteLabel>(this);
-	const auto *rLab = genmc::dyn_cast<FaiReadLabel>(g.po_imm_pred(this));
-	if (!xLab || rLab->getOp() != RMWBinOp::Xchg)
+	/* The read part may be a hole: a revisit under a dependency-tracking
+	 * model keeps the write it depends on, not the read (re-executed) */
+	const auto *rLab = genmc::dyn_cast_if_present<FaiReadLabel>(g.po_imm_pred(this));
+	if (!xLab || !rLab || rLab->getOp() != RMWBinOp::Xchg)
 		return true;
 
 	return rLab->getAccessValue(rLab->getAccess()) != xLab->getVal();
