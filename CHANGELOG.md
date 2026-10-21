@@ -27,6 +27,25 @@ released.
   what they claim), and `-verify-pass-analyses` checks the dominator trees
   passes declare preserved. `scripts/check-passes.sh` runs both over test
   programs and checks every pass with Alive2's `alive-tv`.
+- `-exhaustive`, a reference exploration for small programs: every
+  consistent backward revisit is explored, graphs are deduplicated by a
+  canonical hash (threads named by their creation path), and every
+  reduction is off. `scripts/oracle-diff.sh` compares the default
+  exploration with it over the test suite (ctest target `oracle-diff`),
+  and `scripts/fuzz-c11.py` over random C11 programs, under arbitrary
+  schedules and without resume points too.
+
+### Fixed
+
+- A weak CAS lost executions in three ways: its spurious-failure flag
+  survived into the forward revisits that followed (#116); the failure
+  revisit of a CAS that a backward revisit made succeed cut the write it
+  reads from (an internal failure under rc11 and imm, #117); and its
+  spurious failure reading a write that a settled RMW reads was never
+  explored (#118).
+- `-imm` segfaulted when a revisit kept a `fetch_add`'s write part without
+  its read part (#120), and left that write stale (an inconsistent
+  execution) or relocated it when the read was executed anew (#122).
 
 
 ## [0.19.0-vzhn.13] - 2026.10.21
