@@ -151,7 +151,8 @@ public:
 
 	auto operator=(const value_ptr &v) -> value_ptr<T, Cloner, Deleter> &
 	{
-		ptr().reset(v.get_cloner()(*v));
+		if (this != &v)
+			ptr().reset(v ? v.get_cloner()(*v) : nullptr);
 		get_cloner() = v.get_cloner();
 		return *this;
 	}

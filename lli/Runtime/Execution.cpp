@@ -2912,7 +2912,7 @@ GenericValue Interpreter::getOperandValue(Value *V, ExecutionContext &SF)
 	} else if (GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
 		return PTOGV(getPointerToGlobal(GV));
 	} else {
-		return SF.Values[V];
+		return SF.Values.lookup(V);
 	}
 }
 
@@ -3667,6 +3667,7 @@ void Interpreter::runAtExitHandlers()
 		while (ECStack().size() >= size) {
 			llvm::ExecutionContext &SF = ECStack().back();
 			++getCurThr().visitNo;
+			visitStartPos_ = currPos();
 			llvm::Instruction &I = *SF.CurInst++;
 			visit(I);
 			if (!ECStack().empty()) {
@@ -3979,6 +3980,7 @@ void Interpreter::run()
 		scheduleThread(std::get<int>(tid));
 		llvm::ExecutionContext &SF = ECStack().back();
 		++getCurThr().visitNo;
+		visitStartPos_ = currPos();
 		llvm::Instruction &I = *SF.CurInst++;
 		visit(I);
 		if (!ECStack().empty()) {

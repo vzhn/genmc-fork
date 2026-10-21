@@ -95,13 +95,22 @@ static auto calculateReplaySchedule(const ExecutionGraph &g, const Config *conf,
 		result.push_back(*errorEvent);
 	}
 
-	/* Erase any non-schedulable threads (if possible) */
+	/* Erase the threads that finished: their interpreter state is never
+	 * needed again (a join takes its value from the graph), and a thread
+	 * that an in-place revisit later cuts starts over, driven by the graph.
+	 * A finished thread with holes (events outside a non-po-closed prefix,
+	 * see copyGraphUpTo()) must still run to fill them. */
 	if (!conf->replayCompletedThreads && !errorEvent) {
-		std::erase_if(result, [&g](const auto &pos) {
-			auto *lab = g.getLastThreadLabel(pos.thread);
-			return !isSchedulable(g, lab->getThread()) &&
-			       !genmc::isa_and_present<BlockLabel>(lab);
-		});
+		std::vector<bool> skip(g.getNumThreads(), false);
+		for (auto tid : g.thr_ids()) {
+			const auto *lab = g.getLastThreadLabel(tid);
+			skip[tid] = !isSchedulable(g, tid) && !genmc::isa_and_present<BlockLabel>(lab) &&
+				    std::ranges::none_of(g.po_succs(g.getFirstThreadLabel(tid)),
+							 [](auto &oLab) {
+								 return genmc::isa<EmptyLabel>(&oLab);
+							 });
+		}
+		std::erase_if(result, [&skip](const auto &pos) { return skip[pos.thread]; });
 	}
 
 	/* Erase NAs as they cannot affect the schedule (unless RD is disabled),
@@ -118,11 +127,12 @@ static auto calculateReplaySchedule(const ExecutionGraph &g, const Config *conf,
 	return result;
 }
 
-void Scheduler::resetExplorationOptions(const ExecutionGraph &g)
+void Scheduler::resetExplorationOptions(const ExecutionGraph &g, bool replay)
 {
 	setRescheduledRead(Event::getInit());
 	threadPrios_.clear();
-	replaySchedule_ = calculateReplaySchedule(g, getConf(), eventToReexecute_);
+	replaySchedule_ = replay ? calculateReplaySchedule(g, getConf(), eventToReexecute_)
+				 : std::vector<Event>{};
 
 	/* Check whether the event that led to this execs needs thread prioritization */
 	for (auto tid : g.thr_ids()) {

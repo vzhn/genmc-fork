@@ -20,12 +20,15 @@
 #include "genmc/Verification/ChoiceMap.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
+#include "genmc/Verification/ResumePoint.hpp"
 #include "genmc/Verification/Scheduler.hpp"
 #include "genmc/Verification/VerificationError.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
 #include "genmc/Verification/WorkList.hpp"
 
 #include <cstdint>
+#include <deque>
+#include <functional>
 #include <memory>
 #include <random>
 #include <utility>
@@ -151,6 +154,24 @@ public:
 	}
 	void clearEventKey() { currKey = nullptr; }
 	auto checksReplayKeys() const -> bool { return getConf()->checkReplayKeys; }
+
+	/** Lets forward revisits resume from saved runtime states: HOOK saves
+	 * the runtime's state at the event at POS, or returns null */
+	void setResumeHook(std::function<std::shared_ptr<ResumePoint>(Event)> hook)
+	{
+		resumeHook_ = std::move(hook);
+	}
+
+	/** The state the execution about to start resumes from, if any
+	 * (cleared once taken; otherwise the runtime replays the graph) */
+	auto takePendingResumePoint() -> std::shared_ptr<ResumePoint>
+	{
+		return std::exchange(pendingResume_, nullptr);
+	}
+
+	/** Prepares the replay of the graph after a resume point was taken
+	 * but could not be used (see Interpreter::resumeFrom()) */
+	void prepareReplay();
 
 	/** Under LKMM, a control dependency ends at the join of its branch */
 	auto scopesCtrlDeps() const -> bool { return relocatesKeptEvents(); }
@@ -912,6 +933,15 @@ private:
 
 	/** The details of an error to be reported (buffered) */
 	std::optional<ErrorDetails> bufferedError_;
+
+	/** Saves the runtime state at the event at POS for the forward revisits
+	 * queued for it (null if the run cannot resume, see saveResumePoint()) */
+	auto saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>;
+
+	std::function<std::shared_ptr<ResumePoint>(Event)> resumeHook_;
+	/** The newest saved states; a revisit whose state was dropped replays */
+	std::deque<std::shared_ptr<ResumePoint>> resumePoints_;
+	std::shared_ptr<ResumePoint> pendingResume_;
 
 	/** "Puppet" labels to be used for race detection */
 	std::unique_ptr<ReadLabel> readProbeLab_;

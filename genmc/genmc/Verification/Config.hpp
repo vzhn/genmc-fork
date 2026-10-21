@@ -56,12 +56,14 @@ struct Config {
 	bool disableBAM{};
 	bool blindRMWReduction{};
 	bool ipr{};
+	/* How many runtime states forward revisits may resume from (0: always replay) */
+	unsigned int resumePoints{};
 	bool warnUnfreedMemory{};
 	std::optional<std::string> collectLinSpec;
 	std::optional<std::string> checkLinSpec;
 	unsigned int maxExtSize{};
 	bool dotPrintOnlyClientEvents{};
-	bool replayCompletedThreads{true};
+	bool replayCompletedThreads{false};
 	static constexpr bool emitNALabels = EMIT_NA_LABELS;
 
 	/*** Debugging options ***/
