@@ -24,6 +24,8 @@ load of the flag saw the write (no data race).
                           (-schedule-policy=arbitrary -schedule-seed=N), K times
   no-resume               -resume-points=0 (forward revisits replay the graph)
   exhaustive              -exhaustive, the reference
+  exhaustive-sched        -exhaustive under an arbitrary schedule (the
+                          reference must not depend on the schedule either)
 and reports every seed whose runs disagree on the number of complete executions
 or on the verdict (no errors, or the error reported), with the seed, the model,
 the program's path and each run's result; then a summary line. A seed whose
@@ -231,6 +233,8 @@ def configs(seed, schedules):
                    ["-schedule-policy=arbitrary", "-schedule-seed=%d" % (seed * 7919 + k + 1)]))
     cs.append(("no-resume", ["-resume-points=0"]))
     cs.append(("exhaustive", ["-exhaustive"]))
+    cs.append(("exhaustive-sched", ["-exhaustive", "-schedule-policy=arbitrary",
+                                    "-schedule-seed=%d" % (seed * 7919 + 1)]))
     return cs
 
 
