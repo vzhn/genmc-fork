@@ -9,6 +9,16 @@ released.
 
 - Merge of MIXER [POPL'25] into mainline GenMC
 
+### Fixed
+
+- `-lkmm`: a run whose thread reached, at a hole, an instruction whose kept
+  event lies behind kept events of a branch the thread does not take went
+  on until the thread's end instead of being dropped at once (#109). It added a
+  second event for the instruction, placed it in coherence against the
+  kept events, could report a spurious write-write race (against a hole),
+  and queued revisits whose graphs contradict coherence; `-lkmm-reference`
+  stopped on them with "The LKMM checker and the model disagree".
+
 ### Added
 
 - Debugging options for the transformation passes: `-output-llvm-passes=<dir>`

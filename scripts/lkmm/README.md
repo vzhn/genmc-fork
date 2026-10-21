@@ -558,11 +558,15 @@ rest of the thread.
   choice map follow. The run is then repeated from its start (the events it
   added are cut), so that the interpreter, the execution state and the
   schedule are built for the new positions. A run is dropped when a kept
-  event would be skipped or follow the thread's end, or when the thread
-  blocks before kept events and stays blocked (its block goes after them,
-  as a thread's last label, until it is unblocked). After an event is added
-  before kept events, the whole graph is checked once (an incremental check
-  assumes an event to be its thread's last).
+  event would be skipped (the instruction being run has its kept event
+  behind other kept events, whether a kept event or a hole sits where it
+  goes) or follow the thread's end, or when the thread blocks before kept
+  events and stays blocked (its block goes after them, as a thread's last
+  label, until it is unblocked). A dropped run adds nothing more: the event
+  it was aligning is not added, so that no work, warning or coherence
+  placement is computed from a graph that is no execution's prefix. After
+  an event is added before kept events, the whole graph is checked once (an
+  incremental check assumes an event to be its thread's last).
 - **Dependencies** (step 3): the deps of a branch's condition last until
   its join; the phis at the join take them (a value the branch chose); an
   indirect call gives its callee's events the pointer's deps. GenMC's
