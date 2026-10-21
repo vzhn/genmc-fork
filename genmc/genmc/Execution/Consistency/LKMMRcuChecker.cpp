@@ -22,6 +22,8 @@
 #include "genmc/Support/Error.hpp"
 #include "genmc/Verification/Config.hpp"
 
+#include <algorithm>
+
 /* Whether G has what the generated checker cannot decide: a grace period
  * (rb) or a potential race (plain-coherence) */
 static auto needsModel(const ExecutionGraph &g) -> bool
@@ -143,6 +145,40 @@ auto LKMMRcuChecker::checkAccessFreed(const EventLabel *lab, const EventLabel *&
 			}
 		}
 	return {};
+}
+
+auto LKMMRcuChecker::checkWarnings(const EventLabel *lab, const VSet<VerificationError> &reported,
+				   std::vector<const EventLabel *> &races) const
+	-> std::vector<VerificationError>
+{
+	auto warnings = LKMMChecker::checkWarnings(lab, reported, races);
+	auto it = std::ranges::find(warnings, VerificationError::VE_WWRace);
+	const auto &g = *lab->getParent();
+	if (it == warnings.end() || !lkmm::hasGracePeriod(g))
+		return warnings;
+
+	/* The rule found a last marked write of another thread outside the hb
+	 * view of LAB. Take the writes RCU orders, either way, as ordered: the
+	 * rule's counterexample is one of them, the others may not be */
+	auto idx = it - warnings.begin();
+	auto rcuOrdered = [&](const EventLabel *a, const EventLabel *b) {
+		return lkmm::isRcuOrderedBefore(g, a, b) || lkmm::isRcuOrderedBefore(g, b, a);
+	};
+	const EventLabel *racy = nullptr;
+	for (auto e : g.pomax_at_writes_pos(lab)) {
+		const auto *wLab = g.getEventLabelIfPresent(e);
+		if (wLab && !getHbView(lab).contains(e) && !rcuOrdered(wLab, lab)) {
+			racy = wLab;
+			break;
+		}
+	}
+	if (racy) {
+		races[idx] = racy;
+	} else {
+		warnings.erase(it);
+		races.erase(races.begin() + idx);
+	}
+	return warnings;
 }
 
 auto LKMMRcuChecker::checkErrors(const EventLabel *lab, const EventLabel *&race) const

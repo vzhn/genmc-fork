@@ -46,6 +46,14 @@ public:
 	auto checkErrors(const EventLabel *lab, const EventLabel *&race) const
 		-> std::optional<VerificationError> override;
 
+	/* The kat's write-write warning (ww_conflict <= hb) with RCU's
+	 * ordering: a grace period orders a reader's write in its critical
+	 * section before an updater's write after synchronize_rcu(), which
+	 * hb (po | rf) does not */
+	auto checkWarnings(const EventLabel *lab, const VSet<VerificationError> &reported,
+			   std::vector<const EventLabel *> &races) const
+		-> std::vector<VerificationError> override;
+
 private:
 	/* An access of freed memory: last_accesses ; [FREE] <= hb and
 	 * free ; [R | W] = 0, with RCU's ordering as well as hb */
