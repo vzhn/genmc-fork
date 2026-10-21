@@ -42,6 +42,28 @@ released.
   kept events, could report a spurious write-write race (against a hole),
   and queued revisits whose graphs contradict coherence; `-lkmm-reference`
   stopped on them with "The LKMM checker and the model disagree".
+- Error traces printed wrong names for struct fields. With a constant
+  initializer, the global's LLVM type is not the declared one: the
+  padding after a `pthread_mutex_t`/`spinlock_t` or `int` member becomes
+  a field (`v.b` for `v.a`), an array of such structs becomes a packed
+  struct (`arr` for `arr[1].a`), bitfields are split. Without one, a field
+  after implicit padding was named as if the padding were not there
+  (`go_chans[0].sendq[0].sg` for `go_chans[0].nrecv`). Names are now laid
+  out from the debug-info type alone (member offsets, array subranges),
+  which also names base-class and anonymous-member fields without an
+  empty component (`d.b1`, not `d..b1`). A wrong test's
+  `expected-output.in` lists lines its output must contain
+  (`tests/wrong/infr/print-names-init-padding`).
+- GenMC failed before exploring a program with a zero-sized global or a
+  global that is only declared. A zero-sized one (an empty struct, a
+  zero-length array, or the `external global [0 x ptr]` vtable of
+  `__cxxabiv1::__class_type_info` that the type info of any C++ class with
+  virtual methods refers to) failed the check `size != 0` in
+  `SAddrAllocator::allocate()`; a declared one (`extern int optind;`)
+  crashed re-initializing it from its missing initializer. A zero-sized
+  global now gets one byte, reading as zero, and a declared one keeps the
+  contents of the host symbol the interpreter bound it to
+  (`tests/correct/infr/{cpp-vtable-global,global-zero-size,global-extern-decl}`).
 
 ### Added
 

@@ -39,16 +39,16 @@ public:
 
 private:
 	/* Collects name info for a global variable */
-	void collectGlobalInfo(llvm::GlobalVariable &v, llvm::Module &M);
+	void collectGlobalInfo(llvm::GlobalVariable &v);
 
 	/* Collects name info for a stack variable */
-	void collectLocalInfo(llvm::DbgDeclareInst *dbgDecl, llvm::Module &M);
+	void collectLocalInfo(llvm::DbgDeclareInst *dbgDecl);
 
 	/*
 	 * Collects name info about global variables w/ private linkage
 	 * used in memory intrinsics
 	 */
-	void collectMemCpyInfo(llvm::MemCpyInst *MI, llvm::Module &M);
+	void collectMemCpyInfo(llvm::MemCpyInst *MI);
 
 	/* Check whether the respective information exist */
 	auto hasGlobalInfo(llvm::Value *gv) const -> bool

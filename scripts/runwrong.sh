@@ -205,6 +205,21 @@ runvariants() {
 	    outcome_failure=1
 	    failure=1
 	fi
+	# with an expected-output.in, the output must contain each line it lists
+	# (e.g., the names the error trace prints for the accessed locations)
+	if test "$status" -eq 42 -a -f "${dir}/expected-output.in"
+	then
+	    while IFS= read -r line
+	    do
+		if ! echo "${output}" | grep -qF -- "${line}"
+		then
+		    failure_status="42, but no \"${line}\" in the output"
+		    outcome_failure=1
+		    failure=1
+		    break
+		fi
+	    done < "${dir}/expected-output.in"
+	fi
 	explored=`echo "${output}" | awk '/explored/ { print $6 }'`
 	time=`echo "${output}" | awk '/wall-clock/ { print substr($4, 1, length($4)-1) }'`
 	time="${time}" && [[ -z "${time}" ]] && time=0 # if pattern was NOT found

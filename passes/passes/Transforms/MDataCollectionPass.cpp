@@ -16,11 +16,13 @@
 #include "genmc/Support/NameInfo.hpp"
 #include "passes/LLVMUtils.hpp"
 
+#include <llvm/ADT/ArrayRef.h>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/BinaryFormat/Dwarf.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/DebugInfoMetadata.h>
-#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstIterator.h>
@@ -31,108 +33,160 @@
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
-#include <llvm/IR/Type.h>
 #include <llvm/Support/Casting.h>
 
-#include <algorithm>
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 using namespace llvm;
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
-static void collectVarName(Module &M, unsigned int ptr, Type *typ, DIType *dit,
-			   const std::string &nameBuilder, NameInfo &info)
+/* Strips typedefs and qualifiers off DIT */
+static auto stripDIType(DIType *dit) -> DIType *
 {
-	if (!isa<StructType>(typ) && !isa<ArrayType>(typ) && !isa<VectorType>(typ)) {
+	while (auto *didt = dyn_cast_or_null<DIDerivedType>(dit)) {
+		switch (didt->getTag()) {
+		case dwarf::DW_TAG_typedef:
+		case dwarf::DW_TAG_const_type:
+		case dwarf::DW_TAG_volatile_type:
+		case dwarf::DW_TAG_restrict_type:
+		case dwarf::DW_TAG_atomic_type:
+			if (!didt->getBaseType())
+				return dit;
+			dit = didt->getBaseType();
+			break;
+		default:
+			return dit;
+		}
+	}
+	return dit;
+}
+
+static void collectVarName(unsigned int ptr, DIType *dit, const std::string &nameBuilder,
+			   NameInfo &info);
+
+/* Names the elements of an array with dimensions COUNTS and elements of type ELEM */
+static void collectArrayNames(unsigned int ptr, DIType *elem, uint64_t elemSize,
+			      ArrayRef<uint64_t> counts, const std::string &nameBuilder,
+			      NameInfo &info)
+{
+	if (counts.empty()) {
+		collectVarName(ptr, elem, nameBuilder, info);
+		return;
+	}
+
+	/* The stride of this dimension is the size of the subarray below it */
+	auto stride = elemSize;
+	for (auto count : counts.drop_front())
+		stride *= count;
+	for (auto i = 0U; i < counts.front(); i++)
+		collectArrayNames(ptr + (i * stride), elem, elemSize, counts.drop_front(),
+				  nameBuilder + "[" + std::to_string(i) + "]", info);
+}
+
+static void collectArrayNames(unsigned int ptr, DICompositeType *dict,
+			      const std::string &nameBuilder, NameInfo &info)
+{
+	/* Arrays of unknown (count -1 or none) or zero size, like flexible array members,
+	 * get a single name */
+	SmallVector<uint64_t> counts;
+	for (auto *node : dict->getElements()) {
+		auto *subrange = dyn_cast<DISubrange>(node);
+		auto *count = subrange ? dyn_cast_if_present<ConstantInt *>(subrange->getCount())
+				       : nullptr;
+		if (!count || count->getSExtValue() <= 0) {
+			info.addOffsetInfo(ptr, nameBuilder);
+			return;
+		}
+		counts.push_back(count->getSExtValue());
+	}
+
+	auto *base = stripDIType(dict->getBaseType());
+	auto elemSize = base ? base->getSizeInBits() / 8 : 0;
+	if (elemSize == 0) {
+		info.addOffsetInfo(ptr, nameBuilder);
+		return;
+	}
+	collectArrayNames(ptr, dict->getBaseType(), elemSize, counts, nameBuilder, info);
+}
+
+/* Names the data members of the struct, class, or union DICT */
+static void collectMemberNames(unsigned int ptr, DICompositeType *dict,
+			       const std::string &nameBuilder, NameInfo &info)
+{
+	auto isUnion = dict->getTag() == dwarf::DW_TAG_union_type;
+	auto oldSize = info.size();
+	std::optional<uint64_t> prevOffset;
+	for (auto *elem : dict->getElements()) {
+		/* Skip static members (DW_TAG_variable), methods, and virtual bases,
+		 * which do not live at a fixed offset of the object */
+		auto *member = dyn_cast<DIDerivedType>(elem);
+		if (!member || member->isStaticMember() || member->isVirtual() ||
+		    (member->getTag() != dwarf::DW_TAG_member &&
+		     member->getTag() != dwarf::DW_TAG_inheritance))
+			continue;
+
+		/* Bitfields sharing a byte go by the first one's name */
+		auto offset = member->getOffsetInBits() / 8;
+		if (member->isBitField() && prevOffset == offset)
+			continue;
+		prevOffset = offset;
+
+		/* Base classes and anonymous members add no component to the name */
+		auto name = member->getName().empty() ? nameBuilder
+						      : nameBuilder + "." + member->getName().str();
+		collectVarName(ptr + offset, member->getBaseType(), name, info);
+
+		/* All members of a union overlap: name it after the first one */
+		if (isUnion)
+			break;
+	}
+
+	/* Never leave an object without a name (e.g., an empty struct) */
+	if (info.size() == oldSize)
+		info.addOffsetInfo(ptr, nameBuilder);
+}
+
+/*
+ * Names the object at offset PTR whose declared type is DIT.
+ * We walk the debug-info type rather than the LLVM type of the allocation:
+ * the latter is not the declared type when the object has a constant initializer
+ * (e.g., the padding becomes explicit fields, an array becomes a packed struct,
+ * a union takes the type of the initialized member).
+ */
+static void collectVarName(unsigned int ptr, DIType *dit, const std::string &nameBuilder,
+			   NameInfo &info)
+{
+	auto *dict = dyn_cast_or_null<DICompositeType>(stripDIType(dit));
+	if (!dict) {
 		info.addOffsetInfo(ptr, nameBuilder);
 		return;
 	}
 
-	unsigned int offset = 0;
-	if (auto *arrayType = dyn_cast<ArrayType>(typ)) {
-		auto *newDit = dit;
-		if (auto *dict = dyn_cast<DICompositeType>(dit)) {
-			newDit = (!dict->getBaseType())
-					 ? dict
-					 : llvm::dyn_cast<DIType>(dict->getBaseType());
-		}
-		auto elemSize = M.getDataLayout().getTypeAllocSize(arrayType->getElementType());
-		for (auto i = 0U; i < arrayType->getNumElements(); i++) {
-			collectVarName(M, ptr + offset, arrayType->getElementType(), newDit,
-				       nameBuilder + "[" + std::to_string(i) + "]", info);
-			offset += elemSize;
-		}
-	} else if (auto *structType = dyn_cast<StructType>(typ)) {
-		DINodeArray dictElems;
-
-		/* Since this is a struct type, the metadata should yield a
-		 * composite type, or a derived type that will eventually
-		 * yield a composite type. */
-		if (auto *dict = dyn_cast<DICompositeType>(dit)) {
-			dictElems = dict->getElements();
-		}
-		if (auto *dict = dyn_cast<DIDerivedType>(dit)) {
-			DIType *dbt = dict;
-			while (auto *dbtc = dyn_cast<DIDerivedType>(dbt))
-				dbt = dyn_cast<DIType>(dbtc->getBaseType());
-
-			if (auto *dbtc = dyn_cast<DICompositeType>(dbt))
-				dictElems = dbtc->getElements();
-			else {
-				/* Take some precautions, in case we got this
-				 * metadata thing all wrong... */
-				PRINT_BUGREPORT_INFO_ONCE("struct-mdata",
-							  "Cannot get variable naming info");
-				return;
-			}
-		}
-
-		/* It can be dictElems.size() < structType->getNumElements(), e.g., for va_arg */
-		auto i = 0U;
-		auto minSize = std::min(dictElems.size(), structType->getNumElements());
-		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-		for (const auto *it = structType->element_begin(); i < minSize; ++it, ++i) {
-			auto elemSize = M.getDataLayout().getTypeAllocSize(*it);
-			auto *didt = dictElems[i];
-
-			/* Skip any C-level const class members: these don't make it in the LLVM
-			 * type but do appear in the debug data */
-			while (i < dictElems.size()) {
-				/* const class members have variable tag */
-				auto *dit = dyn_cast<DIDerivedType>(didt);
-				if (!dit || dit->getTag() != llvm::dwarf::Tag::DW_TAG_variable)
-					break;
-
-				/* they also have base type with const tag */
-				if (dit->getBaseType()->getTag() !=
-				    llvm::dwarf::Tag::DW_TAG_const_type)
-					break;
-
-				didt = dictElems[++i];
-			}
-
-			if (auto *dit = dyn_cast<DIDerivedType>(didt)) {
-				if (auto *ditb = dyn_cast<DIType>(dit->getBaseType()))
-					collectVarName(M, ptr + offset, *it, ditb,
-						       nameBuilder + "." + dit->getName().str(),
-						       info);
-			}
-			offset += elemSize;
-		}
-	} else {
-		UNREACHABLE();
+	switch (dict->getTag()) {
+	case dwarf::DW_TAG_array_type:
+		collectArrayNames(ptr, dict, nameBuilder, info);
+		break;
+	case dwarf::DW_TAG_structure_type:
+	case dwarf::DW_TAG_class_type:
+	case dwarf::DW_TAG_union_type:
+		collectMemberNames(ptr, dict, nameBuilder, info);
+		break;
+	default:
+		info.addOffsetInfo(ptr, nameBuilder);
+		break;
 	}
 }
 
-static auto collectVarName(Module &M, Type *typ, DIType *dit) -> NameInfo
+static auto collectVarName(DIType *dit) -> NameInfo
 {
 	NameInfo info;
-	collectVarName(M, 0, typ, dit, "", info);
+	collectVarName(0, dit, "", info);
 	return info;
 }
 
-void MDataInfo::collectGlobalInfo(GlobalVariable &v, Module &M)
+void MDataInfo::collectGlobalInfo(GlobalVariable &v)
 {
 	/* If we already have data for the variable, skip */
 	if (hasGlobalInfo(&v))
@@ -149,11 +203,11 @@ void MDataInfo::collectGlobalInfo(GlobalVariable &v, Module &M)
 	auto *dit = dive->getVariable()->getType();
 
 	/* Check whether it is a global pointer */
-	if (auto *ditc = dyn_cast<DIType>(dit))
-		*info = collectVarName(M, v.getValueType(), ditc);
+	if (auto *ditc = dyn_cast_or_null<DIType>(dit))
+		*info = collectVarName(ditc);
 }
 
-void MDataInfo::collectLocalInfo(DbgDeclareInst *dbgDecl, Module &M)
+void MDataInfo::collectLocalInfo(DbgDeclareInst *dbgDecl)
 {
 	/* Skip if it's not an alloca or we don't have data */
 	auto *v = dyn_cast<AllocaInst>(dbgDecl->getAddress());
@@ -170,11 +224,11 @@ void MDataInfo::collectLocalInfo(DbgDeclareInst *dbgDecl, Module &M)
 	allocaMData[v] = dbgDecl->getVariable();
 
 	auto *dit = dbgDecl->getVariable()->getType();
-	if (auto *ditc = dyn_cast<DIType>(dit))
-		*info = collectVarName(M, v->getAllocatedType(), ditc);
+	if (auto *ditc = dyn_cast_or_null<DIType>(dit))
+		*info = collectVarName(ditc);
 }
 
-void MDataInfo::collectMemCpyInfo(MemCpyInst *mi, Module &M)
+void MDataInfo::collectMemCpyInfo(MemCpyInst *mi)
 {
 	/*
 	 * Only mark global variables w/ private linkage that will
@@ -202,23 +256,23 @@ void MDataInfo::collectMemCpyInfo(MemCpyInst *mi, Module &M)
 	if (!allocaMData.contains(dst))
 		return; /* We did our best, but couldn't get a name for it... */
 	auto *dit = allocaMData[dst]->getType();
-	if (auto *ditc = dyn_cast<DIType>(dit))
-		*info = collectVarName(M, dst->getAllocatedType(), ditc);
+	if (auto *ditc = dyn_cast_or_null<DIType>(dit))
+		*info = collectVarName(ditc);
 }
 
 auto MDataInfo::run(Module &M, ModuleAnalysisManager & /*AM*/) -> Result
 {
 	/* First, get type information for user's global variables */
 	for (auto &v : GLOBALS(M))
-		collectGlobalInfo(v, M);
+		collectGlobalInfo(v);
 
 	/* Then for all local variables and some other special cases */
 	for (auto &F : M) {
 		for (auto &I : instructions(F)) {
 			if (auto *dbgDecl = dyn_cast<DbgDeclareInst>(&I))
-				collectLocalInfo(dbgDecl, M);
+				collectLocalInfo(dbgDecl);
 			if (auto *mi = dyn_cast<MemCpyInst>(&I))
-				collectMemCpyInfo(mi, M);
+				collectMemCpyInfo(mi);
 		}
 	}
 	return PMI;
