@@ -34,6 +34,7 @@
 #include "genmc/Support/Parser.hpp"
 #include "passes/LLIConfig.hpp"
 #include "passes/LLVMUtils.hpp"
+#include <algorithm>
 #include <llvm/CodeGen/IntrinsicLowering.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/InstIterator.h>
@@ -280,21 +281,31 @@ void Interpreter::collectStaticAddresses()
 			continue;
 		}
 
+		/* A zero-sized global (an empty struct, a zero-length array, or
+		 * the `external global [0 x ptr]` vtable that C++ type info
+		 * refers to) still needs an address of its own: reserve one
+		 * byte for it, reading as zero, as for malloc(0) */
+		static const char zeroByte = 0;
+		const uint64_t allocSize = std::max<uint64_t>(typeSize, 1);
+
 		/* Allocate a symbolic address for this global via the driver API */
-		auto addr = driver->allocateGlobal(ASize(typeSize), v.getAlignment(),
+		auto addr = driver->allocateGlobal(ASize(allocSize), v.getAlignment(),
 #if EMIT_NA_LABELS
-						   ptr,
+						   typeSize == 0 ? &zeroByte : ptr,
 #endif
 						   v.getSection() == "__genmc_persist",
 						   v.getAddressSpace() == 42);
 		ERROR_ON(addr == SAddr(), "Allocator is out of memory");
-		staticAllocas.insert(std::make_pair(addr, addr + ASize(typeSize - 1)));
+		staticAllocas.insert(std::make_pair(addr, addr + ASize(allocSize - 1)));
 		staticValueMap[addr] = ptr;
 
 		/* ... and use that in the EE instead. Make sure to re-initialize it too;
-		 * it might contain the address of another global */
+		 * it might contain the address of another global. A declaration
+		 * has no initializer: the EE bound it to the host's symbol, whose
+		 * contents are its initial value */
 		updateGlobalMapping(&v, (void *)addr.get());
-		toReinitialize.push_back(std::make_pair(&v, ptr));
+		if (v.hasInitializer())
+			toReinitialize.push_back(std::make_pair(&v, ptr));
 
 		/* Update naming information */
 		staticNames[addr] = &v;
