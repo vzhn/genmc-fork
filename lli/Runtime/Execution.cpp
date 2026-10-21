@@ -1849,6 +1849,7 @@ void Interpreter::visitAtomicRMWInst(AtomicRMWInst &I)
 			return;                                                                    \
                                                                                                    \
 		res = *retVal;                                                                     \
+		rmwRead = currPos();                                                               \
 		updateDataDeps(getCurThr().id, &I, currPos());                                     \
 		updateAddrPoDeps(getCurThr().id, I.getPointerOperand());                           \
 		auto newVal = executeRMWBinOp(res, val, size, toGenMCBinOp(I.getOperation()));     \
@@ -1859,6 +1860,7 @@ void Interpreter::visitAtomicRMWInst(AtomicRMWInst &I)
 	}
 
 	SVal res{};
+	std::optional<Event> rmwRead;
 	switch (switchPair(getFaiKinds(I))) {
 		IMPLEMENT_FAI_VISIT(FaiRead, FaiWrite);
 		IMPLEMENT_FAI_VISIT(NoRetFaiRead, NoRetFaiWrite);
@@ -1866,6 +1868,13 @@ void Interpreter::visitAtomicRMWInst(AtomicRMWInst &I)
 	default:
 		UNREACHABLE();
 	}
+
+	/* The read of an RMW is exclusive: IMM orders it before all later
+	 * events of its thread, as a CAS's (see visitAtomicCmpXchgInst()).
+	 * Nothing else does: its write part depends on it (rmw), the events
+	 * after it only if they use its value */
+	if (rmwRead && !scopesCtrlDeps())
+		updateCtrlDeps(getCurThr().id, *rmwRead);
 
 	SetValue(&I, SVAL_TO_GV(res, typ), ECStack().back());
 }

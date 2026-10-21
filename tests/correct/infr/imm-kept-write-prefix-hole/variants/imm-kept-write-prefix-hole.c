@@ -6,7 +6,14 @@
  * first is a maximal extension, but isCoBeforeSavedPrefix() did not count
  * W(x0, 2) as an alternative for the fetch_add in the second, because the
  * prefix of W(x0, 2) reaches t0's W(x1, 0), past the fetch_add, through a
- * hole: it revisited the fetch_add all the same in the first graph. */
+ * hole: it revisited the fetch_add all the same in the first graph.
+ *
+ * IMM orders the fetch_add's read (an exclusive read) before t0's later
+ * events, W(x1, 0) included ([Rex] ; po), which GenMC's IMM did not: 14 of
+ * the 60 executions have the fetch_add read one of t1's stores to x0
+ * while t1's load or CAS of x1 reads W(x1, 0), a cycle in ar. Under IMM,
+ * as herd7 with IMM's model, there are 46, as under rc11; the fetch_add is
+ * in the prefix of W(x0, 2), and the path above is no longer reached. */
 #include <pthread.h>
 #include <stdatomic.h>
 
