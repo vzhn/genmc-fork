@@ -35,8 +35,42 @@
 # (both register modes of scripts/lkmm/litmus2c.py) reports JumpThreadingPass
 # as adding a control dependency to the write of z of P1 (issue #78).
 #
-# Triage of the dependency checks (this branch; one line per pass):
-#   TRIAGE-TABLE
+# Triage of the dependency checks (release 0.19.0-vzhn.13 plus this check;
+# the LKMM suite (132 programs), 101 fuzz seeds in both register modes, 87
+# programs of litmus, synthetic and infr under -imm; the counts of pass runs
+# are kept/added/dropped/changed/unproved):
+#   JumpThreadingPass      lkmm 164/1/0/0/7, fuzz globals 339/24/0/1/13,
+#                          fuzz locals 310/23/1/0/13, imm 100/0/2/0/5
+#     added, join threaded: the code after an if's join runs inside its
+#       branches and gets their control dependency, which herd7 does not
+#       have (#78): all 23 with locals, about 10 with globals (seed 506 in
+#       both modes); the changed and the dropped run are events the
+#       threading moved between branches, in the same family;
+#     added, forwarded PHI: a register global stored under a branch and
+#       loaded after the join becomes a PHI (load PRE), which the join rule
+#       gives the branch's dependency; herd7 gives a register assigned
+#       under a branch that dependency too (jt-phi in #125's thread: herd7
+#       3, GenMC 3 with the pass, 4 without), so these agree with it: about
+#       11 with globals, tests/correct/lkmm/inverted-co-range P2;
+#     added, a branch with one target (the folded expected-value store of
+#       a cmpxchg) opening a control dependency: GenMC bug #125, fixed on
+#       this branch (3 fuzz seeds and ctrl-shadow-not-ppo before the fix);
+#     dropped under -imm: malloc-dep (the folded null check of a malloc
+#       result: a dependency on the allocation event, which orders nothing)
+#       and casdep (the cmpxchg lowering's own branch folded to one target:
+#       its artifact dependency on the cmpxchg; the suite's counts are
+#       unchanged).
+#   EliminateCASPHIsPass * lkmm 8/0/0/0/4, fuzz 73+71 kept, 40 unproved,
+#                          imm 0/0/0/1/1: casdep, data from the cmpxchg
+#                          instead of the expected value's read (on purpose)
+#   EliminateUnusedCodePass, EliminateRedundantInstPass, LocalSimplifyCFGPass,
+#   EliminateCastsPass, EliminateAnnotationsPass: all kept (the unproved
+#     ones are loops beyond the unroll bound: llist, slab-rcu-lookup, urcu-mb)
+#   LoopSimplifyPass, LCSSAPass: unproved only (loops)
+#   StrengthenCASPass, PropagateAssumesPass, SpinAssumePass: skipped (they
+#     change orderings, assumptions and markers on purpose)
+#   srcu-thread-handoff main was reported changed before the capture check
+#     of isPrivateAccess matched the interpreter's (a checker imprecision).
 #
 # Usage: scripts/check-passes.sh [-g genmc] [-o outdir] [-j jobs] [-t secs]
 #            [-f "genmc flags"] file.c...
