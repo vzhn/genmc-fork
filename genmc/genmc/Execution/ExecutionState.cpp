@@ -452,10 +452,14 @@ void ExecutionState::onAllocAt(Event pos, SAddr addr, ASize size, uint64_t align
 	if (addr == SAddr())
 		return;
 
+	/* A zero-size block takes a byte of address space, as in onAlloc():
+	 * an empty interval would not be registered, and the block could
+	 * neither be freed nor kept apart from the thread's next one */
+	auto span = ASize(std::max(size.get(), uint64_t(1)));
 	VERIFY(!allocInfoMap_.contains(addr));
-	allocInfoMap_.add(
-		{{addr, addr + size}, {pos, AAccess(addr, size), static_cast<unsigned int>(alignment)}});
-	getAllocator().reserve(addr, size.get());
+	allocInfoMap_.add({{addr, addr + span},
+			   {pos, AAccess(addr, size), static_cast<unsigned int>(alignment)}});
+	getAllocator().reserve(addr, span.get());
 }
 
 void ExecutionState::onThreadCreate(Event pos)
