@@ -138,12 +138,17 @@ static auto calculateReplaySchedule(const ExecutionGraph &g, const Config *conf,
 	return result;
 }
 
-void Scheduler::resetExplorationOptions(const ExecutionGraph &g, bool replay)
+void Scheduler::resetExplorationOptions(const ExecutionGraph &g)
 {
 	setRescheduledRead(Event::getInit());
 	threadPrios_.clear();
-	replaySchedule_ = replay ? calculateReplaySchedule(g, getConf(), eventToReexecute_)
-				 : std::vector<Event>{};
+	/* Also for an execution resuming from a saved state: its threads have
+	 * passed most of the schedule (scheduleReplay() skips that), but a
+	 * thread with holes before kept events (a non-po-closed prefix a
+	 * backward revisit copied) must fill them before the policy lets the
+	 * others run, as it would in a replay; otherwise the events the others
+	 * add first make the kept events' revisits non-maximal (issue #111) */
+	replaySchedule_ = calculateReplaySchedule(g, getConf(), eventToReexecute_);
 
 	/* Check whether the event that led to this execs needs thread prioritization */
 	for (auto tid : g.thr_ids()) {

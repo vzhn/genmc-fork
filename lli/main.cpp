@@ -971,8 +971,6 @@ void run(GenMCDriver *driver, llvm::Interpreter *EE)
 		auto resumed = rp && !errorReplay &&
 			       EE->resumeFrom(*rp, createExecutionContext(g), lastIndices(g));
 		if (!resumed) {
-			if (rp)
-				driver->prepareReplay();
 			EE->reset();
 			EE->setExecutionContext(createExecutionContext(g));
 			EE->runMain(errorReplay);

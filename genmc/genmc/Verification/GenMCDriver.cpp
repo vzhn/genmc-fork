@@ -361,18 +361,13 @@ auto GenMCDriver::handleExecutionStart() -> bool
 						     bufferedError_.has_value()),
 					 &g, invariantContext("starting an execution"));
 	}
-	getScheduler().resetExplorationOptions(g, /*replay=*/!pendingResume_);
+	getScheduler().resetExplorationOptions(g);
 	/* A resumed execution is driven through the holes before its kept
 	 * events as a replayed one is (I4) */
 	if (pendingResume_ && checksInvariants())
 		invariants::checkResumeSchedule(g, getScheduler().getReplaySchedule(),
 						invariantContext("starting a resumed execution"));
 	return getScheduler().inErrorReplay();
-}
-
-void GenMCDriver::prepareReplay()
-{
-	getScheduler().resetExplorationOptions(getExec().getGraph());
 }
 
 void GenMCDriver::checkHelpingCasAnnotation()

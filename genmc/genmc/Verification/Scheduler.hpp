@@ -52,10 +52,12 @@ public:
 
 	static auto create(const Config *config) -> std::unique_ptr<Scheduler>;
 
-	/** Should be called at the beginning of each execution */
-	/** Resets the options for a new execution; REPLAY says whether the
-	 * runtime replays the graph (a resumed execution does not) */
-	void resetExplorationOptions(const ExecutionGraph &g, bool replay = true);
+	/** Resets the options for a new execution (to be called at the
+	 * beginning of each one), including the schedule that drives the
+	 * runtime through the graph's events: a replayed execution through all
+	 * of them, a resumed one through those its threads have not reached,
+	 * i.e. the holes before kept events and the kept events themselves */
+	void resetExplorationOptions(const ExecutionGraph &g);
 
 	/** The events the runtime is still to be driven through, latest first */
 	[[nodiscard]] auto getReplaySchedule() const -> const std::vector<Event> &
