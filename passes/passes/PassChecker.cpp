@@ -26,6 +26,7 @@
 #include <llvm/IR/CFG.h>
 #include <llvm/Analysis/ValueTracking.h>
 #include <llvm/AsmParser/Parser.h>
+#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/Dominators.h>
@@ -146,7 +147,16 @@ auto isPrivateAccess(const llvm::Instruction &I) -> bool
 	if (!ptr)
 		return false;
 	const auto *obj = llvm::dyn_cast<llvm::AllocaInst>(llvm::getUnderlyingObject(ptr));
-	return obj && !llvm::PointerMayBeCaptured(obj, /*ReturnCaptures=*/true);
+	if (!obj)
+		return false;
+#if LLVM_VERSION_MAJOR >= 21
+	/* As the interpreter (isThreadPrivateAlloca): a comparison captures only
+	 * the address, which gives no other thread a pointer to the memory */
+	return !llvm::capturesAnyProvenance(llvm::PointerMayBeCaptured(
+		obj, /*ReturnCaptures=*/true, llvm::CaptureComponents::Provenance));
+#else
+	return !llvm::PointerMayBeCaptured(obj, /*ReturnCaptures=*/true, /*StoreCaptures=*/true);
+#endif
 }
 
 /*
