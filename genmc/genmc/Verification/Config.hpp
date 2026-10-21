@@ -64,6 +64,8 @@ struct Config {
 	unsigned int maxExtSize{};
 	bool dotPrintOnlyClientEvents{};
 	bool replayCompletedThreads{false};
+	/* Check the bookkeeping invariants at run time (see Invariants.hpp) */
+	bool checkInvariants{};
 	static constexpr bool emitNALabels = EMIT_NA_LABELS;
 
 	/*** Debugging options ***/

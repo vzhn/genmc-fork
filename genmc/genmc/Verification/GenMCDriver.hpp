@@ -31,8 +31,14 @@
 #include <functional>
 #include <memory>
 #include <random>
+#include <string_view>
 #include <utility>
 #include <variant>
+
+namespace invariants {
+struct Context;
+struct RestrictionPlan;
+} // namespace invariants
 
 namespace llvm {
 class Interpreter;
@@ -933,6 +939,22 @@ private:
 
 	/** The details of an error to be reported (buffered) */
 	std::optional<ErrorDetails> bufferedError_;
+
+	/** -check-invariants (see Invariants.hpp): whether the checks run */
+	[[nodiscard]] auto checksInvariants() const -> bool { return getConf()->checkInvariants; }
+
+	/** -check-invariants: the situation the checks report (WHERE names the
+	 * operation just performed) */
+	[[nodiscard]] auto invariantContext(std::string_view where) const -> invariants::Context;
+
+	/** -check-invariants: checks I1 on G after WHERE (with the restriction's
+	 * PLAN, if it was one); nothing with the option off */
+	void checkGraphInvariants(const ExecutionGraph &g, std::string_view where,
+				  const invariants::RestrictionPlan *plan = nullptr) const;
+
+	/** Restricts the current execution to STAMP (see Execution::restrict()),
+	 * checking I1 under -check-invariants */
+	void restrictExecution(Stamp stamp, std::string_view where);
 
 	/** Saves the runtime state at the event at POS for the forward revisits
 	 * queued for it (null if the run cannot resume, see saveResumePoint()) */

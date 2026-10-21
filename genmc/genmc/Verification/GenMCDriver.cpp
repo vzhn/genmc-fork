@@ -41,6 +41,7 @@
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/DriverHandlerDispatcher.hpp"
 #include "genmc/Verification/GraphPrinting.hpp"
+#include "genmc/Verification/Invariants.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/Relinche/Specification.hpp"
 #include "genmc/Verification/Revisit.hpp"
@@ -152,6 +153,32 @@ void GenMCDriver::pushExecution(Execution &&e)
 	getConsChecker().recomputeCacheCounters(getExec().getGraph());
 }
 
+auto GenMCDriver::invariantContext(std::string_view where) const -> invariants::Context
+{
+	return {.where = where,
+		.dbgInfo = &dbgInfo_,
+		.holesAllowed = getConf()->isDepTrackingModel};
+}
+
+void GenMCDriver::checkGraphInvariants(const ExecutionGraph &g, std::string_view where,
+				       const invariants::RestrictionPlan *plan) const
+{
+	if (!checksInvariants())
+		return;
+	invariants::checkGraph(g, invariantContext(where), plan);
+}
+
+void GenMCDriver::restrictExecution(Stamp stamp, std::string_view where)
+{
+	if (!checksInvariants()) {
+		getExec().restrict(stamp);
+		return;
+	}
+	auto plan = invariants::planCutToStamp(getExec().getGraph(), stamp);
+	getExec().restrict(stamp);
+	checkGraphInvariants(getExec().getGraph(), where, &plan);
+}
+
 /* The role of a write in a mutex, for spinloop detection */
 static auto getLockRole(const WriteLabel *wLab) -> ExecutionState::LockRole
 {
@@ -175,6 +202,8 @@ auto GenMCDriver::popExecution() -> bool
 
 void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 {
+	checkGraphInvariants(*exec->graph, "taking a task from the pool");
+
 	/* A replay that collects an error's metadata belongs to the executions
 	 * being replaced: drop it, or the next schedule would replay to an event
 	 * of the old graph. (It is cut short only when the pool halts, and then
@@ -195,8 +224,10 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 
 auto GenMCDriver::extractState() -> std::unique_ptr<GenMCDriver::Execution>
 {
+	auto og = getExec().getGraph().clone();
+	checkGraphInvariants(*og, "copying the graph for another worker");
 	return std::make_unique<Execution>(GenMCDriver::Execution(
-		getExec().getGraph().clone(), LocalQueueT(), ChoiceMap(getExec().getChoiceMap())));
+		std::move(og), LocalQueueT(), ChoiceMap(getExec().getChoiceMap())));
 }
 
 static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state)
@@ -505,6 +536,7 @@ void GenMCDriver::maybeCutGraph(const EventLabel *lab)
 	if (es.empty())
 		return;
 	g.cutToView(calcSCPrefixClosure(g, es));
+	checkGraphInvariants(g, "pruning the graph");
 }
 
 void GenMCDriver::restartExecution()
@@ -534,7 +566,8 @@ auto GenMCDriver::done() -> bool
 			 "bug report to {}\n",
 			 PACKAGE_BUGREPORT);
 		getExec().getWorkqueue().truncate(runStartWork_);
-		getExec().restrict(runStartStamp_);
+		restrictExecution(runStartStamp_,
+				  "restricting the graph to rerun after a relocation");
 		getConsChecker().recomputeCacheCounters(getExec().getGraph());
 		repairDanglingReads(getExec().getGraph());
 		return false;
@@ -546,7 +579,8 @@ auto GenMCDriver::done() -> bool
 		eagerKeptChecks_ = true;
 		++result.keptCheckReruns;
 		getExec().getWorkqueue().truncate(runStartWork_);
-		getExec().restrict(runStartStamp_);
+		restrictExecution(runStartStamp_,
+				  "restricting the graph to rerun with eager checks");
 		getConsChecker().recomputeCacheCounters(getExec().getGraph());
 		repairDanglingReads(getExec().getGraph());
 		return false;
@@ -763,6 +797,7 @@ void GenMCDriver::relocateExecution(int thread, int from, int delta)
 	getExec().getGraph().relocateThread(thread, from, delta);
 	getExec().getWorkqueue().relocateThread(thread, from, delta);
 	getExec().getChoiceMap().relocateThread(thread, from, delta);
+	checkGraphInvariants(getExec().getGraph(), "relocating a thread's events");
 }
 
 void GenMCDriver::relocateAndRerun(int thread, int from, int delta)
@@ -3749,7 +3784,11 @@ auto GenMCDriver::copyGraph(const BackwardRevisit *br, VectorClock *v) const
 
 	/* Adjust the view that will be used for copying */
 	auto prefix = getRevisitPrefixView(g.getEventLabel(br->getRev()));
+	auto plan = checksInvariants() ? std::optional(invariants::planCopyUpTo(g, *v))
+				       : std::nullopt;
 	auto og = g.getCopyUpTo(*v);
+	checkGraphInvariants(*og, "copying the graph for a backward revisit",
+			     plan ? &*plan : nullptr);
 
 	/** Ensure the prefix of the write will not be revisitable.
 	 * This is also used to check whether a write has revisited,
@@ -3950,7 +3989,7 @@ auto GenMCDriver::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 	auto &g = getExec().getGraph();
 	auto *br = genmc::dyn_cast<BackwardRevisit>(&*item);
 	auto stamp = g.getEventLabel(br ? br->getRev() : item->getPos())->getStamp();
-	getExec().restrict(stamp);
+	restrictExecution(stamp, "restricting the graph for a revisit");
 	/* Cutting the graph bypasses the incremental counter updates */
 	getConsChecker().recomputeCacheCounters(getExec().getGraph());
 	repairDanglingReads(g);
