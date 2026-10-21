@@ -889,6 +889,10 @@ static void printVerificationResults(const std::shared_ptr<const Config> &conf,
 		      "visited, {} revisits to a visited graph skipped",
 		      res.explored + res.exploredDuplicates, res.exploredDuplicates,
 		      res.graphsVisited, res.revisitsRepeated);
+	if (conf->exhaustive && res.exploredInconsistent) {
+		PRINT(VerbosityLevel::Error, ", {} inconsistent ones not counted",
+		      res.exploredInconsistent);
+	}
 	if (res.boundExceeding) {
 		VERIFY(conf->boundType != BoundType::round);
 		PRINT(VerbosityLevel::Error, " ({} exceeded bound)", res.boundExceeding);

@@ -526,6 +526,20 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 	if (const auto err = checkLkmmRace())
 		return err;
 
+	/* -exhaustive under IMM: the exploration checks an event that fills a
+	 * hole (one the threads add before events a revisit kept) as if it were
+	 * the last event of its thread (rf and coherence choices among the
+	 * coherent ones, and the extensibility of the last choice), and the
+	 * views of the kept events after it are those they had when they were
+	 * kept: the complete execution is counted only if it is consistent when
+	 * checked anew (on a copy, so that the exploration from the graph is not
+	 * changed) */
+	if (getConf()->exhaustive && getConf()->model == ModelType::IMM &&
+	    !isExecutionConsistent(g)) {
+		++result.exploredInconsistent;
+		return {};
+	}
+
 	/* -exhaustive reaches an execution by every path to it: count each once */
 	if (getConf()->exhaustive && !countedExecutions_.insert(canonicalGraphHash(g)).second) {
 		++result.exploredDuplicates;
@@ -2511,6 +2525,15 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 
 	/* Get an approximation of the stores we can read from */
 	auto stores = getRfsApproximation(lab);
+	/* -exhaustive under IMM: the read fills a hole, and the events a revisit
+	 * kept after it leave it no coherent write (see getCoherentStores()).
+	 * It reads from the last write, for the graph to stay well formed until
+	 * the run is dropped */
+	if (stores.empty() && getConf()->exhaustive && getConf()->model == ModelType::IMM) {
+		repairRead(g, lab);
+		moot();
+		return {.result = Invalid{}, .count = 1U};
+	}
 	VERIFY(!stores.empty());
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Rfs: {}", stores););
 	if (inVerificationMode())
@@ -3042,6 +3065,14 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 	 * they do not (the checker rejects the placings that break its axioms),
 	 * and the kat's own warning rule decides (see checkForRaces()) */
 	auto cos = getConsChecker().getCoherentPlacings(lab);
+	/* -exhaustive under IMM: as for a read (see handleLoad()); the store
+	 * still goes in coherence (last), for the graph to stay well formed
+	 * until the run is dropped */
+	if (cos.empty() && getConf()->exhaustive && getConf()->model == ModelType::IMM) {
+		lab->addCo(g.co_max(lab->getAddr()));
+		moot();
+		return {.result = Invalid{}, .count = 1U};
+	}
 	const auto *racyLab =
 		cos.size() > 1 && getConf()->model != ModelType::LKMM ? cos[0] : nullptr;
 
@@ -3795,7 +3826,180 @@ auto GenMCDriver::getRevisitView(const ReadLabel *rLab, const WriteLabel *sLab) 
 		return preds;
 	}
 	updatePredsWithPrefixView(g, *preds, prefix);
+	if (getConf()->exhaustive && getConf()->model == ModelType::IMM &&
+	    !keepValueDependencies(rLab->getPos(), *preds))
+		return nullptr;
 	return preds;
+}
+
+/* -exhaustive under IMM. A revisit keeps the events added before the read and
+ * the write's prefix, which is closed under (ppo | rfe)-predecessors; for a
+ * kept read whose write is in its own thread, it also keeps the write (see
+ * updatePredsWithPrefixView()), but not what the write depends on. That
+ * write can be an RMW's write part whose read is not kept: its value is
+ * then that of a read that is executed anew, and so is the value of the
+ * kept read. The default exploration then updates the write when the read
+ * is executed again (updateKeptRMWWrite()): it moves in coherence under the
+ * readers it has, its revisits are queued with its old stamp (restricting
+ * the graph to it cuts the read that completed it, and the revisiting
+ * write), and its cached prefix view names events the graph no longer
+ * has. Under -exhaustive, which takes revisits the maximality check
+ * rejects, those cases end in crashes and in executions that are not
+ * consistent or not executions of the program (issues #127, #135, #136).
+ *
+ * The reference keeps, instead, the graphs whose kept events are what the
+ * program computes from the kept events: every event it keeps comes with
+ * what its value and its existence depend on, its data, address, control
+ * and CAS dependencies, an RMW's read for its write part, a read's write,
+ * the creation of its thread, transitively. A revisit for which that
+ * includes the revisited read, or an event the graph does not have, has no
+ * such graph and is not taken. (A write is still kept without the events
+ * it is merely ordered after: its value does not depend on them, and the
+ * graph's consistency is checked once the revisit is done; see
+ * backwardRevisit().) No kept write then changes when the threads fill
+ * the holes, and none is completed anew */
+auto GenMCDriver::keepValueDependencies(Event r, VectorClock &v) const -> bool
+{
+	const auto &g = getExec().getGraph();
+	auto &dv = *genmc::cast<DepView>(&v);
+	std::vector<Event> work;
+	for (const auto &lab : g.labels())
+		if (lab.getPos() != r && !genmc::isa<EmptyLabel>(&lab) && v.contains(lab.getPos()))
+			work.push_back(lab.getPos());
+	while (!work.empty()) {
+		const auto *lab = g.getEventLabel(work.back());
+		work.pop_back();
+
+		std::vector<Event> deps;
+		const auto &d = lab->getDeps();
+		for (const auto *di : {&d.data, &d.addr, &d.ctrl, &d.cas})
+			std::ranges::copy(*di, std::back_inserter(deps));
+		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(lab); wLab && wLab->isRMW())
+			deps.push_back(lab->getPos().prev());
+		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab); rLab && rLab->getRf())
+			deps.push_back(rLab->getRf()->getPos());
+		if (const auto *bLab = g.getFirstThreadLabel(lab->getThread());
+		    bLab && bLab->getCreate())
+			deps.push_back(bLab->getCreate()->getPos());
+
+		for (auto e : deps) {
+			if (e == r)
+				return false;
+			if (e.isInitializer() || v.contains(e))
+				continue;
+			const auto *eLab = g.getEventLabelIfPresent(e);
+			if (!eLab || genmc::isa<EmptyLabel>(eLab))
+				return false;
+			dv.updateIdx(e);
+			work.push_back(e);
+		}
+	}
+	return true;
+}
+
+auto GenMCDriver::recomputeViews(ExecutionGraph &g) -> bool
+{
+	/* A label's views come from those of the labels before it in hb, which
+	 * need not come first in the insertion order: iterate until the hb
+	 * views settle (they only grow after the first pass; an hb cycle makes
+	 * them grow until the bound). A hole takes its po-predecessor's views,
+	 * which the events kept after it inherit */
+	const auto hb = getConsChecker().getHbViewIndex();
+	auto same = [&g](const View &a, const View &b) {
+		return std::ranges::all_of(std::views::iota(0, g.getNumThreads()),
+					   [&](auto t) { return a.getMax(t) == b.getMax(t); });
+	};
+	auto settled = false;
+	for (auto pass = 0U; !settled && pass <= g.getMaxStamp().get() + 1; pass++) {
+		settled = true;
+		for (auto &lab : g.labels()) {
+			if (genmc::isa<InitLabel>(&lab))
+				continue;
+			const auto had = lab.views().size() > hb;
+			const auto old = had ? lab.view(hb) : View();
+			updateLabelViews(&lab);
+			settled &= had && same(old, lab.view(hb));
+		}
+	}
+	for (auto &lab : g.labels())
+		if (!genmc::isa<InitLabel>(&lab))
+			lab.setPrefixView(nullptr);
+	return settled;
+}
+
+auto GenMCDriver::isGraphConsistent(const ExecutionGraph &g) const -> bool
+{
+	const auto &cc = getConsChecker();
+	auto coIndex = [&g](const EventLabel *wLab) -> int {
+		if (genmc::isa<InitLabel>(wLab))
+			return -1;
+		auto i = 0;
+		for (const auto &oLab : g.co(genmc::cast<WriteLabel>(wLab)->getAddr())) {
+			if (&oLab == wLab)
+				return i;
+			++i;
+		}
+		VERIFY(false);
+		return -1;
+	};
+
+	/* Coherence: no cycle in hb;eco, as CoWR, CoRW, CoRR and CoWW */
+	for (const auto &lab : g.labels()) {
+		const auto *rLab = genmc::dyn_cast<ReadLabel>(&lab);
+		if (!rLab || !rLab->getRf())
+			continue;
+		const auto &hbR = cc.getHbView(rLab);
+		const auto rf = coIndex(rLab->getRf());
+		auto i = 0;
+		for (const auto &wLab : g.co(rLab->getAddr())) {
+			if (i > rf && hbR.contains(wLab.getPos()))
+				return false;
+			if (i <= rf && cc.getHbView(&wLab).contains(rLab->getPos()))
+				return false;
+			++i;
+		}
+		for (const auto &oLab : g.labels()) {
+			const auto *oRLab = genmc::dyn_cast<ReadLabel>(&oLab);
+			if (oRLab && oRLab != rLab && oRLab->getRf() &&
+			    oRLab->getAddr() == rLab->getAddr() && hbR.contains(oRLab->getPos()) &&
+			    coIndex(oRLab->getRf()) > rf)
+				return false;
+		}
+	}
+	for (auto locIt = g.loc_begin(); locIt != g.loc_end(); ++locIt) {
+		auto i = 0;
+		for (const auto &wLab : g.co(locIt->first)) {
+			auto j = 0;
+			for (const auto &oLab : g.co(locIt->first)) {
+				if (j++ >= i)
+					break;
+				if (cc.getHbView(&oLab).contains(wLab.getPos()))
+					return false;
+			}
+			++i;
+		}
+	}
+
+	/* Atomicity: an RMW's write follows the write its read reads from */
+	for (const auto &lab : g.labels()) {
+		const auto *wLab = genmc::dyn_cast<WriteLabel>(&lab);
+		if (!wLab || !wLab->isRMW())
+			continue;
+		const auto *rLab = genmc::dyn_cast<ReadLabel>(g.po_imm_pred(wLab));
+		const EventLabel *pLab = g.co_imm_pred(wLab);
+		if (!rLab || rLab->getRf() != (pLab ? pLab : g.getInitLabel()))
+			return false;
+	}
+	return cc.isConsistent(g);
+}
+
+auto GenMCDriver::isExecutionConsistent(const ExecutionGraph &g) -> bool
+{
+	auto copy = g.clone();
+	getConsChecker().recomputeCacheCounters(*copy);
+	const auto consistent = recomputeViews(*copy) && isGraphConsistent(*copy);
+	getConsChecker().recomputeCacheCounters(g);
+	return consistent;
 }
 
 auto GenMCDriver::constructBackwardRevisit(const ReadLabel *rLab, const WriteLabel *sLab) const
@@ -4124,7 +4328,7 @@ void GenMCDriver::calcRevisits(WriteLabel *sLab)
 		/* -exhaustive: every revisit whose graph is well formed and can be
 		 * consistent (the visited set, not maximality, bounds the exploration) */
 		if (getConf()->exhaustive) {
-			if (isRevisitViewClosed(*br) && !keepsConflictingRMW(*br))
+			if (br->getViewNoRel() && isRevisitViewClosed(*br) && !keepsConflictingRMW(*br))
 				getExec().getWorkqueue().add(std::move(br));
 			continue;
 		}
@@ -4335,6 +4539,10 @@ auto GenMCDriver::backwardRevisit(const BackwardRevisit &br) -> bool
 	/* Recalculate the view because some B labels might have been
 	 * removed */
 	auto v = getRevisitView(g.getReadLabel(br.getPos()), g.getWriteLabel(br.getRev()));
+	if (!v) {
+		VERIFY(getConf()->exhaustive);
+		return false;
+	}
 
 	auto og = copyGraph(&br, &*v);
 	auto cmap = ChoiceMap(getExec().getChoiceMap());
@@ -4343,7 +4551,25 @@ auto GenMCDriver::backwardRevisit(const BackwardRevisit &br) -> bool
 	pushExecution({std::move(og), LocalQueueT(), std::move(cmap)});
 
 	repairDanglingReads(getExec().getGraph());
-	auto succeeded = revisitRead(br);
+
+	/* -exhaustive under IMM: the copy keeps the views its labels had in
+	 * the graph of the revisit, computed before the read read from the
+	 * revisiting write. The events kept after the read (and after the holes
+	 * of other threads) are ordered differently in the new graph; their
+	 * views are computed anew, before the read's revisit and after it, and
+	 * the graph is checked as a whole: coherence and atomicity, which the
+	 * exploration otherwise ensures as it adds each event, do not cover the
+	 * kept events, and the revisit is not taken if the graph is not
+	 * consistent. (A revisit that pushed work of its own: it is dropped, so
+	 * that the execution is popped) */
+	const auto checksGraph = getConf()->exhaustive && getConf()->model == ModelType::IMM;
+	auto succeeded = !checksGraph || recomputeViews(getExec().getGraph());
+	succeeded = succeeded && revisitRead(br);
+	if (checksGraph && (!succeeded || !recomputeViews(getExec().getGraph()) ||
+			    !isGraphConsistent(getExec().getGraph()))) {
+		getExec().getWorkqueue().truncate(0);
+		return false;
+	}
 	VERIFY(succeeded);
 
 	/* If there are idle workers in the thread pool,

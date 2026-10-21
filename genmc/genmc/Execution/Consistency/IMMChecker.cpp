@@ -933,6 +933,18 @@ static auto splitLocMOAfter(WriteLabel *wLab) -> ExecutionGraph::co_iterator
 				    [&](auto &sLab) { return isHbOptRfBefore(wLab, &sLab); });
 }
 
+/* Whether END is reached from BEGIN in ADDR's coherence order */
+static auto isRangeOrdered(ExecutionGraph &g, SAddr addr, ExecutionGraph::co_iterator begin,
+			   ExecutionGraph::co_iterator end) -> bool
+{
+	for (auto it = begin;; ++it) {
+		if (it == end)
+			return true;
+		if (it == std::ranges::end(g.co(addr)))
+			return false;
+	}
+}
+
 auto IMMChecker::getCoherentStores(ReadLabel *rLab) -> std::vector<EventLabel *>
 {
 	auto &g = *rLab->getParent();
@@ -964,6 +976,11 @@ auto IMMChecker::getCoherentStores(ReadLabel *rLab) -> std::vector<EventLabel *>
 	 */
 	auto endIt = (isDepTracking()) ? splitLocMOAfterHb(rLab)
 				       : std::ranges::end(g.co(rLab->getAddr()));
+	/* -exhaustive: a read filling a hole can be bounded by the events kept
+	 * after it from both sides, the end of the range before its beginning:
+	 * no write is coherent */
+	if (getConf()->exhaustive && isDepTracking() && !isRangeOrdered(g, rLab->getAddr(), begIt, endIt))
+		return {};
 	std::transform(begIt, endIt, std::back_inserter(stores), [&](auto &lab) { return &lab; });
 	return stores;
 }
@@ -1093,6 +1110,10 @@ auto IMMChecker::getCoherentPlacings(WriteLabel *wLab) -> std::vector<EventLabel
 	auto rangeBegin = splitLocMOBefore(wLab->getAddr(), wLab);
 	auto rangeEnd = (isDepTracking()) ? splitLocMOAfter(wLab)
 					  : std::ranges::end(g.co(wLab->getAddr()));
+	/* -exhaustive: as for a read (see getCoherentStores()) */
+	if (getConf()->exhaustive && isDepTracking() &&
+	    !isRangeOrdered(g, wLab->getAddr(), rangeBegin, rangeEnd))
+		return {};
 	auto cos = std::ranges::subrange(rangeBegin, rangeEnd) |
 		   std::views::filter([&](auto &sLab) { return !sLab.isRMW(); }) |
 		   std::views::transform([&](auto &sLab) {

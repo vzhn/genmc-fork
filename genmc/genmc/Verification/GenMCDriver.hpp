@@ -667,9 +667,29 @@ private:
 
 	/** Given a revisit RLAB <- WLAB, returns the view of the resulting graph.
 	 * (This function can be abused and also be utilized for returning the view
-	 * of "fictional" revisits, e.g., the view of an event in a maximal path.) */
+	 * of "fictional" revisits, e.g., the view of an event in a maximal path.)
+	 * -exhaustive under IMM: null when no well-formed graph results (see
+	 * keepValueDependencies()) */
 	auto getRevisitView(const ReadLabel *rLab, const WriteLabel *sLab) const
 		-> std::unique_ptr<VectorClock>;
+
+	/** -exhaustive under IMM: adds to V, the view of a revisit of R, what
+	 * the events it keeps depend on for their value and existence. Returns
+	 * false if that includes R or an event the graph does not have */
+	auto keepValueDependencies(Event r, VectorClock &v) const -> bool;
+
+	/** -exhaustive under IMM: computes the views of G's labels anew, in G,
+	 * and drops their cached prefix views. Returns false if they do not
+	 * settle (an hb cycle) */
+	auto recomputeViews(ExecutionGraph &g) -> bool;
+
+	/** -exhaustive under IMM: whether G, with the views its labels have, is
+	 * consistent: coherence, the atomicity of its RMWs, the other axioms */
+	auto isGraphConsistent(const ExecutionGraph &g) const -> bool;
+
+	/** -exhaustive under IMM: whether the complete execution G is
+	 * consistent, checked on a copy whose views are computed anew */
+	auto isExecutionConsistent(const ExecutionGraph &g) -> bool;
 
 	auto isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLabel *lab) -> bool;
 
