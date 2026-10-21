@@ -4075,6 +4075,11 @@ auto GenMCDriver::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 	auto &g = getExec().getGraph();
 	auto *br = genmc::dyn_cast<BackwardRevisit>(&*item);
 	auto stamp = g.getEventLabel(br ? br->getRev() : item->getPos())->getStamp();
+	/* A weak CAS that a backward revisit made succeed reads from a write
+	 * added after it: its spurious failure keeps that write (and the graph
+	 * of the revisit), not just what preceded the read */
+	if (const auto *wcf = genmc::dyn_cast<WeakCasFailureRevisit>(&*item))
+		stamp = std::max(stamp, g.getEventLabel(wcf->getRev())->getStamp());
 	restrictExecution(stamp, "restricting the graph for a revisit");
 	/* Cutting the graph bypasses the incremental counter updates */
 	getConsChecker().recomputeCacheCounters(getExec().getGraph());
