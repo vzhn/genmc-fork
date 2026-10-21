@@ -11,6 +11,19 @@ released.
 
 ### Fixed
 
+- `-imm` segfaulted (in `Interpreter::run()`), lost executions and
+  repeated others on programs with a compare-exchange whose expected value
+  is not used afterwards (#145, #137, since the fix of #125). IMM orders
+  the read of a CAS, a failing one's included, before all later events of
+  its thread (`[Rex] ; po`); GenMC took that ordering from the control
+  dependency of the branch that stores the expected value, which a branch
+  with one target no longer opens. A backward revisit could then keep
+  events after a CAS whose outcome it changed, and with the outcome
+  whether the CAS has a write part, i.e., where those events are. The read
+  of a CAS now orders them under IMM whatever follows it, and `-exhaustive`
+  no longer counts the load-buffering executions through a failing CAS
+  that this allowed (fuzz seed 64: 458, as the default exploration and
+  rc11, instead of 474).
 - A spinloop nested in another one restarted the outer loop's spinloop
   detection: the outer loop's next iteration was judged by what followed
   the inner loop's last spin start only (#147). An outer iteration whose

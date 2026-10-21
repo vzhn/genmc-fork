@@ -2965,12 +2965,14 @@ static auto hasReads(const ExecutionGraph &g, SAddr addr) -> bool
  * it would fail reading from (an acquire read before the write's events,
  * or its write part, a release one, before a write of its thread to the
  * location), and be in that write's prefix, where TruSt looks for the reads
- * the write cannot revisit: since #133 the events after a CAS do not depend
- * on it, and a load-buffering cycle through a CAS that fails is consistent
- * (issue #137). Such a CAS is revisitable all the same when the write's
- * value changes its ordering or makes it fail; the revisit drops its write
- * part (getRevisitView()), and the consistency of the graph it produces
- * decides (backwardRevisit()) */
+ * the write cannot revisit. The default exploration relies on the CAS's
+ * read being ordered before all later events of its thread whatever its
+ * outcome, as IMM orders it (see Interpreter::visitAtomicCmpXchgInst()),
+ * so that only its write part depends on the outcome, as under porf
+ * (issue #137). The reference does not: such a CAS is revisitable all the
+ * same when the write's value changes its ordering or makes it fail; the
+ * revisit drops its write part (getRevisitView()), and the consistency of
+ * the graph it produces decides (backwardRevisit()) */
 static auto failsReading(const ReadLabel *rLab, const WriteLabel *sLab) -> bool
 {
 	const auto *cLab = genmc::dyn_cast<CasReadLabel>(rLab);
