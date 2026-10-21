@@ -3966,6 +3966,12 @@ auto GenMCDriver::revisitRead(const Revisit &ri) -> bool
 
 	rLab->setRf(revLab);
 	updateLabelViews(rLab);
+	/* A revisited weak CAS is a fresh instance of the read: whether it
+	 * fails spuriously is decided again (see maybePushWeakCasFailure()).
+	 * The flag of the failing instance explored before it would otherwise
+	 * turn the new one into a failure too, whatever it reads */
+	if (auto *cLab = genmc::dyn_cast<CasReadLabel>(rLab))
+		cLab->setSpuriousFailure(false);
 	const auto *fri = genmc::dyn_cast<ReadForwardRevisit>(&ri);
 
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug1, "--- {} revisiting {} <-- {}\n{}",
