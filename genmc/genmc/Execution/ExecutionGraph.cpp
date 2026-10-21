@@ -226,9 +226,13 @@ auto ExecutionGraph::removeLast(int thread) -> std::unique_ptr<EventLabel>
 		auto &accesses = accessMap_[dLab->getAddr()];
 		std::erase(accesses, dLab);
 	}
-	if (genmc::isa<ThreadCreateLabel>(lab)) {
-		if (auto *tsLab = genmc::dyn_cast_if_present<ThreadStartLabel>(
-			    getFirstThreadLabel(lab->getThread())))
+	if (const auto *tcLab = genmc::dyn_cast<ThreadCreateLabel>(lab)) {
+		/* Unlink the child's begin (if the child exists), not the
+		 * creator's first label */
+		if (auto *tsLab = tcLab->getChildId() < getNumThreads()
+					  ? getFirstThreadLabel(tcLab->getChildId())
+					  : nullptr;
+		    tsLab && tsLab->getCreate() == tcLab)
 			tsLab->setCreate(nullptr);
 	}
 	if (auto *tjLab = genmc::dyn_cast<ThreadJoinLabel>(lab)) {
