@@ -12,8 +12,10 @@
 #     https://opensource.org/licenses/MIT
 
 # Under -lkmm, a store with several coherence placings is no write-write race:
-# the placings do not respect hb there. Writes ordered by a lock or by a
-# release and an acquire must not be reported; unordered marked writes must.
+# the placings do not respect hb there. Writes ordered by a lock, by a
+# release and an acquire, or by a grace period (a reader's write in its
+# critical section, an updater's after synchronize_rcu()) must not be
+# reported; unordered marked writes must, with or without a grace period.
 # ctest target "lkmm-ww-warning".
 #
 #   GenMC=<build>/bin/genmc scripts/check-lkmm-ww-warning.sh
@@ -24,7 +26,7 @@ TESTS="${DIR}/../tests/correct/lkmm"
 WARN='Unordered writes'
 
 status=0
-for t in ww-lock-ordered ww-mp-ordered; do
+for t in ww-lock-ordered ww-mp-ordered ww-rcu-ordered; do
 	out=$("${GenMC}" -lkmm -disable-estimation -- "${TESTS}/${t}/variants/${t}.c" 2>&1)
 	if echo "${out}" | grep -q "${WARN}"; then
 		echo "FAIL ${t}: warned about ordered writes"; echo "${out}" | tail -5; status=1
@@ -33,10 +35,12 @@ for t in ww-lock-ordered ww-mp-ordered; do
 	fi
 done
 
-out=$("${GenMC}" -lkmm -disable-estimation -- "${TESTS}/ww-unordered/variants/ww-unordered.c" 2>&1)
-if echo "${out}" | grep -q "${WARN}"; then
-	echo "ok   ww-unordered: warned"
-else
-	echo "FAIL ww-unordered: no warning"; echo "${out}" | tail -5; status=1
-fi
+for t in ww-unordered ww-rcu-unordered; do
+	out=$("${GenMC}" -lkmm -disable-estimation -- "${TESTS}/${t}/variants/${t}.c" 2>&1)
+	if echo "${out}" | grep -q "${WARN}"; then
+		echo "ok   ${t}: warned"
+	else
+		echo "FAIL ${t}: no warning"; echo "${out}" | tail -5; status=1
+	fi
+done
 exit ${status}
