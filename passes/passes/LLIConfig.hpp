@@ -29,6 +29,8 @@ struct LLIConfig {
 	unsigned int threads{};
 	bool disableStopOnSystemError{};
 	bool isDepTrackingModel{};
+	/* Control dependencies end at their branch's join (-lkmm) */
+	bool scopedCtrlDeps{};
 	std::optional<std::string> collectLinSpec;
 	std::optional<std::string> checkLinSpec;
 

@@ -226,8 +226,12 @@ auto transformLLVMModule(llvm::Module &mod, ModuleInfo &MI, const LLIConfig *con
 	fam.registerPass([&] { return LoadAnnotationAnalysis(); });
 
 	llvm::PassInstrumentationCallbacks PIC;
+	using DepMode = PassChecker::DepMode;
+	auto depMode = !conf->isDepTrackingModel ? DepMode::None
+		       : conf->scopedCtrlDeps	 ? DepMode::Scoped
+						 : DepMode::Unscoped;
 	PassChecker checker(conf->outputLlvmPasses, conf->verifyPassAnalyses, conf->helper,
-			    conf->confirmation, conf->finalWrite, fam);
+			    conf->confirmation, conf->finalWrite, depMode, fam);
 	checker.registerCallbacks(PIC);
 
 	llvm::PassBuilder PB(nullptr, llvm::PipelineTuningOptions(), std::nullopt, &PIC);

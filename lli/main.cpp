@@ -460,6 +460,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	}
 	lliConfig.programEntryFun = std::move(clProgramEntryFunction);
 	lliConfig.isDepTrackingModel = isDepTrackingModel(clModelType);
+	lliConfig.scopedCtrlDeps = clModelType == ModelType::LKMM;
 
 	/* Exploration */
 	conf.mode = clExplorationMode;
