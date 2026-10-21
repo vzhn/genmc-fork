@@ -19,6 +19,51 @@ released.
   programs and checks every pass with Alive2's `alive-tv`.
 
 
+## [0.19.0-vzhn.13] - 2026.10.21
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
+### Fixed
+
+- `-lkmm` lost executions when a backward revisit kept a thread's write
+  to a location while deleting a read of it that comes before (#100,
+  #105): the read, re-executed into the hole, cannot read the po-later
+  write, yet it counted as not added maximally, and every later revisit
+  that deleted it was rejected. A two-worker program handing pooled
+  buffers from one worker to the other explored 692 complete executions
+  instead of rc11's 11,786. This affected every `-lkmm` release.
+- `-lkmm` reported "Attempt to access freed memory" for an access that a
+  thread re-added, after a revisit, before its own kept free (#96, #97).
+- `-lkmm` warned "Unordered writes" about writes that a lock or a
+  release/acquire pair orders, naming the initial event (#98, #99). The
+  model's own rule alone decides now.
+- Every run left the compiled module's temp file `/tmp/__genmc.ll.XXXXXX`
+  behind (#102).
+
+### Performance
+
+- Finished threads are no longer replayed at the start of each execution,
+  and forward revisits resume from saved interpreter states
+  (`-resume-points=<n>`, default 256) instead of re-executing the graph
+  (#104).
+- `FunctionInlinerPass` inlines callees first, through their uses, instead
+  of rescanning the module for each function (#103): the transformation
+  phase of a nine-file program went from 5.5 s to 2.3 s.
+
+### Added
+
+- Debugging options to check the transformation passes with Alive2 (#101):
+  `-output-llvm-passes=<dir>` writes each pass's module before and after
+  it in a form `alive-tv` can check, and `-verify-pass-analyses` checks
+  the analyses the passes declare preserved.
+
+### Tests
+
+- `tests/correct/lkmm/hole-read-kept-write`, `kept-free-access`,
+  `ww-lock-ordered`, `ww-mp-ordered` and `ww-unordered` (the last three
+  checked by `scripts/check-lkmm-ww-warning.sh`, ctest `lkmm-ww-warning`).
+
+
 ## [0.19.0-vzhn.12] - 2026.10.20
 
 Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
