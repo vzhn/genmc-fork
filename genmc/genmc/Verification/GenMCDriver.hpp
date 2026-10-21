@@ -19,6 +19,7 @@
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/ChoiceMap.hpp"
 #include "genmc/Verification/Config.hpp"
+#include "genmc/Verification/GraphHash.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
 #include "genmc/Verification/Scheduler.hpp"
@@ -32,6 +33,7 @@
 #include <memory>
 #include <random>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -677,6 +679,18 @@ private:
 	 * RLAB <- SLAB form a maximal extension */
 	auto isMaximalExtension(const BackwardRevisit &r) -> bool;
 
+	/** -exhaustive: whether every read the revisit R keeps (but the
+	 * revisited one) keeps the write it reads from */
+	auto isRevisitViewClosed(const BackwardRevisit &r) -> bool;
+
+	/** -exhaustive: whether the graph R produces keeps an RMW that reads
+	 * from the write the revisiting RMW reads from (atomicity) */
+	auto keepsConflictingRMW(const BackwardRevisit &r) -> bool;
+
+	/** -exhaustive: records the graph ITEM produced in the visited set.
+	 * Returns whether it is new (a repeated graph is not explored again) */
+	auto visitRevisitedGraph(const Revisit &item) -> bool;
+
 	/** Calculates all possible coherence placings for SLAB and
 	 * pushes them to the worklist. */
 	void calcCoOrderings(WriteLabel *sLab, const std::vector<EventLabel *> &cos);
@@ -964,6 +978,10 @@ private:
 	/** Restricts the current execution to STAMP (see Execution::restrict()),
 	 * checking I1 under -check-invariants */
 	void restrictExecution(Stamp stamp, std::string_view where);
+	/** -exhaustive: the canonical hashes of the graphs revisits produced,
+	 * and of the complete executions counted (see visitRevisitedGraph()) */
+	std::unordered_set<GraphHash> visitedGraphs_;
+	std::unordered_set<GraphHash> countedExecutions_;
 
 	/** Saves the runtime state at the event at POS for the forward revisits
 	 * queued for it (null if the run cannot resume, see saveResumePoint()) */

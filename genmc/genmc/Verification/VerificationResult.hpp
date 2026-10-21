@@ -21,6 +21,10 @@ struct VerificationResult {
 	unsigned relocationReruns{}; /**< Runs repeated after moving a thread's kept events */
 	unsigned relocationsLost{};  /**< Runs dropped: a kept event would be skipped */
 	unsigned keptCheckReruns{};  /**< Runs repeated with eager checks of events before kept ones */
+	unsigned exploredDuplicates{}; /**< -exhaustive: complete executions seen again (not counted
+					  in explored) */
+	unsigned graphsVisited{};    /**< -exhaustive: distinct graphs produced by revisits */
+	unsigned revisitsRepeated{}; /**< -exhaustive: revisits skipped, their graph seen before */
 	long double estimationMean{};	  /**< The mean of estimations */
 	long double estimationVariance{}; /**< The (biased) variance of the estimations */
 	bool inferredSymmetryError{}; /**< Whether the error is unordered writes, an error
@@ -57,6 +61,9 @@ struct VerificationResult {
 		relocationReruns += other.relocationReruns;
 		relocationsLost += other.relocationsLost;
 		keptCheckReruns += other.keptCheckReruns;
+		exploredDuplicates += other.exploredDuplicates;
+		graphsVisited += other.graphsVisited;
+		revisitsRepeated += other.revisitsRepeated;
 		estimationMean += other.estimationMean;
 		estimationVariance += other.estimationVariance;
 #ifdef ENABLE_GENMC_DEBUG
