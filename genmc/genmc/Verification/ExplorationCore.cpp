@@ -80,7 +80,11 @@ ExplorationCore::ExplorationCore(std::shared_ptr<const Config> conf, WorkSharing
 	: mode(mode), pool(pool), userConf(std::move(conf)), resumePoints_(userConf->resumePoints)
 {
 	/* Set up the execution context */
-	consChecker = ConsistencyChecker::create(getConf());
+	consChecker = ConsistencyChecker::create(
+		userConf->model, {.collectLinSpec = userConf->collectLinSpec.has_value(),
+				  .checkLinSpec = userConf->checkLinSpec.has_value(),
+				  .exhaustive = userConf->exhaustive,
+				  .lkmmReference = userConf->lkmmReference});
 	stack_ = std::make_unique<ExplorationStack>(*consChecker, execState_,
 						    userConf->isDepTrackingModel);
 	stack_->reset(stack_->emptyFrame());

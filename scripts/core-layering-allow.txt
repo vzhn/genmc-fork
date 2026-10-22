@@ -1,3 +1,2 @@
 # Upward includes in the core library that exist today (see check-core-layering.sh).
 # Remove a line when its include goes away; never add one.
-genmc/Execution/Consistency/ConsistencyChecker.cpp -> genmc/Verification/Config.hpp

@@ -9,7 +9,6 @@
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Execution/GraphUtils.hpp"
-#include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/Invariants.hpp"
 #include "genmc/Execution/MemoryModel.hpp"
 
@@ -209,9 +208,7 @@ TEST(ExecutionGraphTest, CutToViewPrunesAndRedirects)
  */
 TEST(ExecutionGraphTest, InitReadersInheritPrunedViews)
 {
-	Config conf;
-	conf.model = ModelType::RC11;
-	auto checker = ConsistencyChecker::create(&conf);
+	auto checker = ConsistencyChecker::create(ModelType::RC11);
 	ExecutionGraph g{ExecutionGraph::Config{.memModel = &*checker, .emitNALabels = true}};
 
 	auto xAddr = SAddr(0x100);

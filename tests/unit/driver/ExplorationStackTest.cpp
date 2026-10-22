@@ -19,7 +19,7 @@
 
 #include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
 #include "genmc/Execution/ExecutionState.hpp"
-#include "genmc/Verification/Config.hpp"
+#include "genmc/Execution/MemoryModel.hpp"
 #include "genmc/Verification/ExplorationStack.hpp"
 
 #include <gtest/gtest.h>
@@ -27,12 +27,7 @@
 namespace {
 
 struct Fixture {
-	Config conf = [] {
-		Config c;
-		c.model = ModelType::SC;
-		return c;
-	}();
-	std::unique_ptr<ConsistencyChecker> model = ConsistencyChecker::create(&conf);
+	std::unique_ptr<ConsistencyChecker> model = ConsistencyChecker::create(ModelType::SC);
 	ExecutionState state;
 	ExplorationStack stack{*model, state, false};
 };

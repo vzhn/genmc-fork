@@ -21,35 +21,32 @@
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/MemoryModel.hpp"
 #include "genmc/Support/Error.hpp"
-#include "genmc/Verification/Config.hpp"
 
 #include <memory>
 
-ConsistencyChecker::ConsistencyChecker(const Config *conf)
-{
-	if (!conf)
-		return;
-	opts_ = {.collectLinSpec = conf->collectLinSpec.has_value(),
-		 .checkLinSpec = conf->checkLinSpec.has_value(),
-		 .exhaustive = conf->exhaustive,
-		 .lkmmReference = conf->lkmmReference};
-}
-
-auto ConsistencyChecker::create(const Config *conf) -> std::unique_ptr<ConsistencyChecker>
+static auto createChecker(ModelType model) -> std::unique_ptr<ConsistencyChecker>
 {
 #define CREATE_CHECKER(_model)                                                                     \
 	case ModelType::_model:                                                                    \
-		return std::make_unique<_model##Checker>(conf);
+		return std::make_unique<_model##Checker>(nullptr);
 
-	switch (conf->model) {
+	switch (model) {
 		CREATE_CHECKER(SC);
 		CREATE_CHECKER(TSO);
 		CREATE_CHECKER(RA);
 		CREATE_CHECKER(RC11);
 		CREATE_CHECKER(IMM);
 	case ModelType::LKMM:
-		return std::make_unique<LKMMRcuChecker>(conf);
+		return std::make_unique<LKMMRcuChecker>(nullptr);
 	default:
 		UNREACHABLE();
 	}
+}
+
+auto ConsistencyChecker::create(ModelType model, ModelOptions opts)
+	-> std::unique_ptr<ConsistencyChecker>
+{
+	auto checker = createChecker(model);
+	checker->opts_ = opts;
+	return checker;
 }
