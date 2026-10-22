@@ -102,6 +102,13 @@ released.
   `tests/correct/sr/{tls-symmetric,tls-between-spawns}`; the canonical
   graph hash of `-exhaustive` names the copies by their threads' creation
   paths: `GraphHashTest.ThreadLocalCopiesAreNamedByCreationPath`).
+- `memset()` on a thread-local, or `memcpy()` between two thread-locals,
+  aborted GenMC (`Invalid call to memset()!`, or `memcpy()`): clang takes
+  the address of a thread-local through `@llvm.threadlocal.address`,
+  behind which the promotion of memory intrinsics did not find the
+  variable's type, so it left the call whole, which GenMC cannot run. It
+  looks through the intrinsic now, and the call becomes an access per
+  field (`tests/correct/infr/tls-memintrinsics`).
 
 ### Added
 
