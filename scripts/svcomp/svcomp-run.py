@@ -9,8 +9,8 @@ Usage: svcomp-run.py [-j JOBS] [-t TIMEOUT] [-m MODEL] [-o OUTDIR]
                      [--nondet-max N] [--max-choices N] [--max-spurious N]
                      GENMC TASK_DIR...
 
-For each <task>.yml, runs GenMC on the task's .c source with svcomp-shim.h and
-maps the outcome to the properties GenMC can decide:
+For each <task>.yml, runs GenMC on the task's input file (input_files, which
+for most tasks is a preprocessed .i) with svcomp-shim.h and maps the outcome to the properties GenMC can decide:
   unreach-call    false if GenMC reports a safety violation (failed assertion)
   no-data-race    false if GenMC reports a non-atomic race
   valid-memsafety false if GenMC reports a memory error
@@ -53,15 +53,18 @@ TAIL = {
     "pthread_exit": "void pthread_exit(void *r) { __VERIFIER_thread_exit(r); }",
     "pthread_self": "pthread_t pthread_self(void) { return __VERIFIER_thread_self(); }",
     "pthread_mutex_init": """int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
-{ return __VERIFIER_mutex_init((__VERIFIER_mutex_t *) m, 0); }""",
+{
+	__svc_rec_register(m, a ? *(const int *) a : 0);
+	return __VERIFIER_mutex_init((__VERIFIER_mutex_t *) m, 0);
+}""",
     "pthread_mutex_destroy": """int pthread_mutex_destroy(pthread_mutex_t *m)
 { return __VERIFIER_mutex_destroy((__VERIFIER_mutex_t *) m); }""",
     "pthread_mutex_lock": """int pthread_mutex_lock(pthread_mutex_t *m)
-{ return __VERIFIER_mutex_lock((__VERIFIER_mutex_t *) m); }""",
+{ return __svc_mutex_lock((__VERIFIER_mutex_t *) m); }""",
     "pthread_mutex_trylock": """int pthread_mutex_trylock(pthread_mutex_t *m)
-{ return __VERIFIER_mutex_trylock((__VERIFIER_mutex_t *) m); }""",
+{ return __svc_mutex_trylock((__VERIFIER_mutex_t *) m); }""",
     "pthread_mutex_unlock": """int pthread_mutex_unlock(pthread_mutex_t *m)
-{ return __VERIFIER_mutex_unlock((__VERIFIER_mutex_t *) m); }""",
+{ return __svc_mutex_unlock((__VERIFIER_mutex_t *) m); }""",
     "pthread_cond_init": """int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a)
 { __atomic_store_n((int *) c, 0, __ATOMIC_RELAXED); return 0; }""",
     "pthread_cond_destroy": "int pthread_cond_destroy(pthread_cond_t *c) { return 0; }",
@@ -69,10 +72,10 @@ TAIL = {
 {
 	int seq = __atomic_load_n((int *) c, __ATOMIC_ACQUIRE);
 	int spurious = __svc_spurious_wakeup();
-	__VERIFIER_mutex_unlock((__VERIFIER_mutex_t *) m);
+	__svc_mutex_unlock((__VERIFIER_mutex_t *) m);
 	if (!spurious)
 		__VERIFIER_await(__atomic_load_n((int *) c, __ATOMIC_ACQUIRE) != seq);
-	return __VERIFIER_mutex_lock((__VERIFIER_mutex_t *) m);
+	return __svc_mutex_lock((__VERIFIER_mutex_t *) m);
 }""",
     "pthread_cond_signal": """int pthread_cond_signal(pthread_cond_t *c)
 { __atomic_fetch_add((int *) c, 1, __ATOMIC_RELEASE); return 0; }""",
@@ -92,9 +95,37 @@ TAIL = {
     "pthread_attr_init": "int pthread_attr_init(pthread_attr_t *a) { return 0; }",
     "pthread_attr_destroy": "int pthread_attr_destroy(pthread_attr_t *a) { return 0; }",
     "pthread_attr_setdetachstate": "int pthread_attr_setdetachstate(pthread_attr_t *a, int s) { return 0; }",
-    "pthread_mutexattr_init": "int pthread_mutexattr_init(pthread_mutexattr_t *a) { return 0; }",
+    # the attribute keeps the mutex type in its first int, which
+    # pthread_mutex_init reads to tell recursive mutexes apart
+    "pthread_mutexattr_init": "int pthread_mutexattr_init(pthread_mutexattr_t *a) { *(int *) a = 0; return 0; }",
     "pthread_mutexattr_destroy": "int pthread_mutexattr_destroy(pthread_mutexattr_t *a) { return 0; }",
-    "pthread_mutexattr_settype": "int pthread_mutexattr_settype(pthread_mutexattr_t *a, int k) { return 0; }",
+    "pthread_mutexattr_settype": "int pthread_mutexattr_settype(pthread_mutexattr_t *a, int k) { *(int *) a = k; return 0; }",
+    "pthread_mutexattr_gettype": """int pthread_mutexattr_gettype(const pthread_mutexattr_t *a, int *k)
+{ *k = *(const int *) a; return 0; }""",
+    # a rwlock's storage holds one GenMC mutex per thread (svcomp-shim-pp.h)
+    "pthread_rwlock_init": """int pthread_rwlock_init(pthread_rwlock_t *l, const pthread_rwlockattr_t *a)
+{
+	for (unsigned long i = 0; i < SVC_RWLOCK_SLOTS; i++)
+		__VERIFIER_mutex_init(&((__VERIFIER_mutex_t *) l)[i], 0);
+	return 0;
+}""",
+    "pthread_rwlock_destroy": "int pthread_rwlock_destroy(pthread_rwlock_t *l) { return 0; }",
+    "pthread_rwlock_rdlock": """int pthread_rwlock_rdlock(pthread_rwlock_t *l)
+{ return __svc_rw_rdlock((__VERIFIER_mutex_t *) l, SVC_RWLOCK_SLOTS); }""",
+    "pthread_rwlock_tryrdlock": """int pthread_rwlock_tryrdlock(pthread_rwlock_t *l)
+{ return __svc_rw_tryrdlock((__VERIFIER_mutex_t *) l, SVC_RWLOCK_SLOTS); }""",
+    "pthread_rwlock_wrlock": """int pthread_rwlock_wrlock(pthread_rwlock_t *l)
+{ return __svc_rw_wrlock((__VERIFIER_mutex_t *) l, SVC_RWLOCK_SLOTS); }""",
+    "pthread_rwlock_trywrlock": """int pthread_rwlock_trywrlock(pthread_rwlock_t *l)
+{ return __svc_rw_trywrlock((__VERIFIER_mutex_t *) l, SVC_RWLOCK_SLOTS); }""",
+    "pthread_rwlock_unlock": """int pthread_rwlock_unlock(pthread_rwlock_t *l)
+{ return __svc_rw_unlock((__VERIFIER_mutex_t *) l, SVC_RWLOCK_SLOTS); }""",
+    "pthread_key_create": """int pthread_key_create(pthread_key_t *k, void (*destructor)(void *))
+{ return __svc_key_create((unsigned int *) k); }""",
+    "pthread_key_delete": "int pthread_key_delete(pthread_key_t k) { return 0; }",
+    "pthread_getspecific": "void *pthread_getspecific(pthread_key_t k) { return __svc_getspecific(k); }",
+    "pthread_setspecific": """int pthread_setspecific(pthread_key_t k, const void *p)
+{ return __svc_setspecific(k, p); }""",
     # GenMC's allocator rejects size 0 (its stdlib.h asserts); malloc(0) is
     # legal C, so drop those executions instead of reporting an error
     "malloc": "void *malloc(size_t n) { __VERIFIER_assume(n > 0); return __VERIFIER_malloc(n); }",
@@ -108,6 +139,26 @@ TAIL = {
 		   const char *fn)
 { __VERIFIER_assert_fail(e, file, line); }""",
 }
+
+
+# The parameter list of a function definition: no ';' or braces, and
+# parentheses nested one level deep, as in void *(*f)(void *)
+PARAMS = r"\((?:[^;{}()]|\([^;{}()]*\))*\)"
+
+
+def defines(code, fn):
+    """Whether CODE defines function FN: a type word before the name, and a
+    body after the parameters. A call such as `if (pthread_create(...)) {`
+    has a '(' before the name, so it does not count."""
+    return re.search(r"\b[A-Za-z_]\w*[\s*]+" + fn + r"\s*" + PARAMS + r"\s*\{", code)
+
+
+def mentions_recursive(code):
+    """Whether CODE uses recursive mutexes. A preprocessed task carries the
+    PTHREAD_MUTEX_RECURSIVE enumerators of <pthread.h> whether it uses
+    them or not, so those declarations do not count."""
+    code = re.sub(r"\bPTHREAD_MUTEX_RECURSIVE(_NP)?\s*(=\s*\w+\s*)?,", "", code)
+    return re.search(r"\bPTHREAD_MUTEX_RECURSIVE(_NP)?\b", code) is not None
 
 
 def with_local_includes(code, d, seen=None):
@@ -198,9 +249,13 @@ def run_task(args, d, yml):
     if not expected:
         return None
     name = yml[:-4]
-    src = os.path.join(d, name + ".c")
+    # SV-COMP verifies the task's input file, which for most tasks is the
+    # preprocessed .i, not the .c it was made from
+    inputs = task.get("input_files", [])
+    inputs = [inputs] if isinstance(inputs, str) else inputs
+    src = os.path.join(d, inputs[0]) if len(inputs) == 1 else ""
     if not os.path.exists(src):
-        return (os.path.basename(d), name, expected, "no-c-source", 0.0, "NO-C-SOURCE", "")
+        return (os.path.basename(d), name, expected, "no-input", 0.0, "NO-INPUT", "")
     od = os.path.join(args.outdir, os.path.basename(d))
     os.makedirs(od, exist_ok=True)
     code = open(src, errors="replace").read()
@@ -216,15 +271,14 @@ def run_task(args, d, yml):
     else:
         shim, mode = SHIM_PP, "B"
         tail = [body for fn, body in TAIL.items()
-                if re.search(r"\b" + fn + r"\s*\(", code)
-                and not re.search(r"\b" + fn + r"\s*\([^;]*\)\s*\{", code)]
+                if re.search(r"\b" + fn + r"\s*\(", code) and not defines(code, fn)]
         src = os.path.join(od, name + ".pp.c")
         with open(src, "w") as f:
             f.write(code + "\n\n/* ---- svcomp-run tail ---- */\n" + "\n\n".join(tail) + "\n")
     t0 = time.time()
     try:
         main_argc = 1 if re.search(r"\bmain\s*\(\s*int\b", with_local_includes(code, d)) else 0
-        recursive = 1 if "PTHREAD_MUTEX_RECURSIVE" in code else 0
+        recursive = 1 if mentions_recursive(code) else 0
         p = subprocess.run([args.genmc, f"-{args.model}", "-disable-estimation", "--",
                             "-I", os.path.abspath(d), f"-DSVC_MAIN_ARGC={main_argc}",
                             f"-DSVC_RECURSIVE_MUTEX={recursive}",

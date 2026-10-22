@@ -27,8 +27,10 @@ Then run:
     scripts/svcomp/svcomp-run.py -j 12 -t 60 -o results build/bin/genmc \
         sv-benchmarks/c/pthread sv-benchmarks/c/weaver ...
 
-It needs Python 3 with PyYAML, and a GenMC whose `pthread.h` has
-`pthread_once` (0.19.0-vzhn.14 or later). Every task is run under `-rc11`
+Like SV-COMP, it verifies each task's `input_files`: for most tasks the
+preprocessed `.i`, which unlike the `.c` it was made from needs no headers
+from outside the task. It needs Python 3 with PyYAML, and a GenMC whose
+`pthread.h` has `pthread_once` (0.19.0-vzhn.14 or later). Every task is run under `-rc11`
 (`-m` picks another model). The tasks are SC programs, so a race or
 assertion failure found under RC11 also exists under SC, unless it depends
 on weak behaviour of the task's atomics.
@@ -51,8 +53,8 @@ fails first. Each task gets one of:
 - **FALSE-ALARM:** an error on a property that is expected to hold.
 - **UNCHECKED:** an error on a property the task does not state.
 - Otherwise a label saying why there is no verdict: `TIMEOUT`, `COMPILE-ERROR`,
-  `UNSUPPORTED-CALL` (a call to a function GenMC cannot run), `NO-C-SOURCE`
-  (the task ships only a `.i` file) and so on.
+  `UNSUPPORTED-CALL` (a call to a function GenMC cannot run), `NO-INPUT`
+  (the task's input file is missing) and so on.
 
 ## What the shim approximates
 
@@ -68,7 +70,9 @@ so a clean result holds only up to those bounds:
   counts accesses inside atomic sections as atomic; GenMC does not, so a race
   with one side in an atomic section is labelled `ATOMIC-RACE`, with no verdict.
 - **`pthread_detach`, mutex attributes and recursive mutexes** are modelled
-  in the prelude; GenMC's `pthread.h` lacks them. Condition variables and
+  in the prelude; GenMC's `pthread.h` lacks them. Preprocessed tasks also
+  get rwlocks and thread-specific data in the prelude, modelled as in
+  `pthread.h`, for up to 16 threads; a task with more threads gets no verdict. Condition variables and
   `pthread_once` come from GenMC's `pthread.h` (the generated tail of a
   preprocessed task defines them the same way), except that a condvar wait
   may wake up without a signal, at most `--max-spurious` times per
@@ -78,20 +82,25 @@ so a clean result holds only up to those bounds:
 
 ## Results
 
-With GenMC 0.19.0-vzhn.5, the folders of `Concurrency.set` except
-`pthread-wmm` (891 tasks), 60 s per task:
+With GenMC 0.19.0-vzhn.14 and every folder of `Concurrency.set`
+(sv-benchmarks of 2026-10-21: 1154 tasks, 1143 with a property GenMC
+decides), 60 s per task:
 
 | Verdict | Tasks |
 |---|---|
-| AGREE | 528 |
-| MISSED | 26 |
-| FALSE-ALARM | 0 |
-| UNCHECKED, ATOMIC-RACE | 12, 4 |
-| TIMEOUT | 87 |
-| COMPILE-ERROR | 74 |
-| UNSUPPORTED-CALL | 58 |
-| NO-C-SOURCE | 32 |
-| UNKNOWN, OTHER-ERROR | 34, 5 |
+| AGREE | 631 |
+| MISSED | 29 |
+| FALSE-ALARM | 1 |
+| UNCHECKED, ATOMIC-RACE | 16, 40 |
+| TIMEOUT | 372 |
+| COMPILE-ERROR | 26 |
+| UNSUPPORTED-CALL | 17 |
+| UNKNOWN, OTHER-ERROR | 6, 5 |
+
+Most timeouts are in `pthread-wmm` (201): its tasks simulate weak memory
+with many small atomic sections, and the one lock that implements them
+makes GenMC explore every order of the sections. The false alarm is a read
+of uninitialised memory, which GenMC reports and SV-COMP does not count.
 
 The missed bugs fall into four groups:
 - races hidden by the atomic-section lock;
@@ -100,5 +109,6 @@ The missed bugs fall into four groups:
 - memory leaks, which GenMC does not check;
 - out-of-bounds accesses that land in a neighbouring object.
 
-Most `UNSUPPORTED-CALL` tasks (in `pthread-ext`) call functions they declare but
-never define.
+The `UNSUPPORTED-CALL` tasks call library functions that neither GenMC nor
+the prelude provides (`sleep`, `time`, `ffs`, `sem_init`, `strcpy`, `mmap`)
+or, in one case, a function the task declares but never defines.
