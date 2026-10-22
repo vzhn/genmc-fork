@@ -94,6 +94,7 @@ GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool /
 	scheduler_ = (inEstimationMode() || inRandomMode())
 			     ? std::make_unique<WFRScheduler>(getConf())
 			     : Scheduler::create(getConf());
+	errorReplay_ = std::make_unique<ErrorReplay>(*scheduler_);
 
 	/* Set up a random-number generator (for the scheduler) */
 	if (userConf->printRandomScheduleSeed) {
@@ -139,7 +140,7 @@ void GenMCDriver::pushExecution(Execution &&e) { stack_->push(std::move(e)); }
 auto GenMCDriver::invariantContext(std::string_view where) const -> invariants::Context
 {
 	return {.where = where,
-		.dbgInfo = &dbgInfo_,
+		.dbgInfo = &errorReplay_->dbgInfo(),
 		.holesAllowed = getConf()->isDepTrackingModel};
 }
 
@@ -187,13 +188,13 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 	/* A task is only taken once the previous one is done, and a done task
 	 * has reported its errors (or the pool halted and no task is taken):
 	 * a replay still pending here is stale (see -check-invariants, I2) */
-	if (checksInvariants() && (getScheduler().inErrorReplay() || bufferedError_)) {
-		auto target = getScheduler().getErrorReplayEvent();
+	if (checksInvariants() && (errorReplay_->active() || errorReplay_->buffered())) {
+		auto target = errorReplay_->target();
 		invariants::fail("I2 (error replay)",
 				 std::format("a new task is taken with an error replay pending "
 					     "(target {}, buffered error: {})",
 					     target ? std::format("{}", *target) : "none",
-					     bufferedError_.has_value()),
+					     errorReplay_->buffered().has_value()),
 				 stack_->empty() ? static_cast<const ExecutionGraph *>(nullptr)
 						   : &getExec().getGraph(),
 				 invariantContext("taking a task from the pool"));
@@ -204,9 +205,7 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 	 * being replaced: drop it, or the next schedule would replay to an event
 	 * of the old graph. (It is cut short only when the pool halts, and then
 	 * the error is reported by the worker that halted it.) */
-	getScheduler().setErrorReplayEvent(std::nullopt);
-	bufferedError_ = std::nullopt;
-	dbgInfo_.clear();
+	errorReplay_->stop();
 	resumePoints_.clearPending();
 
 	stack_->reset({std::move(exec->graph), LocalQueueT(), std::move(exec->choices)});
@@ -317,7 +316,7 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	/* An error replay replays to its target, which the graph holds (I2) */
 	if (checksInvariants() && getScheduler().inErrorReplay()) {
 		auto target = *getScheduler().getErrorReplayEvent();
-		if (!bufferedError_ || !g.containsPosNonEmpty(target))
+		if (!errorReplay_->buffered() || !g.containsPosNonEmpty(target))
 			invariants::fail("I2 (error replay)",
 					 std::format("an execution starts in error replay but its "
 						     "target {} is {} (buffered error: {})",
@@ -325,7 +324,7 @@ auto GenMCDriver::handleExecutionStart() -> bool
 						     g.containsPosNonEmpty(target)
 							     ? "in the graph"
 							     : "not in the graph",
-						     bufferedError_.has_value()),
+						     errorReplay_->buffered().has_value()),
 					 &g, invariantContext("starting an execution"));
 	}
 	getScheduler().resetExplorationOptions(g);
@@ -434,11 +433,11 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 	/* An error replay that ended without reaching its target: report the
 	 * error with the metadata collected so far rather than lose it (or carry
 	 * the replay into the next execution) */
-	if (getScheduler().inErrorReplay() && bufferedError_) {
+	if (errorReplay_->active() && errorReplay_->buffered()) {
 		WARN_ONCE("incomplete-error-replay",
 			  "The error report may lack source information (incomplete replay).\n");
-		auto details = *bufferedError_;
-		reportError(*getScheduler().getErrorReplayEvent(), details);
+		auto details = *errorReplay_->buffered();
+		reportError(*errorReplay_->target(), details);
 		return details.shouldHalt ? std::optional(details.type) : std::nullopt;
 	}
 
@@ -476,7 +475,7 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		    }))
 			++result.spinBlocked;
 		if (getConf()->printBlockedExecs)
-			printGraph(g, dbgInfo_);
+			printGraph(g, errorReplay_->dbgInfo());
 		if (getConf()->checkLiveness)
 			return checkLiveness();
 		return {};
@@ -510,7 +509,7 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		return {};
 	}
 	if (getConf()->printExecGraphs)
-		printGraph(g, dbgInfo_);
+		printGraph(g, errorReplay_->dbgInfo());
 
 	GENMC_DEBUG(if (getConf()->boundsHistogram && inVerificationMode()) trackExecutionBound(););
 
@@ -3210,9 +3209,7 @@ void GenMCDriver::initiateErrorReplay(const ErrorDetails &details)
 
 void GenMCDriver::haltErrorReplay()
 {
-	getScheduler().setErrorReplayEvent(std::nullopt);
-	dbgInfo_.clear();
-	bufferedError_ = std::nullopt;
+	errorReplay_->stop();
 
 	/* The error-collecting execution finished; we have to drop it */
 	moot();
@@ -3283,14 +3280,15 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 	if (const auto *bLab = genmc::dyn_cast_if_present<BlockLabel>(errLab))
 		inheritDbgInfo(bLab->getPos().prev(), bLab);
 
-	result.message += errorReport(g, details, dbgInfo_, getConf()->printErrorTrace);
+	result.message += errorReport(g, details, errorReplay_->dbgInfo(), getConf()->printErrorTrace);
 
 	/* Dump the graph into a file (DOT format) */
 	if (!getConf()->dotFile.empty())
 		dotPrintToFile(getConf()->dotFile, errLab,
 			       errLab ? getPrefixView(errLab).clone() : nullptr, details.racyLab,
 			       details.racyLab ? getPrefixView(details.racyLab).clone() : nullptr,
-			       &getConsChecker(), dbgInfo_, getConf()->dotPrintOnlyClientEvents);
+			       &getConsChecker(), errorReplay_->dbgInfo(),
+			       getConf()->dotPrintOnlyClientEvents);
 
 	/* Stop the error-collecting execution */
 	haltErrorReplay();
@@ -3868,11 +3866,10 @@ auto GenMCDriver::forwardRevisit(const ForwardRevisit &fr) -> bool
 		 * create */
 		auto *errLab = g.getEventLabel(fr.getPos());
 		const auto *bLab = genmc::dyn_cast<ThreadStartLabel>(errLab);
-		getScheduler().setErrorReplayEvent(
-			genmc::isa<BlockLabel>(errLab) ? errLab->getPos().prev()
-			: bLab && bLab->getCreate()    ? bLab->getCreate()->getPos()
-						       : errLab->getPos());
-		bufferedError_ = rr->getDetails();
+		errorReplay_->start(genmc::isa<BlockLabel>(errLab) ? errLab->getPos().prev()
+				    : bLab && bLab->getCreate()    ? bLab->getCreate()->getPos()
+								   : errLab->getPos(),
+				    rr->getDetails());
 		return true;
 	}
 	if (const auto *wcf = genmc::dyn_cast<WeakCasFailureRevisit>(&fr))
@@ -4285,28 +4282,29 @@ auto GenMCDriver::updateErrorInfoAndMaybeExit(Event pos, bool isNA, const EventD
 	if (!getScheduler().inErrorReplay())
 		return std::nullopt;
 	if (dbg && (!isNA || Config::emitNALabels)) {
-		VERIFY(!dbgInfo_.contains(pos));
-		dbgInfo_[pos] = *dbg;
+		errorReplay_->record(pos, *dbg);
 	}
 
 	/* Check whether error replay is complete */
-	if (bufferedError_ && getScheduler().isErrorReplayEvent(pos)) {
-		auto code = bufferedError_.value().type;       /* will be erased */
-		auto halt = bufferedError_.value().shouldHalt; /* will be erased */
-		reportError(pos, *bufferedError_);
+	if (errorReplay_->reachedTarget(pos)) {
+		auto details = *errorReplay_->buffered(); /* stop() erases it */
+		auto code = details.type;
+		auto halt = details.shouldHalt;
+		reportError(pos, details);
 		return halt ? std::optional(code) : std::nullopt;
 	}
 	return std::nullopt;
 }
 auto GenMCDriver::getDbgInfo(Event pos) -> const GenMCDriver::EventDbgInfo *
 {
-	if (!dbgInfo_.contains(pos))
+	if (!errorReplay_->dbgInfo().contains(pos))
 		return nullptr;
-	return &dbgInfo_.at(pos);
+	return &errorReplay_->dbgInfo().at(pos);
 }
 
 void GenMCDriver::inheritDbgInfo(Event from, const BlockLabel *bLab)
 {
-	if (auto it = dbgInfo_.find(from); it != dbgInfo_.end())
-		dbgInfo_.try_emplace(bLab->getPos(), it->second);
+	auto &dbgInfo = errorReplay_->dbgInfo();
+	if (auto it = dbgInfo.find(from); it != dbgInfo.end())
+		dbgInfo.try_emplace(bLab->getPos(), it->second);
 }

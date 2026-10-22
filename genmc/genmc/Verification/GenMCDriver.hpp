@@ -23,6 +23,7 @@
 #include "genmc/Verification/ExplorationStack.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/DebugInfo.hpp"
+#include "genmc/Verification/ErrorReplay.hpp"
 #include "genmc/Verification/GraphHash.hpp"
 #include "genmc/Verification/KeptEventRuns.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
@@ -917,11 +918,9 @@ private:
 	/** Random-number generators for estimation randomization */
 	MyRNG estRng;
 
-	/** Stores instruction debug info */
-	GraphDbgInfo dbgInfo_;
+	/** The error being replayed for its report */
+	std::unique_ptr<ErrorReplay> errorReplay_;
 
-	/** The details of an error to be reported (buffered) */
-	std::optional<ErrorDetails> bufferedError_;
 
 	/** -check-invariants (see Invariants.hpp): whether the checks run */
 	[[nodiscard]] auto checksInvariants() const -> bool { return getConf()->checkInvariants; }
