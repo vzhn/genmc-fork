@@ -187,7 +187,7 @@ list_runs() {
 	return
     fi
     if [ -f "${argsfile}" ]; then
-	while IFS= read -r line; do
+	while IFS= read -r line || [[ -n "${line}" ]]; do
 	    local gargs cargs
 	    gargs=$(echo "${line}" | cut -f1 -d'|' | sed 's/^ *//;s/ *$//')
 	    cargs=$(echo "${line}" | cut -f2 -s -d'|' | sed 's/^ *//;s/ *$//')
