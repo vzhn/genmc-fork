@@ -41,8 +41,8 @@ private:
 	/* Collects name info for a global variable */
 	void collectGlobalInfo(llvm::GlobalVariable &v);
 
-	/* Collects name info for a stack variable */
-	void collectLocalInfo(llvm::DbgDeclareInst *dbgDecl);
+	/* Collects name info for a stack variable, from its declaration */
+	void collectLocalInfo(llvm::Value *address, llvm::DILocalVariable *var);
 
 	/*
 	 * Collects name info about global variables w/ private linkage

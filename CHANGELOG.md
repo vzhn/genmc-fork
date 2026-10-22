@@ -72,6 +72,11 @@ released.
   line. A block the error replay does not re-execute, such as that of a
   `pthread_join()` waiting for a stuck thread, still has no location
   (`scripts/check-call-site-locs.sh`, ctest `call-site-locs`).
+- Error traces gave the fields of stack variables no name: an access to
+  `loc.b` of a local `struct pair loc` printed as `(, 1)`. LLVM (19 and
+  later) keeps a variable's `dbg.declare` as a debug record attached to
+  an instruction, which the collection of names did not look at; it reads
+  both forms now (`tests/wrong/infr/print-names-local`).
 - `-print-error-trace` left out the event right after a thread's
   creation, taking it for the store of the new thread's ID: when the
   `pthread_t` was kept in a register, which has no such store, a second

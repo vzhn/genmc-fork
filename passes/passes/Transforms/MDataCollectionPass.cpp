@@ -23,6 +23,7 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/DebugInfoMetadata.h>
+#include <llvm/IR/DebugProgramInstruction.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstIterator.h>
@@ -207,11 +208,11 @@ void MDataInfo::collectGlobalInfo(GlobalVariable &v)
 		*info = collectVarName(ditc);
 }
 
-void MDataInfo::collectLocalInfo(DbgDeclareInst *dbgDecl)
+void MDataInfo::collectLocalInfo(Value *address, DILocalVariable *var)
 {
 	/* Skip if it's not an alloca or we don't have data */
-	auto *v = dyn_cast<AllocaInst>(dbgDecl->getAddress());
-	if (!v)
+	auto *v = dyn_cast_or_null<AllocaInst>(address);
+	if (!v || !var)
 		return;
 
 	if (hasLocalInfo(v))
@@ -221,9 +222,9 @@ void MDataInfo::collectLocalInfo(DbgDeclareInst *dbgDecl)
 	info = std::make_shared<NameInfo>();
 
 	/* Store alloca's metadata, in case it's used in memcpy */
-	allocaMData[v] = dbgDecl->getVariable();
+	allocaMData[v] = var;
 
-	auto *dit = dbgDecl->getVariable()->getType();
+	auto *dit = var->getType();
 	if (auto *ditc = dyn_cast_or_null<DIType>(dit))
 		*info = collectVarName(ditc);
 }
@@ -266,11 +267,16 @@ auto MDataInfo::run(Module &M, ModuleAnalysisManager & /*AM*/) -> Result
 	for (auto &v : GLOBALS(M))
 		collectGlobalInfo(v);
 
-	/* Then for all local variables and some other special cases */
+	/* Then for all local variables and some other special cases
+	 * (LLVM keeps a dbg.declare as a record attached to an instruction,
+	 * unless the module uses the old intrinsics) */
 	for (auto &F : M) {
 		for (auto &I : instructions(F)) {
+			for (DbgVariableRecord &dvr : filterDbgVars(I.getDbgRecordRange()))
+				if (dvr.isDbgDeclare())
+					collectLocalInfo(dvr.getAddress(), dvr.getVariable());
 			if (auto *dbgDecl = dyn_cast<DbgDeclareInst>(&I))
-				collectLocalInfo(dbgDecl);
+				collectLocalInfo(dbgDecl->getAddress(), dbgDecl->getVariable());
 			if (auto *mi = dyn_cast<MemCpyInst>(&I))
 				collectMemCpyInfo(mi);
 		}
