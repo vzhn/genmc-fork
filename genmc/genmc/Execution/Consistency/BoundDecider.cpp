@@ -15,7 +15,6 @@
 #include "genmc/Execution/Consistency/ContextBoundDecider.hpp"
 #include "genmc/Execution/Consistency/RoundBoundDecider.hpp"
 #include "genmc/Support/Error.hpp"
-#include "genmc/Verification/Config.hpp"
 
 #include <memory>
 

@@ -20,7 +20,6 @@
 #include "genmc/Execution/LkmmModel.hpp"
 #include "genmc/Execution/LkmmRelations.hpp"
 #include "genmc/Support/Error.hpp"
-#include "genmc/Verification/Config.hpp"
 
 #include <algorithm>
 

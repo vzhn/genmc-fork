@@ -21,7 +21,6 @@
 #include "genmc/ADT/View.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Execution/GraphUtils.hpp"
-#include "genmc/Verification/Config.hpp"
 #include "genmc/Support/VerificationError.hpp"
 
 #include <algorithm>
