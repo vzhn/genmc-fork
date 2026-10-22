@@ -29,6 +29,16 @@ class VectorClock;
 class View;
 enum class ModelType : std::uint8_t;
 
+/** The options a memory model reads (from the user's Config). The field
+ * names are those of Config, which the generated checkers read through
+ * getConf() */
+struct ModelOptions {
+	bool collectLinSpec = false; /**< Relinche collects a specification */
+	bool checkLinSpec = false;   /**< Relinche checks against a specification */
+	bool exhaustive = false;     /**< -exhaustive */
+	bool lkmmReference = false;  /**< -lkmm-reference */
+};
+
 /** A memory model: everything a model offers (see ModelInterfaces.hpp),
  * implemented by a checker generated for each model.
  * This class is not thread-safe: each thread needs its own checker.
@@ -39,7 +49,8 @@ class ConsistencyChecker : public GraphModel,
 			   public ModelErrors {
 
 protected:
-	ConsistencyChecker(const Config *conf) : conf_(conf) {}
+	/* (CONF may be null: default options) */
+	ConsistencyChecker(const Config *conf);
 
 public:
 	ConsistencyChecker() = delete;
@@ -51,13 +62,11 @@ public:
 
 	static auto create(const Config *conf) -> std::unique_ptr<ConsistencyChecker>;
 
-	/** Returns the user config */
-	[[nodiscard]] auto getConf() const -> const Config * { return conf_; }
+	/** Returns the options the model reads */
+	[[nodiscard]] auto getConf() const -> const ModelOptions * { return &opts_; }
 
 private:
-	/* Keep the config around for convenience (e.g., for optimizing
-	 * consistency checking routines) */
-	const Config *conf_;
+	ModelOptions opts_;
 };
 
 #endif /* GENMC_CONSISTENCY_CHECKER_HPP */

@@ -14,6 +14,7 @@
 #ifndef GENMC_CONFIG_HPP
 #define GENMC_CONFIG_HPP
 
+#include "genmc/Execution/Consistency/BoundDecider.hpp"
 #include "genmc/Execution/MemoryModel.hpp"
 #include "genmc/config.h"
 
@@ -25,7 +26,6 @@
 
 enum class ExplorationMode : std::uint8_t { verify, random, estimate };
 enum class SchedulePolicy : std::uint8_t { LTR, WF, WFR, Arbitrary };
-enum class BoundType : std::uint8_t { none, context, round };
 
 using ConfigErrorList = std::vector<std::string>;
 using ValidationStatus = std::variant<std::monostate, ConfigErrorList>;

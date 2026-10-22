@@ -20,7 +20,8 @@
 #include "genmc/Support/Error.hpp"
 #include "genmc/Support/Parser.hpp"
 #include "genmc/Support/ThreadInfo.hpp"
-#include "genmc/Verification/GenMCDriver.hpp"
+#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/Relinche/Observation.hpp"
 
 #include <format>
@@ -28,6 +29,7 @@
 #include <iostream>
 #include <memory>
 #include <ranges>
+#include <sstream>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -35,7 +37,7 @@
 /* Whether LAB is the store of the PID of the thread created just before it,
  * at the creation's line (a PID kept in a register has no store: the event
  * after the creation is then the program's next one) */
-static auto isPidStore(const EventLabel &lab, const GenMCDriver::GraphDbgInfo &dbgInfo) -> bool
+static auto isPidStore(const EventLabel &lab, const GraphDbgInfo &dbgInfo) -> bool
 {
 	const auto *cLab = lab.getParent()->po_imm_pred(&lab);
 	if (!genmc::isa<WriteLabel>(&lab) || !genmc::isa_and_present<ThreadCreateLabel>(cLab) ||
@@ -46,7 +48,7 @@ static auto isPidStore(const EventLabel &lab, const GenMCDriver::GraphDbgInfo &d
 	return wInfo.file == cInfo.file && wInfo.line == cInfo.line;
 }
 
-void printTraceBefore(const GenMCDriver::GraphDbgInfo &dbgInfo, const EventLabel *lab,
+void printTraceBefore(const GraphDbgInfo &dbgInfo, const EventLabel *lab,
 		      std::ostream &s /* = std::cerr */)
 {
 	if (dbgInfo.empty())
@@ -76,7 +78,7 @@ void printTraceBefore(const GenMCDriver::GraphDbgInfo &dbgInfo, const EventLabel
 	}
 }
 
-static void executeMDPrint(const EventLabel * /*lab*/, const GenMCDriver::EventDbgInfo &dbg,
+static void executeMDPrint(const EventLabel * /*lab*/, const EventDbgInfo &dbg,
 			   std::ostream &os = std::cout)
 {
 	std::string errPath = dbg.file;
@@ -97,7 +99,7 @@ static auto shouldPrintLOC(const EventLabel *lab) -> bool
 	return true;
 }
 
-static auto printVarName(const MemAccessLabel &lab, const GenMCDriver::GraphDbgInfo &dbgInfo)
+static auto printVarName(const MemAccessLabel &lab, const GraphDbgInfo &dbgInfo)
 	-> std::string
 {
 	const auto &g = *lab.getParent();
@@ -115,7 +117,7 @@ static auto printThreadName(const ThreadInfo &info) -> std::string
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void printGraph(const ExecutionGraph &g,
-		const GenMCDriver::GraphDbgInfo
+		const GraphDbgInfo
 			&dbgInfo, // NOLINT(readability-function-cognitive-complexity)
 		std::ostream &s /* = std::cerr */)
 {
@@ -169,7 +171,7 @@ void dotPrintToFile(const std::string &filename,
 		    EventLabel *errLab, // NOLINT(readability-function-cognitive-complexity)
 		    std::unique_ptr<VectorClock> errView, const EventLabel *confLab,
 		    std::unique_ptr<VectorClock> confView, const ConsistencyChecker *checker,
-		    const GenMCDriver::GraphDbgInfo &dbgInfo, bool printObservation)
+		    const GraphDbgInfo &dbgInfo, bool printObservation)
 {
 	auto &g = *errLab->getParent();
 
@@ -307,4 +309,31 @@ void dotPrintToFile(const std::string &filename,
 	}
 
 	ss << "}\n";
+}
+
+auto errorReport(const ExecutionGraph &g, const ErrorDetails &details,
+		 const GraphDbgInfo &dbgInfo, bool printTrace) -> std::string
+{
+	const auto *errLab = details.pos ? g.getEventLabel(*details.pos) : nullptr;
+
+	/* Print basic error message (graph) */
+	std::ostringstream out;
+	out << std::format("{}: {}!\n", isHardError(details.type) ? "Error" : "Warning",
+			   details.type);
+	if (errLab)
+		out << std::format("Event {} ", errLab->getPos());
+	if (details.racyLab != nullptr)
+		out << std::format("conflicts with event {} ", details.racyLab->getPos());
+	out << "in graph:\n";
+	printGraph(g, dbgInfo, out);
+
+	/* Print an error trace (if desired), and the specific error message */
+	if (printTrace && errLab) {
+		printTraceBefore(dbgInfo, errLab, out);
+		if (details.racyLab != nullptr)
+			printTraceBefore(dbgInfo, details.racyLab, out);
+	}
+	if (!details.msg.empty())
+		out << details.msg;
+	return out.str();
 }

@@ -343,3 +343,10 @@ auto calcSCPrefixClosure(const ExecutionGraph &g, const std::vector<EventLabel *
 	}
 	return result;
 }
+
+auto failsReading(const ReadLabel *rLab, const WriteLabel *sLab) -> bool
+{
+	const auto *cLab = genmc::dyn_cast<CasReadLabel>(rLab);
+	return cLab && cLab->isRMW() &&
+	       !cLab->valueMakesRMWSucceed(sLab->getAccessValue(cLab->getAccess()));
+}

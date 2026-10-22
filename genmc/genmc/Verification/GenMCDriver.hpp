@@ -17,12 +17,19 @@
 #include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
+#include "genmc/Verification/BackwardRevisits.hpp"
 #include "genmc/Verification/ChoiceMap.hpp"
 #include "genmc/Verification/ExecutionFrame.hpp"
+#include "genmc/Verification/ExplorationStack.hpp"
 #include "genmc/Verification/Config.hpp"
+#include "genmc/Verification/DebugInfo.hpp"
+#include "genmc/Verification/ErrorReplay.hpp"
 #include "genmc/Verification/GraphHash.hpp"
+#include "genmc/Verification/KeptEventRuns.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
+#include "genmc/Verification/ResumePointStore.hpp"
+#include "genmc/Verification/RfReductions.hpp"
 #include "genmc/Verification/Scheduler.hpp"
 #include "genmc/Support/VerificationError.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
@@ -44,14 +51,8 @@ struct Context;
 struct RestrictionPlan;
 } // namespace invariants
 
-namespace llvm {
-class Interpreter;
-class Module;
-} // namespace llvm
-struct ModuleInfo;
 class ThreadPool;
 class EventProducer;
-struct LLIConfig;
 class BoundDecider;
 class ConsistencyChecker;
 class SymmetryChecker;
@@ -105,16 +106,10 @@ public:
 		HandleResult<std::conditional_t<Config::emitNALabels, bool, std::monostate>>;
 
 	/** Debug information for an instruction */
-	struct EventDbgInfo {
-		std::string file;
-		int line = 0;
-		std::string functionName;
-		std::string source;
-		std::string accessedVarName;
-	};
+	using EventDbgInfo = ::EventDbgInfo;
 
 	/** Packs together debug information for a graph */
-	using GraphDbgInfo = std::unordered_map<Event, EventDbgInfo>;
+	using GraphDbgInfo = ::GraphDbgInfo;
 
 	template <typename... Ts> static auto create(Ts &&...params) -> std::unique_ptr<GenMCDriver>
 	{
@@ -140,16 +135,13 @@ public:
 
 	/** Lets forward revisits resume from saved runtime states: HOOK saves
 	 * the runtime's state at the event at POS, or returns null */
-	void setResumeHook(std::function<std::shared_ptr<ResumePoint>(Event)> hook)
-	{
-		resumeHook_ = std::move(hook);
-	}
+	void setResumeHook(ResumePointStore::Hook hook) { resumePoints_.setHook(std::move(hook)); }
 
 	/** The state the execution about to start resumes from, if any
 	 * (cleared once taken; otherwise the runtime replays the graph) */
 	auto takePendingResumePoint() -> std::shared_ptr<ResumePoint>
 	{
-		return std::exchange(pendingResume_, nullptr);
+		return resumePoints_.takePending();
 	}
 
 	/** Under LKMM, a control dependency ends at the join of its branch */
@@ -343,20 +335,9 @@ public:
 	auto operator=(GenMCDriver &&) -> GenMCDriver & = delete;
 
 protected:
-	friend class Scheduler;
-	friend class ArbitraryScheduler;
 	friend class ThreadPool;
 	friend class DriverHandlerDispatcher;
 	friend void explore(GenMCDriver &driver, EventProducer &producer);
-	friend auto estimate(const LLIConfig &lliConfig, std::shared_ptr<const Config> conf,
-			     const std::unique_ptr<llvm::Module> &mod,
-			     const std::unique_ptr<ModuleInfo> &modInfo) -> VerificationResult;
-	friend auto sample(const LLIConfig &lliConfig, std::shared_ptr<const Config> conf,
-			   std::unique_ptr<llvm::Module> mod, std::unique_ptr<ModuleInfo> modInfo)
-		-> VerificationResult;
-	friend auto verify(const LLIConfig &lliConfig, std::shared_ptr<const Config> conf,
-			   std::unique_ptr<llvm::Module> mod, std::unique_ptr<ModuleInfo> modInfo)
-		-> VerificationResult;
 
 	GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool = nullptr,
 		    Mode /*mode*/ = VerificationMode{});
@@ -365,8 +346,8 @@ protected:
 	auto getConf() const -> const Config * { return userConf.get(); }
 
 	/** Returns a reference to the current execution */
-	auto getExec() -> Execution & { return execStack.back(); }
-	auto getExec() const -> const Execution & { return execStack.back(); }
+	auto getExec() -> Execution & { return stack_->top(); }
+	auto getExec() const -> const Execution & { return stack_->top(); }
 
 	/** Returns a reference to the current execution state */
 	auto getExecState() -> ExecutionState & { return execState_; }
@@ -555,6 +536,10 @@ private:
 	/** If LAB accesses improperly initialized memory, reports an error */
 	auto checkInitializedMem(const WriteLabel *lab) -> std::optional<VerificationError>;
 
+	/** Reports VIOLATION, if any (see ErrorRules.hpp), and returns its type */
+	auto reportIfViolated(const std::optional<ErrorDetails> &violation)
+		-> std::optional<VerificationError>;
+
 	/** If LAB is an IPR read in a location with WW-races, reports an error */
 	auto checkIPRValidity(const ReadLabel *rLab) -> std::optional<VerificationError>;
 
@@ -663,23 +648,6 @@ private:
 	 * LOADS, and returns whether we can skip revisiting altogether */
 	auto tryOptimizeRevisits(WriteLabel *lab, std::vector<ReadLabel *> &loads) -> bool;
 
-	/** Constructs a BackwardRevisit representing RLAB <- SLAB */
-	auto constructBackwardRevisit(const ReadLabel *rLab, const WriteLabel *sLab) const
-		-> std::unique_ptr<BackwardRevisit>;
-
-	/** Given a revisit RLAB <- WLAB, returns the view of the resulting graph.
-	 * (This function can be abused and also be utilized for returning the view
-	 * of "fictional" revisits, e.g., the view of an event in a maximal path.)
-	 * -exhaustive under IMM: null when no well-formed graph results (see
-	 * keepValueDependencies()) */
-	auto getRevisitView(const ReadLabel *rLab, const WriteLabel *sLab) const
-		-> std::unique_ptr<VectorClock>;
-
-	/** -exhaustive under IMM: adds to V, the view of a revisit of R, what
-	 * the events it keeps depend on for their value and existence. Returns
-	 * false if that includes R or an event the graph does not have */
-	auto keepValueDependencies(Event r, VectorClock &v) const -> bool;
-
 	/** -exhaustive under IMM: adds to LOADS the CAS reads in PREFIX, SLAB's
 	 * prefix, whose ordering or write part reading from SLAB would change */
 	void addRevisitableCases(WriteLabel *sLab, const VectorClock &prefix,
@@ -703,36 +671,6 @@ private:
 	 * whose views are computed anew (positions name the same events in
 	 * both) */
 	void checkWithViewsAnew(const std::function<void(const ExecutionGraph &)> &check);
-
-	auto isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLabel *lab) -> bool;
-
-	/** Dependency-tracking models: whether LAB, an access the revisit R
-	 * deletes (or the read it revisits), reads from or follows the co-latest
-	 * write it can reach among the writes R keeps and those added before LAB */
-	auto isPlacedMaximallyInRevisit(const BackwardRevisit &r, const MemAccessLabel *lab) const
-		-> bool;
-
-	/** Whether LAB is in the prefix of a write that R keeps and that
-	 * revisited a read still reading it */
-	auto isKeptByKeptRevisit(const BackwardRevisit &r, const EventLabel *lab) const -> bool;
-
-	/** Whether LAB is a write that a write of the saved prefix, added after LAB
-	 * and to the same location, precedes in coherence */
-	auto isCoAfterLaterSavedWrite(const BackwardRevisit &r, const EventLabel *lab) -> bool;
-
-	auto coherenceSuccRemainInGraph(const BackwardRevisit &r) -> bool;
-
-	/** Returns true if all events to be removed by the revisit
-	 * RLAB <- SLAB form a maximal extension */
-	auto isMaximalExtension(const BackwardRevisit &r) -> bool;
-
-	/** -exhaustive: whether every read the revisit R keeps (but the
-	 * revisited one) keeps the write it reads from */
-	auto isRevisitViewClosed(const BackwardRevisit &r) -> bool;
-
-	/** -exhaustive: whether the graph R produces keeps an RMW that reads
-	 * from the write the revisiting RMW reads from (atomicity) */
-	auto keepsConflictingRMW(const BackwardRevisit &r) -> bool;
 
 	/** -exhaustive: records the graph ITEM produced in the visited set.
 	 * Returns whether it is new (a repeated graph is not explored again) */
@@ -785,11 +723,6 @@ private:
 	auto copyGraph(const BackwardRevisit *br, VectorClock *v) const
 		-> std::unique_ptr<ExecutionGraph>;
 
-	/** Given a list of stores that it is consistent to read-from,
-	 * filters out options that can be skipped (according to the conf),
-	 * and determines the order in which these options should be explored */
-	void filterOptimizeRfs(const ReadLabel *lab, std::vector<EventLabel *> &stores);
-
 	auto isExecutionValid(const EventLabel *lab) -> bool;
 
 	/** Removes rfs from RFS until a consistent option for RLAB is found */
@@ -812,9 +745,6 @@ private:
 	/** SAVer: Given the end of a potential FAI-ZNE spinloop,
 	 * returns true if it is indeed a spinloop */
 	auto areFaiZNEConstraintsSat(const FaiZNESpinEndLabel *lab) -> bool;
-
-	/** BAM: Filters out unnecessary rfs for LAB when BAM is enabled */
-	void filterConflictingBarriers(const ReadLabel *lab, std::vector<EventLabel *> &stores);
 
 	/** Estimation: Filters outs stores read by RMW loads */
 	void filterAtomicityViolations(const ReadLabel *lab, std::vector<EventLabel *> &stores);
@@ -852,37 +782,20 @@ private:
 	/** Helper: Checks whether the user annotation about helped/helping CASes seems OK */
 	void checkHelpingCasAnnotation();
 
-	/** SR: Checks whether CANDIDATE is symmetric to PARENT/INFO */
-	auto isSymmetricToSR(int candidate, Event parent, const ThreadInfo &info) const -> bool;
-
 	/* Whether the joiner of JLAB has joined the symmetric predecessors of the
 	 * thread it joins (see the definition) */
 	auto checkSymmetricJoinOrder(const ThreadJoinLabel *jLab) -> std::optional<VerificationError>;
 
-	/* Whether TID's memory accesses in [FROM, TO] only touch memory no other
-	 * thread can access */
-	auto areThreadPrivateAccesses(int tid, int from, int to) const -> bool;
-
 	/** SR: Returns the (greatest) ID of a thread that is symmetric to PARENT/INFO */
 	auto getSymmetricTidSR(const ThreadCreateLabel *tcLab, const ThreadInfo &info) const -> int;
 
-	/** SR: Filter stores that will lead to a symmetric execution */
-	void filterSymmetricStoresSR(const ReadLabel *rLab,
-				     std::vector<EventLabel *> &stores) const;
-
 	/** SAVer: Filters stores that will lead to an assume-blocked execution */
-	/** Removes the stores LAB can read from only by placing itself before an
-	 * identical blind RMW (see --blind-rmw-reduction) */
-	void filterCommutingBlindRMWs(const ReadLabel *lab,
-				      std::vector<EventLabel *> &stores) const;
 
 	/** Reports an error if SLAB is a write the blind-RMW reduction did not account for */
 	auto checkBlindRMWWellFormedness(const WriteLabel *sLab) -> bool;
 
 	/** Reports an error if RLAB observes an order the blind-RMW reduction fixed */
 	auto checkBlindRMWWellFormedness(const ReadLabel *rLab) -> bool;
-
-	void filterValuesFromAnnotSAVER(const ReadLabel *rLab, std::vector<EventLabel *> &stores);
 
 	/*** Estimation-related ***/
 
@@ -945,6 +858,12 @@ private:
 	 * either (po U rf) or (AR U rf) */
 	auto getPrefixView(const EventLabel *lab) const -> const VectorClock &;
 
+	/** The backward revisits of the current graph (see BackwardRevisits) */
+	auto getBackwardRevisits() const -> BackwardRevisits;
+
+	/** The rf reductions on the current graph (see RfReductions) */
+	auto getRfReductions() const -> RfReductions;
+
 	/** The part of LAB's prefix its revisits take (not cached; see
 	 * ConsistencyChecker::calculateRevisitPrefixView()) */
 	auto getRevisitPrefixView(const EventLabel *lab) const -> std::unique_ptr<VectorClock>;
@@ -963,7 +882,7 @@ private:
 	std::shared_ptr<const Config> userConf;
 
 	/** Execution stack */
-	std::vector<Execution> execStack;
+	std::unique_ptr<ExplorationStack> stack_;
 
 	/** Scheduler */
 	std::unique_ptr<Scheduler> scheduler_;
@@ -984,28 +903,8 @@ private:
 	std::shared_ptr<const EventKey> currKey;
 	Event currKeyBase;
 
-	/** The current run's start (its graph's maximum stamp and the number of
-	 * items in its work list), to repeat it after a relocation */
-	Stamp runStartStamp_{0};
-	size_t runStartWork_{};
-	bool rerunAfterRelocation_ = false;
-	unsigned relocationsInRun_{};
-
-	/* An event went before kept events: the incremental checks assume an
-	 * event to be added after its thread's others, so the whole graph is
-	 * checked. Once, when the run ends (keptCheckPending_): a graph that is
-	 * inconsistent stays so. If it is, the run is repeated with the check
-	 * after each such event (eagerKeptChecks_), so that it adds the work it
-	 * would have added (see scheduleNext() and done()) */
-	bool addedBeforeKept_ = false;
-	bool keptCheckPending_ = false;
-	bool eagerKeptChecks_ = false;
-	bool rerunEagerly_ = false;
-
-	/* The run was dropped while an event was aligned with kept ones
-	 * (alignKeptEvents()): the event is not added, so that nothing is
-	 * computed from a graph that is no execution's prefix */
-	bool droppedBeforeKept_ = false;
+	/** When the current run repeats (kept events, see KeptEventRuns) */
+	KeptEventRuns keptRuns_;
 
 	/** Opt: Whether this execution is moot (locking) */
 	bool isMootExecution = false;
@@ -1016,17 +915,12 @@ private:
 	/** Whether we are stopping the exploration (e.g., due to an error found) */
 	bool shouldHalt = false;
 
-	/** Whether we are in error replaying */
-	bool inReplay_ = false;
-
 	/** Random-number generators for estimation randomization */
 	MyRNG estRng;
 
-	/** Stores instruction debug info */
-	GraphDbgInfo dbgInfo_;
+	/** The error being replayed for its report */
+	std::unique_ptr<ErrorReplay> errorReplay_;
 
-	/** The details of an error to be reported (buffered) */
-	std::optional<ErrorDetails> bufferedError_;
 
 	/** -check-invariants (see Invariants.hpp): whether the checks run */
 	[[nodiscard]] auto checksInvariants() const -> bool { return getConf()->checkInvariants; }
@@ -1055,10 +949,8 @@ private:
 	 * queued for it (null if the run cannot resume, see saveResumePoint()) */
 	auto saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>;
 
-	std::function<std::shared_ptr<ResumePoint>(Event)> resumeHook_;
-	/** The newest saved states; a revisit whose state was dropped replays */
-	std::deque<std::shared_ptr<ResumePoint>> resumePoints_;
-	std::shared_ptr<ResumePoint> pendingResume_;
+	/** The runtime states saved for forward revisits */
+	ResumePointStore resumePoints_;
 
 	/** "Puppet" labels to be used for race detection */
 	std::unique_ptr<ReadLabel> readProbeLab_;
@@ -1067,8 +959,8 @@ private:
 	std::unique_ptr<FreeLabel> freeProbeLab_;
 	std::unique_ptr<HpRetireLabel> retireProbeLab_;
 
-	/** Execution state owned by this driver.  All graphs on the execStack hold
-	 *  a non-owning pointer to this object (see ExecutionGraph::setStatePtr). */
+	/** Execution state owned by this driver. All graphs on the exploration
+	 *  stack hold a non-owning pointer to this object (see ExplorationStack). */
 	ExecutionState execState_;
 };
 

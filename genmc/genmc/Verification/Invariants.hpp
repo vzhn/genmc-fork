@@ -91,7 +91,7 @@
 
 #include "genmc/Support/Event.hpp"
 #include "genmc/Execution/Stamp.hpp"
-#include "genmc/Verification/GenMCDriver.hpp"
+#include "genmc/Verification/DebugInfo.hpp"
 #include "genmc/Verification/GraphFingerprint.hpp"
 
 #include <optional>
@@ -111,7 +111,7 @@ struct Context {
 	/** The operation just performed (named in the report) */
 	std::string_view where;
 	/** Debugging information for printing the graph (may be null) */
-	const GenMCDriver::GraphDbgInfo *dbgInfo = nullptr;
+	const GraphDbgInfo *dbgInfo = nullptr;
 	/** Whether the graph may have holes (dependency-tracking models) */
 	bool holesAllowed = false;
 };

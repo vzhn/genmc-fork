@@ -25,6 +25,16 @@
 
 #include <memory>
 
+ConsistencyChecker::ConsistencyChecker(const Config *conf)
+{
+	if (!conf)
+		return;
+	opts_ = {.collectLinSpec = conf->collectLinSpec.has_value(),
+		 .checkLinSpec = conf->checkLinSpec.has_value(),
+		 .exhaustive = conf->exhaustive,
+		 .lkmmReference = conf->lkmmReference};
+}
+
 auto ConsistencyChecker::create(const Config *conf) -> std::unique_ptr<ConsistencyChecker>
 {
 #define CREATE_CHECKER(_model)                                                                     \

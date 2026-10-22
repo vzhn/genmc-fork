@@ -54,8 +54,10 @@ set(GENMC_MODELS_SOURCES
 set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/ChoiceMap.cpp
   genmc/Verification/Config.cpp
+  genmc/Verification/ErrorRules.cpp
   genmc/Verification/ExecutionFrame.cpp
   genmc/Verification/Explorer.cpp
+  genmc/Verification/ExplorationStack.cpp
   genmc/Verification/GenMCDriver.cpp
   genmc/Verification/GraphHash.cpp
   genmc/Verification/GraphPrinting.cpp
@@ -64,7 +66,11 @@ set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/Relinche/Linearization.cpp
   genmc/Verification/Relinche/Observation.cpp
   genmc/Verification/Relinche/Specification.cpp
+  genmc/Verification/ResumePointStore.cpp
+  genmc/Verification/RfReductions.cpp
+  genmc/Verification/BackwardRevisits.cpp
   genmc/Verification/Scheduler.cpp
+  genmc/Verification/SymmetricThreads.cpp
 )
 
 find_package(Threads REQUIRED)

@@ -20,7 +20,7 @@
 #include <memory>
 
 class ExecutionGraph;
-enum class BoundType : std::uint8_t;
+enum class BoundType : std::uint8_t { none, context, round };
 
 enum class BoundCalculationStrategy : std::uint8_t { Slacked, NonSlacked };
 

@@ -39,12 +39,14 @@
 #include "genmc/Support/Verbosity.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/DriverHandlerDispatcher.hpp"
+#include "genmc/Verification/ErrorRules.hpp"
 #include "genmc/Verification/GraphPrinting.hpp"
 #include "genmc/Verification/Invariants.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/Relinche/Specification.hpp"
 #include "genmc/Verification/Revisit.hpp"
 #include "genmc/Verification/Scheduler.hpp"
+#include "genmc/Verification/SymmetricThreads.hpp"
 #include "genmc/Support/VerificationError.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
 #include "genmc/Verification/WorkList.hpp"
@@ -75,16 +77,13 @@ using namespace std::string_literals;
 
 GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool /* = nullptr */,
 			 Mode mode /* = VerificationMode{} */)
-	: mode(mode), pool(pool), userConf(std::move(conf))
+	: mode(mode), pool(pool), userConf(std::move(conf)), resumePoints_(userConf->resumePoints)
 {
 	/* Set up the execution context */
 	consChecker = ConsistencyChecker::create(getConf());
-	auto cfg = ExecutionGraph::Config{.execState = &execState_,
-					  .memModel = &*consChecker,
-					  .emitNALabels = Config::emitNALabels};
-	auto execGraph = userConf->isDepTrackingModel ? std::make_unique<DepExecutionGraph>(cfg)
-						      : std::make_unique<ExecutionGraph>(cfg);
-	execStack.emplace_back(std::move(execGraph), LocalQueueT(), ChoiceMap());
+	stack_ = std::make_unique<ExplorationStack>(*consChecker, execState_,
+						    userConf->isDepTrackingModel);
+	stack_->reset(stack_->emptyFrame());
 
 	symmChecker = SymmetryChecker::create();
 	auto hasBounder = userConf->bound.has_value();
@@ -95,6 +94,7 @@ GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool /
 	scheduler_ = (inEstimationMode() || inRandomMode())
 			     ? std::make_unique<WFRScheduler>(getConf())
 			     : Scheduler::create(getConf());
+	errorReplay_ = std::make_unique<ErrorReplay>(*scheduler_);
 
 	/* Set up a random-number generator (for the scheduler) */
 	if (userConf->printRandomScheduleSeed) {
@@ -135,16 +135,12 @@ void GenMCDriver::repairDanglingReads(ExecutionGraph &g)
 }
 
 
-void GenMCDriver::pushExecution(Execution &&e)
-{
-	execStack.push_back(std::move(e));
-	getConsChecker().recomputeCacheCounters(getExec().getGraph());
-}
+void GenMCDriver::pushExecution(Execution &&e) { stack_->push(std::move(e)); }
 
 auto GenMCDriver::invariantContext(std::string_view where) const -> invariants::Context
 {
 	return {.where = where,
-		.dbgInfo = &dbgInfo_,
+		.dbgInfo = &errorReplay_->dbgInfo(),
 		.holesAllowed = getConf()->isDepTrackingModel};
 }
 
@@ -167,11 +163,11 @@ void GenMCDriver::checkAllocationInvariants(std::string_view where) const
 void GenMCDriver::restrictExecution(Stamp stamp, std::string_view where)
 {
 	if (!checksInvariants()) {
-		getExec().restrict(stamp);
+		stack_->restrict(stamp);
 		return;
 	}
 	auto plan = invariants::planCutToStamp(getExec().getGraph(), stamp);
-	getExec().restrict(stamp);
+	stack_->restrict(stamp);
 	checkGraphInvariants(getExec().getGraph(), where, &plan);
 }
 
@@ -185,30 +181,21 @@ static auto getLockRole(const WriteLabel *wLab) -> ExecutionState::LockRole
 	return ExecutionState::LockRole::None;
 }
 
-auto GenMCDriver::popExecution() -> bool
-{
-	if (execStack.empty())
-		return false;
-	execStack.pop_back();
-	if (execStack.empty())
-		return false;
-	getConsChecker().recomputeCacheCounters(getExec().getGraph());
-	return true;
-}
+auto GenMCDriver::popExecution() -> bool { return stack_->pop(); }
 
 void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 {
 	/* A task is only taken once the previous one is done, and a done task
 	 * has reported its errors (or the pool halted and no task is taken):
 	 * a replay still pending here is stale (see -check-invariants, I2) */
-	if (checksInvariants() && (getScheduler().inErrorReplay() || bufferedError_)) {
-		auto target = getScheduler().getErrorReplayEvent();
+	if (checksInvariants() && (errorReplay_->active() || errorReplay_->buffered())) {
+		auto target = errorReplay_->target();
 		invariants::fail("I2 (error replay)",
 				 std::format("a new task is taken with an error replay pending "
 					     "(target {}, buffered error: {})",
 					     target ? std::format("{}", *target) : "none",
-					     bufferedError_.has_value()),
-				 execStack.empty() ? static_cast<const ExecutionGraph *>(nullptr)
+					     errorReplay_->buffered().has_value()),
+				 stack_->empty() ? static_cast<const ExecutionGraph *>(nullptr)
 						   : &getExec().getGraph(),
 				 invariantContext("taking a task from the pool"));
 	}
@@ -218,18 +205,10 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 	 * being replaced: drop it, or the next schedule would replay to an event
 	 * of the old graph. (It is cut short only when the pool halts, and then
 	 * the error is reported by the worker that halted it.) */
-	getScheduler().setErrorReplayEvent(std::nullopt);
-	bufferedError_ = std::nullopt;
-	dbgInfo_.clear();
-	pendingResume_ = nullptr;
+	errorReplay_->stop();
+	resumePoints_.clearPending();
 
-	execStack.clear();
-	execStack.emplace_back(std::move(exec->graph), LocalQueueT(), std::move(exec->choices));
-
-	getExec().getGraph().setMemModel(&getConsChecker());
-	getExec().getGraph().setState(&getExecState());
-
-	getConsChecker().recomputeCacheCounters(getExec().getGraph());
+	stack_->reset({std::move(exec->graph), LocalQueueT(), std::move(exec->choices)});
 }
 
 auto GenMCDriver::extractState() -> std::unique_ptr<GenMCDriver::Execution>
@@ -327,12 +306,8 @@ auto GenMCDriver::handleExecutionStart() -> bool
 
 	/* Set various exploration options for this execution */
 	unmoot();
-	addedBeforeKept_ = false;
-	keptCheckPending_ = false;
-	droppedBeforeKept_ = false;
 	g.setKeptEventsUnreachable(false);
-	runStartStamp_ = g.getMaxStamp();
-	runStartWork_ = getExec().getWorkqueue().size();
+	keptRuns_.startRun(g.getMaxStamp(), getExec().getWorkqueue().size());
 	state.clear();
 	if constexpr (Config::emitNALabels)
 		reconstructState(g, state);
@@ -341,7 +316,7 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	/* An error replay replays to its target, which the graph holds (I2) */
 	if (checksInvariants() && getScheduler().inErrorReplay()) {
 		auto target = *getScheduler().getErrorReplayEvent();
-		if (!bufferedError_ || !g.containsPosNonEmpty(target))
+		if (!errorReplay_->buffered() || !g.containsPosNonEmpty(target))
 			invariants::fail("I2 (error replay)",
 					 std::format("an execution starts in error replay but its "
 						     "target {} is {} (buffered error: {})",
@@ -349,13 +324,13 @@ auto GenMCDriver::handleExecutionStart() -> bool
 						     g.containsPosNonEmpty(target)
 							     ? "in the graph"
 							     : "not in the graph",
-						     bufferedError_.has_value()),
+						     errorReplay_->buffered().has_value()),
 					 &g, invariantContext("starting an execution"));
 	}
 	getScheduler().resetExplorationOptions(g);
 	/* A resumed execution is driven through the holes before its kept
 	 * events as a replayed one is (I4) */
-	if (pendingResume_ && checksInvariants())
+	if (resumePoints_.pending() && checksInvariants())
 		invariants::checkResumeSchedule(g, getScheduler().getReplaySchedule(),
 						invariantContext("starting a resumed execution"));
 	return getScheduler().inErrorReplay();
@@ -458,11 +433,11 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 	/* An error replay that ended without reaching its target: report the
 	 * error with the metadata collected so far rather than lose it (or carry
 	 * the replay into the next execution) */
-	if (getScheduler().inErrorReplay() && bufferedError_) {
+	if (errorReplay_->active() && errorReplay_->buffered()) {
 		WARN_ONCE("incomplete-error-replay",
 			  "The error report may lack source information (incomplete replay).\n");
-		auto details = *bufferedError_;
-		reportError(*getScheduler().getErrorReplayEvent(), details);
+		auto details = *errorReplay_->buffered();
+		reportError(*errorReplay_->target(), details);
 		return details.shouldHalt ? std::optional(details.type) : std::nullopt;
 	}
 
@@ -500,7 +475,7 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		    }))
 			++result.spinBlocked;
 		if (getConf()->printBlockedExecs)
-			printGraph(g, dbgInfo_);
+			printGraph(g, errorReplay_->dbgInfo());
 		if (getConf()->checkLiveness)
 			return checkLiveness();
 		return {};
@@ -534,7 +509,7 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		return {};
 	}
 	if (getConf()->printExecGraphs)
-		printGraph(g, dbgInfo_);
+		printGraph(g, errorReplay_->dbgInfo());
 
 	GENMC_DEBUG(if (getConf()->boundsHistogram && inVerificationMode()) trackExecutionBound(););
 
@@ -590,52 +565,41 @@ void GenMCDriver::maybeCutGraph(const EventLabel *lab)
 
 void GenMCDriver::restartExecution()
 {
-	pendingResume_ = nullptr;
-	auto cfg = ExecutionGraph::Config{.execState = &execState_,
-					  .memModel = &*consChecker,
-					  .emitNALabels = Config::emitNALabels};
-	auto execGraph = getConf()->isDepTrackingModel ? std::make_unique<DepExecutionGraph>(cfg)
-						       : std::make_unique<ExecutionGraph>(cfg);
-	execStack.clear();
-	execStack.emplace_back(std::move(execGraph), LocalQueueT(), ChoiceMap());
-	getConsChecker().recomputeCacheCounters(getExec().getGraph());
+	resumePoints_.clearPending();
+	stack_->reset(stack_->emptyFrame());
 }
 
 auto GenMCDriver::done() -> bool
 {
 	/* Repeat a run whose thread's kept events were moved: from its start
 	 * (the events added since are cut), so that every structure built during
-	 * the run sees the new positions */
-	if (rerunAfterRelocation_ && !isHalting()) {
-		rerunAfterRelocation_ = false;
+	 * the run sees the new positions. Or repeat a run that was inconsistent
+	 * after an event went before kept ones, checking after each such event
+	 * (the work it added is cut) */
+	switch (keptRuns_.endRun(isHalting())) {
+	case KeptEventRuns::Repeat::AfterRelocation: {
 		++result.relocationReruns;
 		static constexpr auto kMaxRelocations = 64U;
-		ERROR_ON(++relocationsInRun_ > kMaxRelocations,
+		ERROR_ON(keptRuns_.relocationsInRun() > kMaxRelocations,
 			 "Internal error: a thread's kept events do not settle\nPlease submit a "
 			 "bug report to {}\n",
 			 PACKAGE_BUGREPORT);
-		getExec().getWorkqueue().truncate(runStartWork_);
-		restrictExecution(runStartStamp_,
+		getExec().getWorkqueue().truncate(keptRuns_.runStartWork());
+		restrictExecution(keptRuns_.runStartStamp(),
 				  "restricting the graph to rerun after a relocation");
-		getConsChecker().recomputeCacheCounters(getExec().getGraph());
 		repairDanglingReads(getExec().getGraph());
 		return false;
 	}
-	/* Repeat a run that was inconsistent after an event went before kept
-	 * ones, checking after each such event (the work it added is cut) */
-	if (rerunEagerly_ && !isHalting()) {
-		rerunEagerly_ = false;
-		eagerKeptChecks_ = true;
+	case KeptEventRuns::Repeat::Eagerly:
 		++result.keptCheckReruns;
-		getExec().getWorkqueue().truncate(runStartWork_);
-		restrictExecution(runStartStamp_,
+		getExec().getWorkqueue().truncate(keptRuns_.runStartWork());
+		restrictExecution(keptRuns_.runStartStamp(),
 				  "restricting the graph to rerun with eager checks");
-		getConsChecker().recomputeCacheCounters(getExec().getGraph());
 		repairDanglingReads(getExec().getGraph());
 		return false;
+	case KeptEventRuns::Repeat::None:
+		break;
 	}
-	relocationsInRun_ = 0;
-	eagerKeptChecks_ = false;
 
 	auto validExecution = false;
 	while (!isHalting() && !validExecution) {
@@ -716,12 +680,11 @@ void GenMCDriver::blockThreadTryMoot(std::unique_ptr<BlockLabel> bLab)
 
 auto GenMCDriver::checkPendingKept() -> bool
 {
-	if (!keptCheckPending_)
+	if (!keptRuns_.takeDeferredCheck())
 		return true;
-	keptCheckPending_ = false;
 	if (getConsChecker().isConsistent(getExec().getGraph()))
 		return true;
-	rerunEagerly_ = true;
+	keptRuns_.repeatEagerly();
 	moot();
 	return false;
 }
@@ -729,10 +692,10 @@ auto GenMCDriver::checkPendingKept() -> bool
 auto GenMCDriver::scheduleNext(std::span<Action> runnable) -> ScheduleResult
 {
 	auto &g = getExec().getGraph();
-	if (addedBeforeKept_ && !isMoot()) {
-		addedBeforeKept_ = false;
-		if (!eagerKeptChecks_)
-			keptCheckPending_ = true;
+	if (keptRuns_.hasAddedBeforeKept() && !isMoot()) {
+		keptRuns_.takeAddedBeforeKept();
+		if (!keptRuns_.eagerChecks())
+			keptRuns_.deferCheck();
 		else if (!getConsChecker().isConsistent(g))
 			moot();
 	}
@@ -746,8 +709,11 @@ auto GenMCDriver::scheduleNext(std::span<Action> runnable) -> ScheduleResult
 	if (isMoot())
 		return Blocked{};
 
-	if (auto next = getScheduler().schedule(g, runnable); next)
+	if (auto next = getScheduler().schedule(g, runnable); next) {
+		if (auto r = getScheduler().takeReadToUnblock())
+			unblockThread(g, *r);
 		return *next;
+	}
 	return g.isBlocked() ? ScheduleResult(Blocked{}) : ScheduleResult(Finished{});
 }
 
@@ -757,13 +723,17 @@ auto GenMCDriver::runFromCache() -> bool
 		return false;
 
 	do {
-		auto toAdd = getScheduler().scheduleFromCache(getExec().getGraph());
-		if (!toAdd)
+		auto &g = getExec().getGraph();
+		auto next = getScheduler().nextThreadFromCache(g);
+		if (!next)
 			return true;
-		if (*toAdd == nullptr)
+		if (auto r = getScheduler().takeReadToUnblock())
+			unblockThread(g, *r);
+		auto *toAdd = getScheduler().retrieveFromCache(g, *next);
+		if (toAdd == nullptr)
 			return false;
 
-		addLabelsToGraph(**toAdd);
+		addLabelsToGraph(*toAdd);
 	} while (!isMoot() && !isHalting());
 	return true;
 }
@@ -830,7 +800,7 @@ auto GenMCDriver::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 	 * and the revisits and warnings computed from that graph */
 	auto dropRun = [&] {
 		++result.relocationsLost;
-		droppedBeforeKept_ = true;
+		keptRuns_.dropRun();
 		moot();
 	};
 	auto later = [&g, curr] {
@@ -857,7 +827,8 @@ auto GenMCDriver::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 			return false;
 		}
 		/* Open a gap (doubling on repeats; the surplus is closed later) */
-		relocateAndRerun(curr.thread, curr.index, 1 << std::min(relocationsInRun_, 10U));
+		relocateAndRerun(curr.thread, curr.index,
+				 1 << std::min(keptRuns_.relocationsInRun(), 10U));
 		return false;
 	}
 
@@ -873,7 +844,7 @@ auto GenMCDriver::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 			dropRun();
 			return false;
 		}
-		addedBeforeKept_ = true;
+		keptRuns_.addedBeforeKept();
 		return false;
 	}
 	relocateAndRerun(curr.thread, (*first)->getIndex(), curr.index - (*first)->getIndex());
@@ -891,7 +862,7 @@ void GenMCDriver::relocateExecution(int thread, int from, int delta)
 void GenMCDriver::relocateAndRerun(int thread, int from, int delta)
 {
 	relocateExecution(thread, from, delta);
-	rerunAfterRelocation_ = true;
+	keptRuns_.repeatAfterRelocation();
 	moot();
 }
 
@@ -1223,86 +1194,37 @@ void GenMCDriver::maybePushWeakCasFailure(const CasReadLabel *cLab)
 auto GenMCDriver::getInvalidFreeReason(SAddr loc, StorageDuration sdur) const
 	-> std::optional<std::string>
 {
-	const auto &state = getExec().getGraph().getState();
-	if (loc.isStatic())
-		return "The freed address is a global, not a heap block\n";
-	if (sdur == StorageDuration::SD_Heap && loc.isAutomatic())
-		return "The freed address is a stack variable, not a heap block\n";
-	if (!state.isAllocated(loc))
-		return "The freed address is not in an allocated block\n";
-	if (state.getAllocAccess(loc).addr != loc)
-		return "The freed address points into a block, not at its start\n";
-	return std::nullopt;
+	return error_rules::invalidFreeReason(getExec().getGraph().getState(), loc, sdur);
 }
 
 auto GenMCDriver::checkAccessValidity(Event pos, const AAccess &access)
 	-> std::optional<VerificationError>
 {
-	/* Check that static accesses hit a registered global range,
-	 * and dynamic accesses hit allocated memory */
-	auto &state = getExec().getGraph().getState();
-	if ((!getConf()->disableStaticValidityChecks && !access.addr.isDynamic() &&
-	     !state.isStatic(access.addr)) ||
-	    (access.addr.isDynamic() && !state.isAccessible(access.addr))) {
-		reportError(pos, {pos, VerificationError::VE_AccessNonMalloc});
-		return {VerificationError::VE_AccessNonMalloc};
-	}
-	return {};
+	return reportIfViolated(error_rules::invalidAccess(getExec().getGraph().getState(),
+							   !getConf()->disableStaticValidityChecks,
+							   pos, access));
 }
 
 auto GenMCDriver::checkInitializedMem(const ReadLabel *rLab) -> std::optional<VerificationError>
 {
-	// FIXME: Have label for mutex-destroy and check type instead of val.
-	//        Also for barriers.
-
-	// /* Locks should not read from destroyed mutexes */
-	// const auto *lLab = genmc::dyn_cast<LockCasReadLabel>(rLab);
-	// if (lLab && lLab->getAccessValue(lLab->getAccess()) == SVal(-1)) {
-	// 	reportError(lLab->getPos(), {lLab->getPos(), VerificationError::VE_UninitializedMem,
-	// 				     "Called lock() on destroyed mutex!", lLab->getRf()});
-	// 	return {VerificationError::VE_UninitializedMem};
-	// }
-
 	/* Allow frontends to skip uninit/msa checks */
 	if (getConf()->disableInitializationChecks)
 		return {};
-
-	/* Dynamic accesses should read initialized memory (if reading from INIT).
-	 * We use two separate checks for atomics and NAs, since mixed-size NAs don't have an rf */
-	if (rLab->getAddr().isDynamic() &&
-	    (!rLab->getParent()->getState().isInitialized(rLab->getAccess()) ||
-	     !getConsChecker().getHbView(rLab).contains(
-		     rLab->getParent()->getState().getInitView(rLab->getAccess())))) {
-		reportError(rLab->getPos(),
-			    {rLab->getPos(), VerificationError::VE_UninitializedMem});
-		return {VerificationError::VE_UninitializedMem};
-	}
-
-	/* Slightly unrelated check, but ensure there are no mixed-size accesses */
-	if (rLab->getRf() && !rLab->getRf()->getPos().isInitializer() &&
-	    genmc::dyn_cast<WriteLabel>(rLab->getRf())->getSize() != rLab->getSize()) {
-		reportError(rLab->getPos(),
-			    {rLab->getPos(), VerificationError::VE_MixedSize,
-			     "Mixed-size accesses detected: tried to read with a " +
-				     std::to_string(rLab->getSize().get() * CHAR_BIT) +
-				     "-bit access!\n" + "Please check the LLVM-IR.\n"});
-		return {VerificationError::VE_MixedSize};
-	}
-	return {};
+	return reportIfViolated(error_rules::uninitializedRead(getConsChecker(), rLab));
 }
 
 auto GenMCDriver::checkInitializedMem(const WriteLabel *wLab) -> std::optional<VerificationError>
 {
+	return reportIfViolated(error_rules::invalidUnlock(wLab));
+}
 
-	/* Unlocks should unlock mutexes locked by the same thread */
-	const auto *uLab = genmc::dyn_cast<UnlockWriteLabel>(wLab);
-	if (uLab && !findMatchingLock(uLab)) {
-		reportError(uLab->getPos(),
-			    {uLab->getPos(), VerificationError::VE_InvalidUnlock,
-			     "Called unlock() on mutex not locked by the same thread!"});
-		return {VerificationError::VE_InvalidUnlock};
-	}
-	return {};
+auto GenMCDriver::reportIfViolated(const std::optional<ErrorDetails> &violation)
+	-> std::optional<VerificationError>
+{
+	if (!violation)
+		return {};
+	reportError(*violation->pos, *violation);
+	return {violation->type};
 }
 
 auto GenMCDriver::checkFinalAnnotations(const WriteLabel *wLab) -> std::optional<VerificationError>
@@ -1577,219 +1499,10 @@ auto GenMCDriver::checkUnfreedMemory() -> std::optional<VerificationError>
 	return {};
 }
 
-void GenMCDriver::filterConflictingBarriers(const ReadLabel *lab, std::vector<EventLabel *> &stores)
-{
-	if (getConf()->disableBAM ||
-	    (!genmc::isa<BIncFaiReadLabel>(lab) && !genmc::isa<BWaitReadLabel>(lab)))
-		return;
 
-	/* Helper lambdas */
-	auto isReadByExclusiveRead = [&](auto *oLab) {
-		if (auto *wLab = genmc::dyn_cast<WriteLabel>(oLab))
-			return std::ranges::any_of(wLab->readers(),
-						   [&](auto &rLab) { return rLab.isRMW(); });
-		if (auto *iLab = genmc::dyn_cast<InitLabel>(oLab))
-			return std::ranges::any_of(iLab->rfs(lab->getAddr()),
-						   [&](auto &rLab) { return rLab.isRMW(); });
-		UNREACHABLE();
-	};
-	auto findFaiReader = [](BIncFaiWriteLabel *wLab) {
-		return std::ranges::find_if(wLab->readers(), [](auto &rLab) {
-			return genmc::isa<BIncFaiReadLabel>(&rLab);
-		});
-	};
-	auto findSameRoundMaximal = [&](BIncFaiWriteLabel *wLab) {
-		auto &g = *wLab->getParent();
-		while (!isLastInBarrierRound(wLab) &&
-		       findFaiReader(wLab) != std::ranges::end(wLab->readers())) {
-			wLab = genmc::dyn_cast<BIncFaiWriteLabel>(
-				g.po_imm_succ(&*findFaiReader(wLab)));
-		}
-		return wLab;
-	};
 
-	/* barrier_wait()'s plain load should read maximally */
-	if (genmc::isa<BWaitReadLabel>(lab)) {
-		auto *wLab = genmc::dyn_cast<BIncFaiWriteLabel>(stores[0]);
-		VERIFY(wLab && wLab->getPos().next() == lab->getPos());
-		stores[0] = findSameRoundMaximal(wLab);
-		stores.resize(1);
-		return;
-	}
 
-	/* barrier_wait()'s FAI loads should not read from conflicting stores */
-	std::erase_if(stores, [&](auto &sLab) { return isReadByExclusiveRead(sLab); });
-}
 
-void GenMCDriver::filterSymmetricStoresSR(const ReadLabel *rLab,
-					  std::vector<EventLabel *> &stores) const
-{
-	const auto &g = getExec().getGraph();
-	auto tid = g.getFirstThreadLabel(rLab->getThread())->getSymmPredTid();
-
-	/* If there is no symmetric thread, exit */
-	if (tid == -1)
-		return;
-
-	/* Check whether the po-prefixes of the two threads match */
-	if (!getSymmChecker().sharePrefixSR(tid, rLab))
-		return;
-
-	/* Get the symmetric event and make sure it matches as well */
-	const auto *lab = genmc::dyn_cast<ReadLabel>(g.getEventLabel(Event(tid, rLab->getIndex())));
-	if (!lab || lab->getAddr() != rLab->getAddr() || lab->getSize() != lab->getSize())
-		return;
-
-	if (!lab->isRMW())
-		return;
-
-	/* Remove stores that will be explored symmetrically */
-	std::erase_if(stores, [&](auto &sLab) { return lab->getRf()->getPos() == sLab->getPos(); });
-}
-
-namespace {
-/*
- * Decides which FAIs the blind-RMW reduction may reorder.  An FAI qualifies if
- * the interpreter marked it blind, it is relaxed, and it cannot be ordered
- * through synchronization: no release fence precedes it in its thread (which
- * would make its write a synchronization source) and no SC fence is in its hb
- * past (an SC fence hb-before one of two RMWs orders them through psc; one that
- * comes later can only follow both).  Built once per query, since it scans the
- * graph for SC fences.
- */
-class BlindRMWFilter {
-public:
-	BlindRMWFilter(const ExecutionGraph &g, const ConsistencyChecker &cc) : g(g), cc(cc)
-	{
-		for (auto t = 0; t < g.getNumThreads(); t++) {
-			auto first = -1;
-			for (auto i = 0; first == -1 && i < g.getThreadSize(t); i++) {
-				const auto *fLab =
-					genmc::dyn_cast<FenceLabel>(g.getEventLabel(Event(t, i)));
-				if (fLab && fLab->isSC())
-					first = i;
-			}
-			firstSCFence.push_back(first);
-		}
-	}
-
-	/* Returns LAB as a blind relaxed FAI that may be reordered, or null */
-	auto asCommuting(const EventLabel *lab) const -> const FaiReadLabel *
-	{
-		const auto *fLab = genmc::dyn_cast_if_present<FaiReadLabel>(lab);
-		if (!fLab || fLab->getKind() != EventLabel::FaiRead ||
-		    fLab->getAttr() != WriteAttr::Blind ||
-		    fLab->getOrdering() != MemOrdering::Relaxed)
-			return nullptr;
-
-		for (auto i = 0; i < fLab->getIndex(); i++) {
-			const auto *pLab = genmc::dyn_cast<FenceLabel>(
-				g.getEventLabel(Event(fLab->getThread(), i)));
-			if (pLab && pLab->isAtLeastRelease())
-				return nullptr;
-		}
-		const auto &hb = cc.getHbView(fLab);
-		for (auto t = 0U; t < firstSCFence.size(); t++) {
-			if (firstSCFence[t] != -1 &&
-			    hb.getMax(static_cast<int>(t)) >= firstSCFence[t])
-				return nullptr;
-		}
-		return fLab;
-	}
-
-	/* Whether A and B are distinct blind FAIs that can be reordered with each other */
-	auto areTwins(const EventLabel *a, const EventLabel *b) const -> bool
-	{
-		const auto *fA = asCommuting(a);
-		const auto *fB = asCommuting(b);
-		return fA && fB && fA != fB && fA->getAddr() == fB->getAddr() &&
-		       fA->getSize() == fB->getSize() && fA->getOp() == fB->getOp() &&
-		       fA->getOpVal() == fB->getOpVal();
-	}
-
-private:
-	const ExecutionGraph &g;
-	const ConsistencyChecker &cc;
-	std::vector<int> firstSCFence; /* -1 if the thread has none */
-};
-} // namespace
-
-/* The read part of WLAB if it is an RMW write, or null */
-static auto getRMWRead(const WriteLabel &wLab) -> const ReadLabel *
-{
-	const auto *rLab =
-		genmc::dyn_cast_if_present<ReadLabel>(wLab.getParent()->po_imm_pred(&wLab));
-	return rLab && rLab->isRMW() ? rLab : nullptr;
-}
-
-/*
- * Two blind relaxed FAIs that apply the same operation with the same operand
- * to the same location write the same sequence of values in either order, and
- * neither synchronizes with anything.  Executions that differ only in their
- * relative order are thus equivalent, and we keep the order in which they are
- * added: a new such FAI does not read from a store that an identical FAI
- * already reads from (which would place it before that FAI).  The co-maximal
- * store is always kept, so reads stay extensible.
- *
- * Reading co-maximally puts everything before the co-maximal store into the
- * new FAI's prefix, so later writes hb-after it can no longer revisit those
- * reads.  That loses no behavior only if (a) all writes to the location are
- * identical blind FAIs, so the only reads affected are theirs, whose revisits
- * are again swaps, and (b) no other read lies between the skipped store and the
- * co-maximal one in prefix order.  A different write to the location that
- * arrives later is reported by checkBlindRMWWellFormedness().
- */
-void GenMCDriver::filterCommutingBlindRMWs(const ReadLabel *rLab,
-					   std::vector<EventLabel *> &stores) const
-{
-	const auto &g = getExec().getGraph();
-	const BlindRMWFilter blind(g, getConsChecker());
-	const auto *fLab = blind.asCommuting(rLab);
-	if (!fLab)
-		return;
-
-	auto addr = fLab->getAddr();
-
-	/* (a): every write to the location so far is an identical blind FAI */
-	if (!std::ranges::all_of(g.co(addr), [&](auto &wLab) {
-		    const auto *pLab = getRMWRead(wLab);
-		    return pLab && blind.areTwins(pLab, fLab);
-	    }))
-		return;
-
-	const auto *coMax = g.co_max(addr);
-	if (genmc::isa<InitLabel>(coMax))
-		return;
-
-	/* (b): between SLAB and the co-maximal store, the prefix holds only twins */
-	const auto &maxView = getPrefixView(coMax);
-	const auto &ownView = getPrefixView(fLab);
-	auto onlyTwinsAfter = [&](const EventLabel *sLab) {
-		const auto *sView = genmc::isa<InitLabel>(sLab) ? nullptr : &getPrefixView(sLab);
-		for (auto t = 0; t < g.getNumThreads(); t++) {
-			auto from = std::max(ownView.getMax(t), sView ? sView->getMax(t) : -1);
-			for (auto i = std::max(from + 1, 0); i <= maxView.getMax(t); i++) {
-				const auto *lab = g.getEventLabel(Event(t, i));
-				if (genmc::isa<ReadLabel>(lab) && !blind.areTwins(lab, fLab))
-					return false;
-			}
-		}
-		return true;
-	};
-	auto isReadByTwin = [&](const EventLabel *sLab) {
-		auto isTwin = [&](auto &oLab) { return blind.areTwins(&oLab, fLab); };
-		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(sLab))
-			return std::ranges::any_of(wLab->readers(), isTwin);
-		return std::ranges::any_of(genmc::cast<InitLabel>(sLab)->rfs(addr), isTwin);
-	};
-
-	auto kept = stores;
-	std::erase_if(kept, [&](auto *sLab) {
-		return sLab != coMax && isReadByTwin(sLab) && onlyTwinsAfter(sLab);
-	});
-	if (!kept.empty())
-		stores = std::move(kept);
-}
 
 auto GenMCDriver::checkBlindRMWWellFormedness(const ReadLabel *rLab) -> bool
 {
@@ -1862,27 +1575,6 @@ auto GenMCDriver::checkBlindRMWWellFormedness(const WriteLabel *sLab) -> bool
 	return valid;
 }
 
-void GenMCDriver::filterValuesFromAnnotSAVER(const ReadLabel *rLab,
-					     std::vector<EventLabel *> &validStores)
-{
-	/* Locks are treated as annotated CASes */
-	if (!rLab->getAnnot())
-		return;
-
-	using Evaluator = SExprEvaluator<ModuleVarID>;
-
-	auto &g = getExec().getGraph();
-
-	/* Ensure we keep the maximal store around even if Helper messed with it */
-	VERIFY(!validStores.empty());
-	auto *maximal = validStores.back();
-	std::erase_if(validStores, [&](auto *wLab) {
-		auto val = wLab->getAccessValue(rLab->getAccess());
-		return wLab != maximal && wLab != g.co_max(rLab->getAddr()) &&
-		       !Evaluator().evaluate(&*rLab->getAnnot()->expr, val);
-	});
-	VERIFY(!validStores.empty());
-}
 
 void GenMCDriver::unblockWaitingHelping(const WriteLabel *lab)
 {
@@ -2044,83 +1736,15 @@ auto GenMCDriver::handleThreadKill(const EventDbgInfo *dbg, Event pos)
 	return handleThreadKill(ThreadKillLabel::create(pos));
 }
 
-auto GenMCDriver::isSymmetricToSR(int candidate, Event parent, const ThreadInfo &info) const -> bool
-{
-	const auto &g = getExec().getGraph();
-	auto cParent = g.getFirstThreadLabel(candidate)->getCreateId();
-	const auto &cInfo = g.getFirstThreadLabel(candidate)->getThreadInfo();
 
-	/* A tip to print to the user in case two threads look
-	 * symmetric, but we cannot deem it */
-	auto tipSymmetry = [&]() {
-		LOG_ONCE("possible-symmetry", VerbosityLevel::Tip,
-			 "Threads {} and {} could benefit from symmetry reduction. Consider using "
-			 "__VERIFIER_spawn_symmetric().\n",
-			 cInfo.id, info.id);
-	};
 
-	/* First, check that the two threads are actually similar (the arguments
-	 * only matter if the thread body reads its argument) */
-	if (cInfo.id == info.id || cInfo.parentId != info.parentId || cInfo.funId != info.funId ||
-	    (info.argUsed && cInfo.arg != info.arg)) {
-		if (cInfo.funId == info.funId && cInfo.parentId == info.parentId)
-			tipSymmetry();
-		return false;
-	}
-
-	/* Then make sure that there is no memory access in between the spawn
-	 * events, other than to memory only the parent can access (e.g.,
-	 * storing the first thread's handle into a local array) */
-	auto bounds = std::minmax(parent.index, cParent.index);
-	auto lastMemAccess = g.getState().getLastMemAccess(parent.thread);
-	if (lastMemAccess > bounds.first && lastMemAccess <= bounds.second &&
-	    !areThreadPrivateAccesses(parent.thread, bounds.first + 1, lastMemAccess)) {
-		tipSymmetry();
-		return false;
-	}
-	return true;
-}
-
-auto GenMCDriver::areThreadPrivateAccesses(int tid, int from, int to) const -> bool
-{
-	/* Without labels for non-atomic accesses, they cannot be told apart */
-	if constexpr (!Config::emitNALabels)
-		return false;
-
-	const auto &g = getExec().getGraph();
-	const auto &state = g.getState();
-	for (auto i = from; i <= to; i++) {
-		const auto *mLab = genmc::dyn_cast<MemAccessLabel>(g.getEventLabel(Event(tid, i)));
-		if (!mLab)
-			continue;
-		if (!state.isAllocated(mLab->getAddr()))
-			return false;
-		const auto *aLab = genmc::dyn_cast_if_present<MallocLabel>(
-			g.getEventLabel(state.getAllocPos(mLab->getAddr())));
-		if (!aLab || !aLab->isThreadPrivate() || aLab->getThread() != tid)
-			return false;
-	}
-	return true;
-}
 
 auto GenMCDriver::getSymmetricTidSR(const ThreadCreateLabel *tcLab,
 				    const ThreadInfo &childInfo) const -> int
 {
 	if (!getConf()->symmetryReduction)
 		return -1;
-
-	const auto &g = getExec().getGraph();
-	auto isOrphan = [&g](int tid) { return !g.getFirstThreadLabel(tid)->getCreate(); };
-
-	/* Has the user provided any info? (A thread whose create was cut has a
-	 * stale begin and cannot be a symmetric predecessor) */
-	if (childInfo.symmId != -1)
-		return isOrphan(childInfo.symmId) ? -1 : childInfo.symmId;
-
-	for (auto i = childInfo.id - 1; i > 0; i--)
-		if (!isOrphan(i) && isSymmetricToSR(i, tcLab->getPos(), childInfo))
-			return i;
-	return -1;
+	return symmetricPredecessor(getExec().getGraph(), tcLab, childInfo);
 }
 
 auto GenMCDriver::handleThreadCreate(std::unique_ptr<ThreadCreateLabel> tcLab) -> HandleResult<int>
@@ -2334,7 +1958,7 @@ auto GenMCDriver::handleThreadFinish(std::unique_ptr<ThreadFinishLabel> eLab)
 	auto &g = getExec().getGraph();
 
 	/* The run was dropped while aligning this event (alignKeptEvents()) */
-	if (droppedBeforeKept_)
+	if (keptRuns_.runDropped())
 		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = addLabelToGraph(std::move(eLab));
@@ -2502,17 +2126,31 @@ void GenMCDriver::checkReconsiderFaiSpinloop(const MemAccessLabel *lab)
 
 auto GenMCDriver::getPrefixView(const EventLabel *lab) const -> const VectorClock &
 {
-	if (!lab->hasPrefixView())
-		lab->setPrefixView(getConsChecker().calculatePrefixView(lab));
-	return lab->getPrefixView();
+	return prefixView(getConsChecker(), lab);
 }
 
 auto GenMCDriver::getRevisitPrefixView(const EventLabel *lab) const
 	-> std::unique_ptr<VectorClock>
 {
-	if (!scopesCtrlDeps())
-		return getPrefixView(lab).clone();
-	return getConsChecker().calculateRevisitPrefixView(lab);
+	return revisitPrefixView(getConsChecker(), scopesCtrlDeps(), lab);
+}
+
+auto GenMCDriver::getBackwardRevisits() const -> BackwardRevisits
+{
+	return {getExec().getGraph(), getConsChecker(),
+		{.depTracking = getConf()->isDepTrackingModel,
+		 .disableBAM = getConf()->disableBAM,
+		 .scopesCtrlDeps = scopesCtrlDeps(),
+		 .exhaustiveIMM = getConf()->exhaustive && getConf()->model == ModelType::IMM}};
+}
+
+auto GenMCDriver::getRfReductions() const -> RfReductions
+{
+	return {getExec().getGraph(), getConsChecker(), getSymmChecker(),
+		{.symmetryReduction = getConf()->symmetryReduction,
+		 .disableBAM = getConf()->disableBAM,
+		 .blindRMWReduction = getConf()->blindRMWReduction,
+		 .exhaustive = getConf()->exhaustive}};
 }
 
 auto GenMCDriver::getRfsApproximation(ReadLabel *lab) -> std::vector<EventLabel *>
@@ -2544,25 +2182,6 @@ auto GenMCDriver::getRfsApproximation(ReadLabel *lab) -> std::vector<EventLabel 
 	return rfs;
 }
 
-void GenMCDriver::filterOptimizeRfs(const ReadLabel *lab, std::vector<EventLabel *> &stores)
-{
-	/* Symmetry reduction */
-	if (getConf()->symmetryReduction)
-		filterSymmetricStoresSR(lab, stores);
-
-	/* BAM */
-	if (!getConf()->disableBAM)
-		filterConflictingBarriers(lab, stores);
-
-	/* Identical blind RMWs commute */
-	if (getConf()->blindRMWReduction)
-		filterCommutingBlindRMWs(lab, stores);
-
-	/* Keep values that do not lead to blocking (-exhaustive explores the
-	 * blocked executions too: the annotations are not trusted) */
-	if (!getConf()->exhaustive)
-		filterValuesFromAnnotSAVER(lab, stores);
-}
 
 void GenMCDriver::filterAtomicityViolations(const ReadLabel *rLab,
 					    std::vector<EventLabel *> &stores)
@@ -2611,19 +2230,7 @@ auto GenMCDriver::pickRandomRf(ReadLabel *rLab, std::vector<EventLabel *> &store
 
 auto GenMCDriver::checkForMixedSize(MemAccessLabel *lab) -> std::optional<VerificationError>
 {
-	auto *g = lab->getParent();
-
-	if (lab->isNotAtomic())
-		return {};
-
-	if (g->getState().isAtomicAccessConsistent(lab->getAccess()))
-		return {};
-
-	reportError(lab->getPos(),
-		    {lab->getPos(), VerificationError::VE_MixedSize,
-		     "Mixed-size accesses detected: tried to read with a " +
-			     std::to_string(lab->getSize().get() * CHAR_BIT) + "-bit access!\n"});
-	return {VerificationError::VE_MixedSize};
+	return reportIfViolated(error_rules::mixedSizeAccess(lab));
 }
 
 auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal> oldVal)
@@ -2633,7 +2240,7 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 	auto &frontier = g.getState();
 
 	/* The run was dropped while aligning this event (alignKeptEvents()) */
-	if (droppedBeforeKept_)
+	if (keptRuns_.runDropped())
 		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = genmc::dyn_cast<ReadLabel>(addLabelToGraph(std::move(rLab)));
@@ -2682,7 +2289,7 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Rfs: {}", stores););
 	if (inVerificationMode())
 		pushWeakCasFailuresOnDroppedRfs(lab, stores);
-	filterOptimizeRfs(lab, stores);
+	getRfReductions().filter(lab, stores);
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Rfs (optimized): {}", stores););
 
 	const EventLabel *rf = nullptr;
@@ -3031,7 +2638,7 @@ auto GenMCDriver::handleNAStore(const EventDbgInfo *dbg, Event pos, SAddr loc, A
  * TruSt skips the stable ones (in a revisit's prefix, or not reading
  * maximally: their revisits are explored from the maximal path), and the
  * reads added after an RMW that conflicts with SLAB. With ALL (-exhaustive),
- * every such read is a candidate, and GenMCDriver::keepsConflictingRMW()
+ * every such read is a candidate, and BackwardRevisits::keepsConflictingRMW()
  * drops the revisits whose graph would violate atomicity */
 static auto getRevisitable(WriteLabel *sLab, const VectorClock &before, bool all)
 	-> std::vector<ReadLabel *>
@@ -3099,16 +2706,11 @@ static auto hasReads(const ExecutionGraph &g, SAddr addr) -> bool
  * so that only its write part depends on the outcome, as under porf
  * (issue #137). The reference does not: such a CAS is revisitable all the
  * same when the write's value changes its ordering or makes it fail; the
- * revisit drops its write part (getRevisitView()), and the consistency of
- * the graph it produces decides (backwardRevisit()) */
-static auto failsReading(const ReadLabel *rLab, const WriteLabel *sLab) -> bool
-{
-	const auto *cLab = genmc::dyn_cast<CasReadLabel>(rLab);
-	return cLab && cLab->isRMW() &&
-	       !cLab->valueMakesRMWSucceed(sLab->getAccessValue(cLab->getAccess()));
-}
-
-/* Whether reading from SLAB changes the ordering or the write of the CAS RLAB */
+ * revisit drops its write part (BackwardRevisits::revisitView()), and the
+ * consistency of the graph it produces decides (backwardRevisit()).
+ *
+ * Whether reading from SLAB changes the ordering or the write of the CAS RLAB
+ * (failsReading(): whether the CAS fails reading SLAB) */
 static auto outcomeChanges(const ReadLabel *rLab, const WriteLabel *sLab) -> bool
 {
 	const auto *cLab = genmc::dyn_cast<CasReadLabel>(rLab);
@@ -3202,7 +2804,7 @@ auto GenMCDriver::saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>
 	 * relocated kept events (LKMM) move within a run, replay keys count
 	 * from the start, and labels added from the instruction cache have no
 	 * runtime state behind them */
-	if (!resumeHook_ || getConf()->resumePoints == 0 || !inVerificationMode() ||
+	if (!resumePoints_.hasHook() || getConf()->resumePoints == 0 || !inVerificationMode() ||
 	    getScheduler().inErrorReplay() || relocatesKeptEvents() || checksReplayKeys() ||
 	    getConf()->instructionCaching)
 		return nullptr;
@@ -3213,14 +2815,9 @@ auto GenMCDriver::saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>
 	const auto &g = getExec().getGraph();
 	if (g.getMaxStamp() != g.getEventLabel(pos)->getStamp())
 		return nullptr;
-	auto rp = resumeHook_(pos);
-	if (!rp)
-		return nullptr;
-	if (checksInvariants())
+	auto rp = resumePoints_.save(pos);
+	if (rp && checksInvariants())
 		rp->fingerprint = invariants::fingerprint(g, pos);
-	resumePoints_.push_back(rp);
-	if (resumePoints_.size() > getConf()->resumePoints)
-		resumePoints_.pop_front();
 	return rp;
 }
 
@@ -3230,7 +2827,7 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 	auto &g = getExec().getGraph();
 
 	/* The run was dropped while aligning this event (alignKeptEvents()) */
-	if (droppedBeforeKept_)
+	if (keptRuns_.runDropped())
 		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = genmc::dyn_cast<WriteLabel>(addLabelToGraph(std::move(wLab)));
@@ -3612,9 +3209,7 @@ void GenMCDriver::initiateErrorReplay(const ErrorDetails &details)
 
 void GenMCDriver::haltErrorReplay()
 {
-	getScheduler().setErrorReplayEvent(std::nullopt);
-	dbgInfo_.clear();
-	bufferedError_ = std::nullopt;
+	errorReplay_->stop();
 
 	/* The error-collecting execution finished; we have to drop it */
 	moot();
@@ -3648,8 +3243,7 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 				moot();
 				return;
 			}
-		} else if (addedBeforeKept_) {
-			addedBeforeKept_ = false;
+		} else if (keptRuns_.takeAddedBeforeKept()) {
 			if (!getConsChecker().isConsistent(g)) {
 				moot();
 				return;
@@ -3686,33 +3280,15 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 	if (const auto *bLab = genmc::dyn_cast_if_present<BlockLabel>(errLab))
 		inheritDbgInfo(bLab->getPos().prev(), bLab);
 
-	/* Print basic error message (graph) */
-	std::ostringstream out;
-	out << std::format("{}: {}!\n", isHardError(details.type) ? "Error" : "Warning",
-			   details.type);
-	if (errLab)
-		out << std::format("Event {} ", errLab->getPos());
-	if (details.racyLab != nullptr)
-		out << std::format("conflicts with event {} ", details.racyLab->getPos());
-	out << "in graph:\n";
-	printGraph(g, dbgInfo_, out);
-
-	/* Print an error trace (if desired), and the specific error message */
-	if (getConf()->printErrorTrace && errLab) {
-		printTraceBefore(dbgInfo_, errLab, out);
-		if (details.racyLab != nullptr)
-			printTraceBefore(dbgInfo_, details.racyLab, out);
-	}
-	if (!details.msg.empty())
-		out << details.msg;
-	result.message += out.str();
+	result.message += errorReport(g, details, errorReplay_->dbgInfo(), getConf()->printErrorTrace);
 
 	/* Dump the graph into a file (DOT format) */
 	if (!getConf()->dotFile.empty())
 		dotPrintToFile(getConf()->dotFile, errLab,
 			       errLab ? getPrefixView(errLab).clone() : nullptr, details.racyLab,
 			       details.racyLab ? getPrefixView(details.racyLab).clone() : nullptr,
-			       &getConsChecker(), dbgInfo_, getConf()->dotPrintOnlyClientEvents);
+			       &getConsChecker(), errorReplay_->dbgInfo(),
+			       getConf()->dotPrintOnlyClientEvents);
 
 	/* Stop the error-collecting execution */
 	haltErrorReplay();
@@ -3725,56 +3301,15 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 auto GenMCDriver::reportWarningOnce(Event pos, VerificationError wcode,
 				    const EventLabel *racyLab /* = nullptr */) -> bool
 {
-	/* Helper function to determine whether the warning should be treated as an error */
-	auto shouldUpgradeWarning = [&](auto &wcode) {
-		if (wcode != VerificationError::VE_WWRace)
-			return std::make_pair(false, ""s);
-		if (!getConf()->symmetryReduction && !getConf()->ipr)
-			return std::make_pair(false, ""s);
-
-		auto &g = getExec().getGraph();
-		auto *lab = g.getEventLabel(pos);
-		auto isSymmetric = [&](auto tid) {
-			return g.getFirstThreadLabel(tid)->getSymmPredTid() != -1;
-		};
-		auto srUpgrade = getConf()->symmetryReduction &&
-				 std::ranges::any_of(g.thr_ids(), isSymmetric);
-		auto iprUpgrade =
-			getConf()->ipr && std::ranges::any_of(g.samelocs(lab), [&](auto &oLab) {
-				auto *rLab = genmc::dyn_cast<ReadLabel>(&oLab);
-				return rLab && rLab->getAnnot();
-			});
-		auto upgrade = srUpgrade || iprUpgrade;
-
-		/* Without the symmetries GenMC inferred itself (rather than the user
-		 * declared), this would only be a warning: verification may be
-		 * repeated without SR */
-		if (upgrade) {
-			/* IPR is GenMC's own optimization: verification may also be
-			 * repeated without it */
-			getResult().iprError = iprUpgrade;
-			getResult().inferredSymmetryError =
-				!iprUpgrade && std::ranges::none_of(g.thr_ids(), [&](auto tid) {
-					return isSymmetric(tid) &&
-					       g.getFirstThreadLabel(tid)->getThreadInfo().symmId !=
-						       -1;
-				});
-		}
-		auto [cause, cli] =
-			iprUpgrade ? std::make_pair("in-place revisiting (IPR)"s, "-disable-ipr"s)
-				   : std::make_pair("symmetry reduction (SR)"s, "-disable-sr"s);
-		auto msg = "Unordered writes do not constitute a bug per se, though they often "
-			   "indicate faulty design.\n" +
-			   (upgrade ? ("This warning is treated as an error due to " + cause +
-				       ".\n"
-				       "You can use " +
-				       cli + " to disable these features."s)
-				    : ""s);
-		return std::make_pair(upgrade, msg);
-	};
-
 	/* If the warning has been seen before, only report it if it's an error */
-	auto [upgradeWarning, msg] = shouldUpgradeWarning(wcode);
+	auto up = error_rules::wwRaceUpgrade(getExec().getGraph(), pos, wcode,
+					     getConf()->symmetryReduction, getConf()->ipr);
+	if (up.upgrade) {
+		getResult().iprError = up.iprError;
+		getResult().inferredSymmetryError = up.inferredSymmetryError;
+	}
+	auto upgradeWarning = up.upgrade;
+	const auto &msg = up.msg;
 	auto &knownWarnings = getResult().warnings;
 	if (upgradeWarning || !knownWarnings.contains(wcode)) {
 		reportError(pos, {pos, wcode, msg, racyLab, upgradeWarning});
@@ -3840,7 +3375,7 @@ auto GenMCDriver::tryOptimizeBarrierRevisits(BIncFaiWriteLabel *sLab,
 	/* Finally, revisit in place */
 	for (auto *lab : toRevisit) {
 		VERIFY(genmc::isa<BWaitReadLabel>(lab));
-		revisitInPlace(*constructBackwardRevisit(lab, sLab));
+		revisitInPlace(*getBackwardRevisits().construct(lab, sLab));
 	}
 	return true;
 }
@@ -3862,7 +3397,7 @@ void GenMCDriver::tryOptimizeIPRs(const WriteLabel *sLab, std::vector<ReadLabel 
 	});
 
 	for (auto *rLab : toIPR)
-		revisitInPlace(*constructBackwardRevisit(rLab, sLab));
+		revisitInPlace(*getBackwardRevisits().construct(rLab, sLab));
 
 	/* We also have to filter out some regular revisits */
 	const auto *confLab = findPendingRMW(sLab);
@@ -3991,124 +3526,8 @@ void GenMCDriver::revisitInPlace(const BackwardRevisit &br)
 			rLab->getPos(), sLab->getPos(), getExec().getGraph()););
 }
 
-static void updatePredsWithPrefixView(const ExecutionGraph &g, VectorClock &preds,
-				      const VectorClock &pporf)
-{
-	/* In addition to taking (preds U pporf), make sure pporf includes rfis */
-	preds.update(pporf);
 
-	if (!dynamic_cast<const DepExecutionGraph *>(&g))
-		return;
-	auto &predsD = *genmc::dyn_cast<DepView>(&preds);
-	for (auto i = 0; i < pporf.size(); i++) {
-		for (auto j = 1; j <= pporf.getMax(i); j++) {
-			const auto *lab = g.getEventLabel(Event(i, j));
-			if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab)) {
-				if (preds.contains(rLab->getPos()) &&
-				    !preds.contains(rLab->getRf()->getPos())) {
-					if (rLab->getRf()->getThread() == rLab->getThread())
-						predsD.removeHole(rLab->getRf()->getPos());
-				}
-			}
-			const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
-			if (wLab && wLab->isRMW() && pporf.contains(lab->getPos().prev()))
-				predsD.removeHole(lab->getPos());
-		}
-	}
-}
 
-auto GenMCDriver::getRevisitView(const ReadLabel *rLab, const WriteLabel *sLab) const
-	-> std::unique_ptr<VectorClock>
-{
-	const auto &g = getExec().getGraph();
-	auto preds = g.getPredsView(rLab->getPos());
-
-	/* A read in the write's prefix only through pctrl (-lkmm, see
-	 * getRevisitPrefixView()): the prefix has events computed from the read's
-	 * old value, so the revisit keeps the part of it without pctrl */
-	const auto &prefix = getPrefixView(sLab);
-	if (prefix.contains(rLab->getPos())) {
-		updatePredsWithPrefixView(g, *preds, *getRevisitPrefixView(sLab));
-		return preds;
-	}
-	updatePredsWithPrefixView(g, *preds, prefix);
-	if (getConf()->exhaustive && getConf()->model == ModelType::IMM) {
-		/* (a CAS that fails reading SLAB loses its write part) */
-		if (failsReading(rLab, sLab) && preds->contains(rLab->getPos().next()))
-			genmc::cast<DepView>(&*preds)->addHole(rLab->getPos().next());
-		if (!keepValueDependencies(rLab->getPos(), *preds))
-			return nullptr;
-	}
-	return preds;
-}
-
-/* -exhaustive under IMM. A revisit keeps the events added before the read and
- * the write's prefix, which is closed under (ppo | rfe)-predecessors; for a
- * kept read whose write is in its own thread, it also keeps the write (see
- * updatePredsWithPrefixView()), but not what the write depends on. That
- * write can be an RMW's write part whose read is not kept: its value is
- * then that of a read that is executed anew, and so is the value of the
- * kept read. The default exploration then updates the write when the read
- * is executed again (updateKeptRMWWrite()): it moves in coherence under the
- * readers it has, its revisits are queued with its old stamp (restricting
- * the graph to it cuts the read that completed it, and the revisiting
- * write), and its cached prefix view names events the graph no longer
- * has. Under -exhaustive, which takes revisits the maximality check
- * rejects, those cases end in crashes and in executions that are not
- * consistent or not executions of the program (issues #127, #135, #136).
- *
- * The reference keeps, instead, the graphs whose kept events are what the
- * program computes from the kept events: every event it keeps comes with
- * what its value and its existence depend on, its data, address, control
- * and CAS dependencies, an RMW's read for its write part, a read's write,
- * the creation of its thread, transitively. A revisit for which that
- * includes the revisited read, or an event the graph does not have, has no
- * such graph and is not taken. (A write is still kept without the events
- * it is merely ordered after: its value does not depend on them, and the
- * graph's consistency is checked once the revisit is done; see
- * backwardRevisit().) No kept write then changes when the threads fill
- * the holes, and none is completed anew */
-auto GenMCDriver::keepValueDependencies(Event r, VectorClock &v) const -> bool
-{
-	const auto &g = getExec().getGraph();
-	auto &dv = *genmc::cast<DepView>(&v);
-	/* (Every view contains the begins: a begin is not kept for its own sake
-	 * and keeps nothing, its thread's kept events keep the create) */
-	std::vector<Event> work;
-	for (const auto &lab : g.labels())
-		if (lab.getPos() != r && !genmc::isa<EmptyLabel>(&lab) &&
-		    !genmc::isa<ThreadStartLabel>(&lab) && v.contains(lab.getPos()))
-			work.push_back(lab.getPos());
-	while (!work.empty()) {
-		const auto *lab = g.getEventLabel(work.back());
-		work.pop_back();
-
-		std::vector<Event> deps;
-		const auto &d = lab->getDeps();
-		for (const auto *di : {&d.data, &d.addr, &d.ctrl, &d.cas})
-			std::ranges::copy(*di, std::back_inserter(deps));
-		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(lab); wLab && wLab->isRMW())
-			deps.push_back(lab->getPos().prev());
-		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab); rLab && rLab->getRf())
-			deps.push_back(rLab->getRf()->getPos());
-		if (const auto *bLab = g.getFirstThreadLabel(lab->getThread());
-		    bLab && bLab->getCreate())
-			deps.push_back(bLab->getCreate()->getPos());
-
-		for (auto e : deps) {
-			if (e == r)
-				return false;
-			if (e.isInitializer() || v.contains(e))
-				continue;
-			const auto *eLab = g.getEventLabelIfPresent(e);
-			if (!eLab || genmc::isa<EmptyLabel>(eLab))
-				return false;
-			dv.updateIdx(e);
-			work.push_back(e);
-		}
-	}
-	return true;
-}
 
 auto GenMCDriver::recomputeViews(ExecutionGraph &g) -> bool
 {
@@ -4236,274 +3655,14 @@ void GenMCDriver::checkWithViewsAnew(const std::function<void(const ExecutionGra
 	getConsChecker().recomputeCacheCounters(g);
 }
 
-auto GenMCDriver::constructBackwardRevisit(const ReadLabel *rLab, const WriteLabel *sLab) const
-	-> std::unique_ptr<BackwardRevisit>
-{
-	return std::make_unique<BackwardRevisit>(rLab, sLab, getRevisitView(rLab, sLab));
-}
 
-static auto isReadInView(const WriteLabel *sLab, const DepView &v) -> bool
-{
-	return std::ranges::any_of(sLab->readers(),
-				   [&v](auto &rLab) { return v.contains(rLab.getPos()); });
-}
 
-auto GenMCDriver::isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLabel *lab) -> bool
-{
-	const auto *mLab = genmc::dyn_cast<MemAccessLabel>(lab);
-	if (!mLab)
-		return false;
 
-	auto &g = getExec().getGraph();
-	const auto &v = r.getViewNoRel();
-	const auto *rLab = genmc::dyn_cast<ReadLabel>(mLab);
-	auto *wLab = g.getWriteLabel(rLab ? rLab->getRf()->getPos() : mLab->getPos());
 
-	auto succs = wLab ? g.co_succs(wLab) : g.co(mLab->getAddr());
-	return std::ranges::any_of(succs, [&](auto &sLab) {
-		/* Exclude the write that revisits from the prefix */
-		return sLab.getPos() != r.getRev() && v->contains(sLab.getPos());
-	});
-}
 
-/* Dependency-tracking models: R deletes LAB, or LAB is the read R revisits.
- * Whether LAB reads from (a read) or follows in coherence (a write) the
- * co-latest write it can reach among the writes R keeps, except the revisiting
- * one, and those added before LAB: TruSt's condition, that LAB made the
- * maximal choice among the writes present when it was added and that no kept
- * write could have revisited it (as isCoBeforeSavedPrefix() requires for the
- * other models), with the kept writes present from the start. If LAB chose
- * otherwise, the graph where it chose that write is the one R is explored
- * from.
- *
- * R keeps the revisiting write's prefix, which is not po-closed: it may keep
- * accesses of LAB's thread po-after LAB (LAB is then executed anew into a
- * hole), and a kept event was not always added after the deleted ones.
- * Coherence bounds LAB by the first po-later access of its thread to its
- * location present when LAB is added (kept, or added before LAB): LAB
- * precedes a write, and precedes or reads the write a read reads, as
- * coMaxReachable() bounds an access executed into a hole. The writes past
- * the bound are no alternatives. The added-maximally flag judges LAB against
- * the graph of the time it was added, which may lack a kept access that
- * bounds it (#121); and a kept write co-after LAB's is an alternative even
- * when its prefix reaches LAB's thread past LAB through a hole (#128) */
-auto GenMCDriver::isPlacedMaximallyInRevisit(const BackwardRevisit &r,
-					     const MemAccessLabel *lab) const -> bool
-{
-	const auto &g = getExec().getGraph();
-	const auto &v = r.getViewNoRel();
 
-	/* A weak CAS that failed spuriously is the non-maximal twin of its success */
-	if (const auto *cLab = genmc::dyn_cast<CasReadLabel>(lab); cLab && cLab->failsSpuriously())
-		return false;
 
-	/* An RMW's write part kept while its read is deleted follows the write
-	 * that read gets when it is executed anew (updateKeptRMWWrite()): for a
-	 * write LAB, it is placed when its read is added, not before */
-	auto floats = [&](const EventLabel &eLab) {
-		const auto *sLab = genmc::dyn_cast<WriteLabel>(&eLab);
-		return genmc::isa<WriteLabel>(lab) && sLab && sLab->isRMW() &&
-		       v->contains(eLab.getPos()) && !v->contains(eLab.getPos().prev());
-	};
-	auto isKept = [&](const EventLabel &eLab) {
-		return v->contains(eLab.getPos()) && !floats(eLab);
-	};
-	auto addedAt = [&](const EventLabel &eLab) {
-		return floats(eLab) ? g.getEventLabel(eLab.getPos().prev())->getStamp()
-				    : eLab.getStamp();
-	};
-	auto competes = [&](const WriteLabel &sLab) {
-		return sLab.getPos() != r.getRev() &&
-		       (isKept(sLab) || addedAt(sLab) < lab->getStamp());
-	};
 
-	/* An RMW read's own write goes right after the read's write, wherever
-	 * that is: it is no bound and no alternative, nor are the reads of it */
-	const auto *rLab = genmc::dyn_cast<ReadLabel>(lab);
-	const auto *ownLab = rLab && rLab->isRMW() ? g.getWriteLabel(lab->getPos().next())
-						   : nullptr;
-
-	/* The bound: LAB precedes BOUND, or may read it (BOUND a read's write) */
-	const EventLabel *bound = nullptr;
-	auto mayReadBound = false;
-	for (auto j = lab->getIndex() + 1; j < g.getThreadSize(lab->getThread()); j++) {
-		const auto *mLab = genmc::dyn_cast<MemAccessLabel>(
-			g.getEventLabel(Event(lab->getThread(), j)));
-		if (!mLab || mLab == ownLab || mLab->getAddr() != lab->getAddr())
-			continue;
-		/* An access deleted and added after LAB is re-added after it */
-		if (!isKept(*mLab) && addedAt(*mLab) > lab->getStamp())
-			continue;
-		if (const auto *qLab = genmc::dyn_cast<ReadLabel>(mLab)) {
-			if (!qLab->getRf() || qLab->getRf() == ownLab)
-				continue;
-			bound = qLab->getRf();
-			mayReadBound = true;
-		} else {
-			bound = mLab;
-		}
-		break;
-	}
-
-	const auto *wLab = rLab ? rLab->getRf() : lab;
-	VERIFY(wLab);
-
-	/* A read reads a write added after it only through a revisit by that
-	 * write: deleted, that write is no alternative, and the graph before
-	 * its revisit builds the same graph (TruSt's revisitable flag) */
-	const auto *rfLab = genmc::dyn_cast<WriteLabel>(wLab);
-	if (rLab && rfLab && !competes(*rfLab))
-		return false;
-	if (bound && wLab == bound)
-		return true;
-
-	auto succs = rfLab ? g.co_succs(rfLab) : g.co(lab->getAddr());
-	for (const auto &sLab : succs) {
-		if (bound && &sLab == bound)
-			return !(rLab && mayReadBound && competes(sLab));
-		if (&sLab != ownLab && competes(sLab))
-			return false;
-	}
-	return true;
-}
-
-/* Whether LAB, a write to the location of the revisiting write, follows in
- * coherence a write that the revisit keeps although that write was added after
- * LAB and is no RMW (it was placed non-maximally). Under LKMM, whose prefix keeps
- * a write po-before the revisiting one to the same location (moi), the revisit
- * deletes LAB and hides that placement; the same graph then follows from the
- * revisit of the kept write itself (tests/correct/lkmm/dup-revisit-nested-if).
- * Only when that other path exists: the read is no RMW and could read from the
- * kept write (which follows the read's write in coherence). Otherwise, the
- * graph where the kept write is placed maximally is rejected too (the read's
- * write precedes the kept one: isPlacedMaximallyInRevisit(), or
- * isCoBeforeSavedPrefix() for the other models), and this one is the only
- * path */
-auto GenMCDriver::isCoAfterLaterSavedWrite(const BackwardRevisit &r, const EventLabel *lab) -> bool
-{
-	const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
-	if (!wLab)
-		return false;
-
-	auto &g = getExec().getGraph();
-	const auto *rLab = g.getReadLabel(r.getPos());
-	if (rLab->isRMW() || wLab->getAddr() != g.getWriteLabel(r.getRev())->getAddr())
-		return false;
-
-	/* The kept write could have been read instead of the read's write */
-	const auto *rfLab = genmc::dyn_cast<WriteLabel>(rLab->getRf());
-	auto readable = [&](auto &pLab) {
-		return !rfLab || rfLab == &pLab ||
-		       std::ranges::any_of(g.co_succs(rfLab),
-					   [&](auto &sLab) { return &sLab == &pLab; });
-	};
-	const auto &v = r.getViewNoRel();
-	return std::ranges::any_of(g.co_preds(wLab), [&](auto &pLab) {
-		return pLab.getPos() != r.getRev() && !pLab.isRMW() && !pLab.wasAddedMax() &&
-		       v->contains(pLab.getPos()) && pLab.getStamp() > wLab->getStamp() &&
-		       readable(pLab);
-	});
-}
-
-auto GenMCDriver::coherenceSuccRemainInGraph(const BackwardRevisit &r) -> bool
-{
-	auto &g = getExec().getGraph();
-	auto *wLab = g.getWriteLabel(r.getRev());
-	if (wLab->isRMW())
-		return true;
-
-	auto succs = g.co_succs(wLab);
-	if (std::ranges::empty(succs))
-		return true;
-
-	return r.getViewNoRel()->contains(std::ranges::begin(succs)->getPos());
-}
-
-static auto wasAddedMaximally(const EventLabel *lab) -> bool
-{
-	if (const auto *mLab = genmc::dyn_cast<MemAccessLabel>(lab))
-		return mLab->wasAddedMax();
-	if (const auto *oLab = genmc::dyn_cast<OptionalLabel>(lab))
-		return !oLab->isExpanded();
-	return true;
-}
-
-/* Whether LAB, not revisitable, is in the prefix of a write that R keeps and
- * that revisited a read still reading it (the read's stamp is below the
- * write's) */
-auto GenMCDriver::isKeptByKeptRevisit(const BackwardRevisit &r, const EventLabel *lab) const -> bool
-{
-	const auto &g = getExec().getGraph();
-	const auto &v = r.getViewNoRel();
-	return std::ranges::any_of(g.labels(), [&](auto &oLab) {
-		const auto *uLab = genmc::dyn_cast<WriteLabel>(&oLab);
-		if (!uLab || uLab->getPos() == r.getRev() || !v->contains(uLab->getPos()))
-			return false;
-		auto revisited = std::ranges::any_of(uLab->readers(), [&](auto &qLab) {
-			return qLab.getStamp() < uLab->getStamp();
-		});
-		return revisited && getRevisitPrefixView(uLab)->contains(lab->getPos());
-	});
-}
-
-auto GenMCDriver::isMaximalExtension(const BackwardRevisit &r) -> bool
-{
-	/* Only revisit when the write's direct successor (if any) remains in the graph;
-	 * revisits should not only differ on the write's placement */
-	if (!coherenceSuccRemainInGraph(r))
-		return false;
-
-	auto &g = getExec().getGraph();
-	const auto &v = r.getViewNoRel();
-
-	const auto *depV =
-		getConf()->isDepTrackingModel
-			? genmc::dyn_cast<DepView>(&getPrefixView(g.getEventLabel(r.getRev())))
-			: nullptr;
-
-	/* Dependency-tracking models judge the accesses the revisit deletes
-	 * against the writes they can reach (isPlacedMaximallyInRevisit()), not
-	 * by their flags. A deleted event that an earlier revisit kept (not
-	 * revisitable) still rejects the revisit, since the graph before that
-	 * revisit leads to the same one, unless this revisit keeps the earlier
-	 * revisiting write: that write is then an alternative for the read it
-	 * revisited, and the other graph is the one rejected */
-	for (const auto &lab : g.labels()) {
-		/* Exclude events unaffected by the revisit */
-		if (lab.getPos() != r.getPos() && v->contains(lab.getPos()))
-			continue;
-
-		if (depV) {
-			if (const auto *sLab = genmc::dyn_cast<WriteLabel>(&lab);
-			    sLab && isReadInView(sLab, *depV))
-				continue;
-			if (!lab.isRevisitable() && !isKeptByKeptRevisit(r, &lab))
-				return false;
-			/* (Under BAM, a barrier wait reads its round's last increment,
-			 * revisited in place: no choice of its own to judge) */
-			const auto *mLab = genmc::dyn_cast<MemAccessLabel>(&lab);
-			if (mLab && (getConf()->disableBAM || !genmc::isa<BWaitReadLabel>(mLab))) {
-				if (!isPlacedMaximallyInRevisit(r, mLab))
-					return false;
-			} else if (!wasAddedMaximally(&lab)) {
-				return false;
-			}
-			if (isCoAfterLaterSavedWrite(r, &lab))
-				return false;
-			continue;
-		}
-
-		if (!lab.isRevisitable())
-			return false;
-		if (!wasAddedMaximally(&lab))
-			return false;
-		if (isCoBeforeSavedPrefix(r, &lab))
-			return false;
-		if (isCoAfterLaterSavedWrite(r, &lab))
-			return false;
-	}
-	return true;
-}
 
 auto GenMCDriver::copyGraph(const BackwardRevisit *br, VectorClock *v) const
 	-> std::unique_ptr<ExecutionGraph>
@@ -4558,61 +3717,24 @@ void GenMCDriver::calcRevisits(WriteLabel *sLab)
 
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Revisitable (optimized): {}", loads););
 	for (auto *rLab : loads) {
-		auto br = constructBackwardRevisit(rLab, sLab);
+		auto revisits = getBackwardRevisits();
+		auto br = revisits.construct(rLab, sLab);
 		/* -exhaustive: every revisit whose graph is well formed and can be
 		 * consistent (the visited set, not maximality, bounds the exploration) */
 		if (getConf()->exhaustive) {
-			if (br->getViewNoRel() && isRevisitViewClosed(*br) && !keepsConflictingRMW(*br))
+			if (br->getViewNoRel() && revisits.isRevisitViewClosed(*br) &&
+			    !revisits.keepsConflictingRMW(*br))
 				getExec().getWorkqueue().add(std::move(br));
 			continue;
 		}
-		if (!isMaximalExtension(*br))
+		if (!revisits.isMaximalExtension(*br))
 			break;
 
 		getExec().getWorkqueue().add(std::move(br));
 	}
 }
 
-/* The revisit keeps the events added before the read and the write's prefix.
- * A kept read may read from a write the revisit deletes: one added after the
- * read that revisited it earlier (the read's thread may have kept events in
- * between, through that write's prefix). TruSt rejects such a revisit by the
- * revisitable flag it set on that write's prefix; -exhaustive ignores the
- * flags, so it checks the graph: every kept read keeps its write */
-auto GenMCDriver::isRevisitViewClosed(const BackwardRevisit &r) -> bool
-{
-	auto &g = getExec().getGraph();
-	const auto &v = r.getViewNoRel();
-	return std::ranges::all_of(g.labels(), [&](auto &lab) {
-		const auto *rLab = genmc::dyn_cast<ReadLabel>(&lab);
-		if (!rLab || rLab->getPos() == r.getPos() || !v->contains(rLab->getPos()) ||
-		    !rLab->getRf())
-			return true;
-		return v->contains(rLab->getRf()->getPos());
-	});
-}
 
-/* The revisiting RMW's read keeps its write W; another RMW reading from W in
- * the revisit's view would make both RMWs read W, a graph no extension
- * repairs (and backwardRevisit() requires its absence) */
-auto GenMCDriver::keepsConflictingRMW(const BackwardRevisit &r) -> bool
-{
-	auto &g = getExec().getGraph();
-	const auto *sLab = g.getWriteLabel(r.getRev());
-	if (!sLab->isRMW())
-		return false;
-	const auto *pLab = genmc::dyn_cast<ReadLabel>(g.po_imm_pred(sLab));
-	VERIFY(pLab && pLab->getRf());
-	/* (The revisited read is in its own view, but it will read from SLAB) */
-	const auto &v = r.getViewNoRel();
-	auto conflicts = [&](const ReadLabel &rLab) {
-		return &rLab != pLab && rLab.getPos() != r.getPos() && rLab.isRMW() &&
-		       v->contains(rLab.getPos());
-	};
-	if (const auto *wLab = genmc::dyn_cast<WriteLabel>(pLab->getRf()))
-		return std::ranges::any_of(wLab->readers(), conflicts);
-	return std::ranges::any_of(g.getInitLabel()->rfs(pLab->getAddr()), conflicts);
-}
 
 auto GenMCDriver::completeRevisitedRMW(const ReadLabel *rLab) -> WriteLabel *
 {
@@ -4744,11 +3866,10 @@ auto GenMCDriver::forwardRevisit(const ForwardRevisit &fr) -> bool
 		 * create */
 		auto *errLab = g.getEventLabel(fr.getPos());
 		const auto *bLab = genmc::dyn_cast<ThreadStartLabel>(errLab);
-		getScheduler().setErrorReplayEvent(
-			genmc::isa<BlockLabel>(errLab) ? errLab->getPos().prev()
-			: bLab && bLab->getCreate()    ? bLab->getCreate()->getPos()
-						       : errLab->getPos());
-		bufferedError_ = rr->getDetails();
+		errorReplay_->start(genmc::isa<BlockLabel>(errLab) ? errLab->getPos().prev()
+				    : bLab && bLab->getCreate()    ? bLab->getCreate()->getPos()
+								   : errLab->getPos(),
+				    rr->getDetails());
 		return true;
 	}
 	if (const auto *wcf = genmc::dyn_cast<WeakCasFailureRevisit>(&fr))
@@ -4777,7 +3898,8 @@ auto GenMCDriver::backwardRevisit(const BackwardRevisit &br) -> bool
 
 	/* Recalculate the view because some B labels might have been
 	 * removed */
-	auto v = getRevisitView(g.getReadLabel(br.getPos()), g.getWriteLabel(br.getRev()));
+	auto v = getBackwardRevisits().revisitView(g.getReadLabel(br.getPos()),
+						   g.getWriteLabel(br.getRev()));
 	if (!v) {
 		VERIFY(getConf()->exhaustive);
 		return false;
@@ -4835,20 +3957,16 @@ auto GenMCDriver::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 	if (const auto *wcf = genmc::dyn_cast<WeakCasFailureRevisit>(&*item))
 		stamp = std::max(stamp, g.getEventLabel(wcf->getRev())->getStamp());
 	restrictExecution(stamp, "restricting the graph for a revisit");
-	/* Cutting the graph bypasses the incremental counter updates */
-	getConsChecker().recomputeCacheCounters(getExec().getGraph());
 	repairDanglingReads(g);
 
-	pendingResume_ = nullptr;
+	resumePoints_.clearPending();
 	if (auto *fr = genmc::dyn_cast<ForwardRevisit>(&*item)) {
 		/* The graph is now what it was when the event was added: its
 		 * runtime state, if kept, is where the next execution resumes */
-		pendingResume_ = fr->getResumePoint();
-		if (pendingResume_ && --pendingResume_->pending == 0)
-			std::erase(resumePoints_, pendingResume_); /* its last revisit */
-		if (pendingResume_ && checksInvariants() && pendingResume_->fingerprint)
-			invariants::checkResume(g, *pendingResume_->fingerprint,
-						pendingResume_->threadPositions(),
+		resumePoints_.resumeAt(fr->getResumePoint());
+		const auto &rp = resumePoints_.pending();
+		if (rp && checksInvariants() && rp->fingerprint)
+			invariants::checkResume(g, *rp->fingerprint, rp->threadPositions(),
 						invariantContext("restricting the graph for a "
 								 "resumed revisit"));
 		return forwardRevisit(*fr);
@@ -5164,28 +4282,29 @@ auto GenMCDriver::updateErrorInfoAndMaybeExit(Event pos, bool isNA, const EventD
 	if (!getScheduler().inErrorReplay())
 		return std::nullopt;
 	if (dbg && (!isNA || Config::emitNALabels)) {
-		VERIFY(!dbgInfo_.contains(pos));
-		dbgInfo_[pos] = *dbg;
+		errorReplay_->record(pos, *dbg);
 	}
 
 	/* Check whether error replay is complete */
-	if (bufferedError_ && getScheduler().isErrorReplayEvent(pos)) {
-		auto code = bufferedError_.value().type;       /* will be erased */
-		auto halt = bufferedError_.value().shouldHalt; /* will be erased */
-		reportError(pos, *bufferedError_);
+	if (errorReplay_->reachedTarget(pos)) {
+		auto details = *errorReplay_->buffered(); /* stop() erases it */
+		auto code = details.type;
+		auto halt = details.shouldHalt;
+		reportError(pos, details);
 		return halt ? std::optional(code) : std::nullopt;
 	}
 	return std::nullopt;
 }
 auto GenMCDriver::getDbgInfo(Event pos) -> const GenMCDriver::EventDbgInfo *
 {
-	if (!dbgInfo_.contains(pos))
+	if (!errorReplay_->dbgInfo().contains(pos))
 		return nullptr;
-	return &dbgInfo_.at(pos);
+	return &errorReplay_->dbgInfo().at(pos);
 }
 
 void GenMCDriver::inheritDbgInfo(Event from, const BlockLabel *bLab)
 {
-	if (auto it = dbgInfo_.find(from); it != dbgInfo_.end())
-		dbgInfo_.try_emplace(bLab->getPos(), it->second);
+	auto &dbgInfo = errorReplay_->dbgInfo();
+	if (auto it = dbgInfo.find(from); it != dbgInfo.end())
+		dbgInfo.try_emplace(bLab->getPos(), it->second);
 }
