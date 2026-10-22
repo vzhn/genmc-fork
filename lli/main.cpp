@@ -181,7 +181,13 @@ static llvm::cl::opt<bool> clExhaustive(
 	llvm::cl::desc("Reference exploration for small programs: explore every consistent "
 		       "backward revisit, deduplicate graphs by a canonical hash, and disable "
 		       "every reduction (SR, IPR, BAM, helper, blind RMWs, load annotations, "
-		       "resume points, estimation). Slow; memory grows with the visited graphs"));
+		       "resume points, estimation). Slow; memory grows with the visited graphs. "
+		       "The default under -lkmm"));
+static llvm::cl::opt<bool> clDisableLkmmExhaustive(
+	"disable-lkmm-exhaustive", llvm::cl::cat(clGeneral),
+	llvm::cl::desc("Under -lkmm, explore with the optimal exploration instead of -exhaustive: "
+		       "faster, but it misses executions in which a revisit changes the path of "
+		       "a branch whose events order later ones"));
 static llvm::cl::opt<unsigned int> clResumePoints(
 	"resume-points", llvm::cl::cat(clGeneral), llvm::cl::init(256),
 	llvm::cl::desc("How many saved program states forward revisits may resume from, "
@@ -499,10 +505,20 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.printErrorTrace = clPrintErrorTrace;
 	conf.checkLiveness = clCheckLiveness;
 	conf.lkmmReference = clLkmmReference;
+	/* Under LKMM, the prefix of an event can depend on the path of a branch
+	 * before it, which the optimality of the revisits assumes it does not:
+	 * the optimal exploration misses the executions in which a revisit
+	 * changes such a path (#77). -lkmm explores exhaustively instead (when
+	 * verifying), unless asked not to. (Not without spin-assume: a spin loop
+	 * then has a graph per number of iterations, which the exhaustive
+	 * exploration, revisiting every read of each, does not leave) */
+	const bool exhaustive = clExhaustive || (clModelType == ModelType::LKMM &&
+						 !clDisableLkmmExhaustive && !clDisableSpinAssume &&
+						 clExplorationMode == ExplorationMode::verify);
 	/* (-exhaustive under IMM relocates kept events, see
 	 * GenMCDriver::relocatesKeptEvents()) */
 	conf.checkReplayKeys = clCheckReplayKeys || clModelType == ModelType::LKMM ||
-			       (clExhaustive && clModelType == ModelType::IMM);
+			       (exhaustive && clModelType == ModelType::IMM);
 #if EMIT_NA_LABELS
 	conf.instructionCaching = clCacheInstructions;
 #endif
@@ -510,17 +526,21 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.disableBAM = clDisableBAM;
 	conf.blindRMWReduction = clBlindRMWReduction;
 	conf.ipr = !clDisableIPR;
-	conf.exhaustive = clExhaustive;
+	conf.exhaustive = exhaustive;
 	conf.resumePoints = clResumePoints;
 	conf.checkInvariants = clCheckInvariants;
 	/* The reference runs alone, with the graph as its only guide: no load
 	 * annotations (they prune reads that would block), no BAM runtime, one
 	 * worker (the visited set is the driver's) */
-	if (clExhaustive) {
+	if (exhaustive) {
 		lliConfig.loadAnnot = false;
 		lliConfig.bam = false;
-		if (lliConfig.threads != 1)
+		if (lliConfig.threads != 1 && clExhaustive)
 			WARN("-exhaustive runs single-threaded (-nthreads ignored)");
+		else if (lliConfig.threads != 1)
+			WARN("-lkmm explores exhaustively, single-threaded (-nthreads ignored; "
+			     "-disable-lkmm-exhaustive explores in parallel, but may miss "
+			     "executions)");
 		lliConfig.threads = 1;
 	}
 
@@ -645,10 +665,11 @@ static void parseConfig(int argc, char **argv, Config &conf, LLIConfig &lliConfi
 
 	if (conf.exhaustive)
 		PRINT(VerbosityLevel::Error,
-		      "*** Exhaustive mode: every consistent backward revisit is taken and "
+		      "*** Exhaustive mode{}: every consistent backward revisit is taken and "
 		      "graphs are deduplicated by a canonical hash. Off: symmetry reduction, "
 		      "in-place revisiting, BAM, helper, blind-RMW reduction, load annotations, "
-		      "resume points, estimation.\n");
+		      "resume points, estimation.\n",
+		      clExhaustive ? "" : " (the default under -lkmm)");
 
 	/* Set (global) log state */
 	logLevel = clVLevel;

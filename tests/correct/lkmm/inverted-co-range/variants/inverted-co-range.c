@@ -8,9 +8,9 @@
  * With -nthreads, the write-write race warning was reported before the
  * write was in coherence, and the check of the whole graph that reporting
  * makes after such an addition crashed on every run.
- * herd7: 2926 executions; GenMC misses some (issue #77), how many depending
- * on the exploration order (matrix-skip), and counts failed cmpxchg() reads
- * differently. */
+ * herd7: 2926 executions, which -lkmm, exploring exhaustively, finds; the
+ * optimal exploration misses some (#77), how many depending on the
+ * exploration order. */
 #include "lkmm.h"
 #include <assert.h>
 #include <stdlib.h>

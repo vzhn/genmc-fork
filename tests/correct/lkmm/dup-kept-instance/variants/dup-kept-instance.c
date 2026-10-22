@@ -11,10 +11,10 @@
  * range), reported a write-write race between it and a hole, and queued
  * the revisit of P0's read by it, a graph that contradicts coherence
  * (-lkmm-reference stops on it). The run is now dropped at the hole.
- * herd7: 4 executions; GenMC 3, as before: the dropped run was the one
- * where P0 reads P2's write and P2 skips the branch (issue #77, a prefix
- * that depends on the branch path); under other scheduling policies the
- * count is 2 to 4 (matrix-skip). */
+ * herd7: 4 executions. The optimal exploration finds 3: the dropped run
+ * was the one where P0 reads P2's write and P2 skips the branch (#77, a
+ * prefix that depends on the branch path), and 2 to 4 under other
+ * scheduling policies; -lkmm explores exhaustively, which finds 4. */
 #include "lkmm.h"
 #include <assert.h>
 #include <stdlib.h>

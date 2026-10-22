@@ -14,7 +14,8 @@ A full list of the available command-line options can by viewed by issuing `genm
 - **`-cache-instructions`**: Caches instructions to help execution time (sacrifices memory)
 - **`-disable-bam`**: Disables Barrier-Aware Model-checking (BAM)
 - **`-blind-rmw-reduction`**: Explores one order of identical relaxed RMWs whose results are unused (RC11 only; see [Commuting Blind RMWs](features.md#commuting-blind-rmws))
-- **`-exhaustive`**: Reference exploration for small programs: every consistent backward revisit is taken, graphs are deduplicated by a canonical hash, and every reduction is off (see [Reference Exploration](features.md#reference-exploration))
+- **`-exhaustive`**: Reference exploration for small programs: every consistent backward revisit is taken, graphs are deduplicated by a canonical hash, and every reduction is off (see [Reference Exploration](features.md#reference-exploration)); the default under `-lkmm`
+- **`-disable-lkmm-exhaustive`**: Under `-lkmm`, explore with the optimal exploration instead: faster and parallel, but it can miss executions whose events after a branch are ordered by events of the branch (see [the LKMM section](features.md#the-linux-kernel-memory-model-lkmm))
 - **`-check-liveness`**: Check for liveness violations in spinloops
 - **`-unroll=<N>`**: All loops will be executed at most `N` times.
 - **`-dump-error-graph=<file>`**: Outputs an erroneous graph to file `<file>`.
