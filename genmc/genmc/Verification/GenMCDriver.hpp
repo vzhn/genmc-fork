@@ -188,16 +188,19 @@ public:
 	auto runFromCache() -> bool;
 
 	/** Should be called to register a static allocation, before the execution loop.
-	 *  Returns an SAddr.
+	 *  Returns an SAddr. For a thread-local variable, the address is the
+	 *  main thread's copy; another thread's copy is the address with that
+	 *  thread's id (SAddr::withThread()).
 	 *
 	 *  For EMIT_NA_LABELS=ON: @p initData must point to memory that will
 	 *  hold the initial bytes. The pointer must remain valid for the driver's lifetime. */
 #if EMIT_NA_LABELS
 	auto allocateGlobal(ASize size, uint64_t alignment, const void *initData,
-			    bool persistent = false, bool internal = false) -> SAddr;
+			    bool persistent = false, bool internal = false,
+			    bool threadLocal = false) -> SAddr;
 #else
 	auto allocateGlobal(ASize size, uint64_t alignment, bool persistent = false,
-			    bool internal = false) -> SAddr;
+			    bool internal = false, bool threadLocal = false) -> SAddr;
 #endif
 
 	/** Should be called at the beginning of each execution. Returns whether the frontend

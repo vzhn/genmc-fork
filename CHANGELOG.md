@@ -79,6 +79,30 @@ released.
   the trace. Only a write at the creation's line is left out now
   (`tests/wrong/infr/trace-after-create`).
 
+- `__thread` and `_Thread_local` variables lived outside the execution
+  graph, in a map per thread from address to value, with every thread's
+  copy at the same address (#90). A thread-local struct or array aborted
+  GenMC before exploration (`Constant unimplemented for type`), and a
+  thread-local pointer initialized with the address of a global laid out
+  after it, such as a string literal, pointed outside GenMC's memory. A
+  pointer to another thread's thread-local reached the accessing thread's
+  own copy: publishing a thread-local node, as lock implementations do
+  (e.g. Dat3M's `ticket_awnsb_mutex`), gave false assertion violations,
+  and a race through such a pointer went unreported. Each thread now has
+  its own copy of every thread-local, at an address of its own in static
+  memory, starting as the initializer, and accesses to it are events like
+  any other: they are checked for races, and carry dependencies under
+  `-imm` and `-lkmm`. An error trace names another thread's copy after
+  its thread (`tlx of thread 1`). Symmetric threads stay symmetric, but a
+  parent that accesses its own thread-locals between two spawns makes
+  them not symmetric, as the thread-local may be published
+  (`tests/correct/infr/{tls-aggregate,tls-init-address,tls-published}`,
+  `tests/wrong/racy/tls-published-race`,
+  `tests/wrong/infr/print-names-thread-local`,
+  `tests/correct/sr/{tls-symmetric,tls-between-spawns}`; the canonical
+  graph hash of `-exhaustive` names the copies by their threads' creation
+  paths: `GraphHashTest.ThreadLocalCopiesAreNamedByCreationPath`).
+
 ### Added
 
 - The other integer `__VERIFIER_nondet_X()` of SV-COMP (#48): `bool`,

@@ -112,7 +112,8 @@ static auto runOnBasicBlock(BasicBlock &bb, IntrinsicLowering *IL) -> bool
 		if (!I)
 			continue;
 		switch (I->getIntrinsicID()) {
-		/* In case thread-local variables are not accessed directly, make them */
+		/* Access thread-local variables directly: the interpreter resolves
+		 * each use of one to the executing thread's copy */
 		case llvm::Intrinsic::threadlocal_address:
 			I->replaceAllUsesWith(I->getOperand(0));
 			break;

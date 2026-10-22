@@ -132,11 +132,16 @@ static void SetValue(Value *V, GenericValue Val, ExecutionContext &SF) { SF.Valu
 
 bool Interpreter::isStaticallyAllocated(SAddr addr) const
 {
-	auto p = std::make_pair(addr, addr);
+	/* Another thread's copy of a thread-local is at the main thread's copy,
+	 * with the other thread's id (see SAddr) */
+	auto canon = addr.withThread(0);
+	auto p = std::make_pair(canon, canon);
 	auto it = std::lower_bound(
 		staticAllocas.begin(), staticAllocas.end(), p,
 		[](const decltype(p) &itV, const decltype(p) &v) { return itV.second < v.first; });
-	return it == staticAllocas.end() ? false : (it->first <= addr && addr <= it->second);
+	if (it == staticAllocas.end() || canon < it->first || it->second < canon)
+		return false;
+	return addr == canon || cast<GlobalVariable>(staticNames.at(it->first))->isThreadLocal();
 }
 
 SAddr getStaticAllocBegin(const VSet<std::pair<SAddr, SAddr>> &allocMap, SAddr addr)
@@ -179,23 +184,38 @@ std::string Interpreter::getStaticName(SAddr addr) const
 	if (!isStaticallyAllocated(addr))
 		return "";
 
-	auto sBeg = getStaticAllocBegin(staticAllocas, addr);
+	auto canon = addr.withThread(0);
+	auto sBeg = getStaticAllocBegin(staticAllocas, canon);
 	VERIFY(staticNames.count(sBeg));
 	auto gv = staticNames.at(sBeg);
 	auto gvID = MI->idInfo.VID[gv];
 	VERIFY(MI->varInfo.globalInfo.count(gvID));
 	auto &gi = *MI->varInfo.globalInfo.at(gvID);
-	return gv->getName().str() + gi.getNameAtOffset(addr - sBeg);
+	auto name = gv->getName().str() + gi.getNameAtOffset(canon - sBeg);
+
+	/* Another thread's copy of a thread-local is named after the thread */
+	if (cast<GlobalVariable>(gv)->isThreadLocal() && addr.getThread() != dynState.currentThread)
+		name += std::format(" of thread {}", addr.getThread());
+	return name;
 }
 
 void *Interpreter::getStaticAddr(SAddr addr) const
 {
 	/* If the address is not statically allocated, something went
-	 * wrong with the access validity checks; don't bother recovering */
+	 * wrong with the access validity checks; don't bother recovering.
+	 * (The copies of a thread-local have the same initial contents) */
 	VERIFY(isStaticallyAllocated(addr));
-	auto sBeg = getStaticAllocBegin(staticAllocas, addr);
+	auto canon = addr.withThread(0);
+	auto sBeg = getStaticAllocBegin(staticAllocas, canon);
 	VERIFY(staticValueMap.count(sBeg));
-	return (char *)staticValueMap.at(sBeg) + (addr.get() - sBeg.get());
+	return (char *)staticValueMap.at(sBeg) + (canon.get() - sBeg.get());
+}
+
+SAddr Interpreter::getThreadLocalAddr(const GlobalVariable *GV) const
+{
+	auto it = threadLocalAddrs_.find(GV);
+	VERIFY(it != threadLocalAddrs_.end());
+	return it->second.withThread(dynState.currentThread);
 }
 
 std::optional<Annotation> Interpreter::getCurrentAnnotConcretized()
@@ -1567,14 +1587,7 @@ void Interpreter::visitLoadInst(LoadInst &I)
 	auto size = getTypeSize(typ);
 	auto ord = toGenMCOrdering(I.getOrdering());
 
-	/* If this is a thread-local access it is not recorded in the graph,
-	 * so just perform the load. */
-	if (thr.tls.count(ptr)) {
-		SetValue(&I, thr.tls[ptr], ECStack().back());
-		return;
-	}
-
-	/* Otherwise, set the dependencies for this instruction.. */
+	/* First, set the dependencies for this instruction... */
 	auto deps = makeEventDeps(getDataDeps(thr.id, I.getPointerOperand()), nullptr,
 				  getCtrlDeps(thr.id), getAddrPoDeps(thr.id), nullptr);
 
@@ -1623,12 +1636,6 @@ void Interpreter::visitStoreInst(StoreInst &I)
 	auto *ptr = (GenericValue *)GVTOP(src);
 	auto asize = getTypeSize(typ);
 	auto ord = toGenMCOrdering(I.getOrdering());
-
-	/* Do not bother with thread-local accesses */
-	if (thr.tls.count(ptr)) {
-		thr.tls[ptr] = val;
-		return;
-	}
 
 	/* First, record the dependencies for this instruction */
 	auto deps = makeEventDeps(getDataDeps(thr.id, I.getPointerOperand()),
@@ -1724,17 +1731,6 @@ void Interpreter::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I)
 	auto size = getTypeSize(typ);
 	GenericValue result;
 
-	if (thr.tls.count(ptr)) {
-		GenericValue oldVal = thr.tls[ptr];
-		GenericValue cmpRes = executeICMP_EQ(oldVal, cmpVal, typ);
-		if (cmpRes.IntVal.getBoolValue())
-			thr.tls[ptr] = newVal;
-		result.AggregateVal.push_back(oldVal);
-		result.AggregateVal.push_back(cmpRes);
-		SetValue(&I, result, SF);
-		return;
-	}
-
 	auto lDeps = makeEventDeps(getDataDeps(thr.id, I.getPointerOperand()),
 				   getDataDeps(thr.id, I.getNewValOperand()), getCtrlDeps(thr.id),
 				   getAddrPoDeps(thr.id),
@@ -1823,15 +1819,6 @@ void Interpreter::visitAtomicRMWInst(AtomicRMWInst &I)
 	WARN_ON_ONCE(I.getOperation() == AtomicRMWInst::BinOp::Xchg && getDepTracker(),
 		     "unsupported-xchg-deps",
 		     "Atomic xchg support is experimental under dependency-tracking models!");
-
-	if (thr.tls.count(ptr)) {
-		GenericValue oldVal = thr.tls[ptr];
-		auto newVal = executeRMWBinOp(GV_TO_SVAL(oldVal, typ), val, size,
-					      toGenMCBinOp(I.getOperation()));
-		thr.tls[ptr] = SVAL_TO_GV(newVal, typ);
-		SetValue(&I, oldVal, SF);
-		return;
-	}
 
 	auto deps = makeEventDeps(getDataDeps(thr.id, I.getPointerOperand()),
 				  getDataDeps(thr.id, I.getValOperand()), getCtrlDeps(thr.id),
@@ -2943,6 +2930,11 @@ GenericValue Interpreter::getOperandValue(Value *V, ExecutionContext &SF)
 {
 	if (ConstantExpr *CE = dyn_cast<ConstantExpr>(V)) {
 		return getConstantExprValue(CE, SF);
+	} else if (auto *GV = dyn_cast<GlobalVariable>(V); GV && GV->isThreadLocal()) {
+		/* Wherever a thread uses a thread-local (directly, or through
+		 * @llvm.threadlocal.address, which IntrinsicLoweringPass lowers
+		 * to a direct use), it means the thread's own copy */
+		return PTOGV((void *)getThreadLocalAddr(GV).get());
 	} else if (Constant *CPV = dyn_cast<Constant>(V)) {
 		return getConstantValue(CPV);
 	} else if (GlobalValue *GV = dyn_cast<GlobalValue>(V)) {

@@ -3413,14 +3413,14 @@ auto GenMCDriver::handleFree(const EventDbgInfo *dbg, Event pos, SAddr loc, Stor
 
 #if EMIT_NA_LABELS
 auto GenMCDriver::allocateGlobal(ASize size, uint64_t alignment, const void *initData,
-				 bool persistent, bool internal) -> SAddr
+				 bool persistent, bool internal, bool threadLocal) -> SAddr
 #else
-auto GenMCDriver::allocateGlobal(ASize size, uint64_t alignment, bool persistent, bool internal)
-	-> SAddr
+auto GenMCDriver::allocateGlobal(ASize size, uint64_t alignment, bool persistent, bool internal,
+				 bool threadLocal) -> SAddr
 #endif
 {
 	auto &state = getExec().getGraph().getState();
-	auto addr = state.addStaticRange(size, alignment, persistent, internal);
+	auto addr = state.addStaticRange(size, alignment, persistent, internal, threadLocal);
 #if EMIT_NA_LABELS
 	state.addStaticInitData(addr, size, initData);
 #endif

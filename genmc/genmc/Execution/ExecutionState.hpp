@@ -64,9 +64,11 @@ public:
 
 	/* State initialization */
 
-	/** Registers a static range. Returns a fresh address */
-	auto addStaticRange(ASize size, uint64_t alignment, bool persistent, bool internal)
-		-> SAddr;
+	/** Registers a static range. Returns a fresh address. The range of a
+	 * thread-local variable is the main thread's copy of it: the same
+	 * range with another thread id is that thread's copy (see SAddr) */
+	auto addStaticRange(ASize size, uint64_t alignment, bool persistent, bool internal,
+			    bool threadLocal = false) -> SAddr;
 
 #if EMIT_NA_LABELS
 	/** Register raw initial data for a static allocation.
@@ -262,6 +264,7 @@ private:
 	AdaptiveViewMap initialized_;
 	SAddrAllocator alloctor_;
 	VSet<std::pair<SAddr, SAddr>> staticRanges_;
+	VSet<std::pair<SAddr, SAddr>> threadLocalRanges_; /* main thread's copies */
 
 #if EMIT_NA_LABELS
 	/* init vals for statics (not cleared) */

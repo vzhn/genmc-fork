@@ -61,22 +61,26 @@ static auto getMaxView(const ExecutionState::AdaptiveViewMap &viewMap, const AAc
 	return result;
 }
 
-auto ExecutionState::addStaticRange(ASize size, uint64_t alignment, bool persistent, bool internal)
-	-> SAddr
+auto ExecutionState::addStaticRange(ASize size, uint64_t alignment, bool persistent, bool internal,
+				    bool threadLocal) -> SAddr
 {
 	auto &alloctor = getAllocator();
 	auto addr = alloctor.allocStatic(0, size.get(), alignment, persistent, internal);
 	staticRanges_.insert(std::pair{addr, addr + size - ASize(1)});
+	if (threadLocal)
+		threadLocalRanges_.insert(std::pair{addr, addr + size - ASize(1)});
 	return addr;
 }
 
 #if EMIT_NA_LABELS
 auto ExecutionState::readStaticInitValue(const AAccess &access) const -> SVal
 {
-	auto it = staticInitData_.find(access.addr);
+	/* Every thread's copy of a thread-local starts as the main thread's */
+	auto addr = access.addr.withThread(0);
+	auto it = staticInitData_.find(addr);
 	VERIFY(it != staticInitData_.end());
 	auto entry = *it;
-	auto offset = static_cast<size_t>(access.addr - entry.first.start);
+	auto offset = static_cast<size_t>(addr - entry.first.start);
 	const std::span<const uint8_t> bytes{entry.second.ptr, offset + access.size.get()};
 	uint64_t val = 0;
 	for (unsigned i = 0; i < access.size.get(); i++)
@@ -132,11 +136,16 @@ auto ExecutionState::isAccessible(SAddr addr) const -> bool
 
 auto ExecutionState::isStatic(SAddr addr) const -> bool
 {
+	/* Another thread's copy of a thread-local is at the main thread's copy,
+	 * with the other thread's id (see SAddr) */
+	const auto &ranges = addr.getThread() == 0 ? staticRanges_ : threadLocalRanges_;
+	addr = addr.withThread(0);
+
 	auto addrRange = std::make_pair(addr, addr);
-	auto it = std::ranges::lower_bound(
-		staticRanges_, addrRange,
-		[](const auto &itV, const auto &v) { return itV.second < v.first; });
-	return it != staticRanges_.end() && addr >= it->first && addr <= it->second;
+	auto it = std::ranges::lower_bound(ranges, addrRange, [](const auto &itV, const auto &v) {
+		return itV.second < v.first;
+	});
+	return it != ranges.end() && addr >= it->first && addr <= it->second;
 }
 
 /* TODO: adjust this when we have cutting */
