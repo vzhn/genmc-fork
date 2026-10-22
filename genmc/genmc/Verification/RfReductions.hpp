@@ -48,7 +48,7 @@ auto getRMWRead(const WriteLabel &wLab) -> const ReadLabel *;
  */
 class BlindRMWFilter {
 public:
-	BlindRMWFilter(const ExecutionGraph &g, const ConsistencyChecker &cc) : g(g), cc(cc)
+	BlindRMWFilter(const ExecutionGraph &g, const GraphModel &cc) : g(g), cc(cc)
 	{
 		for (auto t = 0; t < g.getNumThreads(); t++) {
 			auto first = -1;
@@ -98,7 +98,7 @@ public:
 
 private:
 	const ExecutionGraph &g;
-	const ConsistencyChecker &cc;
+	const GraphModel &cc;
 	std::vector<int> firstSCFence; /* -1 if the thread has none */
 };
 

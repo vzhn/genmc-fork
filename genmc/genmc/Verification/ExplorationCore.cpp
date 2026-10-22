@@ -553,50 +553,19 @@ void ExplorationCore::updateLabelViews(EventLabel *lab)
 	getSymmChecker().updatePrefixWithSymmetries(lab);
 }
 
-/* If LAB accesses another thread's copy of a thread-local (see SAddr),
- * returns that thread, and 0 otherwise. The copies of a thread end with it,
- * as if freed by its end; those of the main thread (0) last as long as the
- * program */
-static auto getThreadLocalOwner(const EventLabel *lab) -> int
-{
-	const auto *mLab = genmc::dyn_cast<MemAccessLabel>(lab);
-	if (!mLab || !mLab->getAddr().isStatic())
-		return 0;
-	auto owner = mLab->getAddr().getThread();
-	return owner == lab->getThread() || owner >= lab->getParent()->getNumThreads() ? 0 : owner;
-}
-
 auto ExplorationCore::checkThreadLocalEnd(const EventLabel *lab, const ThreadFinishLabel *eLab)
 	-> std::optional<VerificationError>
 {
-	if (getConsChecker().getHbView(eLab).contains(lab->getPos()))
-		return {};
-	reportError(lab->getPos(),
-		    {lab->getPos(), VerificationError::VE_AccessFreed,
-		     std::format("The access is to a thread-local of thread {}, and does not "
-				 "happen before the thread ends\n",
-				 eLab->getThread()),
-		     eLab});
-	return {VerificationError::VE_AccessFreed};
+	return reportIfViolated(error_rules::threadLocalAfterEnd(getConsChecker(), lab, eLab));
 }
 
 auto ExplorationCore::checkEndedThreadLocals(const ThreadFinishLabel *eLab)
 	-> std::optional<VerificationError>
 {
-	/* (The main thread's copies last as long as the program; an owner of 0
-	 * is no owner, see getThreadLocalOwner()) */
-	const auto &g = getExec().getGraph();
-	if (eLab->getThread() == 0 || getConf()->disableRaceDetection || inEstimationMode() ||
-	    !g.getState().hasThreadLocals())
+	if (getConf()->disableRaceDetection || inEstimationMode())
 		return {};
-
-	for (const auto &lab : g.labels()) {
-		if (getThreadLocalOwner(&lab) != eLab->getThread())
-			continue;
-		if (auto err = checkThreadLocalEnd(&lab, eLab); err)
-			return err;
-	}
-	return {};
+	return reportIfViolated(
+		error_rules::endedThreadLocal(getConsChecker(), getExec().getGraph(), eLab));
 }
 
 auto ExplorationCore::checkForRaces(const EventLabel *lab) -> std::optional<VerificationError>
@@ -607,7 +576,7 @@ auto ExplorationCore::checkForRaces(const EventLabel *lab) -> std::optional<Veri
 	/* An access to the thread-local of a thread that has ended (see also
 	 * checkEndedThreadLocals()) */
 	const auto &g = getExec().getGraph();
-	if (auto owner = getThreadLocalOwner(lab); owner != 0) {
+	if (auto owner = error_rules::threadLocalOwner(lab); owner != 0) {
 		const auto *eLab = genmc::dyn_cast<ThreadFinishLabel>(g.getLastThreadLabel(owner));
 		if (auto err = eLab ? checkThreadLocalEnd(lab, eLab) : std::nullopt; err)
 			return err;
@@ -777,119 +746,34 @@ auto ExplorationCore::checkFinalAnnotations(const WriteLabel *wLab) -> std::opti
 {
 	if (!getConf()->finalWrite)
 		return {};
-
-	auto &g = getExec().getGraph();
-
-	if (!g.hasLocMoreThanOneStore(wLab->getAddr()))
-		return {};
-	if ((wLab->isFinal() &&
-	     std::ranges::any_of(g.co(wLab->getAddr()),
-				 [&](auto &sLab) {
-					 return !getConsChecker().getHbView(wLab).contains(
-						 sLab.getPos());
-				 })) ||
-	    (!wLab->isFinal() && std::ranges::any_of(g.co(wLab->getAddr()),
-						     [&](auto &sLab) { return sLab.isFinal(); }))) {
-		reportError(wLab->getPos(), {wLab->getPos(), VerificationError::VE_Annotation,
-					     "Multiple stores at final location!"});
-		return {VerificationError::VE_Annotation};
-	}
-	return {};
+	return reportIfViolated(
+		error_rules::finalWriteViolation(getConsChecker(), getExec().getGraph(), wLab));
 }
 
 auto ExplorationCore::checkIPRValidity(const ReadLabel *rLab) -> std::optional<VerificationError>
 {
-	if (!rLab->getAnnot() || !getConf()->ipr)
+	if (!getConf()->ipr)
 		return {};
-
-	auto &g = getExec().getGraph();
-	if (!g.mayHaveWWRacyWrites())
-		return {};
-	auto racyIt = std::ranges::find_if(g.co(rLab->getAddr()),
-					   [&](auto &wLab) { return wLab.isWWRacy(); });
-	if (racyIt == std::ranges::end(g.co(rLab->getAddr())))
-		return {};
-
-	auto msg =
-		"Unordered writes do not constitute a bug per se, though they often "
-		"indicate faulty design.\n"
-		"This warning is treated as an error due to in-place revisiting (IPR).\n"
-		"You can use -disable-ipr to disable this feature."s; // NOLINT(misc-include-cleaner)
-	getResult().iprError = true;
-	reportError(racyIt->getPos(),
-		    {racyIt->getPos(), VerificationError::VE_WWRace, msg, nullptr, true});
-	return {VerificationError::VE_WWRace};
+	auto violation = error_rules::iprUnorderedWrites(getExec().getGraph(), rLab);
+	if (violation)
+		getResult().iprError = true;
+	return reportIfViolated(violation);
 }
 
 auto ExplorationCore::checkBlindRMWWellFormedness(const ReadLabel *rLab) -> bool
 {
 	if (!getConf()->blindRMWReduction)
 		return true;
-
-	const auto &g = getExec().getGraph();
-	const BlindRMWFilter blind(g, getConsChecker());
-	if (blind.asCommuting(rLab))
-		return true;
-
-	/*
-	 * A read that is hb-after one blind FAI but not after an identical one
-	 * observes their order: it may see the first without the second.  The
-	 * reduction may have fixed that order, so such a read is not supported.
-	 */
-	const auto &view = getConsChecker().getHbView(rLab);
-	std::vector<const ReadLabel *> twins;
-	for (const auto &wLab : g.co(rLab->getAddr())) {
-		if (const auto *pLab = getRMWRead(wLab); blind.asCommuting(pLab))
-			twins.push_back(pLab);
-	}
-	auto valid = std::ranges::none_of(twins, [&](auto *aLab) {
-		return view.contains(aLab->getPos()) && std::ranges::any_of(twins, [&](auto *bLab) {
-			       return blind.areTwins(aLab, bLab) && !view.contains(bLab->getPos());
-		       });
-	});
-	if (!valid)
-		reportError(
-			rLab->getPos(),
-			{rLab->getPos(), VerificationError::VE_BlindRMWWellFormedness,
-			 "This read observes the order of blind RMWs that --blind-rmw-reduction "
-			 "treats as unordered. Rerun without --blind-rmw-reduction.\n"});
-	return valid;
+	return !reportIfViolated(
+		error_rules::blindRMWOrderObserved(getConsChecker(), getExec().getGraph(), rLab));
 }
 
 auto ExplorationCore::checkBlindRMWWellFormedness(const WriteLabel *sLab) -> bool
 {
 	if (!getConf()->blindRMWReduction)
 		return true;
-
-	/*
-	 * The reduction assumed that identical blind FAIs are the only writes to
-	 * their location.  If another write is not hb-after one of them, an order
-	 * we skipped might have let it revisit that FAI.  (Its prefix is no guide:
-	 * the order we kept may have put the FAIs there through their rf chain,
-	 * which creates no hb, as they are relaxed.)
-	 */
-	const auto &g = getExec().getGraph();
-	const BlindRMWFilter blind(g, getConsChecker());
-	const auto *ownRead = getRMWRead(*sLab);
-	const auto &view = getConsChecker().getHbView(sLab);
-	std::vector<const ReadLabel *> twins;
-	for (const auto &wLab : g.co(sLab->getAddr())) {
-		const auto *rLab = getRMWRead(wLab);
-		if (&wLab != sLab && blind.asCommuting(rLab) && !blind.areTwins(rLab, ownRead))
-			twins.push_back(rLab);
-	}
-	auto valid = std::ranges::none_of(twins, [&](auto *aLab) {
-		return !view.contains(aLab->getPos()) &&
-		       std::ranges::any_of(twins,
-					   [&](auto *bLab) { return blind.areTwins(aLab, bLab); });
-	});
-	if (!valid)
-		reportError(
-			sLab->getPos(),
-			{sLab->getPos(), VerificationError::VE_BlindRMWWellFormedness,
-			 "Blind RMWs on this location are reordered by --blind-rmw-reduction, but "
-			 "this write is not one of them. Rerun without --blind-rmw-reduction.\n"});
-	return valid;
+	return !reportIfViolated(
+		error_rules::blindRMWReorderedWith(getConsChecker(), getExec().getGraph(), sLab));
 }
 
 void ExplorationCore::unblockWaitingHelping(const WriteLabel *lab)
@@ -2019,24 +1903,8 @@ auto ExplorationCore::checkBarrierWellFormedness(BIncFaiWriteLabel *sLab) -> boo
 {
 	if (getConf()->disableBAM)
 		return true;
-
-	/* Find the latest round completion (or init, if none exists) */
-	auto &g = getExec().getGraph();
-	auto lastIt = std::ranges::find_if(g.rco(sLab->getAddr()), [sLab](const auto &lab) {
-		return &lab != sLab &&
-		       ((genmc::isa<BIncFaiWriteLabel>(&lab) &&
-			 isLastInBarrierRound(genmc::dyn_cast<BIncFaiWriteLabel>(&lab))) ||
-			lab.getOrdering() == MemOrdering::Relaxed);
-	});
-
-	/* Check whether the last barrier completion is hb;po;po-before SLAB */
-	auto valid = getConsChecker().getHbView(g.po_imm_pred(sLab)).contains(lastIt->getPos());
-	if (!valid) {
-		reportError(sLab->getPos(),
-			    {sLab->getPos(), VerificationError::VE_BarrierWellFormedness,
-			     "Execution not barrier-well-formed!\n"});
-	}
-	return valid;
+	return !reportIfViolated(
+		error_rules::barrierNotWellFormed(getConsChecker(), getExec().getGraph(), sLab));
 }
 
 auto ExplorationCore::tryOptimizeBarrierRevisits(BIncFaiWriteLabel *sLab,
