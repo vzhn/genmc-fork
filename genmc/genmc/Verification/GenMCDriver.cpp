@@ -39,6 +39,7 @@
 #include "genmc/Support/Verbosity.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/DriverHandlerDispatcher.hpp"
+#include "genmc/Verification/ErrorRules.hpp"
 #include "genmc/Verification/GraphPrinting.hpp"
 #include "genmc/Verification/Invariants.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
@@ -1223,86 +1224,37 @@ void GenMCDriver::maybePushWeakCasFailure(const CasReadLabel *cLab)
 auto GenMCDriver::getInvalidFreeReason(SAddr loc, StorageDuration sdur) const
 	-> std::optional<std::string>
 {
-	const auto &state = getExec().getGraph().getState();
-	if (loc.isStatic())
-		return "The freed address is a global, not a heap block\n";
-	if (sdur == StorageDuration::SD_Heap && loc.isAutomatic())
-		return "The freed address is a stack variable, not a heap block\n";
-	if (!state.isAllocated(loc))
-		return "The freed address is not in an allocated block\n";
-	if (state.getAllocAccess(loc).addr != loc)
-		return "The freed address points into a block, not at its start\n";
-	return std::nullopt;
+	return error_rules::invalidFreeReason(getExec().getGraph().getState(), loc, sdur);
 }
 
 auto GenMCDriver::checkAccessValidity(Event pos, const AAccess &access)
 	-> std::optional<VerificationError>
 {
-	/* Check that static accesses hit a registered global range,
-	 * and dynamic accesses hit allocated memory */
-	auto &state = getExec().getGraph().getState();
-	if ((!getConf()->disableStaticValidityChecks && !access.addr.isDynamic() &&
-	     !state.isStatic(access.addr)) ||
-	    (access.addr.isDynamic() && !state.isAccessible(access.addr))) {
-		reportError(pos, {pos, VerificationError::VE_AccessNonMalloc});
-		return {VerificationError::VE_AccessNonMalloc};
-	}
-	return {};
+	return reportIfViolated(error_rules::invalidAccess(getExec().getGraph().getState(),
+							   !getConf()->disableStaticValidityChecks,
+							   pos, access));
 }
 
 auto GenMCDriver::checkInitializedMem(const ReadLabel *rLab) -> std::optional<VerificationError>
 {
-	// FIXME: Have label for mutex-destroy and check type instead of val.
-	//        Also for barriers.
-
-	// /* Locks should not read from destroyed mutexes */
-	// const auto *lLab = genmc::dyn_cast<LockCasReadLabel>(rLab);
-	// if (lLab && lLab->getAccessValue(lLab->getAccess()) == SVal(-1)) {
-	// 	reportError(lLab->getPos(), {lLab->getPos(), VerificationError::VE_UninitializedMem,
-	// 				     "Called lock() on destroyed mutex!", lLab->getRf()});
-	// 	return {VerificationError::VE_UninitializedMem};
-	// }
-
 	/* Allow frontends to skip uninit/msa checks */
 	if (getConf()->disableInitializationChecks)
 		return {};
-
-	/* Dynamic accesses should read initialized memory (if reading from INIT).
-	 * We use two separate checks for atomics and NAs, since mixed-size NAs don't have an rf */
-	if (rLab->getAddr().isDynamic() &&
-	    (!rLab->getParent()->getState().isInitialized(rLab->getAccess()) ||
-	     !getConsChecker().getHbView(rLab).contains(
-		     rLab->getParent()->getState().getInitView(rLab->getAccess())))) {
-		reportError(rLab->getPos(),
-			    {rLab->getPos(), VerificationError::VE_UninitializedMem});
-		return {VerificationError::VE_UninitializedMem};
-	}
-
-	/* Slightly unrelated check, but ensure there are no mixed-size accesses */
-	if (rLab->getRf() && !rLab->getRf()->getPos().isInitializer() &&
-	    genmc::dyn_cast<WriteLabel>(rLab->getRf())->getSize() != rLab->getSize()) {
-		reportError(rLab->getPos(),
-			    {rLab->getPos(), VerificationError::VE_MixedSize,
-			     "Mixed-size accesses detected: tried to read with a " +
-				     std::to_string(rLab->getSize().get() * CHAR_BIT) +
-				     "-bit access!\n" + "Please check the LLVM-IR.\n"});
-		return {VerificationError::VE_MixedSize};
-	}
-	return {};
+	return reportIfViolated(error_rules::uninitializedRead(getConsChecker(), rLab));
 }
 
 auto GenMCDriver::checkInitializedMem(const WriteLabel *wLab) -> std::optional<VerificationError>
 {
+	return reportIfViolated(error_rules::invalidUnlock(wLab));
+}
 
-	/* Unlocks should unlock mutexes locked by the same thread */
-	const auto *uLab = genmc::dyn_cast<UnlockWriteLabel>(wLab);
-	if (uLab && !findMatchingLock(uLab)) {
-		reportError(uLab->getPos(),
-			    {uLab->getPos(), VerificationError::VE_InvalidUnlock,
-			     "Called unlock() on mutex not locked by the same thread!"});
-		return {VerificationError::VE_InvalidUnlock};
-	}
-	return {};
+auto GenMCDriver::reportIfViolated(const std::optional<ErrorDetails> &violation)
+	-> std::optional<VerificationError>
+{
+	if (!violation)
+		return {};
+	reportError(*violation->pos, *violation);
+	return {violation->type};
 }
 
 auto GenMCDriver::checkFinalAnnotations(const WriteLabel *wLab) -> std::optional<VerificationError>
@@ -2615,19 +2567,7 @@ auto GenMCDriver::pickRandomRf(ReadLabel *rLab, std::vector<EventLabel *> &store
 
 auto GenMCDriver::checkForMixedSize(MemAccessLabel *lab) -> std::optional<VerificationError>
 {
-	auto *g = lab->getParent();
-
-	if (lab->isNotAtomic())
-		return {};
-
-	if (g->getState().isAtomicAccessConsistent(lab->getAccess()))
-		return {};
-
-	reportError(lab->getPos(),
-		    {lab->getPos(), VerificationError::VE_MixedSize,
-		     "Mixed-size accesses detected: tried to read with a " +
-			     std::to_string(lab->getSize().get() * CHAR_BIT) + "-bit access!\n"});
-	return {VerificationError::VE_MixedSize};
+	return reportIfViolated(error_rules::mixedSizeAccess(lab));
 }
 
 auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal> oldVal)

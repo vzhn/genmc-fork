@@ -54,6 +54,7 @@ set(GENMC_MODELS_SOURCES
 set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/ChoiceMap.cpp
   genmc/Verification/Config.cpp
+  genmc/Verification/ErrorRules.cpp
   genmc/Verification/ExecutionFrame.cpp
   genmc/Verification/Explorer.cpp
   genmc/Verification/GenMCDriver.cpp

@@ -539,6 +539,10 @@ private:
 	/** If LAB accesses improperly initialized memory, reports an error */
 	auto checkInitializedMem(const WriteLabel *lab) -> std::optional<VerificationError>;
 
+	/** Reports VIOLATION, if any (see ErrorRules.hpp), and returns its type */
+	auto reportIfViolated(const std::optional<ErrorDetails> &violation)
+		-> std::optional<VerificationError>;
+
 	/** If LAB is an IPR read in a location with WW-races, reports an error */
 	auto checkIPRValidity(const ReadLabel *rLab) -> std::optional<VerificationError>;
 
