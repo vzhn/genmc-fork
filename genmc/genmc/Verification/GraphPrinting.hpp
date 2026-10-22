@@ -14,7 +14,8 @@
 #ifndef GENMC_GRAPH_PRINTING_HPP
 #define GENMC_GRAPH_PRINTING_HPP
 
-#include "genmc/Verification/GenMCDriver.hpp"
+#include "genmc/Support/VerificationError.hpp"
+#include "genmc/Verification/DebugInfo.hpp"
 
 #include <iostream>
 #include <memory>
@@ -26,13 +27,18 @@ class ExecutionGraph;
 class VectorClock;
 
 /** Pretty-prints an execution graph according to the available debugging info */
-void printGraph(const ExecutionGraph &g, const GenMCDriver::GraphDbgInfo &dbgInfo,
+void printGraph(const ExecutionGraph &g, const GraphDbgInfo &dbgInfo,
 		std::ostream &s = std::cerr);
 
 /** Uses available debugging information to print the trace of source-code
  * instructions up to LAB */
-void printTraceBefore(const GenMCDriver::GraphDbgInfo &dbgInfo, const EventLabel *lab,
+void printTraceBefore(const GraphDbgInfo &dbgInfo, const EventLabel *lab,
 		      std::ostream &s = std::cerr);
+
+/** The report of the error DETAILS on G: its kind, where it is, the graph,
+ * the source trace up to it (with PRINTTRACE) and its message */
+auto errorReport(const ExecutionGraph &g, const ErrorDetails &details,
+		 const GraphDbgInfo &dbgInfo, bool printTrace) -> std::string;
 
 /** Outputs the current graph into a file (DOT format),
  * and visually marks events e and c (conflicting).
@@ -40,6 +46,6 @@ void printTraceBefore(const GenMCDriver::GraphDbgInfo &dbgInfo, const EventLabel
 void dotPrintToFile(const std::string &filename, EventLabel *errLab,
 		    std::unique_ptr<VectorClock> errView, const EventLabel *confLab,
 		    std::unique_ptr<VectorClock> confView, const ConsistencyChecker *checker,
-		    const GenMCDriver::GraphDbgInfo &dbgInfo, bool printObservation);
+		    const GraphDbgInfo &dbgInfo, bool printObservation);
 
 #endif /* GENMC_GRAPH_PRINTING_HPP */

@@ -3283,26 +3283,7 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 	if (const auto *bLab = genmc::dyn_cast_if_present<BlockLabel>(errLab))
 		inheritDbgInfo(bLab->getPos().prev(), bLab);
 
-	/* Print basic error message (graph) */
-	std::ostringstream out;
-	out << std::format("{}: {}!\n", isHardError(details.type) ? "Error" : "Warning",
-			   details.type);
-	if (errLab)
-		out << std::format("Event {} ", errLab->getPos());
-	if (details.racyLab != nullptr)
-		out << std::format("conflicts with event {} ", details.racyLab->getPos());
-	out << "in graph:\n";
-	printGraph(g, dbgInfo_, out);
-
-	/* Print an error trace (if desired), and the specific error message */
-	if (getConf()->printErrorTrace && errLab) {
-		printTraceBefore(dbgInfo_, errLab, out);
-		if (details.racyLab != nullptr)
-			printTraceBefore(dbgInfo_, details.racyLab, out);
-	}
-	if (!details.msg.empty())
-		out << details.msg;
-	result.message += out.str();
+	result.message += errorReport(g, details, dbgInfo_, getConf()->printErrorTrace);
 
 	/* Dump the graph into a file (DOT format) */
 	if (!getConf()->dotFile.empty())
@@ -3322,56 +3303,15 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 auto GenMCDriver::reportWarningOnce(Event pos, VerificationError wcode,
 				    const EventLabel *racyLab /* = nullptr */) -> bool
 {
-	/* Helper function to determine whether the warning should be treated as an error */
-	auto shouldUpgradeWarning = [&](auto &wcode) {
-		if (wcode != VerificationError::VE_WWRace)
-			return std::make_pair(false, ""s);
-		if (!getConf()->symmetryReduction && !getConf()->ipr)
-			return std::make_pair(false, ""s);
-
-		auto &g = getExec().getGraph();
-		auto *lab = g.getEventLabel(pos);
-		auto isSymmetric = [&](auto tid) {
-			return g.getFirstThreadLabel(tid)->getSymmPredTid() != -1;
-		};
-		auto srUpgrade = getConf()->symmetryReduction &&
-				 std::ranges::any_of(g.thr_ids(), isSymmetric);
-		auto iprUpgrade =
-			getConf()->ipr && std::ranges::any_of(g.samelocs(lab), [&](auto &oLab) {
-				auto *rLab = genmc::dyn_cast<ReadLabel>(&oLab);
-				return rLab && rLab->getAnnot();
-			});
-		auto upgrade = srUpgrade || iprUpgrade;
-
-		/* Without the symmetries GenMC inferred itself (rather than the user
-		 * declared), this would only be a warning: verification may be
-		 * repeated without SR */
-		if (upgrade) {
-			/* IPR is GenMC's own optimization: verification may also be
-			 * repeated without it */
-			getResult().iprError = iprUpgrade;
-			getResult().inferredSymmetryError =
-				!iprUpgrade && std::ranges::none_of(g.thr_ids(), [&](auto tid) {
-					return isSymmetric(tid) &&
-					       g.getFirstThreadLabel(tid)->getThreadInfo().symmId !=
-						       -1;
-				});
-		}
-		auto [cause, cli] =
-			iprUpgrade ? std::make_pair("in-place revisiting (IPR)"s, "-disable-ipr"s)
-				   : std::make_pair("symmetry reduction (SR)"s, "-disable-sr"s);
-		auto msg = "Unordered writes do not constitute a bug per se, though they often "
-			   "indicate faulty design.\n" +
-			   (upgrade ? ("This warning is treated as an error due to " + cause +
-				       ".\n"
-				       "You can use " +
-				       cli + " to disable these features."s)
-				    : ""s);
-		return std::make_pair(upgrade, msg);
-	};
-
 	/* If the warning has been seen before, only report it if it's an error */
-	auto [upgradeWarning, msg] = shouldUpgradeWarning(wcode);
+	auto up = error_rules::wwRaceUpgrade(getExec().getGraph(), pos, wcode,
+					     getConf()->symmetryReduction, getConf()->ipr);
+	if (up.upgrade) {
+		getResult().iprError = up.iprError;
+		getResult().inferredSymmetryError = up.inferredSymmetryError;
+	}
+	auto upgradeWarning = up.upgrade;
+	const auto &msg = up.msg;
 	auto &knownWarnings = getResult().warnings;
 	if (upgradeWarning || !knownWarnings.contains(wcode)) {
 		reportError(pos, {pos, wcode, msg, racyLab, upgradeWarning});

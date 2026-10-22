@@ -19,7 +19,10 @@
 #include "genmc/Execution/ExecutionState.hpp"
 #include "genmc/Execution/GraphUtils.hpp"
 
+#include <algorithm>
 #include <climits>
+#include <ranges>
+#include <utility>
 
 namespace error_rules {
 
@@ -92,6 +95,52 @@ auto mixedSizeAccess(const MemAccessLabel *lab) -> std::optional<ErrorDetails>
 			    "Mixed-size accesses detected: tried to read with a " +
 				    std::to_string(lab->getSize().get() * CHAR_BIT) +
 				    "-bit access!\n"};
+}
+
+auto wwRaceUpgrade(const ExecutionGraph &g, Event pos, VerificationError wcode,
+		   bool symmetryReduction, bool ipr) -> WarningUpgrade
+{
+	using namespace std::string_literals;
+	if (wcode != VerificationError::VE_WWRace)
+		return {};
+	if (!symmetryReduction && !ipr)
+		return {};
+
+	const auto *lab = g.getEventLabel(pos);
+	auto isSymmetric = [&](auto tid) {
+		return g.getFirstThreadLabel(tid)->getSymmPredTid() != -1;
+	};
+	auto srUpgrade = symmetryReduction && std::ranges::any_of(g.thr_ids(), isSymmetric);
+	auto iprUpgrade = ipr && std::ranges::any_of(g.samelocs(lab), [&](auto &oLab) {
+				  const auto *rLab = genmc::dyn_cast<ReadLabel>(&oLab);
+				  return rLab && rLab->getAnnot();
+			  });
+	WarningUpgrade res;
+	res.upgrade = srUpgrade || iprUpgrade;
+
+	/* Without the symmetries GenMC inferred itself (rather than the user
+	 * declared), this would only be a warning: verification may be
+	 * repeated without SR. IPR is GenMC's own optimization: verification
+	 * may also be repeated without it */
+	if (res.upgrade) {
+		res.iprError = iprUpgrade;
+		res.inferredSymmetryError =
+			!iprUpgrade && std::ranges::none_of(g.thr_ids(), [&](auto tid) {
+				return isSymmetric(tid) &&
+				       g.getFirstThreadLabel(tid)->getThreadInfo().symmId != -1;
+			});
+	}
+	auto [cause, cli] = iprUpgrade
+				    ? std::make_pair("in-place revisiting (IPR)"s, "-disable-ipr"s)
+				    : std::make_pair("symmetry reduction (SR)"s, "-disable-sr"s);
+	res.msg = "Unordered writes do not constitute a bug per se, though they often "
+		  "indicate faulty design.\n" +
+		  (res.upgrade ? ("This warning is treated as an error due to " + cause +
+				  ".\n"
+				  "You can use " +
+				  cli + " to disable these features."s)
+			       : ""s);
+	return res;
 }
 
 } // namespace error_rules

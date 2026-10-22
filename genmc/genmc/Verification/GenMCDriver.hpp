@@ -22,6 +22,7 @@
 #include "genmc/Verification/ExecutionFrame.hpp"
 #include "genmc/Verification/ExplorationStack.hpp"
 #include "genmc/Verification/Config.hpp"
+#include "genmc/Verification/DebugInfo.hpp"
 #include "genmc/Verification/GraphHash.hpp"
 #include "genmc/Verification/KeptEventRuns.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
@@ -104,16 +105,10 @@ public:
 		HandleResult<std::conditional_t<Config::emitNALabels, bool, std::monostate>>;
 
 	/** Debug information for an instruction */
-	struct EventDbgInfo {
-		std::string file;
-		int line = 0;
-		std::string functionName;
-		std::string source;
-		std::string accessedVarName;
-	};
+	using EventDbgInfo = ::EventDbgInfo;
 
 	/** Packs together debug information for a graph */
-	using GraphDbgInfo = std::unordered_map<Event, EventDbgInfo>;
+	using GraphDbgInfo = ::GraphDbgInfo;
 
 	template <typename... Ts> static auto create(Ts &&...params) -> std::unique_ptr<GenMCDriver>
 	{

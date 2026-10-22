@@ -30,6 +30,7 @@
 #include <optional>
 #include <string>
 
+class ExecutionGraph;
 class ExecutionState;
 class GraphModel;
 class MemAccessLabel;
@@ -54,6 +55,19 @@ auto uninitializedRead(const GraphModel &model, const ReadLabel *rLab)
 
 /** An unlock of a mutex the thread does not hold */
 auto invalidUnlock(const WriteLabel *wLab) -> std::optional<ErrorDetails>;
+
+/** Whether a warning WCODE at POS is treated as an error, and its message.
+ * Unordered writes are an error when symmetry reduction (with symmetric
+ * threads) or in-place revisiting (with annotated reads of the location)
+ * relies on their absence: verification may be repeated without them */
+struct WarningUpgrade {
+	bool upgrade = false;
+	bool iprError = false;		    /**< caused by IPR (else by SR) */
+	bool inferredSymmetryError = false; /**< SR with symmetries GenMC inferred */
+	std::string msg;
+};
+auto wwRaceUpgrade(const ExecutionGraph &g, Event pos, VerificationError wcode,
+		   bool symmetryReduction, bool ipr) -> WarningUpgrade;
 
 /** An atomic access that overlaps a differently-sized atomic one */
 auto mixedSizeAccess(const MemAccessLabel *lab) -> std::optional<ErrorDetails>;
