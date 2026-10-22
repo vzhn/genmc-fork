@@ -16,7 +16,7 @@
 #include "genmc/ADT/Rc.hpp"
 #include "genmc/ADT/VSet.hpp"
 #include "genmc/ADT/View.hpp"
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/Stamp.hpp"
 #include "genmc/Support/ASize.hpp"
