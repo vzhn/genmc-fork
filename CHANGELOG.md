@@ -236,6 +236,17 @@ released.
   value or from the writer's first write, 4 executions, 3 up to swapping
   the readers). `scripts/sc-driver.sh` (ctest `sc-driver`) runs the
   correct tests under `-sc` now.
+- The test driver skipped the last line of `args.<model>.mo.in` or
+  `expected.<model>.mo.in` when it had no trailing newline (#176), and so
+  did `scripts/oracle-diff.sh` for `args.<model>.mo.in`: with a single such
+  line the test never ran under the model. `litmus/MPU+rel+acq`,
+  `litmus/ori` and `litmus/psc-base-notin-ar` never ran, `infr/caching`,
+  `data-structures/qu-opt` and three more litmus tests never ran under
+  `-imm`, `saver/spin-cas1` never ran under `-rc11`, and nor did the last
+  configuration of `synthetic/barrier3` under `-sc`. They run now and pass
+  (`psc-base-notin-ar` did not compile: it declared `__VERIFIER_assume()`,
+  a macro of `genmc.h`) (`scripts/check-driver-last-line.sh`, ctest
+  `driver-last-line`).
 
 ### Added
 

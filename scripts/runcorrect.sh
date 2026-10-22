@@ -229,7 +229,9 @@ runtest() {
     if test -f "${dir}/args.${model}.${coherence}.in"
     then
 	varNum=0
-	while read test_args <&3 && read expected <&4; do
+	# (read fails on a last line without a newline, but sets the variable)
+	while { read test_args <&3 || [[ -n "${test_args}" ]]; } &&
+	      { read expected <&4 || [[ -n "${expected}" ]]; }; do
 	    varNum=$((varNum + 1))
 	    n="/`echo ${test_args} |
                  awk ' { if (match($0, /-DN=[0-9]+/)) print substr($0, RSTART+4, RLENGTH-4) } '`"

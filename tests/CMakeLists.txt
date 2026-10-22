@@ -14,6 +14,14 @@ add_test(NAME sc-driver
 set_tests_properties(sc-driver PROPERTIES LABELS "integration;fast" TIMEOUT 600
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+# The test scripts run a last configuration line without a newline too (#176)
+add_test(NAME driver-last-line
+    COMMAND bash -c "${SCRIPT_DIR}/check-driver-last-line.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(driver-last-line PROPERTIES LABELS "integration;fast" TIMEOUT 120
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(
     NAME randomize-driver
     COMMAND bash -c "${SCRIPT_DIR}/randomize-driver.sh > ${SCRIPT_DIR}/randomize-driver.log"
