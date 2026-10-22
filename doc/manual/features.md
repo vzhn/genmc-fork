@@ -213,6 +213,20 @@ optimizations, which may remove some that the source has. (GenMC's own
 merging of the branches' common code is off under `-lkmm`: it would move
 their events out of the conditional.)
 
+Under `-lkmm`, GenMC explores exhaustively by default (see [Reference
+Exploration](#reference-exploration)). Under the kernel model, the
+events that order an event after a branch can depend on the path the
+branch took (a write in it to the same location, a fence in it), and
+the maximality check of the optimal exploration assumes they do not: it
+misses the executions in which a revisit changes such a path. The
+exhaustive exploration takes every consistent revisit, at the cost of
+about a third more work on the kernel's litmus tests and of running
+single-threaded. `-disable-lkmm-exhaustive` goes back to the optimal
+exploration, which is faster and can run in parallel (`-nthreads`), but
+can miss such executions; so does `-disable-spin-assume`, as the
+exhaustive exploration of a spin loop that is not turned into an
+`assume()` does not end. (Bound such loops with `-unroll`.)
+
 `scripts/lkmm` in GenMC's source tree has the tools that compare GenMC
 with herd7 on the litmus-test corpora (`README.md` there has the results).
 
@@ -602,8 +616,9 @@ and the exploration repeats work the maximality check avoids. It runs
 single-threaded. `scripts/oracle-diff.sh` compares the default
 exploration with it over the test suite, and `scripts/fuzz-c11.py` over
 random C11 programs; every disagreement is a bug, in the reference or
-in the exploration. Under `-lkmm` the mode runs too (kept events are
-relocated as in the default exploration), and agrees with herd7 on the
+in the exploration. Under `-lkmm` it is the default exploration (see
+[the LKMM section](#the-linux-kernel-memory-model-lkmm); kept events are
+relocated as in the optimal exploration), and agrees with herd7 on the
 kernel's litmus tests.
 
 ## Checking Liveness

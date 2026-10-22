@@ -18,6 +18,23 @@ released.
   under some arbitrary schedules). The main thread's copies last as long
   as the program, and its end frees nothing
   (`tests/correct/infr/tls-main-ends-first`).
+- `-lkmm` missed executions that LKMM allows (#77): under the kernel
+  model, the events that order an event after a branch depend on the
+  path the branch took (a write in it to the same location, a fence),
+  and the maximality check of the optimal exploration assumes they do
+  not, so the only revisit that builds an execution could be rejected.
+  `-lkmm` now explores exhaustively by default (every consistent revisit,
+  graphs deduplicated, as `-exhaustive`), which finds herd7's executions
+  in these cases: 6 more of the 800 fuzz seeds of
+  `scripts/lkmm/fuzz-ctrl.py` agree with herd7, the litmus corpus and the
+  kernel's litmus tests are unchanged, and the exploration does about a
+  third more work on the corpus's largest tests. It runs single-threaded
+  and without load annotations or estimation; `-disable-lkmm-exhaustive`
+  restores the optimal exploration, and so does `-disable-spin-assume` (a
+  spin loop left as a loop has no end under the exhaustive exploration)
+  (`tests/correct/lkmm/prefix-path-revisit`;
+  `dup-kept-instance` and `inverted-co-range` now have herd7's counts,
+  4 and 2926, whatever the schedule).
 - `-lkmm` explored executions that LKMM forbids, and reported errors in
   them: the write of a `cmpxchg()` (or another RMW) whose read did not
   read the last write in coherence was placed after that write without
