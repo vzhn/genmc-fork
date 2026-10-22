@@ -164,9 +164,9 @@ static llvm::cl::opt<bool> clCacheInstructions(
 	llvm::cl::desc("Cache instructions for efficiency (non-stateless exploration)"));
 #endif
 
-static llvm::cl::opt<bool> clDisableRaceDetection("disable-race-detection",
-						  llvm::cl::cat(clGeneral),
-						  llvm::cl::desc("Disable race detection"));
+static llvm::cl::opt<bool> clDisableRaceDetection(
+	"disable-race-detection", llvm::cl::cat(clGeneral),
+	llvm::cl::desc("Disable race detection (racy executions are then explored too)"));
 
 static llvm::cl::opt<bool> clDisableBAM("disable-bam", llvm::cl::cat(clGeneral),
 					llvm::cl::desc("Disable optimized barrier handling (BAM)"));
@@ -444,8 +444,11 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	lliConfig.loadAnnot = !clDisableLoadAnnot;
 	lliConfig.assumePropagation = !clDisableAssumePropagation;
 	/* The detector suggests a model from the orderings used; kernel code is
-	 * relaxed by design (READ_ONCE()), so it has nothing to say under LKMM */
-	lliConfig.mmDetector = !clDisableMMDetector && clModelType != ModelType::LKMM;
+	 * relaxed by design (READ_ONCE()), so it has nothing to say under LKMM.
+	 * A stronger model only has the same outcomes for programs without
+	 * races, which -disable-race-detection no longer checks */
+	lliConfig.mmDetector = !clDisableMMDetector && clModelType != ModelType::LKMM &&
+			       !clDisableRaceDetection;
 	lliConfig.helper = !clDisableHelper;
 	lliConfig.confirmation = clConfirmation; /* could be two options: pass + annot */
 	lliConfig.finalWrite = !clDisableFinalWrite;

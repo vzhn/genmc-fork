@@ -270,8 +270,14 @@ memory that has not been allocated, or freeing an already freed chunk
 of memory.
 
 Race detection can be completely disabled by means of
-`-disable-race-detection`, which may yield better performance for
-certain programs.
+`-disable-race-detection`. GenMC then explores the racy executions too,
+and reports the other errors in them, such as assertion violations: a
+non-atomic read may read any write the model allows, and a non-atomic
+write take any place in coherence, as for atomic accesses (and as under
+`-lkmm`), and the model is not adjusted to a stronger one (see
+`-disable-mm-detector`). A program without races has the same
+executions either way, and skipping the race checks may make its
+verification faster; a racy one has more.
 
 ## Barrier-Aware Model Checking (BAM)
 

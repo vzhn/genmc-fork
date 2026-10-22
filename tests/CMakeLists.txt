@@ -82,6 +82,13 @@ add_test(NAME lkmm-ww-warning
 set_tests_properties(lkmm-ww-warning PROPERTIES LABELS "integration;fast" TIMEOUT 120
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME race-detection-model
+    COMMAND bash -c "${SCRIPT_DIR}/check-race-detection-model.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(race-detection-model PROPERTIES LABELS "integration;fast" TIMEOUT 120
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(NAME install-headers
     COMMAND bash -c "${SCRIPT_DIR}/check-install-headers.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
