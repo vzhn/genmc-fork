@@ -307,12 +307,8 @@ auto GenMCDriver::handleExecutionStart() -> bool
 
 	/* Set various exploration options for this execution */
 	unmoot();
-	addedBeforeKept_ = false;
-	keptCheckPending_ = false;
-	droppedBeforeKept_ = false;
 	g.setKeptEventsUnreachable(false);
-	runStartStamp_ = g.getMaxStamp();
-	runStartWork_ = getExec().getWorkqueue().size();
+	keptRuns_.startRun(g.getMaxStamp(), getExec().getWorkqueue().size());
 	state.clear();
 	if constexpr (Config::emitNALabels)
 		reconstructState(g, state);
@@ -578,35 +574,33 @@ auto GenMCDriver::done() -> bool
 {
 	/* Repeat a run whose thread's kept events were moved: from its start
 	 * (the events added since are cut), so that every structure built during
-	 * the run sees the new positions */
-	if (rerunAfterRelocation_ && !isHalting()) {
-		rerunAfterRelocation_ = false;
+	 * the run sees the new positions. Or repeat a run that was inconsistent
+	 * after an event went before kept ones, checking after each such event
+	 * (the work it added is cut) */
+	switch (keptRuns_.endRun(isHalting())) {
+	case KeptEventRuns::Repeat::AfterRelocation: {
 		++result.relocationReruns;
 		static constexpr auto kMaxRelocations = 64U;
-		ERROR_ON(++relocationsInRun_ > kMaxRelocations,
+		ERROR_ON(keptRuns_.relocationsInRun() > kMaxRelocations,
 			 "Internal error: a thread's kept events do not settle\nPlease submit a "
 			 "bug report to {}\n",
 			 PACKAGE_BUGREPORT);
-		getExec().getWorkqueue().truncate(runStartWork_);
-		restrictExecution(runStartStamp_,
+		getExec().getWorkqueue().truncate(keptRuns_.runStartWork());
+		restrictExecution(keptRuns_.runStartStamp(),
 				  "restricting the graph to rerun after a relocation");
 		repairDanglingReads(getExec().getGraph());
 		return false;
 	}
-	/* Repeat a run that was inconsistent after an event went before kept
-	 * ones, checking after each such event (the work it added is cut) */
-	if (rerunEagerly_ && !isHalting()) {
-		rerunEagerly_ = false;
-		eagerKeptChecks_ = true;
+	case KeptEventRuns::Repeat::Eagerly:
 		++result.keptCheckReruns;
-		getExec().getWorkqueue().truncate(runStartWork_);
-		restrictExecution(runStartStamp_,
+		getExec().getWorkqueue().truncate(keptRuns_.runStartWork());
+		restrictExecution(keptRuns_.runStartStamp(),
 				  "restricting the graph to rerun with eager checks");
 		repairDanglingReads(getExec().getGraph());
 		return false;
+	case KeptEventRuns::Repeat::None:
+		break;
 	}
-	relocationsInRun_ = 0;
-	eagerKeptChecks_ = false;
 
 	auto validExecution = false;
 	while (!isHalting() && !validExecution) {
@@ -687,12 +681,11 @@ void GenMCDriver::blockThreadTryMoot(std::unique_ptr<BlockLabel> bLab)
 
 auto GenMCDriver::checkPendingKept() -> bool
 {
-	if (!keptCheckPending_)
+	if (!keptRuns_.takeDeferredCheck())
 		return true;
-	keptCheckPending_ = false;
 	if (getConsChecker().isConsistent(getExec().getGraph()))
 		return true;
-	rerunEagerly_ = true;
+	keptRuns_.repeatEagerly();
 	moot();
 	return false;
 }
@@ -700,10 +693,10 @@ auto GenMCDriver::checkPendingKept() -> bool
 auto GenMCDriver::scheduleNext(std::span<Action> runnable) -> ScheduleResult
 {
 	auto &g = getExec().getGraph();
-	if (addedBeforeKept_ && !isMoot()) {
-		addedBeforeKept_ = false;
-		if (!eagerKeptChecks_)
-			keptCheckPending_ = true;
+	if (keptRuns_.hasAddedBeforeKept() && !isMoot()) {
+		keptRuns_.takeAddedBeforeKept();
+		if (!keptRuns_.eagerChecks())
+			keptRuns_.deferCheck();
 		else if (!getConsChecker().isConsistent(g))
 			moot();
 	}
@@ -808,7 +801,7 @@ auto GenMCDriver::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 	 * and the revisits and warnings computed from that graph */
 	auto dropRun = [&] {
 		++result.relocationsLost;
-		droppedBeforeKept_ = true;
+		keptRuns_.dropRun();
 		moot();
 	};
 	auto later = [&g, curr] {
@@ -835,7 +828,8 @@ auto GenMCDriver::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 			return false;
 		}
 		/* Open a gap (doubling on repeats; the surplus is closed later) */
-		relocateAndRerun(curr.thread, curr.index, 1 << std::min(relocationsInRun_, 10U));
+		relocateAndRerun(curr.thread, curr.index,
+				 1 << std::min(keptRuns_.relocationsInRun(), 10U));
 		return false;
 	}
 
@@ -851,7 +845,7 @@ auto GenMCDriver::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 			dropRun();
 			return false;
 		}
-		addedBeforeKept_ = true;
+		keptRuns_.addedBeforeKept();
 		return false;
 	}
 	relocateAndRerun(curr.thread, (*first)->getIndex(), curr.index - (*first)->getIndex());
@@ -869,7 +863,7 @@ void GenMCDriver::relocateExecution(int thread, int from, int delta)
 void GenMCDriver::relocateAndRerun(int thread, int from, int delta)
 {
 	relocateExecution(thread, from, delta);
-	rerunAfterRelocation_ = true;
+	keptRuns_.repeatAfterRelocation();
 	moot();
 }
 
@@ -1965,7 +1959,7 @@ auto GenMCDriver::handleThreadFinish(std::unique_ptr<ThreadFinishLabel> eLab)
 	auto &g = getExec().getGraph();
 
 	/* The run was dropped while aligning this event (alignKeptEvents()) */
-	if (droppedBeforeKept_)
+	if (keptRuns_.runDropped())
 		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = addLabelToGraph(std::move(eLab));
@@ -2247,7 +2241,7 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 	auto &frontier = g.getState();
 
 	/* The run was dropped while aligning this event (alignKeptEvents()) */
-	if (droppedBeforeKept_)
+	if (keptRuns_.runDropped())
 		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = genmc::dyn_cast<ReadLabel>(addLabelToGraph(std::move(rLab)));
@@ -2834,7 +2828,7 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 	auto &g = getExec().getGraph();
 
 	/* The run was dropped while aligning this event (alignKeptEvents()) */
-	if (droppedBeforeKept_)
+	if (keptRuns_.runDropped())
 		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = genmc::dyn_cast<WriteLabel>(addLabelToGraph(std::move(wLab)));
@@ -3252,8 +3246,7 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 				moot();
 				return;
 			}
-		} else if (addedBeforeKept_) {
-			addedBeforeKept_ = false;
+		} else if (keptRuns_.takeAddedBeforeKept()) {
 			if (!getConsChecker().isConsistent(g)) {
 				moot();
 				return;

@@ -23,6 +23,7 @@
 #include "genmc/Verification/ExplorationStack.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/GraphHash.hpp"
+#include "genmc/Verification/KeptEventRuns.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
 #include "genmc/Verification/ResumePointStore.hpp"
@@ -906,28 +907,8 @@ private:
 	std::shared_ptr<const EventKey> currKey;
 	Event currKeyBase;
 
-	/** The current run's start (its graph's maximum stamp and the number of
-	 * items in its work list), to repeat it after a relocation */
-	Stamp runStartStamp_{0};
-	size_t runStartWork_{};
-	bool rerunAfterRelocation_ = false;
-	unsigned relocationsInRun_{};
-
-	/* An event went before kept events: the incremental checks assume an
-	 * event to be added after its thread's others, so the whole graph is
-	 * checked. Once, when the run ends (keptCheckPending_): a graph that is
-	 * inconsistent stays so. If it is, the run is repeated with the check
-	 * after each such event (eagerKeptChecks_), so that it adds the work it
-	 * would have added (see scheduleNext() and done()) */
-	bool addedBeforeKept_ = false;
-	bool keptCheckPending_ = false;
-	bool eagerKeptChecks_ = false;
-	bool rerunEagerly_ = false;
-
-	/* The run was dropped while an event was aligned with kept ones
-	 * (alignKeptEvents()): the event is not added, so that nothing is
-	 * computed from a graph that is no execution's prefix */
-	bool droppedBeforeKept_ = false;
+	/** When the current run repeats (kept events, see KeptEventRuns) */
+	KeptEventRuns keptRuns_;
 
 	/** Opt: Whether this execution is moot (locking) */
 	bool isMootExecution = false;
