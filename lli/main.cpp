@@ -707,7 +707,7 @@ static auto buildCompilationArgs(const LLIConfig &lliConfig) -> std::string
 	args += lliConfig.rust ? " -gdwarf-4" : " -g";
 	for (const auto &f : lliConfig.cflags)
 		args += " " + f;
-	for (const auto &dir : getRuntimeIncludeDirs())
+	for (const auto &dir : lliConfig.runtimeIncludeDirs)
 		args += " -I'" + dir + "'";
 	args += " -S -emit-llvm";
 	args += " -o " + getOutFilename(lliConfig);
@@ -1138,6 +1138,7 @@ auto main(int argc, char **argv) -> int
 	LLIConfig lliConfig;
 
 	parseConfig(argc, argv, *conf, lliConfig);
+	lliConfig.runtimeIncludeDirs = getRuntimeIncludeDirs();
 
 	PRINT(VerbosityLevel::Error,
 	      PACKAGE_NAME " v" PACKAGE_VERSION " (LLVM " LLVM_VERSION ")\n"
@@ -1163,6 +1164,7 @@ auto main(int argc, char **argv) -> int
 
 		confNew.inputFile = extraInput;
 		confNew.cflags = {};
+		confNew.runtimeIncludeDirs = lliConfig.runtimeIncludeDirs;
 		std::unique_ptr<llvm::Module> linkModule = compileToModule(confNew, ctx);
 
 		modules.push_back(std::move(linkModule));

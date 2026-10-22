@@ -60,6 +60,7 @@
 #include <llvm/Support/DataTypes.h>
 #include <llvm/Support/ErrorHandling.h>
 
+#include <filesystem>
 #include <format>
 #include <optional>
 #include <random>
@@ -423,6 +424,11 @@ protected:
 
 	/* Maps internal functions to their code. Derived once from internalFunNames */
 	llvm::DenseMap<const llvm::Function *, InternalFunctions> internalFunCache_;
+
+	/* The directories of GenMC's runtime headers, and whether each file
+	 * met in debug locations is one of them (see getReportedLoc()) */
+	std::vector<std::filesystem::path> runtimeIncludeDirs_;
+	llvm::DenseMap<const llvm::DIFile *, bool> runtimeHeaders_;
 
 	/* List of thread-local variables, with their initializing values */
 	std::unordered_map<const void *, llvm::GenericValue> threadLocalVars;
@@ -827,6 +833,13 @@ private: // Helper functions
 
 	/* Sets up how some errors will be reported to the user */
 	void setupErrorPolicy(Module *M, const LLIConfig *userConf);
+
+	/* The location THR's current instruction is reported at: outside
+	 * GenMC's runtime headers if possible (see isRuntimeHeader()) */
+	auto getReportedLoc(Thread &thr) -> const llvm::DILocation *;
+
+	/* Whether LOC is in one of GenMC's runtime headers (e.g., <pthread.h>) */
+	auto isRuntimeHeader(const llvm::DILocation &loc) -> bool;
 
 	/* Sets-up the specified thread for execution */
 	void scheduleThread(int tid)

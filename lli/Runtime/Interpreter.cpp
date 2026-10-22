@@ -419,9 +419,8 @@ void Interpreter::updateInternalFunRetDeps(unsigned int tid, Function *F, Instru
 		updateDataDeps(tid, CS, threadPos(tid));
 }
 
-static std::string getFilenameFromMData(MDNode *node)
+static std::string getFilenameFromMData(const llvm::DILocation &loc)
 {
-	const auto &loc = static_cast<const llvm::DILocation &>(*node);
 	llvm::StringRef file = loc.getFilename();
 	llvm::StringRef dir = loc.getDirectory();
 
@@ -453,18 +452,58 @@ std::string Interpreter::getAccessedVarName(const std::optional<SAddr> &loc)
 	return it.value().first + it.value().second->getNameAtOffset(*loc - it.start());
 }
 
+auto Interpreter::isRuntimeHeader(const llvm::DILocation &loc) -> bool
+{
+	auto [it, inserted] = runtimeHeaders_.try_emplace(loc.getFile(), false);
+	if (!inserted)
+		return it->second;
+
+	auto dir =
+		std::filesystem::path(getFilenameFromMData(loc)).parent_path().lexically_normal();
+	/* (The program may name a directory differently, e.g., through a symlink) */
+	it->second = std::ranges::any_of(runtimeIncludeDirs_, [&](const auto &inc) {
+		std::error_code ec;
+		return dir == inc || std::filesystem::equivalent(dir, inc, ec);
+	});
+	return it->second;
+}
+
+/* The wrappers of the runtime headers (pthread_mutex_lock(), free(), ...)
+ * are inlined where the program calls them, or called from there: the
+ * program's line is the first one outside the headers, going out through
+ * the locations the instruction was inlined at, and then the calls on the
+ * stack. Without one, the instruction's own location is reported */
+auto Interpreter::getReportedLoc(Thread &thr) -> const llvm::DILocation *
+{
+	const llvm::DILocation *own = nullptr;
+	for (auto i = thr.ECStack.size(); i-- > 0;) {
+		auto &SF = thr.ECStack[i];
+		auto *I = i + 1 == thr.ECStack.size() ? SF.CurInst->getPrevNode() : &SF.Caller;
+		const auto *loc = I ? I->getDebugLoc().get() : nullptr;
+		if (!loc)
+			break;
+		for (; loc; loc = loc->getInlinedAt()) {
+			if (!isRuntimeHeader(*loc))
+				return loc;
+			if (!own)
+				own = loc;
+		}
+	}
+	return own;
+}
+
 const GenMCDriver::EventDbgInfo *Interpreter::currDbgInfo(std::optional<SAddr> loc)
 {
 	auto &thr = getCurThr();
 	if (!dynState.collectDbgInfo || thr.ECStack.empty())
 		return nullptr;
 
-	auto &I = *thr.ECStack.back().CurInst->getPrevNode();
-	if (!I.getMetadata("dbg"))
+	const auto *dl = getReportedLoc(thr);
+	if (!dl)
 		return nullptr;
 
-	thr.currDbgInfo.line = I.getDebugLoc().getLine();
-	thr.currDbgInfo.file = getFilenameFromMData(I.getMetadata("dbg"));
+	thr.currDbgInfo.line = dl->getLine();
+	thr.currDbgInfo.file = getFilenameFromMData(*dl);
 	thr.currDbgInfo.functionName = thr.threadFun->getName().str();
 	thr.currDbgInfo.source =
 		genmc::getFileLineByNumber(thr.currDbgInfo.file, thr.currDbgInfo.line);
@@ -498,6 +537,11 @@ Interpreter::Interpreter(std::unique_ptr<Module> M, std::unique_ptr<ModuleInfo> 
 			canonToFun_[addr] = &F;
 			++cit;
 		}
+	}
+
+	for (const auto &dir : userConf->runtimeIncludeDirs) {
+		auto path = std::filesystem::path(dir).lexically_normal();
+		runtimeIncludeDirs_.push_back(path.has_filename() ? path : path.parent_path());
 	}
 
 	memset(&dynState.ExitValue.Untyped, 0, sizeof(dynState.ExitValue.Untyped));

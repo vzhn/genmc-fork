@@ -917,6 +917,10 @@ private:
 		-> std::optional<VerificationError>;
 	auto getDbgInfo(Event pos) -> const EventDbgInfo *;
 
+	/** A block that has no metadata of its own takes those of the event
+	 * FROM (if any), whose instruction the thread stopped at */
+	void inheritDbgInfo(Event from, const BlockLabel *bLab);
+
 	void updateLabelViews(EventLabel *lab);
 
 	auto checkForMixedSize(MemAccessLabel *lab) -> std::optional<VerificationError>;
