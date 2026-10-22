@@ -12,6 +12,7 @@
  */
 
 #include "PropagateAssumesPass.hpp"
+#include "genmc/ADT/VSet.hpp"
 #include "genmc/Support/Error.hpp"
 #include "passes/InternalFunctions.hpp"
 #include "passes/LLVMUtils.hpp"
@@ -26,8 +27,6 @@
 #include <llvm/IR/PassManager.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
-
-#include <numeric>
 
 using namespace llvm;
 
@@ -93,13 +92,17 @@ static auto propagateAssumeToPred(CallInst *assume, BasicBlock *pred) -> bool
 	return true;
 }
 
+/* Every conditional branch to the assumption's block gets it (a branch with
+ * both edges to the block is one predecessor) */
 static auto propagateAssume(CallInst *assume) -> bool
 {
 	auto *bb = assume->getParent();
-	return std::accumulate(pred_begin(bb), pred_end(bb), false,
-			       [&](const bool &accum, BasicBlock *pred) {
-				       return accum || propagateAssumeToPred(assume, pred);
-			       });
+	auto modified = false;
+	VSet<BasicBlock *> preds;
+	for (auto *pred : predecessors(bb))
+		if (preds.insert(pred).second)
+			modified |= propagateAssumeToPred(assume, pred);
+	return modified;
 }
 
 auto PropagateAssumesPass::run(Function &F, FunctionAnalysisManager & /*FAM*/) -> PreservedAnalyses

@@ -22,6 +22,14 @@ released.
   checked under `-lkmm`; fuzz seeds 101 and 496 of
   `scripts/lkmm/fuzz-ctrl.py` now have herd7's counts (3479, 554; were
   3756, 734) (`tests/correct/lkmm/ctrl-rmw-coe-cycle`).
+- A spin loop whose condition reads several locations, such as
+  `while (x == 0 || y == 0)`, did not revisit its later reads in place
+  (#92): the loop's failing assumption reached only the first branch
+  before it, so only the read of `x` was annotated. An iteration that
+  failed at `y` stayed blocked: each later write to `y` revisited the
+  read in a copy of the execution, and the blocked execution was explored
+  to its end as well. Every branch to the assumption now gets it
+  (`tests/correct/saver/spin-load-or`: no blocked execution, one before).
 - With `-disable-race-detection`, GenMC missed the errors of racy
   programs under `-rc11`, `-imm` and `-sc` (#142): a non-atomic read read
   only the latest write, and a non-atomic write went last in coherence,
