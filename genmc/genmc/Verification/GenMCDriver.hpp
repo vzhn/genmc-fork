@@ -977,9 +977,6 @@ private:
 	/** Whether we are stopping the exploration (e.g., due to an error found) */
 	bool shouldHalt = false;
 
-	/** Whether we are in error replaying */
-	bool inReplay_ = false;
-
 	/** Random-number generators for estimation randomization */
 	MyRNG estRng;
 
