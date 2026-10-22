@@ -59,7 +59,12 @@ verdict is compared.
 Locations become globals, registers per-thread globals; `main` joins the
 threads and writes every observable to one variable after a
 `__VERIFIER_output()` marker, so `-print-exec-graphs` shows each execution's
-final state. Addresses are written as sentinels, so a state can say that a
+final state. With `--local-regs`, a thread works on locals, copied from and
+back to those globals: a register a branch sets then reaches its uses after
+the join through a phi, which carries the branch's dependency as herd7's
+register does, while a global register is a store and a load, which LKMM
+orders by nothing. `lkmm-diff.py` translates registers as locals under
+`--model lkmm` (`--global-regs` for the old translation). Addresses are written as sentinels, so a state can say that a
 register points to `x`, as herd7 does. Unsupported constructs (SRCU,
 `spin_is_locked()`, loops, arrays, ...) are reported, never translated
 approximately.

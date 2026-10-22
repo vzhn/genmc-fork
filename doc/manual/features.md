@@ -210,8 +210,9 @@ exceptions:
 
 Dependencies are those of the LLVM-IR GenMC runs, after `clang`'s
 optimizations, which may remove some that the source has. (GenMC's own
-merging of the branches' common code is off under `-lkmm`: it would move
-their events out of the conditional.)
+merging of the branches' common code, and LLVM's jump threading, are off
+under `-lkmm`: the first would move events out of a conditional, the
+second the code after a branch into its arms.)
 
 `scripts/lkmm` in GenMC's source tree has the tools that compare GenMC
 with herd7 on the litmus-test corpora (`README.md` there has the results).

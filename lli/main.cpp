@@ -433,7 +433,10 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	lliConfig.unroll = clLoopUnroll >= 0 ? std::optional(clLoopUnroll.getValue())
 					     : std::nullopt;
 	lliConfig.noUnrollFuns.insert(clNoUnrollFuns.begin(), clNoUnrollFuns.end());
-	lliConfig.jumpThreading = !clDisableJumpThreading;
+	/* Jump threading also moves code after a branch's join into its arms
+	 * (when a later branch tests a value the first one set), where it gets
+	 * control dependencies the source does not have (#78) */
+	lliConfig.jumpThreading = !clDisableJumpThreading && clModelType != ModelType::LKMM;
 	lliConfig.loopJumpThreading = !clDisableLoopJumpThreading;
 	lliConfig.castElimination = !clDisableCastElimination;
 	lliConfig.inlineFunctions = !clDisableFunctionInliner;

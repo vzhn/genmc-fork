@@ -11,6 +11,17 @@ released.
 
 ### Fixed
 
+- `-lkmm` gave events after a branch control dependencies the source does
+  not have (#78): LLVM's `JumpThreadingPass`, when a later branch tests a
+  value an earlier one set, moves the code after the earlier branch's join
+  into its arms. The pass is off under `-lkmm`; fuzz seed 155 of
+  `scripts/lkmm/fuzz-ctrl.py` now has herd7's 250 executions (was 170).
+  `scripts/lkmm/lkmm-diff.py` translates litmus registers as locals under
+  `--model lkmm`, as only a local carries a register's dependencies
+  (`--global-regs` for the old translation): fuzz seeds 0-799 754 -> 757
+  agree, the corpus loses `C-viro-2020.09.29a` (a value a branch sets is
+  given the branch's dependencies whichever path it came by, #77,
+  allowlisted) (`tests/correct/lkmm/jump-threading-ctrl`).
 - In a program with thread-locals, the end of the main thread was taken
   for the end of every thread-local: an access of another thread not
   ordered before main's end, to any location, was reported as "Attempt to
