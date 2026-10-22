@@ -1742,6 +1742,7 @@ void Interpreter::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I)
 
 	SVal res{};
 	int cmpRes{};
+	std::optional<Event> casRead;
 
 #define IMPLEMENT_CAS_VISIT(__kindR, __kindW)                                                      \
 	case switchPair(EventLabel::__kindR, EventLabel::__kindW): {                               \
@@ -1757,6 +1758,7 @@ void Interpreter::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I)
 			return;                                                                    \
 		res = retVal->val;                                                                 \
 		cmpRes = retVal->success;                                                          \
+		casRead = currPos();                                                               \
 		updateDataDeps(getCurThr().id, &I, currPos());                                     \
 		updateCasCtrlDeps(I);                                                              \
 		updateAddrPoDeps(getCurThr().id, I.getPointerOperand());                           \
@@ -1785,6 +1787,16 @@ void Interpreter::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I)
 	default:
 		UNREACHABLE();
 	}
+
+	/* IMM orders an exclusive read, a failing CAS's included, before all
+	 * later events of its thread ([Rex] ; po in its deps). Whether the CAS
+	 * succeeds then changes nothing a later event depends on: otherwise, a
+	 * revisit could keep events after a CAS whose outcome it changes, and
+	 * with it whether the CAS has a write part, i.e., where those events
+	 * are (#137, #145). (Until #133, the branch storing the expected value
+	 * gave this dependency, even when that store was dead.) */
+	if (casRead && !scopesCtrlDeps())
+		updateCtrlDeps(getCurThr().id, *casRead);
 
 	result.AggregateVal.push_back(SVAL_TO_GV(res, typ));
 	result.AggregateVal.push_back(INT_TO_GV(Type::getInt1Ty(I.getContext()), cmpRes));
