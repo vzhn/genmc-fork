@@ -22,9 +22,9 @@
  * operations and finishes. Variables are 4-byte globals, zero-initialized.
  */
 
-#include "genmc/Verification/EventProducer.hpp"
-#include "genmc/Verification/Explorer.hpp"
-#include "genmc/Verification/GenMCDriver.hpp"
+#include "genmc/Verification/Core/EventProducer.hpp"
+#include "genmc/Verification/Core/Explorer.hpp"
+#include "genmc/Verification/Core/GenMCDriver.hpp"
 
 #include <algorithm>
 #include <cstdint>

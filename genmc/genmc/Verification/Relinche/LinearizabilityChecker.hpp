@@ -14,7 +14,7 @@
 #ifndef GENMC_RELINCHE_HPP
 #define GENMC_RELINCHE_HPP
 
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Support/Error.hpp"
 #include "genmc/Verification/Relinche/Specification.hpp"

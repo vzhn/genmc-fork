@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Runs a small set of tests with -check-invariants (see
-# genmc/Verification/Invariants.hpp): the regression tests of the bugs the
+# genmc/Verification/Checks/Invariants.hpp): the regression tests of the bugs the
 # invariants were written for, under the models they run under, plus the
 # parallel error reports. ctest target "invariants-fast".
 #

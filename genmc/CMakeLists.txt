@@ -5,7 +5,7 @@
 #   genmc_support       ADT/, Support/: containers, clocks, values, errors
 #   genmc_graph         Execution/: events, labels, graphs, the GraphModel
 #                       interface the graph needs from a memory model
-#   genmc_models        Execution/Consistency/: the memory models (Kater
+#   genmc_models        Models/: the memory models (Kater
 #                       generated), symmetry and bounding deciders
 #   genmc_verification  Verification/: exploration, driver, configuration,
 #                       Relinche
@@ -33,47 +33,47 @@ set(GENMC_GRAPH_SOURCES
   genmc/Execution/ExecutionGraph.cpp
   genmc/Execution/ExecutionState.cpp
   genmc/Execution/GraphUtils.cpp
-  genmc/Execution/Consistency/ModelInterfaces.cpp
+  genmc/Execution/ModelInterfaces.cpp
 )
 set(GENMC_MODELS_SOURCES
-  genmc/Execution/LkmmModel.cpp
-  genmc/Execution/LkmmRelations.cpp
-  genmc/Execution/Consistency/BoundDecider.cpp
-  genmc/Execution/Consistency/ConsistencyChecker.cpp
-  genmc/Execution/Consistency/ContextBoundDecider.cpp
-  genmc/Execution/Consistency/IMMChecker.cpp
-  genmc/Execution/Consistency/LKMMChecker.cpp
-  genmc/Execution/Consistency/LKMMRcuChecker.cpp
-  genmc/Execution/Consistency/RAChecker.cpp
-  genmc/Execution/Consistency/RC11Checker.cpp
-  genmc/Execution/Consistency/RoundBoundDecider.cpp
-  genmc/Execution/Consistency/SCChecker.cpp
-  genmc/Execution/Consistency/SymmetryChecker.cpp
-  genmc/Execution/Consistency/TSOChecker.cpp
+  genmc/Models/LkmmModel.cpp
+  genmc/Models/LkmmRelations.cpp
+  genmc/Models/BoundDecider.cpp
+  genmc/Models/ConsistencyChecker.cpp
+  genmc/Models/ContextBoundDecider.cpp
+  genmc/Models/IMMChecker.cpp
+  genmc/Models/LKMMChecker.cpp
+  genmc/Models/LKMMRcuChecker.cpp
+  genmc/Models/RAChecker.cpp
+  genmc/Models/RC11Checker.cpp
+  genmc/Models/RoundBoundDecider.cpp
+  genmc/Models/SCChecker.cpp
+  genmc/Models/SymmetryChecker.cpp
+  genmc/Models/TSOChecker.cpp
 )
 set(GENMC_VERIFICATION_SOURCES
-  genmc/Verification/ChoiceCandidates.cpp
-  genmc/Verification/ChoiceMap.cpp
+  genmc/Verification/Rules/ChoiceCandidates.cpp
+  genmc/Verification/State/ChoiceMap.cpp
   genmc/Verification/Config.cpp
-  genmc/Verification/ErrorRules.cpp
-  genmc/Verification/ExecutionFrame.cpp
-  genmc/Verification/ExhaustiveConsistency.cpp
-  genmc/Verification/Explorer.cpp
-  genmc/Verification/ExplorationCore.cpp
-  genmc/Verification/ExplorationStack.cpp
-  genmc/Verification/GenMCDriver.cpp
-  genmc/Verification/GraphHash.cpp
-  genmc/Verification/GraphPrinting.cpp
-  genmc/Verification/Invariants.cpp
+  genmc/Verification/Rules/ErrorRules.cpp
+  genmc/Verification/State/ExecutionFrame.cpp
+  genmc/Verification/Rules/ExhaustiveConsistency.cpp
+  genmc/Verification/Core/Explorer.cpp
+  genmc/Verification/Core/ExplorationCore.cpp
+  genmc/Verification/State/ExplorationStack.cpp
+  genmc/Verification/Core/GenMCDriver.cpp
+  genmc/Verification/Checks/GraphHash.cpp
+  genmc/Verification/Report/GraphPrinting.cpp
+  genmc/Verification/Checks/Invariants.cpp
   genmc/Verification/Relinche/LinearizabilityChecker.cpp
   genmc/Verification/Relinche/Linearization.cpp
   genmc/Verification/Relinche/Observation.cpp
   genmc/Verification/Relinche/Specification.cpp
-  genmc/Verification/ResumePointStore.cpp
-  genmc/Verification/RfReductions.cpp
-  genmc/Verification/BackwardRevisits.cpp
-  genmc/Verification/Scheduler.cpp
-  genmc/Verification/SymmetricThreads.cpp
+  genmc/Verification/State/ResumePointStore.cpp
+  genmc/Verification/Rules/RfReductions.cpp
+  genmc/Verification/Rules/BackwardRevisits.cpp
+  genmc/Verification/State/Scheduler.cpp
+  genmc/Verification/Rules/SymmetricThreads.cpp
 )
 
 find_package(Threads REQUIRED)

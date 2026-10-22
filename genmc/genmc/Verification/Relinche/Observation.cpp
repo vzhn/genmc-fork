@@ -13,7 +13,7 @@
 
 #include "genmc/Verification/Relinche/Observation.hpp"
 #include "genmc/ADT/VSet.hpp"
-#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
+#include "genmc/Execution/ModelInterfaces.hpp"
 #include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"

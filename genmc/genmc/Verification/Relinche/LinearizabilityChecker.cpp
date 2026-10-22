@@ -12,7 +12,7 @@
  */
 
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Support/Event.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/Relinche/Observation.hpp"

@@ -13,11 +13,11 @@
 
 
 /*
- * When a run repeats (Verification/KeptEventRuns.hpp), as a state machine
+ * When a run repeats (Verification/State/KeptEventRuns.hpp), as a state machine
  * on its own.
  */
 
-#include "genmc/Verification/KeptEventRuns.hpp"
+#include "genmc/Verification/State/KeptEventRuns.hpp"
 
 #include <gtest/gtest.h>
 

@@ -1,7 +1,7 @@
 ----------------------------- MODULE Replay -----------------------------
 (***************************************************************************)
 (* GenMC's error replay, as one driver runs it                             *)
-(* (genmc/Verification/GenMCDriver.cpp, Scheduler.cpp, lli/main.cpp).      *)
+(* (genmc/Verification/Core/GenMCDriver.cpp, Scheduler.cpp, lli/main.cpp).      *)
 (*                                                                         *)
 (* Before an error is printed, the driver re-executes the graph up to the  *)
 (* erroneous event to collect source information. It queues a replay item; *)

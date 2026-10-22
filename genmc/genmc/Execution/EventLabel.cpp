@@ -12,7 +12,7 @@
  */
 
 #include "genmc/Execution/EventLabel.hpp"
-#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
+#include "genmc/Execution/ModelInterfaces.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Execution/LoadAnnotation.hpp"
 #include "genmc/Support/Cast.hpp"

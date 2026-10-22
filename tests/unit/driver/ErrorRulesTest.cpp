@@ -13,12 +13,12 @@
 
 
 /*
- * The memory-safety rules (Verification/ErrorRules.hpp) on a hand-built
+ * The memory-safety rules (Verification/Rules/ErrorRules.hpp) on a hand-built
  * state, without a driver.
  */
 
 #include "genmc/Execution/ExecutionState.hpp"
-#include "genmc/Verification/ErrorRules.hpp"
+#include "genmc/Verification/Rules/ErrorRules.hpp"
 
 #include <gtest/gtest.h>
 
