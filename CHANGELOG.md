@@ -11,6 +11,13 @@ released.
 
 ### Fixed
 
+- In a program with thread-locals, the end of the main thread was taken
+  for the end of every thread-local: an access of another thread not
+  ordered before main's end, to any location, was reported as "Attempt to
+  access freed memory", depending on the schedule (`print-names-thread-local`
+  under some arbitrary schedules). The main thread's copies last as long
+  as the program, and its end frees nothing
+  (`tests/correct/infr/tls-main-ends-first`).
 - `-lkmm` explored executions that LKMM forbids, and reported errors in
   them: the write of a `cmpxchg()` (or another RMW) whose read did not
   read the last write in coherence was placed after that write without

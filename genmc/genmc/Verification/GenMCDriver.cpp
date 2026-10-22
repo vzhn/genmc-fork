@@ -1062,8 +1062,10 @@ auto GenMCDriver::checkThreadLocalEnd(const EventLabel *lab, const ThreadFinishL
 auto GenMCDriver::checkEndedThreadLocals(const ThreadFinishLabel *eLab)
 	-> std::optional<VerificationError>
 {
+	/* (The main thread's copies last as long as the program; an owner of 0
+	 * is no owner, see getThreadLocalOwner()) */
 	const auto &g = getExec().getGraph();
-	if (getConf()->disableRaceDetection || inEstimationMode() ||
+	if (eLab->getThread() == 0 || getConf()->disableRaceDetection || inEstimationMode() ||
 	    !g.getState().hasThreadLocals())
 		return {};
 
