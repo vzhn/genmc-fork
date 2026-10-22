@@ -69,6 +69,7 @@ set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/RfReductions.cpp
   genmc/Verification/BackwardRevisits.cpp
   genmc/Verification/Scheduler.cpp
+  genmc/Verification/SymmetricThreads.cpp
 )
 
 find_package(Threads REQUIRED)

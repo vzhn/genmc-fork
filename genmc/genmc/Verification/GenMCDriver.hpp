@@ -787,16 +787,9 @@ private:
 	/** Helper: Checks whether the user annotation about helped/helping CASes seems OK */
 	void checkHelpingCasAnnotation();
 
-	/** SR: Checks whether CANDIDATE is symmetric to PARENT/INFO */
-	auto isSymmetricToSR(int candidate, Event parent, const ThreadInfo &info) const -> bool;
-
 	/* Whether the joiner of JLAB has joined the symmetric predecessors of the
 	 * thread it joins (see the definition) */
 	auto checkSymmetricJoinOrder(const ThreadJoinLabel *jLab) -> std::optional<VerificationError>;
-
-	/* Whether TID's memory accesses in [FROM, TO] only touch memory no other
-	 * thread can access */
-	auto areThreadPrivateAccesses(int tid, int from, int to) const -> bool;
 
 	/** SR: Returns the (greatest) ID of a thread that is symmetric to PARENT/INFO */
 	auto getSymmetricTidSR(const ThreadCreateLabel *tcLab, const ThreadInfo &info) const -> int;
