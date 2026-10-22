@@ -18,6 +18,10 @@ set(GENMC_FORK_RELEASE "vzhn.14")
 set(PACKAGE_VERSION "${CMAKE_PROJECT_VERSION}-${GENMC_FORK_RELEASE}")
 set(INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/${PKG_INCLUDE_DIR}")
 set(SRC_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lli/runtime-include/c")
+# Where an installed binary finds the runtime headers installed with it,
+# relative to its own directory (so that a copied prefix works too)
+file(RELATIVE_PATH INCLUDE_DIR_FROM_BIN "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
+     "${INCLUDE_DIR}")
 set(RUST_DIR "${CMAKE_SOURCE_DIR}/lli/runtime-include/rust")
 
 # Executable output goes to bin/ to avoid conflict with genmc/ library directory
@@ -31,7 +35,8 @@ add_library(genmc_config_includes INTERFACE)
 target_compile_features(genmc_config_includes INTERFACE cxx_std_23)
 target_include_directories(genmc_config_includes INTERFACE ${CMAKE_BINARY_DIR}/include)
 
-install(DIRECTORY lli/runtime-include/c/ DESTINATION "${PKG_INCLUDE_DIR}" FILES_MATCHING PATTERN "*.h")
+# All of them: the C++ ones (atomic, cassert, ...) have no extension
+install(DIRECTORY lli/runtime-include/c/ DESTINATION "${PKG_INCLUDE_DIR}")
 
 ### Whether to build lli-based binary
 option(BUILD_LLI "Build lli-based executable (requires LLVM)" ON)
