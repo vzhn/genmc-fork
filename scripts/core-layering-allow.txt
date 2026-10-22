@@ -1,0 +1,11 @@
+# Upward includes in the core library that exist today (see check-core-layering.sh).
+# Remove a line when its include goes away; never add one.
+genmc/Execution/Consistency/BoundDecider.cpp -> genmc/Verification/Config.hpp
+genmc/Execution/Consistency/ConsistencyChecker.cpp -> genmc/Verification/Config.hpp
+genmc/Execution/Consistency/IMMChecker.cpp -> genmc/Verification/Config.hpp
+genmc/Execution/Consistency/LKMMChecker.cpp -> genmc/Verification/Config.hpp
+genmc/Execution/Consistency/LKMMRcuChecker.cpp -> genmc/Verification/Config.hpp
+genmc/Execution/Consistency/RAChecker.cpp -> genmc/Verification/Config.hpp
+genmc/Execution/Consistency/RC11Checker.cpp -> genmc/Verification/Config.hpp
+genmc/Execution/Consistency/SCChecker.cpp -> genmc/Verification/Config.hpp
+genmc/Execution/Consistency/TSOChecker.cpp -> genmc/Verification/Config.hpp

@@ -89,7 +89,7 @@
 #ifndef GENMC_INVARIANTS_HPP
 #define GENMC_INVARIANTS_HPP
 
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/Stamp.hpp"
 #include "genmc/Verification/GenMCDriver.hpp"
 #include "genmc/Verification/GraphFingerprint.hpp"

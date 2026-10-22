@@ -36,7 +36,6 @@
 #include "genmc/Support/NameInfo.hpp"
 #include "genmc/Support/SExprVisitor.hpp"
 #include "genmc/Support/ThreadInfo.hpp"
-#include "genmc/Support/ThreadPool.hpp"
 #include "genmc/Support/Verbosity.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/DriverHandlerDispatcher.hpp"
@@ -46,7 +45,7 @@
 #include "genmc/Verification/Relinche/Specification.hpp"
 #include "genmc/Verification/Revisit.hpp"
 #include "genmc/Verification/Scheduler.hpp"
-#include "genmc/Verification/VerificationError.hpp"
+#include "genmc/Support/VerificationError.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
 #include "genmc/Verification/WorkList.hpp"
 #include "genmc/config.h"
@@ -74,14 +73,14 @@ using namespace std::string_literals;
  ** GENERIC MODEL CHECKING DRIVER
  ***********************************************************/
 
-GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, ThreadPool *pool /* = nullptr */,
+GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool /* = nullptr */,
 			 Mode mode /* = VerificationMode{} */)
 	: mode(mode), pool(pool), userConf(std::move(conf))
 {
 	/* Set up the execution context */
 	consChecker = ConsistencyChecker::create(getConf());
 	auto cfg = ExecutionGraph::Config{.execState = &execState_,
-					  .consChecker = &*consChecker,
+					  .memModel = &*consChecker,
 					  .emitNALabels = Config::emitNALabels};
 	auto execGraph = userConf->isDepTrackingModel ? std::make_unique<DepExecutionGraph>(cfg)
 						      : std::make_unique<ExecutionGraph>(cfg);
@@ -117,11 +116,6 @@ GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, ThreadPool *pool /*
 
 GenMCDriver::~GenMCDriver() = default;
 
-GenMCDriver::Execution::Execution(std::unique_ptr<ExecutionGraph> g, LocalQueueT &&w,
-				  ChoiceMap &&map)
-	: graph(std::move(g)), workqueue(std::move(w)), choices(std::move(map))
-{}
-GenMCDriver::Execution::~Execution() = default;
 
 static void repairRead(ExecutionGraph &g, ReadLabel *lab)
 {
@@ -140,12 +134,6 @@ void GenMCDriver::repairDanglingReads(ExecutionGraph &g)
 	}
 }
 
-void GenMCDriver::Execution::restrict(Stamp stamp)
-{
-	auto &g = getGraph();
-	g.cutToStamp(stamp);
-	getChoiceMap().cut(*g.getViewFromStamp(stamp));
-}
 
 void GenMCDriver::pushExecution(Execution &&e)
 {
@@ -238,7 +226,7 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 	execStack.clear();
 	execStack.emplace_back(std::move(exec->graph), LocalQueueT(), std::move(exec->choices));
 
-	getExec().getGraph().setConsChecker(&getConsChecker());
+	getExec().getGraph().setMemModel(&getConsChecker());
 	getExec().getGraph().setState(&getExecState());
 
 	getConsChecker().recomputeCacheCounters(getExec().getGraph());
@@ -275,23 +263,23 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 			if (rLab->isNotAtomic()) {
 				g.getState().onNALoad(
 					rLab->getPos(), rLab->getAccess(),
-					eLab->getParent()->getConsChecker()->getHbView(rLab));
+					eLab->getParent()->getMemModel()->getHbView(rLab));
 			} else {
 				/* TODO: If we support emitNA + lazy NA value, we should notify
 				 * the corresponding value here */
 				g.getState().onATLoad(rLab->getPos(), rLab->getAccess(),
-						      g.getConsChecker()->getHbView(rLab));
+						      g.getMemModel()->getHbView(rLab));
 			}
 		} else if (const auto *wLab = genmc::dyn_cast<WriteLabel>(lab)) {
 			if (wLab->isNotAtomic())
 				g.getState().onNAStore(wLab->getPos(), wLab->getAccess(),
-						       g.getConsChecker()->getHbView(wLab),
+						       g.getMemModel()->getHbView(wLab),
 						       wLab->getVal());
 			else {
 				/* TODO: If we support emitNA + lazy NA value, we should notify
 				 * the corresponding value here */
 				g.getState().onATStore(wLab->getPos(), wLab->getAccess(),
-						       g.getConsChecker()->getHbView(wLab),
+						       g.getMemModel()->getHbView(wLab),
 						       wLab->isEffectful(),
 						       wLab->isAtLeastRelease(), getLockRole(wLab));
 			}
@@ -303,7 +291,7 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 					aLab->getAlignment());
 			if (aLab->isZeroed())
 				state.onZeroedAlloc(aLab->getPos(), aLab->getAccess(),
-						    g.getConsChecker()->getHbView(aLab));
+						    g.getMemModel()->getHbView(aLab));
 		} else if (const auto *dLab = genmc::dyn_cast<FreeLabel>(lab)) {
 			/* An invalid free (an error event) frees no block */
 			auto addr = dLab->getAddr();
@@ -604,7 +592,7 @@ void GenMCDriver::restartExecution()
 {
 	pendingResume_ = nullptr;
 	auto cfg = ExecutionGraph::Config{.execState = &execState_,
-					  .consChecker = &*consChecker,
+					  .memModel = &*consChecker,
 					  .emitNALabels = Config::emitNALabels};
 	auto execGraph = getConf()->isDepTrackingModel ? std::make_unique<DepExecutionGraph>(cfg)
 						       : std::make_unique<ExecutionGraph>(cfg);
@@ -1404,7 +1392,7 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 		auto coIt = std::ranges::find_if(rco, [&](auto &sLab) {
 			/* (A write that had nothing to revisit may lack its prefix) */
 			if (!sLab.hasPrefixView())
-				sLab.setPrefixView(g.getConsChecker()->calculatePrefixView(&sLab));
+				sLab.setPrefixView(g.getMemModel()->calculatePrefixView(&sLab));
 			return !sLab.getPrefixView().contains(rLab->getPos());
 		});
 		return coIt == std::ranges::end(rco) ? g.getInitLabel()
@@ -1562,7 +1550,7 @@ auto GenMCDriver::checkLkmmSrcu() -> std::optional<VerificationError>
 	    }))
 		return {};
 	auto unordered = lkmm::findUnorderedFree(g, [&](auto *a, auto *f) {
-		return g.getConsChecker()->getHbView(f).contains(a->getPos());
+		return g.getMemModel()->getHbView(f).contains(a->getPos());
 	});
 	if (!unordered)
 		return {};
@@ -4017,7 +4005,7 @@ static void updatePredsWithPrefixView(const ExecutionGraph &g, VectorClock &pred
 			const auto *lab = g.getEventLabel(Event(i, j));
 			if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab)) {
 				if (preds.contains(rLab->getPos()) &&
-				    !preds.contains(rLab->getRf())) {
+				    !preds.contains(rLab->getRf()->getPos())) {
 					if (rLab->getRf()->getThread() == rLab->getThread())
 						predsD.removeHole(rLab->getRf()->getPos());
 				}
@@ -4428,7 +4416,7 @@ auto GenMCDriver::coherenceSuccRemainInGraph(const BackwardRevisit &r) -> bool
 	if (std::ranges::empty(succs))
 		return true;
 
-	return r.getViewNoRel()->contains(&*std::ranges::begin(succs));
+	return r.getViewNoRel()->contains(std::ranges::begin(succs)->getPos());
 }
 
 static auto wasAddedMaximally(const EventLabel *lab) -> bool

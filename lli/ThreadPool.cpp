@@ -11,23 +11,19 @@
  *     https://opensource.org/licenses/MIT
  */
 
-#include "genmc/Support/ThreadPool.hpp"
+#include "ThreadPool.hpp"
 #include "genmc/Execution/DepExecutionGraph.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/ChoiceMap.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
 #include "genmc/Verification/WorkList.hpp"
-#ifdef BUILD_LLI
 #include "Runtime/Interpreter.h"
 #include "passes/LLIConfig.hpp"
 #include "passes/LLVMModule.hpp"
 #include "passes/ModuleInfo.hpp"
 #include <llvm/IR/Module.h>
 #include <llvm/Transforms/Utils/Cloning.h>
-#else
-#include "genmc/Support/Error.hpp"
-#endif
 
 #include <future>
 #include <memory>
@@ -43,9 +39,6 @@ ThreadPool::ThreadPool(const LLIConfig &lliConfig, const std::shared_ptr<const C
 	: numWorkers_(lliConfig.threads), pinner_(numWorkers_), joiner_(workers_)
 {
 
-#ifndef BUILD_LLI
-	UNREACHABLE(); /* unsupported */
-#else
 	/* Set global variables before spawning the threads */
 	shouldHalt_.store(false);
 	remainingTasks_.store(0);
@@ -56,7 +49,7 @@ ThreadPool::ThreadPool(const LLIConfig &lliConfig, const std::shared_ptr<const C
 	auto firstDriver = GenMCDriver::create(conf, this);
 	ExecutionGraph::Config seedCfg{};
 	seedCfg.emitNALabels = Config::emitNALabels;
-	seedCfg.consChecker = &firstDriver->getConsChecker();
+	seedCfg.memModel = &firstDriver->getConsChecker();
 	seedCfg.execState = &firstDriver->getExecState();
 	auto execGraph = conf->isDepTrackingModel ? std::make_unique<DepExecutionGraph>(seedCfg)
 						  : std::make_unique<ExecutionGraph>(seedCfg);
@@ -77,7 +70,6 @@ ThreadPool::ThreadPool(const LLIConfig &lliConfig, const std::shared_ptr<const C
 							&lliConfig, &buf, &*mod);
 		addWorker(i, std::move(dw), std::move(interp), threadFun);
 	}
-#endif
 }
 
 ThreadPool::~ThreadPool() { halt(); }
@@ -85,9 +77,6 @@ ThreadPool::~ThreadPool() { halt(); }
 void ThreadPool::addWorker(unsigned int i, std::unique_ptr<GenMCDriver> driver,
 			   std::unique_ptr<llvm::Interpreter> interp, TFunT threadFun)
 {
-#ifndef BUILD_LLI
-	UNREACHABLE();
-#else
 	using ThreadT = std::packaged_task<VerificationResult(
 		unsigned int, std::unique_ptr<GenMCDriver> driver,
 		std::unique_ptr<llvm::Interpreter> interp, TFunT threadFun)>;
@@ -121,10 +110,8 @@ void ThreadPool::addWorker(unsigned int i, std::unique_ptr<GenMCDriver> driver,
 	workers_.emplace_back(std::move(thread), i, std::move(driver), std::move(interp),
 			      threadFun);
 	pinner_.pin(workers_.back(), i);
-#endif
 }
 
-#ifdef BUILD_LLI
 void ThreadPool::submit(ThreadPool::TaskT task)
 {
 	std::scoped_lock lock(stateMtx_); // NOLINT(misc-const-correctness)
@@ -132,7 +119,6 @@ void ThreadPool::submit(ThreadPool::TaskT task)
 	queue_.push(std::move(task));
 	stateCV_.notify_one();
 }
-#endif
 
 auto ThreadPool::tryPopPoolQueue() -> ThreadPool::TaskT { return queue_.tryPop(); }
 

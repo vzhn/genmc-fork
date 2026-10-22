@@ -14,7 +14,7 @@
 #include "genmc/ADT/DepView.hpp"
 #include "genmc/ADT/VectorClock.hpp"
 #include "genmc/ADT/View.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Support/Cast.hpp"
 #include "genmc/Support/Error.hpp"
 

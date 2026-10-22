@@ -23,6 +23,14 @@ target_include_directories(unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/genmc)
 target_include_directories(unit_tests SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 target_compile_definitions(unit_tests PRIVATE ENABLE_GENMC_DEBUG) # to access validate()
 
+# The exploration without LLVM: a scripted event producer drives the core
+# library alone (no ENABLE_GENMC_DEBUG: the library is built without it, and
+# Config must have the same layout on both sides)
+add_executable(driver_tests driver/DriverTest.cpp)
+target_link_libraries(driver_tests PRIVATE GTest::gtest_main rapidcheck_gtest genmc_config_includes genmc_lib)
+target_include_directories(driver_tests PRIVATE ${CMAKE_SOURCE_DIR}/genmc ${CMAKE_CURRENT_SOURCE_DIR}/driver)
+
 # register with ctest
 include(GoogleTest)
 gtest_discover_tests(unit_tests)
+gtest_discover_tests(driver_tests)

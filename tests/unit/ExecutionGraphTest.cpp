@@ -11,11 +11,11 @@
 #include "genmc/Execution/GraphUtils.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/Invariants.hpp"
-#include "genmc/Verification/MemoryModel.hpp"
+#include "genmc/Execution/MemoryModel.hpp"
 
 struct TestGraph {
 	StubChecker checker;
-	ExecutionGraph graph{ExecutionGraph::Config{.consChecker = &checker}};
+	ExecutionGraph graph{ExecutionGraph::Config{.memModel = &checker}};
 
 	/* Appends a fence to thread 0 */
 	auto addFence() -> EventLabel *
@@ -212,7 +212,7 @@ TEST(ExecutionGraphTest, InitReadersInheritPrunedViews)
 	Config conf;
 	conf.model = ModelType::RC11;
 	auto checker = ConsistencyChecker::create(&conf);
-	ExecutionGraph g{ExecutionGraph::Config{.consChecker = &*checker, .emitNALabels = true}};
+	ExecutionGraph g{ExecutionGraph::Config{.memModel = &*checker, .emitNALabels = true}};
 
 	auto xAddr = SAddr(0x100);
 	auto yAddr = SAddr(0x200);
@@ -302,7 +302,7 @@ TEST(ExecutionGraphTest, PrunedInitReadsUseFoldedHbView)
 	StubChecker checker;
 	ExecutionState st;
 	ExecutionGraph g{ExecutionGraph::Config{
-		.execState = &st, .consChecker = &checker, .emitNALabels = false}};
+		.execState = &st, .memModel = &checker, .emitNALabels = false}};
 	auto addr = SAddr(0x100);
 	auto access = AAccess(addr, ASize(4));
 	seedViews(g.getInitLabel(), 1);
@@ -343,7 +343,7 @@ TEST(ExecutionGraphTest, CurrentMemValueSurvivesFullyPrunedCo)
 	StubChecker checker;
 	ExecutionState st;
 	ExecutionGraph g{ExecutionGraph::Config{
-		.execState = &st, .consChecker = &checker, .emitNALabels = false}};
+		.execState = &st, .memModel = &checker, .emitNALabels = false}};
 	auto addr = SAddr(0x100);
 	auto access = AAccess(addr, ASize(4));
 	seedViews(g.getInitLabel(), 1);

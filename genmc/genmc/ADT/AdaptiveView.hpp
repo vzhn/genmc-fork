@@ -16,7 +16,7 @@
 
 #include "genmc/ADT/SmallVector.hpp"
 #include "genmc/ADT/View.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 
 #include <compare>
 #include <optional>

@@ -19,14 +19,14 @@
 #include "genmc/ADT/View.hpp"
 #include "genmc/ADT/ilist.hpp"
 #include "genmc/Execution/CBIterator.hpp"
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionState.hpp"
 #include "genmc/Execution/Stamp.hpp"
 #include "genmc/Support/Hash.hpp"
 #include "genmc/Support/MemAccess.hpp"
-#include "genmc/Verification/VerificationError.hpp"
+#include "genmc/Support/VerificationError.hpp"
 
 #include <algorithm>
 #include <format>
@@ -50,7 +50,7 @@
  * into account when restricting a graph).
  *
  * NOTE: graphs cannot be passed across threads safely by default.
- * ctor arguments (initValGetter, consChecker) need to be adjusted.
+ * ctor arguments (initValGetter, memModel) need to be adjusted.
  */
 class ExecutionGraph {
 
@@ -90,7 +90,7 @@ public:
 	 */
 	struct Config {
 		ExecutionState *execState{};
-		ConsistencyChecker *consChecker{};
+		GraphModel *memModel{};
 		bool emitNALabels{};
 	};
 
@@ -142,13 +142,13 @@ public:
 
 	/* Constructors */
 	ExecutionGraph(Config cfg)
-		: consChecker_(cfg.consChecker), haveNAs_(cfg.emitNALabels), state_(cfg.execState)
+		: memModel_(cfg.memModel), haveNAs_(cfg.emitNALabels), state_(cfg.execState)
 	{
 		/* Create an entry for main() and push the "initializer" label */
 		events.emplace_back();
 		poLists.emplace_back();
 		auto *iLab = addLabelToGraph(InitLabel::create());
-		consChecker_->updateMMViews(iLab);
+		memModel_->updateMMViews(iLab);
 		iLab->setPrefixView(std::make_unique<View>());
 	}
 
@@ -868,11 +868,11 @@ public:
 	/* Returns the maximum stamp used */
 	auto getMaxStamp() const -> Stamp { return timestamp - 1; }
 
-	/* Returns the consistency checke for this graph */
-	auto getConsChecker() const -> const ConsistencyChecker * { return consChecker_; }
-	auto getConsChecker() -> ConsistencyChecker * { return consChecker_; }
+	/* Returns the memory model's view of this graph (label views, cache counters) */
+	auto getMemModel() const -> const GraphModel * { return memModel_; }
+	auto getMemModel() -> GraphModel * { return memModel_; }
 
-	void setConsChecker(ConsistencyChecker *consChecker) { consChecker_ = consChecker; }
+	void setMemModel(GraphModel *memModel) { memModel_ = memModel; }
 
 	auto getState() const -> const ExecutionState & { return *state_; }
 	auto getState() -> ExecutionState & { return *state_; }
@@ -928,8 +928,8 @@ public:
 	template <typename LabelT> auto add(std::unique_ptr<LabelT> lab) -> LabelT *
 	{
 		auto *raw = lab.get();
-		ASSERT(getConsChecker());
-		getConsChecker()->maybeIncreaseCacheCounters(raw);
+		ASSERT(getMemModel());
+		getMemModel()->maybeIncreaseCacheCounters(raw);
 		addLabelToGraph(std::move(lab));
 		return raw;
 	}
@@ -1305,7 +1305,7 @@ protected:
 	PoLists poLists;
 
 	// NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
-	ConsistencyChecker *consChecker_{};
+	GraphModel *memModel_{};
 	// NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
 	bool haveNAs_{};
 	// NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)

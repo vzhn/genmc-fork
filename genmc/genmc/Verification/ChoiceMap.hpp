@@ -15,7 +15,7 @@
 #define GENMC_CHOICE_MAP_HPP
 
 #include "genmc/ADT/VSet.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 
 #include <unordered_map>

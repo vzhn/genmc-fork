@@ -14,7 +14,7 @@
 #ifndef GENMC_ACTION_ENUMS_HPP
 #define GENMC_ACTION_ENUMS_HPP
 
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 
 #include <cstdint>
 

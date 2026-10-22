@@ -17,6 +17,7 @@
 #include "genmc/Support/ThreadPinner.hpp"
 #include "genmc/Verification/GenMCDriver.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
+#include "genmc/Verification/WorkSharing.hpp"
 
 #include <atomic>
 #include <future>
@@ -24,7 +25,6 @@
 #include <mutex>
 #include <thread>
 
-/* TODO: Make lli-independent */
 namespace llvm {
 class Interpreter;
 class LLVMContext;
@@ -38,7 +38,7 @@ class LLVMContext;
 class GlobalWorkQueue {
 
 public:
-	using ItemT = std::unique_ptr<GenMCDriver::Execution>;
+	using ItemT = std::unique_ptr<ExecutionFrame>;
 	using QueueT = std::vector<ItemT>;
 
 	/*** Constructors ***/
@@ -128,7 +128,7 @@ private:
  * each own exploration driver so that they will able to execute the submitted
  * (exploration) tasks concurrently.
  */
-class ThreadPool {
+class ThreadPool : public WorkSharing {
 
 public:
 	using GlobalQueueT = GlobalWorkQueue;
@@ -154,7 +154,7 @@ public:
 	[[nodiscard]] auto size() const -> size_t { return workers_.size(); }
 
 	/** Returnst the number of workers that will be added in the pool */
-	[[nodiscard]] auto getNumWorkers() const -> unsigned int { return numWorkers_; }
+	[[nodiscard]] auto getNumWorkers() const -> unsigned int override { return numWorkers_; }
 
 	/** Returns the index of the calling thread */
 	[[nodiscard]] static auto getIndex() -> unsigned int { return index_; }
@@ -165,21 +165,17 @@ public:
 	/*** Tasks-related ***/
 
 	/** Submits a task to be executed by a worker */
-#ifdef BUILD_LLI
-	void submit(TaskT task);
-#else
-	void submit(TaskT task) { UNREACHABLE(); }
-#endif
+	void submit(TaskT task) override;
 
 	/** Notify the pool about the addition/completion of a task */
 	auto incRemainingTasks() -> unsigned { return ++remainingTasks_; }
 	auto decRemainingTasks() -> unsigned { return --remainingTasks_; }
-	auto getRemainingTasks() -> unsigned { return remainingTasks_.load(); }
+	auto getRemainingTasks() -> unsigned override { return remainingTasks_.load(); }
 
-	[[nodiscard]] auto shouldHalt() const -> bool { return shouldHalt_.load(); }
+	[[nodiscard]] auto shouldHalt() const -> bool override { return shouldHalt_.load(); }
 
 	/** Stops all threads */
-	void halt()
+	void halt() override
 	{
 		std::scoped_lock lock(stateMtx_); // NOLINT(misc-const-correctness)
 		shouldHalt_.store(true);
@@ -192,7 +188,7 @@ public:
 
 	/*** Destructor ***/
 
-	~ThreadPool();
+	~ThreadPool() override;
 
 private:
 	/** Adds a worker thread to the pool */

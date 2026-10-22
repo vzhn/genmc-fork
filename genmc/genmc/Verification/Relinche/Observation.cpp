@@ -13,8 +13,8 @@
 
 #include "genmc/Verification/Relinche/Observation.hpp"
 #include "genmc/ADT/VSet.hpp"
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Support/Cast.hpp"
@@ -27,7 +27,7 @@
 #include <utility>
 #include <vector>
 
-static auto isHbRelincheBefore(const ConsistencyChecker *checker, const EventLabel *aLab,
+static auto isHbRelincheBefore(const GraphModel *checker, const EventLabel *aLab,
 			       const EventLabel *bLab) -> bool
 {
 	const auto *nextB = aLab->getParent()->po_imm_succ(bLab);
@@ -35,7 +35,7 @@ static auto isHbRelincheBefore(const ConsistencyChecker *checker, const EventLab
 }
 
 static auto isTotallyOrderedOp(const MethodCall &op, const auto &&ops,
-			       const ConsistencyChecker *checker) -> bool
+			       const GraphModel *checker) -> bool
 {
 	return std::ranges::all_of(ops, [&](const auto &other) {
 		return op == other || isHbRelincheBefore(checker, other.endLab, op.beginLab) ||
@@ -152,7 +152,7 @@ static void normalize(std::vector<MethodCall> &ops)
 	std::ranges::stable_sort(ops);
 }
 
-Observation::Observation(ExecutionGraph &g, const ConsistencyChecker *checker)
+Observation::Observation(ExecutionGraph &g, const GraphModel *checker)
 {
 	/* Collect all method calls and non-method RF edges */
 	populateOpsRf(g, ops_, rfs_);

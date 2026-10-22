@@ -18,14 +18,16 @@
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/ChoiceMap.hpp"
+#include "genmc/Verification/ExecutionFrame.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/GraphHash.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
 #include "genmc/Verification/Scheduler.hpp"
-#include "genmc/Verification/VerificationError.hpp"
+#include "genmc/Support/VerificationError.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
 #include "genmc/Verification/WorkList.hpp"
+#include "genmc/Verification/WorkSharing.hpp"
 
 #include <cstdint>
 #include <deque>
@@ -48,6 +50,7 @@ class Module;
 } // namespace llvm
 struct ModuleInfo;
 class ThreadPool;
+class EventProducer;
 struct LLIConfig;
 class BoundDecider;
 class ConsistencyChecker;
@@ -72,35 +75,7 @@ public:
 	using Mode = std::variant<VerificationMode, EstimationMode, RandomMode>;
 
 	/** Represents the execution at a given point */
-	struct Execution {
-		Execution() = delete;
-		Execution(std::unique_ptr<ExecutionGraph> g, LocalQueueT &&w, ChoiceMap &&map);
-
-		Execution(const Execution &) = delete;
-		auto operator=(const Execution &) -> Execution & = delete;
-		Execution(Execution &&) = default;
-		auto operator=(Execution &&) -> Execution & = default;
-
-		/** Returns a reference to the current graph (mutable/const getter pair) */
-		// NOLINTNEXTLINE(readability-make-member-function-const)
-		auto getGraph() -> ExecutionGraph & { return *graph; }
-		auto getGraph() const -> const ExecutionGraph & { return *graph; }
-
-		auto getWorkqueue() -> LocalQueueT & { return workqueue; }
-		auto getWorkqueue() const -> const LocalQueueT & { return workqueue; }
-
-		auto getChoiceMap() -> ChoiceMap & { return choices; }
-		auto getChoiceMap() const -> const ChoiceMap & { return choices; }
-
-		/** Removes all items with stamp >= STAMP from the execution */
-		void restrict(Stamp stamp);
-
-		~Execution();
-
-		std::unique_ptr<ExecutionGraph> graph;
-		LocalQueueT workqueue;
-		ChoiceMap choices;
-	};
+	using Execution = ExecutionFrame;
 
 	/** Scheduler result type */
 	struct Finished {};
@@ -212,6 +187,10 @@ public:
 
 	/** Whether there are more executions to be explored */
 	auto done() -> bool;
+
+	/** The graph of the execution being explored (read-only: for producers
+	 * and observers, e.g. to read a complete execution's outcome) */
+	auto getCurrentGraph() const -> const ExecutionGraph & { return getExec().getGraph(); }
 
 	/** Returns the result of the verification procedure */
 	auto getResult() const -> const VerificationResult & { return result; }
@@ -368,7 +347,7 @@ protected:
 	friend class ArbitraryScheduler;
 	friend class ThreadPool;
 	friend class DriverHandlerDispatcher;
-	friend void run(GenMCDriver *driver, llvm::Interpreter *interp);
+	friend void explore(GenMCDriver &driver, EventProducer &producer);
 	friend auto estimate(const LLIConfig &lliConfig, std::shared_ptr<const Config> conf,
 			     const std::unique_ptr<llvm::Module> &mod,
 			     const std::unique_ptr<ModuleInfo> &modInfo) -> VerificationResult;
@@ -379,7 +358,7 @@ protected:
 			   std::unique_ptr<llvm::Module> mod, std::unique_ptr<ModuleInfo> modInfo)
 		-> VerificationResult;
 
-	GenMCDriver(std::shared_ptr<const Config> conf, ThreadPool *pool = nullptr,
+	GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool = nullptr,
 		    Mode /*mode*/ = VerificationMode{});
 
 	/** Returns a pointer to the user configuration */
@@ -419,9 +398,9 @@ protected:
 	auto popExecution() -> bool;
 
 	/** Gets/sets the thread pool this driver should account to */
-	auto getThreadPool() -> ThreadPool * { return pool; }
-	auto getThreadPool() const -> ThreadPool * { return pool; }
-	void setThreadPool(ThreadPool *threadPool) { pool = threadPool; }
+	auto getThreadPool() -> WorkSharing * { return pool; }
+	auto getThreadPool() const -> WorkSharing * { return pool; }
+	void setThreadPool(WorkSharing *threadPool) { pool = threadPool; }
 
 	/** Initializes the exploration from a given state */
 	void initFromState(std::unique_ptr<Execution> exec);
@@ -978,7 +957,7 @@ private:
 	Mode mode = VerificationMode{};
 
 	/** The thread pool this driver may belong to */
-	ThreadPool *pool = nullptr;
+	WorkSharing *pool = nullptr;
 
 	/** User configuration */
 	std::shared_ptr<const Config> userConf;

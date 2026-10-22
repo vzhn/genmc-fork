@@ -14,7 +14,7 @@
 #include "genmc/Verification/ChoiceMap.hpp"
 #include "genmc/ADT/VSet.hpp"
 #include "genmc/ADT/VectorClock.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 
 #include <algorithm>

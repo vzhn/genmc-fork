@@ -15,7 +15,7 @@
 #define GENMC_SPECIFICATION_HPP
 
 #include "genmc/ADT/VSet.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Verification/Relinche/Linearization.hpp"
 #include "genmc/Verification/Relinche/Observation.hpp"
 
@@ -114,7 +114,7 @@ public:
 	[[nodiscard]] auto refinementMissingEdges(const Observation & /*obs*/) const
 		-> std::vector<std::vector<Edge>>;
 
-	void add(ExecutionGraph &g, const ConsistencyChecker *consChecker, bool symmReduction);
+	void add(ExecutionGraph &g, const GraphModel *memModel, bool symmReduction);
 	void merge(Specification &&other);
 	void calculateHints();
 
