@@ -30,6 +30,13 @@ released.
   read in a copy of the execution, and the blocked execution was explored
   to its end as well. Every branch to the assumption now gets it
   (`tests/correct/saver/spin-load-or`: no blocked execution, one before).
+- Nor did a spin loop that retries with `continue`, or by reaching the
+  end of its body, revisit its reads in place (#92), as in a seqlock
+  reader (`if (s & 1) continue; ... if (seq == s) break;`): such branches
+  reach the latch, where the failing assumption is, through blocks of
+  their own that only jump on, and the assumption did not get past them.
+  It now does (`tests/correct/saver/spin-seqlock-reader`: 5 blocked
+  executions, 13 before).
 - With `-disable-race-detection`, GenMC missed the errors of racy
   programs under `-rc11`, `-imm` and `-sc` (#142): a non-atomic read read
   only the latest write, and a non-atomic write went last in coherence,
