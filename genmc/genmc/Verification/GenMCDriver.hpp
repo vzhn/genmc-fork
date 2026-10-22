@@ -813,6 +813,10 @@ private:
 	/** Remove cos from COS until a consistent option for WLAB is found */
 	auto findConsistentCo(WriteLabel *wLab, std::vector<EventLabel *> &cos) -> EventLabel *;
 
+	/** Whether the graph stays consistent with WLAB where it was placed in
+	 * coherence (see findConsistentCo()) */
+	auto isPlacementConsistent(const WriteLabel *wLab) const -> bool;
+
 	/** SAVer: Checks whether the addition of an event changes our
 	 * perspective of a potential spinloop */
 	void checkReconsiderFaiSpinloop(const MemAccessLabel *lab);

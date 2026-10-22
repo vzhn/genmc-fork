@@ -11,6 +11,17 @@ released.
 
 ### Fixed
 
+- `-lkmm` explored executions that LKMM forbids, and reported errors in
+  them: the write of a `cmpxchg()` (or another RMW) whose read did not
+  read the last write in coherence was placed after that write without
+  checking the graph, which only a write placed last can skip. Through its
+  `coe` edges, `prop` could close an hb cycle that the check of the read
+  part could not see: `r0 = READ_ONCE(y); if (r0) r1 = cmpxchg_relaxed(&x,
+  0, 2);` against `WRITE_ONCE(x, 1); smp_store_release(&y, 2);` reported
+  that `r0 == 2 && r1 == 0` can happen (herd7: never). Such a write is now
+  checked under `-lkmm`; fuzz seeds 101 and 496 of
+  `scripts/lkmm/fuzz-ctrl.py` now have herd7's counts (3479, 554; were
+  3756, 734) (`tests/correct/lkmm/ctrl-rmw-coe-cycle`).
 - With `-disable-race-detection`, GenMC missed the errors of racy
   programs under `-rc11`, `-imm` and `-sc` (#142): a non-atomic read read
   only the latest write, and a non-atomic write went last in coherence,
