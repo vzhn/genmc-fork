@@ -930,6 +930,15 @@ private:
 
 	auto checkForRaces(const EventLabel *lab) -> std::optional<VerificationError>;
 
+	/** LAB accesses a thread-local of the thread ELAB ends: if LAB does not
+	 * happen before ELAB, reports an error */
+	auto checkThreadLocalEnd(const EventLabel *lab, const ThreadFinishLabel *eLab)
+		-> std::optional<VerificationError>;
+
+	/** Checks the accesses to the thread-locals of the thread ELAB ends */
+	auto checkEndedThreadLocals(const ThreadFinishLabel *eLab)
+		-> std::optional<VerificationError>;
+
 	void configureProbe(MemLabel *rLab, Event pos, SAddr addr, ASize size,
 			    const EventDeps &deps);
 

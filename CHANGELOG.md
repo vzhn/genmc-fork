@@ -109,6 +109,14 @@ released.
   variable's type, so it left the call whole, which GenMC cannot run. It
   looks through the intrinsic now, and the call becomes an access per
   field (`tests/correct/infr/tls-memintrinsics`).
+- An access to a thread's thread-local by another thread, through a
+  pointer the thread published, was not reported when it came after the
+  thread ended (e.g., after joining it) or concurrently with its end,
+  which natively is a use after free. A thread's copies of thread-locals
+  now end with it, as if freed by its end: such an access is reported as
+  an access to freed memory, with the thread's end as the conflicting
+  event. The main thread's copies last as long as the program
+  (`tests/wrong/memory/tls-access-ended`).
 
 ### Added
 

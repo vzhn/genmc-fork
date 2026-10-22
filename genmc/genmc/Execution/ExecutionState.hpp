@@ -93,6 +93,7 @@ public:
 	/** Whether ADDR is in an allocated block that may be accessed (i.e., not a zero-size one) */
 	[[nodiscard]] auto isAccessible(SAddr addr) const -> bool;
 	[[nodiscard]] auto isStatic(SAddr addr) const -> bool;
+	[[nodiscard]] auto hasThreadLocals() const -> bool { return !threadLocalRanges_.empty(); }
 	[[nodiscard]] auto isInitialized(const AAccess &access) const -> bool;
 	[[nodiscard]] auto isAtomicAccessConsistent(const AAccess &access) const -> bool;
 	[[nodiscard]] auto isFreed(SAddr addr) const -> bool;
