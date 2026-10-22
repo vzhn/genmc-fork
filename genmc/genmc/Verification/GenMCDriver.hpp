@@ -25,6 +25,7 @@
 #include "genmc/Verification/GraphHash.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
+#include "genmc/Verification/RfReductions.hpp"
 #include "genmc/Verification/Scheduler.hpp"
 #include "genmc/Support/VerificationError.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
@@ -727,11 +728,6 @@ private:
 	auto copyGraph(const BackwardRevisit *br, VectorClock *v) const
 		-> std::unique_ptr<ExecutionGraph>;
 
-	/** Given a list of stores that it is consistent to read-from,
-	 * filters out options that can be skipped (according to the conf),
-	 * and determines the order in which these options should be explored */
-	void filterOptimizeRfs(const ReadLabel *lab, std::vector<EventLabel *> &stores);
-
 	auto isExecutionValid(const EventLabel *lab) -> bool;
 
 	/** Removes rfs from RFS until a consistent option for RLAB is found */
@@ -754,9 +750,6 @@ private:
 	/** SAVer: Given the end of a potential FAI-ZNE spinloop,
 	 * returns true if it is indeed a spinloop */
 	auto areFaiZNEConstraintsSat(const FaiZNESpinEndLabel *lab) -> bool;
-
-	/** BAM: Filters out unnecessary rfs for LAB when BAM is enabled */
-	void filterConflictingBarriers(const ReadLabel *lab, std::vector<EventLabel *> &stores);
 
 	/** Estimation: Filters outs stores read by RMW loads */
 	void filterAtomicityViolations(const ReadLabel *lab, std::vector<EventLabel *> &stores);
@@ -808,23 +801,13 @@ private:
 	/** SR: Returns the (greatest) ID of a thread that is symmetric to PARENT/INFO */
 	auto getSymmetricTidSR(const ThreadCreateLabel *tcLab, const ThreadInfo &info) const -> int;
 
-	/** SR: Filter stores that will lead to a symmetric execution */
-	void filterSymmetricStoresSR(const ReadLabel *rLab,
-				     std::vector<EventLabel *> &stores) const;
-
 	/** SAVer: Filters stores that will lead to an assume-blocked execution */
-	/** Removes the stores LAB can read from only by placing itself before an
-	 * identical blind RMW (see --blind-rmw-reduction) */
-	void filterCommutingBlindRMWs(const ReadLabel *lab,
-				      std::vector<EventLabel *> &stores) const;
 
 	/** Reports an error if SLAB is a write the blind-RMW reduction did not account for */
 	auto checkBlindRMWWellFormedness(const WriteLabel *sLab) -> bool;
 
 	/** Reports an error if RLAB observes an order the blind-RMW reduction fixed */
 	auto checkBlindRMWWellFormedness(const ReadLabel *rLab) -> bool;
-
-	void filterValuesFromAnnotSAVER(const ReadLabel *rLab, std::vector<EventLabel *> &stores);
 
 	/*** Estimation-related ***/
 
@@ -889,6 +872,9 @@ private:
 
 	/** The backward revisits of the current graph (see BackwardRevisits) */
 	auto getBackwardRevisits() const -> BackwardRevisits;
+
+	/** The rf reductions on the current graph (see RfReductions) */
+	auto getRfReductions() const -> RfReductions;
 
 	/** The part of LAB's prefix its revisits take (not cached; see
 	 * ConsistencyChecker::calculateRevisitPrefixView()) */

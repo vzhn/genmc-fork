@@ -1498,219 +1498,10 @@ auto GenMCDriver::checkUnfreedMemory() -> std::optional<VerificationError>
 	return {};
 }
 
-void GenMCDriver::filterConflictingBarriers(const ReadLabel *lab, std::vector<EventLabel *> &stores)
-{
-	if (getConf()->disableBAM ||
-	    (!genmc::isa<BIncFaiReadLabel>(lab) && !genmc::isa<BWaitReadLabel>(lab)))
-		return;
 
-	/* Helper lambdas */
-	auto isReadByExclusiveRead = [&](auto *oLab) {
-		if (auto *wLab = genmc::dyn_cast<WriteLabel>(oLab))
-			return std::ranges::any_of(wLab->readers(),
-						   [&](auto &rLab) { return rLab.isRMW(); });
-		if (auto *iLab = genmc::dyn_cast<InitLabel>(oLab))
-			return std::ranges::any_of(iLab->rfs(lab->getAddr()),
-						   [&](auto &rLab) { return rLab.isRMW(); });
-		UNREACHABLE();
-	};
-	auto findFaiReader = [](BIncFaiWriteLabel *wLab) {
-		return std::ranges::find_if(wLab->readers(), [](auto &rLab) {
-			return genmc::isa<BIncFaiReadLabel>(&rLab);
-		});
-	};
-	auto findSameRoundMaximal = [&](BIncFaiWriteLabel *wLab) {
-		auto &g = *wLab->getParent();
-		while (!isLastInBarrierRound(wLab) &&
-		       findFaiReader(wLab) != std::ranges::end(wLab->readers())) {
-			wLab = genmc::dyn_cast<BIncFaiWriteLabel>(
-				g.po_imm_succ(&*findFaiReader(wLab)));
-		}
-		return wLab;
-	};
 
-	/* barrier_wait()'s plain load should read maximally */
-	if (genmc::isa<BWaitReadLabel>(lab)) {
-		auto *wLab = genmc::dyn_cast<BIncFaiWriteLabel>(stores[0]);
-		VERIFY(wLab && wLab->getPos().next() == lab->getPos());
-		stores[0] = findSameRoundMaximal(wLab);
-		stores.resize(1);
-		return;
-	}
 
-	/* barrier_wait()'s FAI loads should not read from conflicting stores */
-	std::erase_if(stores, [&](auto &sLab) { return isReadByExclusiveRead(sLab); });
-}
 
-void GenMCDriver::filterSymmetricStoresSR(const ReadLabel *rLab,
-					  std::vector<EventLabel *> &stores) const
-{
-	const auto &g = getExec().getGraph();
-	auto tid = g.getFirstThreadLabel(rLab->getThread())->getSymmPredTid();
-
-	/* If there is no symmetric thread, exit */
-	if (tid == -1)
-		return;
-
-	/* Check whether the po-prefixes of the two threads match */
-	if (!getSymmChecker().sharePrefixSR(tid, rLab))
-		return;
-
-	/* Get the symmetric event and make sure it matches as well */
-	const auto *lab = genmc::dyn_cast<ReadLabel>(g.getEventLabel(Event(tid, rLab->getIndex())));
-	if (!lab || lab->getAddr() != rLab->getAddr() || lab->getSize() != lab->getSize())
-		return;
-
-	if (!lab->isRMW())
-		return;
-
-	/* Remove stores that will be explored symmetrically */
-	std::erase_if(stores, [&](auto &sLab) { return lab->getRf()->getPos() == sLab->getPos(); });
-}
-
-namespace {
-/*
- * Decides which FAIs the blind-RMW reduction may reorder.  An FAI qualifies if
- * the interpreter marked it blind, it is relaxed, and it cannot be ordered
- * through synchronization: no release fence precedes it in its thread (which
- * would make its write a synchronization source) and no SC fence is in its hb
- * past (an SC fence hb-before one of two RMWs orders them through psc; one that
- * comes later can only follow both).  Built once per query, since it scans the
- * graph for SC fences.
- */
-class BlindRMWFilter {
-public:
-	BlindRMWFilter(const ExecutionGraph &g, const ConsistencyChecker &cc) : g(g), cc(cc)
-	{
-		for (auto t = 0; t < g.getNumThreads(); t++) {
-			auto first = -1;
-			for (auto i = 0; first == -1 && i < g.getThreadSize(t); i++) {
-				const auto *fLab =
-					genmc::dyn_cast<FenceLabel>(g.getEventLabel(Event(t, i)));
-				if (fLab && fLab->isSC())
-					first = i;
-			}
-			firstSCFence.push_back(first);
-		}
-	}
-
-	/* Returns LAB as a blind relaxed FAI that may be reordered, or null */
-	auto asCommuting(const EventLabel *lab) const -> const FaiReadLabel *
-	{
-		const auto *fLab = genmc::dyn_cast_if_present<FaiReadLabel>(lab);
-		if (!fLab || fLab->getKind() != EventLabel::FaiRead ||
-		    fLab->getAttr() != WriteAttr::Blind ||
-		    fLab->getOrdering() != MemOrdering::Relaxed)
-			return nullptr;
-
-		for (auto i = 0; i < fLab->getIndex(); i++) {
-			const auto *pLab = genmc::dyn_cast<FenceLabel>(
-				g.getEventLabel(Event(fLab->getThread(), i)));
-			if (pLab && pLab->isAtLeastRelease())
-				return nullptr;
-		}
-		const auto &hb = cc.getHbView(fLab);
-		for (auto t = 0U; t < firstSCFence.size(); t++) {
-			if (firstSCFence[t] != -1 &&
-			    hb.getMax(static_cast<int>(t)) >= firstSCFence[t])
-				return nullptr;
-		}
-		return fLab;
-	}
-
-	/* Whether A and B are distinct blind FAIs that can be reordered with each other */
-	auto areTwins(const EventLabel *a, const EventLabel *b) const -> bool
-	{
-		const auto *fA = asCommuting(a);
-		const auto *fB = asCommuting(b);
-		return fA && fB && fA != fB && fA->getAddr() == fB->getAddr() &&
-		       fA->getSize() == fB->getSize() && fA->getOp() == fB->getOp() &&
-		       fA->getOpVal() == fB->getOpVal();
-	}
-
-private:
-	const ExecutionGraph &g;
-	const ConsistencyChecker &cc;
-	std::vector<int> firstSCFence; /* -1 if the thread has none */
-};
-} // namespace
-
-/* The read part of WLAB if it is an RMW write, or null */
-static auto getRMWRead(const WriteLabel &wLab) -> const ReadLabel *
-{
-	const auto *rLab =
-		genmc::dyn_cast_if_present<ReadLabel>(wLab.getParent()->po_imm_pred(&wLab));
-	return rLab && rLab->isRMW() ? rLab : nullptr;
-}
-
-/*
- * Two blind relaxed FAIs that apply the same operation with the same operand
- * to the same location write the same sequence of values in either order, and
- * neither synchronizes with anything.  Executions that differ only in their
- * relative order are thus equivalent, and we keep the order in which they are
- * added: a new such FAI does not read from a store that an identical FAI
- * already reads from (which would place it before that FAI).  The co-maximal
- * store is always kept, so reads stay extensible.
- *
- * Reading co-maximally puts everything before the co-maximal store into the
- * new FAI's prefix, so later writes hb-after it can no longer revisit those
- * reads.  That loses no behavior only if (a) all writes to the location are
- * identical blind FAIs, so the only reads affected are theirs, whose revisits
- * are again swaps, and (b) no other read lies between the skipped store and the
- * co-maximal one in prefix order.  A different write to the location that
- * arrives later is reported by checkBlindRMWWellFormedness().
- */
-void GenMCDriver::filterCommutingBlindRMWs(const ReadLabel *rLab,
-					   std::vector<EventLabel *> &stores) const
-{
-	const auto &g = getExec().getGraph();
-	const BlindRMWFilter blind(g, getConsChecker());
-	const auto *fLab = blind.asCommuting(rLab);
-	if (!fLab)
-		return;
-
-	auto addr = fLab->getAddr();
-
-	/* (a): every write to the location so far is an identical blind FAI */
-	if (!std::ranges::all_of(g.co(addr), [&](auto &wLab) {
-		    const auto *pLab = getRMWRead(wLab);
-		    return pLab && blind.areTwins(pLab, fLab);
-	    }))
-		return;
-
-	const auto *coMax = g.co_max(addr);
-	if (genmc::isa<InitLabel>(coMax))
-		return;
-
-	/* (b): between SLAB and the co-maximal store, the prefix holds only twins */
-	const auto &maxView = getPrefixView(coMax);
-	const auto &ownView = getPrefixView(fLab);
-	auto onlyTwinsAfter = [&](const EventLabel *sLab) {
-		const auto *sView = genmc::isa<InitLabel>(sLab) ? nullptr : &getPrefixView(sLab);
-		for (auto t = 0; t < g.getNumThreads(); t++) {
-			auto from = std::max(ownView.getMax(t), sView ? sView->getMax(t) : -1);
-			for (auto i = std::max(from + 1, 0); i <= maxView.getMax(t); i++) {
-				const auto *lab = g.getEventLabel(Event(t, i));
-				if (genmc::isa<ReadLabel>(lab) && !blind.areTwins(lab, fLab))
-					return false;
-			}
-		}
-		return true;
-	};
-	auto isReadByTwin = [&](const EventLabel *sLab) {
-		auto isTwin = [&](auto &oLab) { return blind.areTwins(&oLab, fLab); };
-		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(sLab))
-			return std::ranges::any_of(wLab->readers(), isTwin);
-		return std::ranges::any_of(genmc::cast<InitLabel>(sLab)->rfs(addr), isTwin);
-	};
-
-	auto kept = stores;
-	std::erase_if(kept, [&](auto *sLab) {
-		return sLab != coMax && isReadByTwin(sLab) && onlyTwinsAfter(sLab);
-	});
-	if (!kept.empty())
-		stores = std::move(kept);
-}
 
 auto GenMCDriver::checkBlindRMWWellFormedness(const ReadLabel *rLab) -> bool
 {
@@ -1783,27 +1574,6 @@ auto GenMCDriver::checkBlindRMWWellFormedness(const WriteLabel *sLab) -> bool
 	return valid;
 }
 
-void GenMCDriver::filterValuesFromAnnotSAVER(const ReadLabel *rLab,
-					     std::vector<EventLabel *> &validStores)
-{
-	/* Locks are treated as annotated CASes */
-	if (!rLab->getAnnot())
-		return;
-
-	using Evaluator = SExprEvaluator<ModuleVarID>;
-
-	auto &g = getExec().getGraph();
-
-	/* Ensure we keep the maximal store around even if Helper messed with it */
-	VERIFY(!validStores.empty());
-	auto *maximal = validStores.back();
-	std::erase_if(validStores, [&](auto *wLab) {
-		auto val = wLab->getAccessValue(rLab->getAccess());
-		return wLab != maximal && wLab != g.co_max(rLab->getAddr()) &&
-		       !Evaluator().evaluate(&*rLab->getAnnot()->expr, val);
-	});
-	VERIFY(!validStores.empty());
-}
 
 void GenMCDriver::unblockWaitingHelping(const WriteLabel *lab)
 {
@@ -2441,6 +2211,15 @@ auto GenMCDriver::getBackwardRevisits() const -> BackwardRevisits
 		 .exhaustiveIMM = getConf()->exhaustive && getConf()->model == ModelType::IMM}};
 }
 
+auto GenMCDriver::getRfReductions() const -> RfReductions
+{
+	return {getExec().getGraph(), getConsChecker(), getSymmChecker(),
+		{.symmetryReduction = getConf()->symmetryReduction,
+		 .disableBAM = getConf()->disableBAM,
+		 .blindRMWReduction = getConf()->blindRMWReduction,
+		 .exhaustive = getConf()->exhaustive}};
+}
+
 auto GenMCDriver::getRfsApproximation(ReadLabel *lab) -> std::vector<EventLabel *>
 {
 	auto &checker = getConsChecker();
@@ -2470,25 +2249,6 @@ auto GenMCDriver::getRfsApproximation(ReadLabel *lab) -> std::vector<EventLabel 
 	return rfs;
 }
 
-void GenMCDriver::filterOptimizeRfs(const ReadLabel *lab, std::vector<EventLabel *> &stores)
-{
-	/* Symmetry reduction */
-	if (getConf()->symmetryReduction)
-		filterSymmetricStoresSR(lab, stores);
-
-	/* BAM */
-	if (!getConf()->disableBAM)
-		filterConflictingBarriers(lab, stores);
-
-	/* Identical blind RMWs commute */
-	if (getConf()->blindRMWReduction)
-		filterCommutingBlindRMWs(lab, stores);
-
-	/* Keep values that do not lead to blocking (-exhaustive explores the
-	 * blocked executions too: the annotations are not trusted) */
-	if (!getConf()->exhaustive)
-		filterValuesFromAnnotSAVER(lab, stores);
-}
 
 void GenMCDriver::filterAtomicityViolations(const ReadLabel *rLab,
 					    std::vector<EventLabel *> &stores)
@@ -2596,7 +2356,7 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Rfs: {}", stores););
 	if (inVerificationMode())
 		pushWeakCasFailuresOnDroppedRfs(lab, stores);
-	filterOptimizeRfs(lab, stores);
+	getRfReductions().filter(lab, stores);
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Rfs (optimized): {}", stores););
 
 	const EventLabel *rf = nullptr;
