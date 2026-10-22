@@ -79,13 +79,20 @@ approximation; SRCU is `-lkmm` only.)
 The following functions from the ones defined in SV-COMP [\[SV-COMP 2019\]](references.md#sv-comp) are supported:
 
 - `void __VERIFIER_assume(int)`
-- `int __VERIFIER_nondet_int(void)`
+- `int __VERIFIER_nondet_int(void)` and the other integer variants, which
+  `<genmc.h>` declares with SV-COMP's types: `__VERIFIER_nondet_bool`,
+  `_char`, `_uchar`, `_short`, `_ushort`, `_uint`, `_unsigned`, `_long`,
+  `_ulong`, `_longlong`, `_ulonglong`, `_size_t`, `_int128` and `_uint128`.
+  `__VERIFIER_nondet_u32`, `_loff_t` and `_sector_t` are supported too; a
+  program declares them itself, as their types are its own.
 
 Note that, since GenMC is a stateless model checker,
-`__VERIFIER_nondet_int()` only "simulates" data non-determinism, and
-does actually provide support for it. More specifically, the sequence
-of numbers it produces for each thread remains the same across
-different executions.
+`__VERIFIER_nondet_*()` only "simulates" data non-determinism, and
+does not actually provide support for it. More specifically, the sequence
+of numbers they produce for each thread remains the same across
+different executions: GenMC explores one value per call, so a run that
+finds no errors does not cover the other values. The `float`, `double`
+and pointer variants are not supported.
 
 ## Rust APIs
 

@@ -24,8 +24,29 @@ void __VERIFIER_output(const char *msg);
  * Models a limited amount of non-determinism by returning
  * a pseudo-random sequence of integers. This sequence
  * is always the same per execution for each thread
+ *
+ * The other variants SV-COMP defines return such a value
+ * in their type. (__VERIFIER_nondet_u32, _loff_t and
+ * _sector_t are supported too, but their types are the
+ * program's own, so a program declares them itself.)
  */
 int __VERIFIER_nondet_int(void) __attribute__ ((__nothrow__));
+bool __VERIFIER_nondet_bool(void) __attribute__ ((__nothrow__));
+char __VERIFIER_nondet_char(void) __attribute__ ((__nothrow__));
+unsigned char __VERIFIER_nondet_uchar(void) __attribute__ ((__nothrow__));
+short __VERIFIER_nondet_short(void) __attribute__ ((__nothrow__));
+unsigned short __VERIFIER_nondet_ushort(void) __attribute__ ((__nothrow__));
+unsigned int __VERIFIER_nondet_uint(void) __attribute__ ((__nothrow__));
+unsigned int __VERIFIER_nondet_unsigned(void) __attribute__ ((__nothrow__));
+long __VERIFIER_nondet_long(void) __attribute__ ((__nothrow__));
+unsigned long __VERIFIER_nondet_ulong(void) __attribute__ ((__nothrow__));
+long long __VERIFIER_nondet_longlong(void) __attribute__ ((__nothrow__));
+unsigned long long __VERIFIER_nondet_ulonglong(void) __attribute__ ((__nothrow__));
+size_t __VERIFIER_nondet_size_t(void) __attribute__ ((__nothrow__));
+#ifdef __SIZEOF_INT128__
+__int128 __VERIFIER_nondet_int128(void) __attribute__ ((__nothrow__));
+unsigned __int128 __VERIFIER_nondet_uint128(void) __attribute__ ((__nothrow__));
+#endif
 
 /*
  * An (opaque) datatype used by GenMC's thread functions,

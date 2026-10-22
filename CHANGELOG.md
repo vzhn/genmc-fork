@@ -36,6 +36,18 @@ released.
   source tree's, as before (`scripts/check-install-headers.sh`, ctest
   `install-headers`).
 
+### Added
+
+- The other integer `__VERIFIER_nondet_X()` of SV-COMP (#48): `bool`,
+  `char`, `uchar`, `short`, `ushort`, `uint`, `unsigned`, `long`, `ulong`,
+  `longlong`, `ulonglong`, `size_t`, `int128` and `uint128`, declared in
+  `genmc.h`, and `u32`, `loff_t` and `sector_t`, which a program declares
+  itself. Before, a call to any of them stopped GenMC with "Tried to
+  execute an unknown external function". Like `__VERIFIER_nondet_int()`,
+  each call returns one value (an `int` of the same pseudo-random sequence,
+  fitted to the type). The `float`, `double` and pointer variants are
+  still unsupported (`tests/correct/infr/nondet-variants`).
+
 
 ## [0.19.0-vzhn.14] - 2026.10.22
 

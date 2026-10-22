@@ -3111,9 +3111,10 @@ void Interpreter::callNondetInt(Function *F, const std::vector<GenericValue> &Ar
 {
 	Thread::MyDist dist(std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
 
+	/* The other __VERIFIER_nondet_X() share this: fit the int drawn to X */
 	GenericValue result;
-	result.IntVal = APInt(F->getReturnType()->getIntegerBitWidth(), dist(getCurThr().rng),
-			      true); // signed
+	result.IntVal = APInt(32, dist(getCurThr().rng), true) // signed
+				.sextOrTrunc(F->getReturnType()->getIntegerBitWidth());
 	returnValueToCaller(F->getReturnType(), result);
 	return;
 }
