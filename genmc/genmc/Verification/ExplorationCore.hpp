@@ -14,7 +14,7 @@
 #ifndef GENMC_EXPLORATION_CORE_HPP
 #define GENMC_EXPLORATION_CORE_HPP
 
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/BackwardRevisits.hpp"

@@ -5,7 +5,7 @@
 #   genmc_support       ADT/, Support/: containers, clocks, values, errors
 #   genmc_graph         Execution/: events, labels, graphs, the GraphModel
 #                       interface the graph needs from a memory model
-#   genmc_models        Execution/Consistency/: the memory models (Kater
+#   genmc_models        Models/: the memory models (Kater
 #                       generated), symmetry and bounding deciders
 #   genmc_verification  Verification/: exploration, driver, configuration,
 #                       Relinche
@@ -33,23 +33,23 @@ set(GENMC_GRAPH_SOURCES
   genmc/Execution/ExecutionGraph.cpp
   genmc/Execution/ExecutionState.cpp
   genmc/Execution/GraphUtils.cpp
-  genmc/Execution/Consistency/ModelInterfaces.cpp
+  genmc/Execution/ModelInterfaces.cpp
 )
 set(GENMC_MODELS_SOURCES
-  genmc/Execution/LkmmModel.cpp
-  genmc/Execution/LkmmRelations.cpp
-  genmc/Execution/Consistency/BoundDecider.cpp
-  genmc/Execution/Consistency/ConsistencyChecker.cpp
-  genmc/Execution/Consistency/ContextBoundDecider.cpp
-  genmc/Execution/Consistency/IMMChecker.cpp
-  genmc/Execution/Consistency/LKMMChecker.cpp
-  genmc/Execution/Consistency/LKMMRcuChecker.cpp
-  genmc/Execution/Consistency/RAChecker.cpp
-  genmc/Execution/Consistency/RC11Checker.cpp
-  genmc/Execution/Consistency/RoundBoundDecider.cpp
-  genmc/Execution/Consistency/SCChecker.cpp
-  genmc/Execution/Consistency/SymmetryChecker.cpp
-  genmc/Execution/Consistency/TSOChecker.cpp
+  genmc/Models/LkmmModel.cpp
+  genmc/Models/LkmmRelations.cpp
+  genmc/Models/BoundDecider.cpp
+  genmc/Models/ConsistencyChecker.cpp
+  genmc/Models/ContextBoundDecider.cpp
+  genmc/Models/IMMChecker.cpp
+  genmc/Models/LKMMChecker.cpp
+  genmc/Models/LKMMRcuChecker.cpp
+  genmc/Models/RAChecker.cpp
+  genmc/Models/RC11Checker.cpp
+  genmc/Models/RoundBoundDecider.cpp
+  genmc/Models/SCChecker.cpp
+  genmc/Models/SymmetryChecker.cpp
+  genmc/Models/TSOChecker.cpp
 )
 set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/ChoiceCandidates.cpp

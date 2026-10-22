@@ -17,7 +17,7 @@
  * frame order, and the binding of every frame to the stack's model.
  */
 
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/ExecutionState.hpp"
 #include "genmc/Execution/MemoryModel.hpp"
 #include "genmc/Verification/ExplorationStack.hpp"

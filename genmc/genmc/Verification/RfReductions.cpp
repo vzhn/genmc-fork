@@ -14,7 +14,7 @@
 
 #include "genmc/Verification/RfReductions.hpp"
 #include "genmc/Verification/BackwardRevisits.hpp"
-#include "genmc/Execution/Consistency/SymmetryChecker.hpp"
+#include "genmc/Models/SymmetryChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/GraphUtils.hpp"
 #include "genmc/Support/Error.hpp"

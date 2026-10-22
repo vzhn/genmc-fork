@@ -17,7 +17,7 @@
 #ifndef GENMC_LKMM_RCU_CHECKER_HPP
 #define GENMC_LKMM_RCU_CHECKER_HPP
 
-#include "genmc/Execution/Consistency/LKMMChecker.hpp"
+#include "genmc/Models/LKMMChecker.hpp"
 
 /** The Linux-kernel memory model: the Kater-generated LKMMChecker, plus the
  * axioms it cannot generate: RCU's (irreflexive rb), which counts grace

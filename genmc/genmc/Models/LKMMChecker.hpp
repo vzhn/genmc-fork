@@ -19,7 +19,7 @@
 #ifndef GENMC_LKMM_CHECKER_HPP
 #define GENMC_LKMM_CHECKER_HPP
 
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include <concepts>
 #include <cstdint>

@@ -13,7 +13,7 @@
 
 
 #include "genmc/Verification/ExplorationStack.hpp"
-#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
+#include "genmc/Execution/ModelInterfaces.hpp"
 #include "genmc/Execution/DepExecutionGraph.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/Config.hpp"

@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "StubChecker.hpp"
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Execution/GraphUtils.hpp"

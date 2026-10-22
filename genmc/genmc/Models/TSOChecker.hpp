@@ -15,17 +15,17 @@
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
  *******************************************************************************/
 
-#ifndef GENMC_SC_CHECKER_HPP
-#define GENMC_SC_CHECKER_HPP
+#ifndef GENMC_TSO_CHECKER_HPP
+#define GENMC_TSO_CHECKER_HPP
 
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include <concepts>
 #include <cstdint>
 #include <vector>
 
 // NOLINTBEGIN
-class SCChecker : public ConsistencyChecker {
+class TSOChecker : public ConsistencyChecker {
 
 private:
 	enum class NodeStatus : uint32_t { unseen = 0, entered = 1, left = 2 };
@@ -154,7 +154,7 @@ private:
 	};
 
 public:
-	SCChecker(const Config *conf) : ConsistencyChecker(conf) {};
+	TSOChecker(const Config *conf) : ConsistencyChecker(conf) {};
 
 private:
 	bool isConsistent(const EventLabel *lab) const override;
@@ -224,6 +224,9 @@ private:
 	bool visitCoherenceRelinche(const ExecutionGraph &g) const;
 
 	mutable NodeVisitStatusVector visitedConsAcyclic1_0;
+	mutable NodeVisitStatusVector visitedConsAcyclic1_1;
+	mutable NodeVisitStatusVector visitedConsAcyclic1_2;
+	mutable NodeVisitStatusVector visitedConsAcyclic1_3;
 	mutable uint32_t visitedConsAcyclic1Accepting;
 
 	bool visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &worklist) const;
@@ -322,4 +325,4 @@ private:
 
 // NOLINTEND
 
-#endif /* GENMC_SC_CHECKER_HPP */
+#endif /* GENMC_TSO_CHECKER_HPP */

@@ -46,7 +46,7 @@
  * of kat/lkmm-genmc.kat (the Kater fork), which generates the rest.
  */
 
-#include "genmc/Execution/LkmmRelations.hpp"
+#include "genmc/Models/LkmmRelations.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Support/Cast.hpp"

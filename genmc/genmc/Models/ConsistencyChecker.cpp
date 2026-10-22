@@ -11,13 +11,13 @@
  *     https://opensource.org/licenses/MIT
  */
 
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
-#include "genmc/Execution/Consistency/IMMChecker.hpp"  // NOLINT(misc-include-cleaner)
-#include "genmc/Execution/Consistency/LKMMRcuChecker.hpp" // NOLINT(misc-include-cleaner)
-#include "genmc/Execution/Consistency/RAChecker.hpp"   // NOLINT(misc-include-cleaner)
-#include "genmc/Execution/Consistency/RC11Checker.hpp" // NOLINT(misc-include-cleaner)
-#include "genmc/Execution/Consistency/SCChecker.hpp"   // NOLINT(misc-include-cleaner)
-#include "genmc/Execution/Consistency/TSOChecker.hpp"  // NOLINT(misc-include-cleaner)
+#include "genmc/Models/ConsistencyChecker.hpp"
+#include "genmc/Models/IMMChecker.hpp"  // NOLINT(misc-include-cleaner)
+#include "genmc/Models/LKMMRcuChecker.hpp" // NOLINT(misc-include-cleaner)
+#include "genmc/Models/RAChecker.hpp"   // NOLINT(misc-include-cleaner)
+#include "genmc/Models/RC11Checker.hpp" // NOLINT(misc-include-cleaner)
+#include "genmc/Models/SCChecker.hpp"   // NOLINT(misc-include-cleaner)
+#include "genmc/Models/TSOChecker.hpp"  // NOLINT(misc-include-cleaner)
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/MemoryModel.hpp"
 #include "genmc/Support/Error.hpp"

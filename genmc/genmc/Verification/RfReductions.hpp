@@ -24,7 +24,7 @@
  * what a proof of the reduction has to establish.
  */
 
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 
 #include <vector>

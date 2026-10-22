@@ -20,7 +20,7 @@
 #include "genmc/Support/Error.hpp"
 #include "genmc/Support/Parser.hpp"
 #include "genmc/Support/ThreadInfo.hpp"
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/Relinche/Observation.hpp"
 

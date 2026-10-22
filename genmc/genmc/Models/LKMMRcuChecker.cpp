@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#include "genmc/Execution/Consistency/LKMMRcuChecker.hpp"
+#include "genmc/Models/LKMMRcuChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
-#include "genmc/Execution/LkmmModel.hpp"
-#include "genmc/Execution/LkmmRelations.hpp"
+#include "genmc/Models/LkmmModel.hpp"
+#include "genmc/Models/LkmmRelations.hpp"
 #include "genmc/Support/Error.hpp"
 
 #include <algorithm>

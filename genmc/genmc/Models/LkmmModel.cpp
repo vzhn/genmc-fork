@@ -60,7 +60,7 @@
  * acquire read, and the pairs they order are no potential races.
  */
 
-#include "genmc/Execution/LkmmModel.hpp"
+#include "genmc/Models/LkmmModel.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Support/Cast.hpp"

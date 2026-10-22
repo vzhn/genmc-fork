@@ -12,7 +12,7 @@
  */
 
 
-#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
+#include "genmc/Execution/ModelInterfaces.hpp"
 #include "genmc/ADT/VectorClock.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 

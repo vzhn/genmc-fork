@@ -12,7 +12,7 @@
  */
 
 #include "genmc/Verification/ErrorRules.hpp"
-#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
+#include "genmc/Execution/ModelInterfaces.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Execution/ExecutionState.hpp"

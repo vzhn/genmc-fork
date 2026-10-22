@@ -25,7 +25,7 @@
  * prefixes of symmetry reduction, see ExplorationCore::updateLabelViews()).
  */
 
-#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 
 #include <functional>

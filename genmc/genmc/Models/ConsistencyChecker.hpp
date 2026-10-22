@@ -14,7 +14,7 @@
 #ifndef GENMC_CONSISTENCY_CHECKER_HPP
 #define GENMC_CONSISTENCY_CHECKER_HPP
 
-#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
+#include "genmc/Execution/ModelInterfaces.hpp"
 
 #include <cstdint>
 #include <memory>

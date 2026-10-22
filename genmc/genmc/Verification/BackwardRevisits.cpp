@@ -15,7 +15,7 @@
 #include "genmc/Verification/BackwardRevisits.hpp"
 #include "genmc/ADT/DepView.hpp"
 #include "genmc/ADT/VectorClock.hpp"
-#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
+#include "genmc/Execution/ModelInterfaces.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/DepExecutionGraph.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"

@@ -19,7 +19,7 @@
 #include "genmc/ADT/View.hpp"
 #include "genmc/ADT/ilist.hpp"
 #include "genmc/Execution/CBIterator.hpp"
-#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
+#include "genmc/Execution/ModelInterfaces.hpp"
 #include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionState.hpp"
