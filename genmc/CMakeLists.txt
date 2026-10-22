@@ -52,6 +52,7 @@ set(GENMC_MODELS_SOURCES
   genmc/Execution/Consistency/TSOChecker.cpp
 )
 set(GENMC_VERIFICATION_SOURCES
+  genmc/Verification/ChoiceCandidates.cpp
   genmc/Verification/ChoiceMap.cpp
   genmc/Verification/Config.cpp
   genmc/Verification/ErrorRules.cpp

@@ -18,6 +18,7 @@
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/BackwardRevisits.hpp"
+#include "genmc/Verification/ChoiceCandidates.hpp"
 #include "genmc/Verification/ChoiceMap.hpp"
 #include "genmc/Verification/ExecutionFrame.hpp"
 #include "genmc/Verification/ExplorationStack.hpp"
@@ -491,11 +492,6 @@ private:
 	 * LOADS, and returns whether we can skip revisiting altogether */
 	auto tryOptimizeRevisits(WriteLabel *lab, std::vector<ReadLabel *> &loads) -> bool;
 
-	/** -exhaustive under IMM: adds to LOADS the CAS reads in PREFIX, SLAB's
-	 * prefix, whose ordering or write part reading from SLAB would change */
-	void addRevisitableCases(WriteLabel *sLab, const VectorClock &prefix,
-				 std::vector<ReadLabel *> &loads);
-
 	/** -exhaustive under IMM: computes the views of G's labels anew, in G,
 	 * and drops their cached prefix views. Returns false if they do not
 	 * settle (an hb cycle) */
@@ -583,9 +579,6 @@ private:
 	/** SAVer: Given the end of a potential FAI-ZNE spinloop,
 	 * returns true if it is indeed a spinloop */
 	auto areFaiZNEConstraintsSat(const FaiZNESpinEndLabel *lab) -> bool;
-
-	/** Estimation: Filters outs stores read by RMW loads */
-	void filterAtomicityViolations(const ReadLabel *lab, std::vector<EventLabel *> &stores);
 
 	/** IPR: Performs BR in-place */
 	void revisitInPlace(const BackwardRevisit &br);
@@ -676,6 +669,9 @@ private:
 
 	/** The rf reductions on the current graph (see RfReductions) */
 	auto getRfReductions() const -> RfReductions;
+
+	/** The rf and revisit candidates on the current graph (see ChoiceCandidates) */
+	auto getChoiceCandidates() -> ChoiceCandidates;
 
 	/** The part of LAB's prefix its revisits take (not cached; see
 	 * ConsistencyChecker::calculateRevisitPrefixView()) */
