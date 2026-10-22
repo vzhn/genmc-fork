@@ -33,6 +33,7 @@ set(LIB_SOURCES
   genmc/Verification/ChoiceMap.cpp
   genmc/Verification/Config.cpp
   genmc/Verification/ExecutionFrame.cpp
+  genmc/Verification/Explorer.cpp
   genmc/Verification/GenMCDriver.cpp
   genmc/Verification/GraphHash.cpp
   genmc/Verification/GraphPrinting.cpp

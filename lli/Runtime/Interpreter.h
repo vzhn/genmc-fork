@@ -39,6 +39,7 @@
 #include "genmc/Support/SAddr.hpp"
 #include "genmc/Support/SVal.hpp"
 #include "genmc/Support/ThreadInfo.hpp"
+#include "genmc/Verification/EventProducer.hpp"
 #include "genmc/Verification/GenMCDriver.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
 #include "genmc/Verification/VerificationError.hpp"
@@ -395,7 +396,9 @@ using InterpreterState = DynamicComponents;
 
 // Interpreter - This class represents the entirety of the interpreter.
 //
-class Interpreter : public ExecutionEngine, public InstVisitor<Interpreter> {
+class Interpreter : public ExecutionEngine,
+		    public InstVisitor<Interpreter>,
+		    public EventProducer {
 
 protected:
 	using AnnotID = ModuleID::ID;
@@ -493,7 +496,7 @@ public:
 	/* Saves the dynamic state at the event at POS, which the current thread
 	 * is adding (see ResumePoint); null if the runtime is not inside the
 	 * instruction that adds it */
-	auto saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>;
+	auto saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint> override;
 
 	/* Restores a saved state and runs on from it, instead of runMain(),
 	 * unless a thread of the state is past the graph (an event of its that
@@ -503,7 +506,15 @@ public:
 	 * restriction may have kept the begin of a thread the state does not
 	 * have, which is added as new) and LASTIDX each thread's last event */
 	auto resumeFrom(const ResumePoint &rp, const std::vector<ThreadInfo> &tis,
-			const std::vector<int> &lastIdx) -> bool;
+			const std::vector<int> &lastIdx) -> bool override;
+
+	/* Runs main() from scratch on the threads TIS (see EventProducer) */
+	void runFromStart(const std::vector<ThreadInfo> &tis, bool collectDbg) override
+	{
+		reset();
+		setExecutionContext(tis);
+		runMain(collectDbg);
+	}
 
 	Thread &constructAddThreadFromInfo(const ThreadInfo &ti)
 	{
@@ -663,7 +674,7 @@ public:
 #ifdef LLVM_EXECUTION_ENGINE_RUN_FUNCTION_VECTOR
 	virtual GenericValue runFunction(Function *F, const std::vector<GenericValue> &ArgValues);
 #else
-	virtual GenericValue runFunction(Function *F, llvm::ArrayRef<GenericValue> ArgValues);
+	GenericValue runFunction(Function *F, llvm::ArrayRef<GenericValue> ArgValues) override;
 #endif
 
 	void *getPointerToNamedFunction(const std::string &Name, bool AbortOnFailure = true)
@@ -672,7 +683,7 @@ public:
 		return nullptr;
 	}
 
-	void *getPointerToNamedFunction(llvm::StringRef Name, bool AbortOnFailure = true)
+	void *getPointerToNamedFunction(llvm::StringRef Name, bool AbortOnFailure = true) override
 	{
 		// FIXME: not implemented.
 		return nullptr;
@@ -792,7 +803,7 @@ private: // Helper functions
 
 	/* A function's address is the Function* of the canonical module (see
 	 * funToCanon_), so that all workers of a thread pool agree on it */
-	void *getPointerToFunction(Function *F)
+	void *getPointerToFunction(Function *F) override
 	{
 		auto it = funToCanon_.find(F);
 		return it == funToCanon_.end() ? (void *)F : it->second;

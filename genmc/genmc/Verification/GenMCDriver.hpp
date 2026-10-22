@@ -50,6 +50,7 @@ class Module;
 } // namespace llvm
 struct ModuleInfo;
 class ThreadPool;
+class EventProducer;
 struct LLIConfig;
 class BoundDecider;
 class ConsistencyChecker;
@@ -186,6 +187,10 @@ public:
 
 	/** Whether there are more executions to be explored */
 	auto done() -> bool;
+
+	/** The graph of the execution being explored (read-only: for producers
+	 * and observers, e.g. to read a complete execution's outcome) */
+	auto getCurrentGraph() const -> const ExecutionGraph & { return getExec().getGraph(); }
 
 	/** Returns the result of the verification procedure */
 	auto getResult() const -> const VerificationResult & { return result; }
@@ -342,7 +347,7 @@ protected:
 	friend class ArbitraryScheduler;
 	friend class ThreadPool;
 	friend class DriverHandlerDispatcher;
-	friend void run(GenMCDriver *driver, llvm::Interpreter *interp);
+	friend void explore(GenMCDriver &driver, EventProducer &producer);
 	friend auto estimate(const LLIConfig &lliConfig, std::shared_ptr<const Config> conf,
 			     const std::unique_ptr<llvm::Module> &mod,
 			     const std::unique_ptr<ModuleInfo> &modInfo) -> VerificationResult;

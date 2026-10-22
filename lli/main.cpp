@@ -16,6 +16,7 @@
 #include "genmc/Support/Logger.hpp"
 #include "ThreadPool.hpp"
 #include "genmc/Verification/Config.hpp"
+#include "genmc/Verification/Explorer.hpp"
 #include "genmc/Verification/GenMCDriver.hpp"
 #include "genmc/lli_config.h"
 #include "passes/LLIConfig.hpp"
@@ -1055,47 +1056,7 @@ static void calculateHintsAndSaveSpec(const std::shared_ptr<const Config> &conf,
 	serialize(specFile, spec);
 }
 
-/* Each thread's last event in G (see Interpreter::resumeFrom()) */
-static auto lastIndices(const ExecutionGraph &g) -> std::vector<int>
-{
-	std::vector<int> v;
-	for (auto i = 0U; i < g.getNumThreads(); i++)
-		v.push_back(g.getThreadSize(i) - 1);
-	return v;
-}
-
-static auto createExecutionContext(const ExecutionGraph &g) -> std::vector<ThreadInfo>
-{
-	std::vector<ThreadInfo> tis;
-	for (auto i = 1U; i < g.getNumThreads(); i++) { // skip main
-		const auto *bLab = g.getFirstThreadLabel(i);
-		VERIFY(bLab);
-		tis.push_back(bLab->getThreadInfo());
-	}
-	return tis;
-}
-
-void run(GenMCDriver *driver, llvm::Interpreter *EE)
-{
-	driver->setResumeHook([EE](Event pos) { return EE->saveResumePoint(pos); });
-	do {
-		auto errorReplay = driver->handleExecutionStart();
-		const auto &g = driver->getExec().getGraph();
-		if (!errorReplay && driver->runFromCache()) {
-			driver->handleExecutionEnd();
-			continue;
-		}
-		auto rp = driver->takePendingResumePoint();
-		auto resumed = rp && !errorReplay &&
-			       EE->resumeFrom(*rp, createExecutionContext(g), lastIndices(g));
-		if (!resumed) {
-			EE->reset();
-			EE->setExecutionContext(createExecutionContext(g));
-			EE->runMain(errorReplay);
-		}
-		driver->handleExecutionEnd();
-	} while (!driver->done());
-}
+void run(GenMCDriver *driver, llvm::Interpreter *EE) { explore(*driver, *EE); }
 
 auto estimate(const LLIConfig &lliConfig, std::shared_ptr<const Config> conf,
 	      const std::unique_ptr<llvm::Module> &mod, const std::unique_ptr<ModuleInfo> &modInfo)
