@@ -72,6 +72,21 @@ released.
   line. A block the error replay does not re-execute, such as that of a
   `pthread_join()` waiting for a stuck thread, still has no location
   (`scripts/check-call-site-locs.sh`, ctest `call-site-locs`).
+- Error traces gave the fields of stack variables no name: an access to
+  `loc.b` of a local `struct pair loc` printed as `(, 1)`. LLVM (19 and
+  later) keeps a variable's `dbg.declare` as a debug record attached to
+  an instruction, which the collection of names did not look at; it reads
+  both forms now (`tests/wrong/infr/print-names-local`).
+- Error traces gave heap blocks no name (#144): a field of a `malloc`'d
+  or `calloc`'d object printed as `(, 1)`. A heap block is now named after
+  the program's call that allocated it, numbered if that call made
+  several (`calloc@locs.c:18`, `new@list.cpp:7#2`), with the fields of
+  the type its result is stored as when known: the pointee type of the
+  local or global variable it is stored to, or of the function that
+  returns it (`calloc@locs.c:18.mutex.__private`). A block larger than
+  that type is an array of it (`calloc@a.c:12[2].next`); a block of
+  unknown type shows the offset (`malloc@a.c:30+8`)
+  (`tests/wrong/infr/print-names-heap`, `tests/wrong/infr/print-names-heap-new`).
 - `-print-error-trace` left out the event right after a thread's
   creation, taking it for the store of the new thread's ID: when the
   `pthread_t` was kept in a register, which has no such store, a second

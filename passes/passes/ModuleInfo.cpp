@@ -83,6 +83,7 @@ auto ModuleInfo::clone(const llvm::Module &mod) const -> std::unique_ptr<ModuleI
 	}
 	for (const auto &kv : varInfo.internalInfo)
 		info->varInfo.internalInfo[kv.first] = kv.second;
+	info->varInfo.heapInfo = varInfo.heapInfo;
 
 	/* Copy annotation information */
 	for (const auto &kv : annotInfo.annotMap)

@@ -41,8 +41,16 @@ private:
 	/* Collects name info for a global variable */
 	void collectGlobalInfo(llvm::GlobalVariable &v);
 
-	/* Collects name info for a stack variable */
-	void collectLocalInfo(llvm::DbgDeclareInst *dbgDecl);
+	/* Collects name info for a stack variable, from its declaration */
+	void collectLocalInfo(llvm::Value *address, llvm::DILocalVariable *var);
+
+	/* Collects name info for the blocks a call to an allocation function
+	 * returns, from the type it is used as */
+	void collectHeapInfo(llvm::CallBase *cb);
+
+	/* The type of the blocks CB allocates: the pointee type of the variable
+	 * its result is stored to, or of its function's result */
+	auto getHeapType(llvm::CallBase *cb) -> llvm::DIType *;
 
 	/*
 	 * Collects name info about global variables w/ private linkage

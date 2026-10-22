@@ -24,6 +24,7 @@
 #include <llvm/ADT/IndexedMap.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Metadata.h>
 
 #include "genmc/ADT/value_ptr.hpp"
 
@@ -41,6 +42,13 @@ class Value;
  * Information kept about the module under test by the interpreter.
  */
 
+/** The type a heap allocation is used as (see getHeapInfoKey()): the names
+ * of its fields, and its size (a larger block is an array of it) */
+struct HeapInfo {
+	std::shared_ptr<NameInfo> fields;
+	uint64_t size{};
+};
+
 /** Source-code level (naming) information for variables */
 template <typename Key> struct VariableInfo {
 
@@ -49,17 +57,34 @@ template <typename Key> struct VariableInfo {
 	using ID = Key;
 	using InternalKey = std::string;
 
+	using HeapKey = std::string;
+
 	std::unordered_map<ID, std::shared_ptr<NameInfo>> globalInfo;
 	std::unordered_map<ID, std::shared_ptr<NameInfo>> localInfo;
 	std::unordered_map<InternalKey, std::shared_ptr<NameInfo>> internalInfo;
+	std::unordered_map<HeapKey, HeapInfo> heapInfo;
 
 	void clear()
 	{
 		globalInfo.clear();
 		localInfo.clear();
 		internalInfo.clear();
+		heapInfo.clear();
 	}
 };
+
+/** The metadata that names an allocation call's entry in heapInfo */
+inline constexpr const char *heapInfoMDKind = "genmc.heap";
+
+/** The key of the allocation call I in heapInfo, if it has one */
+inline auto getHeapInfoKey(const llvm::Instruction &I) -> std::optional<std::string>
+{
+	const auto *md = I.getMetadata(heapInfoMDKind);
+	const auto *str = md ? llvm::dyn_cast<llvm::MDString>(md->getOperand(0)) : nullptr;
+	if (!str)
+		return std::nullopt;
+	return str->getString().str();
+}
 
 /** Annotations for loads used by assume()s for SAVer */
 template <typename K, typename V> struct AnnotationInfo {
