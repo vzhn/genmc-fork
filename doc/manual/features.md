@@ -599,7 +599,9 @@ tracking), the reference keeps its graphs well formed and consistent:
   an RMW's read for its write part, a read's write, its thread's
   creation); a revisit for which that includes the revisited read, or an
   event the graph does not have, is not taken. No kept write then changes
-  when the threads fill the holes;
+  when the threads fill the holes. (A thread's begin, which every graph
+  keeps, keeps nothing: a thread with no other kept event starts anew
+  once it is created again);
 - the views of the revisited graph's labels are computed anew, and the
   graph is checked as a whole (coherence, RMW atomicity, the other
   axioms); an inconsistent one is not explored. A read or write that

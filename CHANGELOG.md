@@ -11,6 +11,16 @@ released.
 
 ### Fixed
 
+- `-exhaustive` reported a false "Non-atomic race!" under `-imm` in
+  `tests/correct/saver/spin-fmutex`, where the default exploration finds
+  none in 1719 executions. A backward revisit keeps, with each kept
+  event, the creation of its thread, and it took every thread's begin for
+  a kept event (every view has it): the create of a thread that had not
+  run yet was kept, without the join before it in `main`. Once the join
+  was executed again, the views of the create and of the thread still
+  lacked it, and the thread's accesses raced with those of the joined
+  thread. A begin alone now keeps nothing; `-exhaustive` gives 1719
+  executions (`tests/correct/infr/imm-exhaustive-kept-begin`).
 - `-lkmm` gave events after a branch control dependencies the source does
   not have (#78): LLVM's `JumpThreadingPass`, when a later branch tests a
   value an earlier one set, moves the code after the earlier branch's join

@@ -4051,9 +4051,12 @@ auto GenMCDriver::keepValueDependencies(Event r, VectorClock &v) const -> bool
 {
 	const auto &g = getExec().getGraph();
 	auto &dv = *genmc::cast<DepView>(&v);
+	/* (Every view contains the begins: a begin is not kept for its own sake
+	 * and keeps nothing, its thread's kept events keep the create) */
 	std::vector<Event> work;
 	for (const auto &lab : g.labels())
-		if (lab.getPos() != r && !genmc::isa<EmptyLabel>(&lab) && v.contains(lab.getPos()))
+		if (lab.getPos() != r && !genmc::isa<EmptyLabel>(&lab) &&
+		    !genmc::isa<ThreadStartLabel>(&lab) && v.contains(lab.getPos()))
 			work.push_back(lab.getPos());
 	while (!work.empty()) {
 		const auto *lab = g.getEventLabel(work.back());
