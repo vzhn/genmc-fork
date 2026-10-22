@@ -35,6 +35,27 @@ released.
   moved prefix works too); a binary run from its build tree uses the
   source tree's, as before (`scripts/check-install-headers.sh`, ctest
   `install-headers`).
+- `__VERIFIER_nondet_int()` returns the same pseudo-random sequence in
+  every execution, so GenMC explores one value per call, and nothing said
+  so: `int x = __VERIFIER_nondet_int(); assert(x != 1);` reported "No
+  errors were detected" after one execution (#48). GenMC now warns, once
+  per run and before exploring, when the program calls such a function:
+  the warning names the functions called and says that a run that finds
+  no errors does not cover their other values. Each call still returns
+  one value (`scripts/check-nondet-warning.sh`, ctest `nondet-warning`).
+
+### Added
+
+- The other integer `__VERIFIER_nondet_X()` of SV-COMP (#48): `bool`,
+  `char`, `uchar`, `short`, `ushort`, `uint`, `unsigned`, `long`, `ulong`,
+  `longlong`, `ulonglong`, `size_t`, `int128` and `uint128`, declared in
+  `genmc.h`, and `u32`, `loff_t` and `sector_t`, which a program declares
+  itself. Before, a call to any of them stopped GenMC with "Tried to
+  execute an unknown external function". Like `__VERIFIER_nondet_int()`,
+  each call returns one value (an `int` of the same pseudo-random sequence,
+  fitted to the type), and GenMC prints the same warning. The `float`,
+  `double` and pointer variants are still unsupported
+  (`tests/correct/infr/nondet-variants`).
 
 
 ## [0.19.0-vzhn.14] - 2026.10.22
