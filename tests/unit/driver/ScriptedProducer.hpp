@@ -26,7 +26,9 @@
 #include "genmc/Verification/Explorer.hpp"
 #include "genmc/Verification/GenMCDriver.hpp"
 
+#include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <set>
 #include <string>
@@ -43,6 +45,9 @@ struct Op {
 	std::uint32_t val = 0;
 	MemOrdering ord = MemOrdering::Relaxed;
 	std::uint32_t expected = 0; /* CompareSwap: swaps in VAL if it reads this */
+	bool blind = false;	    /* FetchAdd: its result is not used */
+
+	auto operator==(const Op &) const -> bool = default;
 };
 
 inline auto ld(unsigned var, MemOrdering ord = MemOrdering::Relaxed) -> Op
@@ -53,6 +58,13 @@ inline auto st(unsigned var, std::uint32_t val, MemOrdering ord = MemOrdering::R
 {
 	return {.kind = OpKind::Store, .var = var, .val = val, .ord = ord};
 }
+/** A fetch-and-add whose result the program does not use (a blind RMW:
+ * its read is not part of the outcome, and -blind-rmw-reduction applies) */
+inline auto blindFai(unsigned var, std::uint32_t val) -> Op
+{
+	return {.kind = OpKind::FetchAdd, .var = var, .val = val, .blind = true};
+}
+
 /** An atomic fetch-and-add of VAL (its read's value is part of the outcome) */
 inline auto fai(unsigned var, std::uint32_t val, MemOrdering ord = MemOrdering::Relaxed) -> Op
 {
@@ -77,8 +89,15 @@ struct Program {
 	std::vector<std::vector<Op>> threads;
 };
 
-/** The values one complete execution read, per thread in program order */
+/** One complete execution: the values each thread read, in program order
+ * (but those of blind RMWs), and last the final value of each variable */
 using Outcome = std::vector<std::vector<std::uint32_t>>;
+
+/** The reductions an exploration uses */
+struct Options {
+	bool symmetryReduction = false;
+	bool blindRMWReduction = false;
+};
 
 class Producer : public EventProducer {
 public:
@@ -98,7 +117,7 @@ public:
 		pc_.assign(1, 0);
 		acts_.emplace_back(ActionKind::NonLoad, Event(0, 0));
 		for (const auto &ti : tis)
-			addThread(ti.id, ti.funId);
+			addThread(ti.id, static_cast<unsigned>(ti.arg.get()));
 
 		auto next = driver_.scheduleNext(acts_);
 		while (const auto *tid = std::get_if<int>(&next)) {
@@ -122,15 +141,25 @@ private:
 	 * does not see every read.) */
 	auto outcomeOf(const ExecutionGraph &g) const -> Outcome
 	{
-		Outcome out(prog_.threads.size());
+		Outcome out(prog_.threads.size() + 1);
 		for (auto t = 1U; t < g.getNumThreads(); t++) {
-			auto fun = g.getFirstThreadLabel(t)->getThreadInfo().funId;
+			auto prog = g.getFirstThreadLabel(t)->getThreadInfo().arg.get();
 			for (auto i = 0U; i < g.getThreadSize(t); i++) {
 				const auto *lab = g.getEventLabel(Event(static_cast<int>(t), static_cast<int>(i)));
-				if (genmc::isa<ReadLabel>(lab))
-					out[fun - 1].push_back(
-						static_cast<std::uint32_t>(lab->getReturnValue().get()));
+				const auto *rLab = genmc::dyn_cast<ReadLabel>(lab);
+				if (!rLab)
+					continue;
+				const auto *fLab = genmc::dyn_cast<FaiReadLabel>(rLab);
+				if (fLab && fLab->hasAttr(WriteAttr::Blind))
+					continue;
+				out[prog - 1].push_back(static_cast<std::uint32_t>(rLab->getReturnValue().get()));
 			}
+		}
+		for (auto v = 0U; v < prog_.numVars; v++) {
+			const auto *wLab = g.containsLoc(addrs_[v])
+						   ? genmc::dyn_cast<WriteLabel>(g.co_max(addrs_[v]))
+						   : nullptr; /* never written: the initial 0 */
+			out.back().push_back(wLab ? static_cast<std::uint32_t>(wLab->getVal().get()) : 0U);
 		}
 		return out;
 	}
@@ -176,11 +205,17 @@ private:
 		const auto pos = acts_[tid].event;
 		if (tid == 0) {
 			if (pc_[0] < prog_.threads.size()) {
-				auto fun = static_cast<unsigned>(pc_[0] + 1);
-				ThreadInfo info(-1, 0, fun, SVal(0), "t" + std::to_string(fun));
+				/* Identical threads run the same function (so that symmetry
+				 * reduction sees them); the argument, unused, names the thread */
+				auto prog = static_cast<unsigned>(pc_[0] + 1);
+				auto fun = 1U + static_cast<unsigned>(std::distance(
+						   prog_.threads.begin(),
+						   std::ranges::find(prog_.threads, prog_.threads[prog - 1])));
+				ThreadInfo info(-1, 0, fun, SVal(prog), "t" + std::to_string(prog));
+				info.argUsed = false;
 				if (const auto *child = advance(0, driver_.handleThreadCreate(
 									   nullptr, pos, info, EventDeps())))
-					addThread(*child, fun);
+					addThread(*child, prog);
 			} else {
 				advance(0, driver_.handleThreadFinish(nullptr, pos, SVal(0)));
 			}
@@ -231,17 +266,18 @@ private:
 			/* One instruction, two events (as the interpreter issues an
 			 * atomicrmw): the read, then the write of the sum. If either is
 			 * reset, the instruction runs again */
+			auto wattr = op.blind ? WriteAttr::Blind : WriteAttr::None;
 			auto r = driver_.handleFaiRead(nullptr, pos, op.ord, addrs_[op.var],
-						       ASize(kSize), RMWBinOp::Add, SVal(op.val),
-						       WriteAttr::None, nullptr, std::nullopt, EventDeps());
+						       ASize(kSize), RMWBinOp::Add, SVal(op.val), wattr,
+						       nullptr, std::nullopt, EventDeps());
 			acts_[tid].event.index += static_cast<int>(r.count);
 			const auto *old = std::get_if<SVal>(&r.result);
 			if (!old)
 				break;
 			auto sum = static_cast<std::uint32_t>(old->get() + op.val);
 			advance(tid, driver_.handleFaiWrite(nullptr, acts_[tid].event, op.ord,
-							    addrs_[op.var], ASize(kSize), SVal(sum),
-							    WriteAttr::None, EventDeps()));
+							    addrs_[op.var], ASize(kSize), SVal(sum), wattr,
+							    EventDeps()));
 			break;
 		}
 		}
@@ -266,7 +302,7 @@ struct Exploration {
 	std::set<Outcome> outcomes;
 };
 
-inline auto explore(const Program &prog, ModelType model) -> Exploration
+inline auto explore(const Program &prog, ModelType model, Options opts = {}) -> Exploration
 {
 	auto conf = std::make_shared<Config>();
 	conf->model = model;
@@ -274,6 +310,8 @@ inline auto explore(const Program &prog, ModelType model) -> Exploration
 	conf->schedulePolicy = SchedulePolicy::WF;
 	conf->randomScheduleSeed = 0;
 	conf->warnOnGraphSize = 1024;
+	conf->symmetryReduction = opts.symmetryReduction;
+	conf->blindRMWReduction = opts.blindRMWReduction;
 	auto driver = GenMCDriver::create(conf);
 	Producer producer(*driver, prog);
 	::explore(*driver, producer);

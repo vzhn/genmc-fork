@@ -42,7 +42,7 @@ inline void showValue(const Program &p, std::ostream &os)
 			else if (op.kind == OpKind::Store)
 				os << "v" << op.var << "=" << op.val;
 			else if (op.kind == OpKind::FetchAdd)
-				os << "r=fai(v" << op.var << "," << op.val << ")";
+				os << (op.blind ? "blindfai(v" : "r=fai(v") << op.var << "," << op.val << ")";
 			else if (op.kind == OpKind::CompareSwap)
 				os << "r=cas(v" << op.var << "," << op.expected << "->" << op.val << ")";
 			else
@@ -69,6 +69,17 @@ auto outcome(std::initializer_list<std::vector<std::uint32_t>> threads) -> Outco
 	return {threads};
 }
 
+/* The values read in OUTCOMES (without the final memory) */
+auto reads(const Exploration &r) -> std::set<Outcome>
+{
+	std::set<Outcome> res;
+	for (auto o : r.outcomes) {
+		o.pop_back();
+		res.insert(o);
+	}
+	return res;
+}
+
 /* The driver explores what the axioms allow: as many graphs, same outcomes */
 void expectMatchesOracle(const Program &p, ModelType model)
 {
@@ -87,7 +98,7 @@ TEST(ScriptedDriver, SingleThreadReadsItsOwnWrite)
 	auto r = explore(p, ModelType::RC11);
 	EXPECT_EQ(r.explored, 1U);
 	EXPECT_FALSE(r.error);
-	EXPECT_EQ(r.outcomes, std::set<Outcome>{outcome({{7}})});
+	EXPECT_EQ(reads(r), std::set<Outcome>{outcome({{7}})});
 }
 
 TEST(ScriptedDriver, StoreBufferingRelaxed)
@@ -95,7 +106,7 @@ TEST(ScriptedDriver, StoreBufferingRelaxed)
 	Program p{.numVars = 2, .threads = {{st(X, 1), ld(Y)}, {st(Y, 1), ld(X)}}};
 	auto r = explore(p, ModelType::RC11);
 	EXPECT_EQ(r.explored, 4U);
-	EXPECT_TRUE(r.outcomes.contains(outcome({{0}, {0}})));
+	EXPECT_TRUE(reads(r).contains(outcome({{0}, {0}})));
 	expectMatchesOracle(p, ModelType::RC11);
 	expectMatchesOracle(p, ModelType::SC);
 }
@@ -112,7 +123,7 @@ TEST(ScriptedDriver, StoreBufferingSCAccessesForbidBothZero)
 		  .threads = {{st(X, 1, sc), ld(Y, sc)}, {st(Y, 1, sc), ld(X, sc)}}};
 	auto r = explore(p, ModelType::RC11);
 	EXPECT_EQ(r.explored, 3U);
-	EXPECT_FALSE(r.outcomes.contains(outcome({{0}, {0}})));
+	EXPECT_FALSE(reads(r).contains(outcome({{0}, {0}})));
 }
 
 TEST(ScriptedDriver, StoreBufferingFencesForbidBothZero)
@@ -121,7 +132,7 @@ TEST(ScriptedDriver, StoreBufferingFencesForbidBothZero)
 		  .threads = {{st(X, 1), fence(), ld(Y)}, {st(Y, 1), fence(), ld(X)}}};
 	auto r = explore(p, ModelType::RC11);
 	EXPECT_EQ(r.explored, 3U);
-	EXPECT_FALSE(r.outcomes.contains(outcome({{0}, {0}})));
+	EXPECT_FALSE(reads(r).contains(outcome({{0}, {0}})));
 }
 
 TEST(ScriptedDriver, StoreBufferingTSOAllowsBothZero)
@@ -129,7 +140,7 @@ TEST(ScriptedDriver, StoreBufferingTSOAllowsBothZero)
 	Program p{.numVars = 2, .threads = {{st(X, 1), ld(Y)}, {st(Y, 1), ld(X)}}};
 	auto r = explore(p, ModelType::TSO);
 	EXPECT_EQ(r.explored, 4U);
-	EXPECT_TRUE(r.outcomes.contains(outcome({{0}, {0}})));
+	EXPECT_TRUE(reads(r).contains(outcome({{0}, {0}})));
 }
 
 TEST(ScriptedDriver, MessagePassingRelaxedAllowsStaleData)
@@ -137,7 +148,7 @@ TEST(ScriptedDriver, MessagePassingRelaxedAllowsStaleData)
 	Program p{.numVars = 2, .threads = {{st(X, 1), st(Y, 1)}, {ld(Y), ld(X)}}};
 	auto r = explore(p, ModelType::RC11);
 	EXPECT_EQ(r.explored, 4U);
-	EXPECT_TRUE(r.outcomes.contains(outcome({{}, {1, 0}})));
+	EXPECT_TRUE(reads(r).contains(outcome({{}, {1, 0}})));
 	expectMatchesOracle(p, ModelType::RC11);
 }
 
@@ -146,7 +157,7 @@ TEST(ScriptedDriver, MessagePassingReleaseAcquireForbidsStaleData)
 	Program p{.numVars = 2, .threads = {{st(X, 1), st(Y, 1, rel)}, {ld(Y, acq), ld(X)}}};
 	auto r = explore(p, ModelType::RC11);
 	EXPECT_EQ(r.explored, 3U);
-	EXPECT_FALSE(r.outcomes.contains(outcome({{}, {1, 0}})));
+	EXPECT_FALSE(reads(r).contains(outcome({{}, {1, 0}})));
 }
 
 TEST(ScriptedDriver, LoadBufferingDependsOnTheModel)
@@ -154,13 +165,13 @@ TEST(ScriptedDriver, LoadBufferingDependsOnTheModel)
 	Program p{.numVars = 2, .threads = {{ld(X), st(Y, 1)}, {ld(Y), st(X, 1)}}};
 	auto rc11 = explore(p, ModelType::RC11);
 	EXPECT_EQ(rc11.explored, 3U);
-	EXPECT_FALSE(rc11.outcomes.contains(outcome({{1}, {1}})));
+	EXPECT_FALSE(reads(rc11).contains(outcome({{1}, {1}})));
 	expectMatchesOracle(p, ModelType::RC11);
 
 	/* No dependencies: IMM allows the cycle */
 	auto imm = explore(p, ModelType::IMM);
 	EXPECT_EQ(imm.explored, 4U);
-	EXPECT_TRUE(imm.outcomes.contains(outcome({{1}, {1}})));
+	EXPECT_TRUE(reads(imm).contains(outcome({{1}, {1}})));
 }
 
 TEST(ScriptedDriver, TwoPlusTwoWritesDependsOnTheModel)
@@ -178,8 +189,8 @@ TEST(ScriptedDriver, CoherenceOfReadReadForbidsGoingBack)
 	/* CoRR: a thread that saw the second write cannot see the first after */
 	Program p{.numVars = 1, .threads = {{st(X, 1), st(X, 2)}, {ld(X), ld(X)}}};
 	auto r = explore(p, ModelType::RC11);
-	EXPECT_FALSE(r.outcomes.contains(outcome({{}, {2, 1}})));
-	EXPECT_FALSE(r.outcomes.contains(outcome({{}, {2, 0}})));
+	EXPECT_FALSE(reads(r).contains(outcome({{}, {2, 1}})));
+	EXPECT_FALSE(reads(r).contains(outcome({{}, {2, 0}})));
 	expectMatchesOracle(p, ModelType::RC11);
 }
 
@@ -190,7 +201,7 @@ TEST(ScriptedDriver, ConcurrentIncrementsAreNeverLost)
 	p.threads[2] = {}; /* (an empty third thread) */
 	auto r = explore(p, ModelType::RC11);
 	EXPECT_EQ(r.explored, 2U);
-	EXPECT_EQ(r.outcomes, (std::set<Outcome>{outcome({{0}, {1}, {}}), outcome({{1}, {0}, {}})}));
+	EXPECT_EQ(reads(r), (std::set<Outcome>{outcome({{0}, {1}, {}}), outcome({{1}, {0}, {}})}));
 	expectMatchesOracle(p, ModelType::RC11);
 	expectMatchesOracle(p, ModelType::SC);
 }
@@ -200,7 +211,7 @@ TEST(ScriptedDriver, AReadAfterIncrementsSeesEveryPrefix)
 	Program p{.numVars = 1, .threads = {{fai(X, 1)}, {fai(X, 2)}, {ld(X)}}};
 	auto r = explore(p, ModelType::RC11);
 	for (auto v : {0U, 1U, 2U, 3U})
-		EXPECT_TRUE(std::ranges::any_of(r.outcomes, [v](auto &o) { return o[2] == std::vector{v}; }))
+		EXPECT_TRUE(std::ranges::any_of(reads(r), [v](auto &o) { return o[2] == std::vector{v}; }))
 			<< "the reader never sees " << v;
 	expectMatchesOracle(p, ModelType::RC11);
 	expectMatchesOracle(p, ModelType::SC);
@@ -220,7 +231,7 @@ TEST(ScriptedDriver, OnlyOneOfTwoLocksSucceeds)
 	Program p{.numVars = 1, .threads = {{cas(X, 0, 1)}, {cas(X, 0, 2)}}};
 	auto r = explore(p, ModelType::RC11);
 	EXPECT_EQ(r.explored, 2U);
-	EXPECT_EQ(r.outcomes, (std::set<Outcome>{outcome({{0}, {1}}), outcome({{2}, {0}})}));
+	EXPECT_EQ(reads(r), (std::set<Outcome>{outcome({{0}, {1}}), outcome({{2}, {0}})}));
 	expectMatchesOracle(p, ModelType::RC11);
 	expectMatchesOracle(p, ModelType::SC);
 }
@@ -297,4 +308,126 @@ RC_GTEST_PROP(ScriptedDriverOracle, SCExploresExactlyTheConsistentGraphs, ())
 RC_GTEST_PROP(ScriptedDriverOracle, RC11RelaxedExploresExactlyTheConsistentGraphs, ())
 {
 	checkAgainstOracle(*genProgram(true), ModelType::RC11);
+}
+
+/*
+ * The reductions lose no behaviour: with a reduction on, the outcomes
+ * (values read and final memory) are those without it, in no more
+ * executions. A run the reduction declines (it reports that the program is
+ * outside its conditions) says nothing and is discarded.
+ */
+namespace {
+
+/* Up to three threads of identical blind increments of X (the setting of
+ * -blind-rmw-reduction), reads of X, and relaxed accesses of Y; now and
+ * then a write to X the reduction does not cover */
+auto genBlindProgram() -> rc::Gen<Program>
+{
+	auto genOp = rc::gen::apply(
+		[](unsigned kind, unsigned val) {
+			switch (kind) {
+			case 0:
+			case 1:
+			case 2:
+				return blindFai(X, 1);
+			case 3:
+				return ld(X);
+			case 4:
+				return ld(Y);
+			case 5:
+				return st(Y, val);
+			default:
+				return st(X, val);
+			}
+		},
+		rc::gen::inRange(0U, 7U), rc::gen::inRange(1U, 3U));
+	auto genThread = rc::gen::mapcat(rc::gen::inRange<std::size_t>(1, 4), [=](std::size_t n) {
+		return rc::gen::container<std::vector<Op>>(n, genOp);
+	});
+	return rc::gen::map(rc::gen::mapcat(rc::gen::inRange<std::size_t>(1, 4),
+					    [=](std::size_t n) {
+						    return rc::gen::container<std::vector<std::vector<Op>>>(
+							    n, genThread);
+					    }),
+			    [](std::vector<std::vector<Op>> ts) {
+				    return Program{.numVars = 2, .threads = std::move(ts)};
+			    });
+}
+
+/* A thread body, repeated: two to three copies, and maybe one other thread */
+auto genSymmetricProgram() -> rc::Gen<Program>
+{
+	return rc::gen::apply(
+		[](std::vector<Op> body, std::size_t copies, std::vector<Op> other, bool hasOther) {
+			Program p{.numVars = 2};
+			for (auto i = 0U; i < copies; i++)
+				p.threads.push_back(body);
+			if (hasOther)
+				p.threads.push_back(other);
+			return p;
+		},
+		rc::gen::container<std::vector<Op>>(2, genOp(true)), rc::gen::inRange<std::size_t>(2, 4),
+		rc::gen::container<std::vector<Op>>(2, genOp(true)), rc::gen::arbitrary<bool>());
+}
+
+/* OUTCOMES with the rows of identical threads in a canonical order */
+auto upToSymmetry(const Program &p, const std::set<Outcome> &outcomes) -> std::set<Outcome>
+{
+	std::set<Outcome> res;
+	for (auto o : outcomes) {
+		for (auto i = 0U; i < p.threads.size(); i++) {
+			std::vector<std::size_t> same;
+			for (auto j = 0U; j < p.threads.size(); j++)
+				if (p.threads[j] == p.threads[i])
+					same.push_back(j);
+			if (same.front() != i)
+				continue;
+			std::vector<std::vector<std::uint32_t>> rows;
+			for (auto j : same)
+				rows.push_back(o[j]);
+			std::ranges::sort(rows);
+			for (auto k = 0U; k < same.size(); k++)
+				o[same[k]] = rows[k];
+		}
+		res.insert(o);
+	}
+	return res;
+}
+
+} // namespace
+
+RC_GTEST_PROP(ScriptedDriverReductions, BlindRMWReductionKeepsTheOutcomes, ())
+{
+	auto p = *genBlindProgram();
+	auto off = explore(p, ModelType::RC11);
+	auto on = explore(p, ModelType::RC11, {.blindRMWReduction = true});
+	RC_CLASSIFY(on.error, "declined");
+	RC_PRE(!on.error);
+	RC_ASSERT(!off.error);
+	RC_ASSERT(on.outcomes == off.outcomes);
+	RC_ASSERT(on.explored <= off.explored);
+	RC_CLASSIFY(on.explored < off.explored, "reduced");
+}
+
+RC_GTEST_PROP(ScriptedDriverReductions, SymmetryReductionKeepsTheOutcomes, ())
+{
+	auto p = *genSymmetricProgram();
+	auto off = explore(p, ModelType::RC11);
+	auto on = explore(p, ModelType::RC11, {.symmetryReduction = true});
+	RC_PRE(!on.error);
+	RC_ASSERT(!off.error);
+	RC_ASSERT(upToSymmetry(p, on.outcomes) == upToSymmetry(p, off.outcomes));
+	RC_ASSERT(on.explored <= off.explored);
+	RC_CLASSIFY(on.explored < off.explored, "reduced");
+}
+
+TEST(ScriptedDriverReductions, BlindIncrementsAreExploredInOneOrder)
+{
+	/* Two identical blind increments commute: one execution, not two */
+	Program p{.numVars = 1, .threads = {{blindFai(X, 1)}, {blindFai(X, 1)}}};
+	auto off = explore(p, ModelType::RC11);
+	auto on = explore(p, ModelType::RC11, {.blindRMWReduction = true});
+	EXPECT_EQ(off.explored, 2U);
+	EXPECT_EQ(on.explored, 1U);
+	EXPECT_EQ(on.outcomes, off.outcomes);
 }

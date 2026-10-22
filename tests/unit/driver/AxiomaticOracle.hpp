@@ -58,6 +58,7 @@ struct Ev {
 	std::uint32_t val;
 	int rmwRead = -1; /* the write of an RMW: the event of its read */
 	bool cas = false;  /* the write of a CAS: only if its read reads EXPECTED */
+	bool blind = false; /* the read of a blind RMW: not in the outcome */
 	std::uint32_t expected = 0;
 };
 
@@ -105,7 +106,8 @@ inline auto enumerate(const scripted::Program &prog, ModelType model) -> Result
 				       .idx = idx++,
 				       .write = op.kind == scripted::OpKind::Store,
 				       .var = op.var,
-				       .val = op.val});
+				       .val = op.val,
+				       .blind = op.blind});
 			if (isRMW)
 				evs.push_back({.thr = static_cast<int>(t),
 					       .fun = static_cast<int>(t),
@@ -233,9 +235,12 @@ inline auto enumerate(const scripted::Program &prog, ModelType model) -> Result
 		if (!ok)
 			return;
 		++res.graphs;
-		scripted::Outcome out(prog.threads.size());
+		scripted::Outcome out(prog.threads.size() + 1);
 		for (auto k = 0U; k < reads.size(); k++)
-			out[evs[reads[k]].fun].push_back(value[rf[k]]);
+			if (!evs[reads[k]].blind)
+				out[evs[reads[k]].fun].push_back(value[rf[k]]);
+		for (auto v = 0U; v < prog.numVars; v++)
+			out.back().push_back(co[v].empty() ? 0U : value[co[v].back()]);
 		res.outcomes.insert(out);
 	};
 
