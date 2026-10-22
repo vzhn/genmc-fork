@@ -16,6 +16,8 @@
 
 #include "genmc/Verification/ExplorationCore.hpp"
 
+#include <unordered_set>
+
 /**
  * The driver: the protocol between the exploration (ExplorationCore) and the
  * program that produces the events (see EventProducer). For each event the
@@ -274,6 +276,9 @@ private:
 	void trackExecutionBound();
 
 	auto getDbgInfo(Event pos) -> const EventDbgInfo *;
+
+	/** -exhaustive: the canonical hashes of the complete executions counted */
+	std::unordered_set<GraphHash> countedExecutions_;
 };
 
 #endif /* GENMC_GENMC_DRIVER_HPP */

@@ -332,11 +332,7 @@ protected:
 	auto reportWarningOnce(Event pos, VerificationError wcode,
 			       const EventLabel *racyLab = nullptr) -> bool;
 
-	/*** Exploration-related ***/
-
-	/** Returns whether a revisit results to a valid execution
-	 * (e.g., consistent, accessing allocated memory, etc) */
-	auto isRevisitValid(const Revisit &revisit) -> bool;
+	/*** For the driver (GenMCDriver): run state and replay checks ***/
 
 	/** Returns true if this driver is shutting down */
 	auto isHalting() const -> bool;
@@ -346,7 +342,53 @@ protected:
 
 	/** Opt: Mark current execution as moot/normal */
 	void moot() { isMootExecution = true; }
+
 	void unmoot() { isMootExecution = false; }
+
+	/** Returns true if the exploration is guided by a graph */
+	auto isExecutionDrivenByGraph(Event curr) -> bool;
+
+	/** Whether kept events are moved to their instruction (see alignKeptEvents()):
+	 * under LKMM, and under IMM with -exhaustive, where a revisit can keep
+	 * events after a CAS whose outcome changes, and so whether it writes */
+	auto relocatesKeptEvents() const -> bool
+	{
+		return getConf()->checkReplayKeys &&
+		       (getConf()->model == ModelType::LKMM ||
+			(getConf()->exhaustive && getConf()->model == ModelType::IMM));
+	}
+
+	/** -exhaustive under IMM: whether G (a complete execution, or the
+	 * graph of an error) is consistent, checked on a copy whose views are
+	 * computed anew */
+	auto isExecutionConsistent(const ExecutionGraph &g) -> bool;
+
+	/* Checks the whole graph if an event went before kept ones during the
+	 * run; if it is inconsistent, moots the run and has it repeated with
+	 * eager checks. Returns whether the run stands */
+	bool checkPendingKept();
+
+	auto executionExceedsBound(BoundCalculationStrategy strategy) const -> bool;
+
+	auto updateErrorInfoAndMaybeExit(Event pos, bool isNA, const EventDbgInfo *dbg)
+		-> std::optional<VerificationError>;
+
+	/** -check-invariants (see Invariants.hpp): whether the checks run */
+	[[nodiscard]] auto checksInvariants() const -> bool { return getConf()->checkInvariants; }
+
+	/** -check-invariants: the situation the checks report (WHERE names the
+	 * operation just performed) */
+	[[nodiscard]] auto invariantContext(std::string_view where) const -> invariants::Context;
+
+	/** -check-invariants: checks I3 on the current graph and state after WHERE */
+	void checkAllocationInvariants(std::string_view where) const;
+
+private:
+	/*** Exploration-related ***/
+
+	/** Returns whether a revisit results to a valid execution
+	 * (e.g., consistent, accessing allocated memory, etc) */
+	auto isRevisitValid(const Revisit &revisit) -> bool;
 
 	/** Blocks thread at POS with type T. Tries to moot afterward */
 	void blockThreadTryMoot(std::unique_ptr<BlockLabel> bLab);
@@ -378,9 +420,6 @@ protected:
 	 * is added, reports an error */
 	auto checkFinalAnnotations(const WriteLabel *wLab) -> std::optional<VerificationError>;
 
-	/** Returns true if the exploration is guided by a graph */
-	auto isExecutionDrivenByGraph(Event curr) -> bool;
-
 	/** Under LKMM, kept events of the current thread may sit where the
 	 * thread's new path does not reach them (a control dependency ends at the
 	 * join of its branch): moves them so that @p curr's instruction instance
@@ -394,16 +433,6 @@ protected:
 
 	/** relocateExecution(), and schedules a repeat of the run */
 	void relocateAndRerun(int thread, int from, int delta);
-
-	/** Whether kept events are moved to their instruction (see alignKeptEvents()):
-	 * under LKMM, and under IMM with -exhaustive, where a revisit can keep
-	 * events after a CAS whose outcome changes, and so whether it writes */
-	auto relocatesKeptEvents() const -> bool
-	{
-		return getConf()->checkReplayKeys &&
-		       (getConf()->model == ModelType::LKMM ||
-			(getConf()->exhaustive && getConf()->model == ModelType::IMM));
-	}
 
 	/** Stops with an internal error unless @p lab, reused on replay, comes
 	 * from the instruction instance being executed (as its @p sub-th event) */
@@ -475,11 +504,6 @@ protected:
 	/** -exhaustive under IMM: whether G, with the views its labels have, is
 	 * consistent: coherence, the atomicity of its RMWs, the other axioms */
 	auto isGraphConsistent(const ExecutionGraph &g) const -> bool;
-
-	/** -exhaustive under IMM: whether G (a complete execution, or the
-	 * graph of an error) is consistent, checked on a copy whose views are
-	 * computed anew */
-	auto isExecutionConsistent(const ExecutionGraph &g) -> bool;
 
 	/** -exhaustive under IMM: runs CHECK on a copy of the current graph
 	 * whose views are computed anew (positions name the same events in
@@ -577,11 +601,6 @@ protected:
 	 * and if so moots the current execution */
 	void mootExecutionIfFullyBlocked(EventLabel *bLab);
 
-	/* Checks the whole graph if an event went before kept ones during the
-	 * run; if it is inconsistent, moots the run and has it repeated with
-	 * eager checks. Returns whether the run stands */
-	bool checkPendingKept();
-
 	/** Helper: Wake up any threads blocked on a helping CAS */
 	void unblockWaitingHelping(const WriteLabel *lab);
 
@@ -612,17 +631,12 @@ protected:
 
 	/*** Bound-related  ***/
 
-	auto executionExceedsBound(BoundCalculationStrategy strategy) const -> bool;
-
 	auto partialExecutionExceedsBound() const -> bool;
 
 #ifdef ENABLE_GENMC_DEBUG
 #endif
 
 	/*** Output-related ***/
-
-	auto updateErrorInfoAndMaybeExit(Event pos, bool isNA, const EventDbgInfo *dbg)
-		-> std::optional<VerificationError>;
 
 	/** A block that has no metadata of its own takes those of the event
 	 * FROM (if any), whose instruction the thread stopped at */
@@ -702,14 +716,8 @@ protected:
 	std::shared_ptr<const EventKey> currKey;
 	Event currKeyBase;
 
-	/** When the current run repeats (kept events, see KeptEventRuns) */
-	KeptEventRuns keptRuns_;
-
 	/** Opt: Whether this execution is moot (locking) */
 	bool isMootExecution = false;
-
-	/** Verification result to be returned to caller */
-	VerificationResult result;
 
 	/** Whether we are stopping the exploration (e.g., due to an error found) */
 	bool shouldHalt = false;
@@ -717,38 +725,21 @@ protected:
 	/** Random-number generators for estimation randomization */
 	MyRNG estRng;
 
-	/** The error being replayed for its report */
-	std::unique_ptr<ErrorReplay> errorReplay_;
-
-	/** -check-invariants (see Invariants.hpp): whether the checks run */
-	[[nodiscard]] auto checksInvariants() const -> bool { return getConf()->checkInvariants; }
-
-	/** -check-invariants: the situation the checks report (WHERE names the
-	 * operation just performed) */
-	[[nodiscard]] auto invariantContext(std::string_view where) const -> invariants::Context;
-
 	/** -check-invariants: checks I1 on G after WHERE (with the restriction's
 	 * PLAN, if it was one); nothing with the option off */
 	void checkGraphInvariants(const ExecutionGraph &g, std::string_view where,
 				  const invariants::RestrictionPlan *plan = nullptr) const;
 
-	/** -check-invariants: checks I3 on the current graph and state after WHERE */
-	void checkAllocationInvariants(std::string_view where) const;
-
 	/** Restricts the current execution to STAMP (see Execution::restrict()),
 	 * checking I1 under -check-invariants */
 	void restrictExecution(Stamp stamp, std::string_view where);
-	/** -exhaustive: the canonical hashes of the graphs revisits produced,
-	 * and of the complete executions counted (see visitRevisitedGraph()) */
+	/** -exhaustive: the canonical hashes of the graphs revisits produced
+	 * (see visitRevisitedGraph()) */
 	std::unordered_set<GraphHash> visitedGraphs_;
-	std::unordered_set<GraphHash> countedExecutions_;
 
 	/** Saves the runtime state at the event at POS for the forward revisits
 	 * queued for it (null if the run cannot resume, see saveResumePoint()) */
 	auto saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>;
-
-	/** The runtime states saved for forward revisits */
-	ResumePointStore resumePoints_;
 
 	/** "Puppet" labels to be used for race detection */
 	std::unique_ptr<ReadLabel> readProbeLab_;
@@ -763,6 +754,18 @@ protected:
 
 	void configureProbe(MemLabel *rLab, Event pos, SAddr addr, ASize size,
 			    const EventDeps &deps);
+
+protected:
+	/* State the driver reads too. (Last: resumePoints_ is initialized
+	 * from userConf, so it must be declared after it) */
+	/** Verification result to be returned to caller */
+	VerificationResult result;
+	/** The error being replayed for its report */
+	std::unique_ptr<ErrorReplay> errorReplay_;
+	/** When the current run repeats (kept events, see KeptEventRuns) */
+	KeptEventRuns keptRuns_;
+	/** The runtime states saved for forward revisits */
+	ResumePointStore resumePoints_;
 };
 
 #endif /* GENMC_EXPLORATION_CORE_HPP */
