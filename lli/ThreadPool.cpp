@@ -49,7 +49,7 @@ ThreadPool::ThreadPool(const LLIConfig &lliConfig, const std::shared_ptr<const C
 	auto firstDriver = GenMCDriver::create(conf, this);
 	ExecutionGraph::Config seedCfg{};
 	seedCfg.emitNALabels = Config::emitNALabels;
-	seedCfg.consChecker = &firstDriver->getConsChecker();
+	seedCfg.memModel = &firstDriver->getConsChecker();
 	seedCfg.execState = &firstDriver->getExecState();
 	auto execGraph = conf->isDepTrackingModel ? std::make_unique<DepExecutionGraph>(seedCfg)
 						  : std::make_unique<ExecutionGraph>(seedCfg);

@@ -14,6 +14,7 @@
 #ifndef GENMC_RELINCHE_HPP
 #define GENMC_RELINCHE_HPP
 
+#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Support/Error.hpp"
 #include "genmc/Verification/Relinche/Specification.hpp"
@@ -23,7 +24,6 @@
 #include <string>
 
 class ExecutionGraph;
-class ConsistencyChecker;
 
 /** Abstract class for linearizability checking errors */
 struct LinearizabilityError { // NOLINT(cppcoreguidelines-special-member-functions)
@@ -66,13 +66,14 @@ public:
 
 private:
 	LinearizabilityChecker(const ConsistencyChecker *consChecker, const std::string &specFile)
-		: consChecker(consChecker)
+		: consistency(consChecker), memModel(consChecker)
 	{
 		std::ifstream istream(specFile);
 		specification = std::make_unique<Specification>(deserialize(istream));
 	}
 
-	const ConsistencyChecker *consChecker{};
+	const ModelConsistency *consistency{};
+	const GraphModel *memModel{};
 	std::unique_ptr<Specification> specification;
 };
 

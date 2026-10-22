@@ -25,7 +25,7 @@
 
 #include <memory>
 
-auto ConsistencyChecker::getHbView(const EventLabel *lab) const -> const View &
+auto GraphModel::getHbView(const EventLabel *lab) const -> const View &
 {
 	return lab->view(getHbViewIndex());
 }
@@ -49,7 +49,7 @@ auto ConsistencyChecker::create(const Config *conf) -> std::unique_ptr<Consisten
 	}
 }
 
-auto ConsistencyChecker::calculateRevisitPrefixView(const EventLabel *lab) const
+auto GraphModel::calculateRevisitPrefixView(const EventLabel *lab) const
 	-> std::unique_ptr<VectorClock>
 {
 	return calculatePrefixView(lab);

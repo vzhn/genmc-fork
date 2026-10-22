@@ -158,7 +158,7 @@ static auto combineHints(const Specification &spec, const Observation &obs) -> s
 	return result;
 }
 
-static auto checkHint(ExecutionGraph &graph, const ConsistencyChecker *consChecker,
+static auto checkHint(ExecutionGraph &graph, const ModelConsistency *consistency,
 		      const Observation &obs, const Hint &hint)
 	-> std::unique_ptr<LinearizabilityError>
 {
@@ -171,7 +171,7 @@ static auto checkHint(ExecutionGraph &graph, const ConsistencyChecker *consCheck
 	for (const auto &[endLab, begLab] : edges)
 		endLab->addSucc(begLab);
 
-	if (consChecker->isCoherentRelinche(graph) && consChecker->isConsistent(graph)) {
+	if (consistency->isCoherentRelinche(graph) && consistency->isConsistent(graph)) {
 		std::vector<LinearizabilityExtensionError::KCEdge> kcEdges;
 		kcEdges.reserve(hint.edges.size());
 		for (const auto &[op1, op2] : hint.edges)
@@ -190,7 +190,7 @@ auto LinearizabilityChecker::refinesSpec(ExecutionGraph &graph) -> Result
 {
 	/* Phase 1: Check refinement
 	 * 1.1. Check return values are correct */
-	const Observation implObsGraph(graph, consChecker);
+	const Observation implObsGraph(graph, memModel);
 	Result result;
 
 	if (!specification->containsSameOutput(implObsGraph)) {
@@ -211,7 +211,7 @@ auto LinearizabilityChecker::refinesSpec(ExecutionGraph &graph) -> Result
 	/* Check whether adding the hints back to the original creates a violation */
 	for (const Hint &hint : hints) {
 		++result.hintsChecked;
-		result.status = checkHint(graph, consChecker, implObsGraph, hint);
+		result.status = checkHint(graph, consistency, implObsGraph, hint);
 		if (result.status)
 			break;
 	}

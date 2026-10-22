@@ -15,7 +15,7 @@ namespace {
 
 struct TestGraph {
 	StubChecker checker;
-	ExecutionGraph graph{ExecutionGraph::Config{.consChecker = &checker}};
+	ExecutionGraph graph{ExecutionGraph::Config{.memModel = &checker}};
 
 	/* Appends a fence to thread 0, with DEPS and a view seeing VIEWMAX of
 	 * the thread */

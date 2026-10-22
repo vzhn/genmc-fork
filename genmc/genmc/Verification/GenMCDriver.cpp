@@ -80,7 +80,7 @@ GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool /
 	/* Set up the execution context */
 	consChecker = ConsistencyChecker::create(getConf());
 	auto cfg = ExecutionGraph::Config{.execState = &execState_,
-					  .consChecker = &*consChecker,
+					  .memModel = &*consChecker,
 					  .emitNALabels = Config::emitNALabels};
 	auto execGraph = userConf->isDepTrackingModel ? std::make_unique<DepExecutionGraph>(cfg)
 						      : std::make_unique<ExecutionGraph>(cfg);
@@ -226,7 +226,7 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 	execStack.clear();
 	execStack.emplace_back(std::move(exec->graph), LocalQueueT(), std::move(exec->choices));
 
-	getExec().getGraph().setConsChecker(&getConsChecker());
+	getExec().getGraph().setMemModel(&getConsChecker());
 	getExec().getGraph().setState(&getExecState());
 
 	getConsChecker().recomputeCacheCounters(getExec().getGraph());
@@ -263,23 +263,23 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 			if (rLab->isNotAtomic()) {
 				g.getState().onNALoad(
 					rLab->getPos(), rLab->getAccess(),
-					eLab->getParent()->getConsChecker()->getHbView(rLab));
+					eLab->getParent()->getMemModel()->getHbView(rLab));
 			} else {
 				/* TODO: If we support emitNA + lazy NA value, we should notify
 				 * the corresponding value here */
 				g.getState().onATLoad(rLab->getPos(), rLab->getAccess(),
-						      g.getConsChecker()->getHbView(rLab));
+						      g.getMemModel()->getHbView(rLab));
 			}
 		} else if (const auto *wLab = genmc::dyn_cast<WriteLabel>(lab)) {
 			if (wLab->isNotAtomic())
 				g.getState().onNAStore(wLab->getPos(), wLab->getAccess(),
-						       g.getConsChecker()->getHbView(wLab),
+						       g.getMemModel()->getHbView(wLab),
 						       wLab->getVal());
 			else {
 				/* TODO: If we support emitNA + lazy NA value, we should notify
 				 * the corresponding value here */
 				g.getState().onATStore(wLab->getPos(), wLab->getAccess(),
-						       g.getConsChecker()->getHbView(wLab),
+						       g.getMemModel()->getHbView(wLab),
 						       wLab->isEffectful(),
 						       wLab->isAtLeastRelease(), getLockRole(wLab));
 			}
@@ -291,7 +291,7 @@ static void reconstructState(EventLabel *eLab, View &view, ExecutionState &state
 					aLab->getAlignment());
 			if (aLab->isZeroed())
 				state.onZeroedAlloc(aLab->getPos(), aLab->getAccess(),
-						    g.getConsChecker()->getHbView(aLab));
+						    g.getMemModel()->getHbView(aLab));
 		} else if (const auto *dLab = genmc::dyn_cast<FreeLabel>(lab)) {
 			/* An invalid free (an error event) frees no block */
 			auto addr = dLab->getAddr();
@@ -592,7 +592,7 @@ void GenMCDriver::restartExecution()
 {
 	pendingResume_ = nullptr;
 	auto cfg = ExecutionGraph::Config{.execState = &execState_,
-					  .consChecker = &*consChecker,
+					  .memModel = &*consChecker,
 					  .emitNALabels = Config::emitNALabels};
 	auto execGraph = getConf()->isDepTrackingModel ? std::make_unique<DepExecutionGraph>(cfg)
 						       : std::make_unique<ExecutionGraph>(cfg);
@@ -1392,7 +1392,7 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 		auto coIt = std::ranges::find_if(rco, [&](auto &sLab) {
 			/* (A write that had nothing to revisit may lack its prefix) */
 			if (!sLab.hasPrefixView())
-				sLab.setPrefixView(g.getConsChecker()->calculatePrefixView(&sLab));
+				sLab.setPrefixView(g.getMemModel()->calculatePrefixView(&sLab));
 			return !sLab.getPrefixView().contains(rLab->getPos());
 		});
 		return coIt == std::ranges::end(rco) ? g.getInitLabel()
@@ -1550,7 +1550,7 @@ auto GenMCDriver::checkLkmmSrcu() -> std::optional<VerificationError>
 	    }))
 		return {};
 	auto unordered = lkmm::findUnorderedFree(g, [&](auto *a, auto *f) {
-		return g.getConsChecker()->getHbView(f).contains(a->getPos());
+		return g.getMemModel()->getHbView(f).contains(a->getPos());
 	});
 	if (!unordered)
 		return {};

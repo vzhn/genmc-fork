@@ -10,12 +10,12 @@ genmc/ADT/View.hpp -> genmc/Execution/Event.hpp
 genmc/Execution/Consistency/BoundDecider.cpp -> genmc/Verification/Config.hpp
 genmc/Execution/Consistency/ConsistencyChecker.cpp -> genmc/Verification/Config.hpp
 genmc/Execution/Consistency/ConsistencyChecker.cpp -> genmc/Verification/MemoryModel.hpp
-genmc/Execution/Consistency/ConsistencyChecker.hpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/IMMChecker.cpp -> genmc/Verification/Config.hpp
 genmc/Execution/Consistency/IMMChecker.cpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/LKMMChecker.cpp -> genmc/Verification/Config.hpp
 genmc/Execution/Consistency/LKMMChecker.cpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/LKMMRcuChecker.cpp -> genmc/Verification/Config.hpp
+genmc/Execution/Consistency/ModelInterfaces.hpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/RAChecker.cpp -> genmc/Verification/Config.hpp
 genmc/Execution/Consistency/RAChecker.cpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/RC11Checker.cpp -> genmc/Verification/Config.hpp

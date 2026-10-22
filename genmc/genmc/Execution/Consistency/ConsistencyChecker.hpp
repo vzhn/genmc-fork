@@ -14,8 +14,7 @@
 #ifndef GENMC_CONSISTENCY_CHECKER_HPP
 #define GENMC_CONSISTENCY_CHECKER_HPP
 
-#include "genmc/ADT/VSet.hpp"
-#include "genmc/Verification/VerificationError.hpp"
+#include "genmc/Execution/Consistency/ModelInterfaces.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -30,19 +29,21 @@ class VectorClock;
 class View;
 enum class ModelType : std::uint8_t;
 
-/** An abstract class defining the API for checking graph consistency,
- * and for caching memory-model-specific information in the execution graph.
- * Consistency checkers for specific models should override this class.
+/** A memory model: everything a model offers (see ModelInterfaces.hpp),
+ * implemented by a checker generated for each model.
  * This class is not thread-safe: each thread needs its own checker.
  */
-class ConsistencyChecker {
+class ConsistencyChecker : public GraphModel,
+			   public ModelConsistency,
+			   public ModelCoherence,
+			   public ModelErrors {
+
 protected:
 	ConsistencyChecker(const Config *conf) : conf_(conf) {}
 
 public:
 	ConsistencyChecker() = delete;
-	virtual ~ConsistencyChecker() = default;
-
+	~ConsistencyChecker() override = default;
 	ConsistencyChecker(const ConsistencyChecker &) = delete;
 	ConsistencyChecker(ConsistencyChecker &&) = delete;
 	auto operator=(const ConsistencyChecker &) -> ConsistencyChecker & = delete;
@@ -52,69 +53,6 @@ public:
 
 	/** Returns the user config */
 	[[nodiscard]] auto getConf() const -> const Config * { return conf_; }
-
-	/** Returns true if the current graph is consistent when LAB is added.
-	 *  As coherence is enforced by default, this only checks the other axioms. */
-	[[nodiscard]] virtual auto isConsistent(const EventLabel *lab) const -> bool = 0;
-	[[nodiscard]] virtual auto isConsistent(const ExecutionGraph & /*g*/) const -> bool = 0;
-
-	/** Whether RLAB, reading the co-maximal write, keeps its graph consistent
-	 * without a check: it does for a model whose po-based orderings are all
-	 * in ppo, as nothing then leaves the read in a cycle */
-	[[nodiscard]] virtual auto isCoMaxReadConsistent(const ReadLabel * /*rLab*/) const -> bool
-	{
-		return true;
-	}
-
-	/** Returns true if the current graph is coherent.
-	 * Should only be used during Relinche's refinement phase. */
-	[[nodiscard]] virtual auto isCoherentRelinche(const ExecutionGraph & /*g*/) const -> bool
-	{
-		ERROR("Unimplemented"); /* should be caught at config */
-	}
-
-	virtual auto checkErrors(const EventLabel *lab, const EventLabel *&race) const
-		-> std::optional<VerificationError> = 0;
-
-	virtual auto checkWarnings(const EventLabel *lab, const VSet<VerificationError> &reported,
-				   std::vector<const EventLabel *> &races) const
-		-> std::vector<VerificationError> = 0;
-
-	virtual void filterCoherentRevisits(WriteLabel *sLab, std::vector<ReadLabel *> &ls) = 0;
-
-	virtual auto getCoherentStores(ReadLabel *rLab) -> std::vector<EventLabel *> = 0;
-
-	virtual auto getCoherentPlacings(WriteLabel *wLab) -> std::vector<EventLabel *> = 0;
-
-	/** Updates LAB with model-specific information.
-	 * Needs to be called every time a new label is added to the graph */
-	virtual void updateMMViews(EventLabel *lab) = 0;
-
-	virtual auto calculatePrefixView(const EventLabel *lab) const
-		-> std::unique_ptr<VectorClock> = 0;
-
-	/** The part of LAB's prefix a write's revisits take: a read in the prefix
-	 * but not in this one may still be revisited by LAB (-lkmm: a branch's
-	 * condition kept with the events after its join, see the kat's rppo) */
-	virtual auto calculateRevisitPrefixView(const EventLabel *lab) const
-		-> std::unique_ptr<VectorClock>;
-
-	/* The hb view lives at getHbViewIndex() in every label's view array */
-	[[nodiscard]] auto getHbView(const EventLabel *lab) const -> const View &;
-	[[nodiscard]] virtual auto getHbViewIndex() const -> unsigned = 0;
-	virtual auto getHbRelincheView(const EventLabel * /*lab*/) const -> const View &
-	{
-		ERROR("Unimplemented"); /* should be caught at config */
-	}
-
-	[[nodiscard]] virtual auto isDepTracking() const -> bool = 0;
-
-	/* Cache the label counts for tracked predicates. Update counts during add/removeLast,
-	 * and calculate from scratch if the graph is restricted */
-	virtual void resetCacheCounters() const = 0;
-	virtual void recomputeCacheCounters(const ExecutionGraph &g) const = 0;
-	virtual void maybeDecreaseCacheCounters(const EventLabel *lab) const = 0;
-	virtual void maybeIncreaseCacheCounters(const EventLabel *lab) const = 0;
 
 private:
 	/* Keep the config around for convenience (e.g., for optimizing

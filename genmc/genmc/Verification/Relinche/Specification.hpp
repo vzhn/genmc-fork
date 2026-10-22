@@ -114,7 +114,7 @@ public:
 	[[nodiscard]] auto refinementMissingEdges(const Observation & /*obs*/) const
 		-> std::vector<std::vector<Edge>>;
 
-	void add(ExecutionGraph &g, const ConsistencyChecker *consChecker, bool symmReduction);
+	void add(ExecutionGraph &g, const GraphModel *memModel, bool symmReduction);
 	void merge(Specification &&other);
 	void calculateHints();
 

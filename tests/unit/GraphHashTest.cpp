@@ -26,7 +26,7 @@ struct HashGraph {
 	StubChecker checker;
 	ExecutionState st; /* the values read are reconstructed through it */
 	ExecutionGraph g{ExecutionGraph::Config{
-		.execState = &st, .consChecker = &checker, .emitNALabels = false}};
+		.execState = &st, .memModel = &checker, .emitNALabels = false}};
 
 	/* Creates a thread from (PARENT, IDX) as thread TID (the next one) */
 	auto spawn(int parent, int idx) -> int

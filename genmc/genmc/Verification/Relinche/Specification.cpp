@@ -241,10 +241,10 @@ template <class T> static auto existsPermutation(std::vector<std::vector<T>> &v)
 		v, [](auto &eq) { return std::ranges::next_permutation(eq).found; });
 }
 
-void Specification::add(ExecutionGraph &g, const ConsistencyChecker *consChecker,
+void Specification::add(ExecutionGraph &g, const GraphModel *memModel,
 			bool symmReduction)
 {
-	Observation obs(g, consChecker);
+	Observation obs(g, memModel);
 	auto lin = calculateLinearization(g, obs);
 	if (!symmReduction) {
 		lookupSyncOrInsert(obs).lins.insert(lin);

@@ -60,14 +60,14 @@ static constexpr uint64_t BYTE_MASK = 0xFF;
 				   ? SVal(0)
 				   : getInitVal(access);
 		const auto &hbView =
-			getInitLabel()->locView(access.addr, getConsChecker()->getHbViewIndex());
+			getInitLabel()->locView(access.addr, getMemModel()->getHbViewIndex());
 		return haveNAs_ ? val : state.reconstructMemValue(access, hbView, val);
 	}
 
 	const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
 	VERIFY(wLab);
 	return haveNAs_ ? wLab->getVal()
-			: state.reconstructMemValue(access, getConsChecker()->getHbView(wLab),
+			: state.reconstructMemValue(access, getMemModel()->getHbView(wLab),
 						    wLab->getVal());
 }
 
@@ -119,7 +119,7 @@ auto ExecutionGraph::getCurrentMemValue(SAddr addr, ASize size) -> SVal
 		auto offset = addr + i - atomicAddr;
 		if (auto *wLab = genmc::dyn_cast<WriteLabel>(co_max(atomicAddr))) {
 			res |= state.reconstructMemValue(
-				       {addr + i, 1}, getConsChecker()->getHbView(wLab),
+				       {addr + i, 1}, getMemModel()->getHbView(wLab),
 				       (wLab->getVal() >> SVal(offset * CHAR_BIT)) &
 					       SVal(BYTE_MASK))
 			       << SVal(i * CHAR_BIT);
@@ -130,7 +130,7 @@ auto ExecutionGraph::getCurrentMemValue(SAddr addr, ASize size) -> SVal
 		 * initializer's cache */
 		auto atomicAccess = AAccess(atomicAddr, ASize(info->second - atomicAddr));
 		const auto &hbView =
-			getInitLabel()->locView(atomicAddr, getConsChecker()->getHbViewIndex());
+			getInitLabel()->locView(atomicAddr, getMemModel()->getHbViewIndex());
 		res |= state.reconstructMemValue(
 			       {addr + i, 1}, hbView,
 			       (getInitVal(atomicAccess) >> SVal(offset * CHAR_BIT)) &
@@ -201,8 +201,8 @@ void ExecutionGraph::trackCoherenceAtLoc(SAddr addr)
 auto ExecutionGraph::removeLast(int thread) -> std::unique_ptr<EventLabel>
 {
 	auto *lab = getLastThreadLabel(thread);
-	ASSERT(getConsChecker());
-	getConsChecker()->maybeDecreaseCacheCounters(lab);
+	ASSERT(getMemModel());
+	getMemModel()->maybeDecreaseCacheCounters(lab);
 
 	if (auto *rLab = genmc::dyn_cast_if_present<ReadLabel>(lab)) {
 		if (auto *wLab = genmc::dyn_cast_if_present<WriteLabel>(rLab->getRf())) {
@@ -508,7 +508,7 @@ auto ExecutionGraph::cutToView(const View &v) -> unsigned
 			  cutEnd);
 	}
 
-	getConsChecker()->recomputeCacheCounters(*this);
+	getMemModel()->recomputeCacheCounters(*this);
 	return removed;
 }
 
@@ -755,7 +755,7 @@ auto ExecutionGraph::getCopyUpTo(const VectorClock &v) const -> std::unique_ptr<
 {
 	auto og = std::make_unique<ExecutionGraph>(
 		ExecutionGraph::Config{.execState = this->state_,
-				       .consChecker = this->consChecker_,
+				       .memModel = this->memModel_,
 				       .emitNALabels = this->haveNAs_});
 	copyGraphUpTo(*og, v);
 	return og;

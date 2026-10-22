@@ -42,7 +42,7 @@ private:
 /* A graph with a counting checker attached */
 struct CountedGraph {
 	CountingChecker checker;
-	ExecutionGraph graph{ExecutionGraph::Config{.consChecker = &checker}};
+	ExecutionGraph graph{ExecutionGraph::Config{.memModel = &checker}};
 
 	/* Appends a fence to thread 0 */
 	auto addFence() -> EventLabel *
