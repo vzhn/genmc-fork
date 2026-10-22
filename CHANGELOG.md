@@ -25,6 +25,21 @@ released.
   for a program without atomics, since that keeps the outcomes of
   race-free programs only (`scripts/check-race-detection-model.sh`, ctest
   `race-detection-model`).
+- Whether GenMC started over without symmetry reduction (SR) or in-place
+  revisiting (IPR), which unordered writes make an error, depended on the
+  schedule (#130): `tests/correct/synthetic/wainc` kept SR, and explored
+  N+1 executions instead of (N+1)!, under an arbitrary schedule. Three
+  causes: unordered writes found before the first symmetric thread was
+  created never made SR an error, as they do when found after it; once
+  one unordered write had been reported, later ones were not checked (a
+  `fetch_add()` unordered with a store to a location IPR revisits kept
+  IPR on); and `-disable-race-detection` skipped the check altogether.
+  The check now runs at every write while SR or IPR is on, with or
+  without race detection, and creating a symmetric thread after unordered
+  writes makes SR an error too (`scripts/check-unordered-writes-fallback.sh`,
+  ctest `unordered-writes-fallback`, with
+  `tests/correct/sr/sym-readers-after-ww` and
+  `tests/correct/infr/ipr-ww-rmw-after-store`).
 - An installed GenMC compiled programs with the runtime headers of the
   source tree it was built from, whatever that tree had become since, as
   long as it existed; once it was gone, C++ programs no longer compiled,

@@ -117,6 +117,13 @@ add_test(NAME invariants-fast
 set_tests_properties(invariants-fast PROPERTIES LABELS "integration;fast" TIMEOUT 600
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME unordered-writes-fallback
+    COMMAND bash -c "${SCRIPT_DIR}/check-unordered-writes-fallback.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(unordered-writes-fallback PROPERTIES LABELS "integration;fast" TIMEOUT 300
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 # The passes keep the dependencies of LKMM programs (needs alive-tv; skipped without it)
 add_test(NAME check-pass-deps
     COMMAND bash -c "${SCRIPT_DIR}/check-pass-deps.sh"
