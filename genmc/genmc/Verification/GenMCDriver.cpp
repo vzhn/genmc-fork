@@ -1032,10 +1032,63 @@ void GenMCDriver::configureProbe(MemLabel *rLab, Event pos, SAddr addr, ASize si
 	rLab->setPrefixView(getPrefixView(predLab).clone());
 }
 
+/* If LAB accesses another thread's copy of a thread-local (see SAddr),
+ * returns that thread, and 0 otherwise. The copies of a thread end with it,
+ * as if freed by its end; those of the main thread (0) last as long as the
+ * program */
+static auto getThreadLocalOwner(const EventLabel *lab) -> int
+{
+	const auto *mLab = genmc::dyn_cast<MemAccessLabel>(lab);
+	if (!mLab || !mLab->getAddr().isStatic())
+		return 0;
+	auto owner = mLab->getAddr().getThread();
+	return owner == lab->getThread() || owner >= lab->getParent()->getNumThreads() ? 0 : owner;
+}
+
+auto GenMCDriver::checkThreadLocalEnd(const EventLabel *lab, const ThreadFinishLabel *eLab)
+	-> std::optional<VerificationError>
+{
+	if (getConsChecker().getHbView(eLab).contains(lab->getPos()))
+		return {};
+	reportError(lab->getPos(),
+		    {lab->getPos(), VerificationError::VE_AccessFreed,
+		     std::format("The access is to a thread-local of thread {}, and does not "
+				 "happen before the thread ends\n",
+				 eLab->getThread()),
+		     eLab});
+	return {VerificationError::VE_AccessFreed};
+}
+
+auto GenMCDriver::checkEndedThreadLocals(const ThreadFinishLabel *eLab)
+	-> std::optional<VerificationError>
+{
+	const auto &g = getExec().getGraph();
+	if (getConf()->disableRaceDetection || inEstimationMode() ||
+	    !g.getState().hasThreadLocals())
+		return {};
+
+	for (const auto &lab : g.labels()) {
+		if (getThreadLocalOwner(&lab) != eLab->getThread())
+			continue;
+		if (auto err = checkThreadLocalEnd(&lab, eLab); err)
+			return err;
+	}
+	return {};
+}
+
 auto GenMCDriver::checkForRaces(const EventLabel *lab) -> std::optional<VerificationError>
 {
 	if (inEstimationMode())
 		return {};
+
+	/* An access to the thread-local of a thread that has ended (see also
+	 * checkEndedThreadLocals()) */
+	const auto &g = getExec().getGraph();
+	if (auto owner = getThreadLocalOwner(lab); owner != 0) {
+		const auto *eLab = genmc::dyn_cast<ThreadFinishLabel>(g.getLastThreadLabel(owner));
+		if (auto err = eLab ? checkThreadLocalEnd(lab, eLab) : std::nullopt; err)
+			return err;
+	}
 
 	/* Check for hard errors */
 	if (!getConf()->disableRaceDetection) {
@@ -2278,6 +2331,8 @@ auto GenMCDriver::handleThreadFinish(std::unique_ptr<ThreadFinishLabel> eLab)
 			     "Thread ends in an RCU read-side critical section!"});
 		return {.result = VerificationError::VE_InvalidRcu};
 	}
+	if (auto err = checkEndedThreadLocals(genmc::cast<ThreadFinishLabel>(lab)); err)
+		return {.result = *err};
 	for (auto i = 0; i < g.getNumThreads(); i++) {
 		auto *pLab = genmc::dyn_cast_if_present<JoinBlockLabel>(g.getLastThreadLabel(i));
 		if (pLab && std::cmp_equal(pLab->getChildId(), lab->getThread())) {
@@ -3413,14 +3468,14 @@ auto GenMCDriver::handleFree(const EventDbgInfo *dbg, Event pos, SAddr loc, Stor
 
 #if EMIT_NA_LABELS
 auto GenMCDriver::allocateGlobal(ASize size, uint64_t alignment, const void *initData,
-				 bool persistent, bool internal) -> SAddr
+				 bool persistent, bool internal, bool threadLocal) -> SAddr
 #else
-auto GenMCDriver::allocateGlobal(ASize size, uint64_t alignment, bool persistent, bool internal)
-	-> SAddr
+auto GenMCDriver::allocateGlobal(ASize size, uint64_t alignment, bool persistent, bool internal,
+				 bool threadLocal) -> SAddr
 #endif
 {
 	auto &state = getExec().getGraph().getState();
-	auto addr = state.addStaticRange(size, alignment, persistent, internal);
+	auto addr = state.addStaticRange(size, alignment, persistent, internal, threadLocal);
 #if EMIT_NA_LABELS
 	state.addStaticInitData(addr, size, initData);
 #endif

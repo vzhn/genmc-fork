@@ -100,6 +100,44 @@ TEST(GraphHashTest, ThreadsAreNamedByCreationPath)
 	EXPECT_NE(canonicalGraphHash(g1.g), canonicalGraphHash(g3.g));
 }
 
+/* A thread's copy of a thread-local carries the thread's id (SAddr), which
+ * is named by creation path like the thread (as in the test above, A1 writes
+ * its copy and B1 reads it through a pointer) */
+TEST(GraphHashTest, ThreadLocalCopiesAreNamedByCreationPath)
+{
+	auto tl = SAddr::createStatic(0, 8, false, false);
+
+	HashGraph g1;
+	auto a = g1.spawn(0, 1);
+	auto b = g1.spawn(0, 2);
+	auto a1 = g1.spawn(a, 1);
+	auto b1 = g1.spawn(b, 1);
+	auto *w1 = g1.write(a1, tl.withThread(a1), SVal(1));
+	g1.read(b1, tl.withThread(a1), w1);
+
+	HashGraph g2;
+	auto a_ = g2.spawn(0, 1);
+	auto b_ = g2.spawn(0, 2);
+	auto b1_ = g2.spawn(b_, 1);
+	auto a1_ = g2.spawn(a_, 1);
+	auto *w2 = g2.write(a1_, tl.withThread(a1_), SVal(1));
+	g2.read(b1_, tl.withThread(a1_), w2);
+
+	EXPECT_EQ(canonicalGraphDescription(g1.g), canonicalGraphDescription(g2.g));
+	EXPECT_EQ(canonicalGraphHash(g1.g), canonicalGraphHash(g2.g));
+
+	/* B1 reading its own copy instead is a different graph */
+	HashGraph g3;
+	auto a3 = g3.spawn(0, 1);
+	auto b3 = g3.spawn(0, 2);
+	auto b13 = g3.spawn(b3, 1);
+	auto a13 = g3.spawn(a3, 1);
+	auto *w3 = g3.write(a13, tl.withThread(b13), SVal(1));
+	g3.read(b13, tl.withThread(b13), w3);
+
+	EXPECT_NE(canonicalGraphDescription(g1.g), canonicalGraphDescription(g3.g));
+}
+
 /* The rf source and the coherence position tell graphs apart */
 TEST(GraphHashTest, RfAndCoherenceAreInTheHash)
 {

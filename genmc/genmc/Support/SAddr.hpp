@@ -34,6 +34,10 @@
  *     B60: 1 -> durable, 0 -> volatile
  *     B32-59: thread id
  *     B0-B31: thread allocation index
+ *
+ * The thread id of a static address is 0, except for a thread-local
+ * variable: thread T's copy of it is at the address of the main thread's
+ * copy, with T as the thread id.
  */
 class SAddr {
 
@@ -100,6 +104,19 @@ public:
 	[[nodiscard]] auto isDurable() const -> bool { return addr & durableMask; }
 	[[nodiscard]] auto isVolatile() const -> bool { return !isDurable(); }
 	[[nodiscard]] auto isNull() const -> bool { return addr == 0; }
+
+	/** The thread id the address carries (see above) */
+	[[nodiscard]] auto getThread() const -> int
+	{
+		return static_cast<int>((addr & threadMask) >> threadStartBit);
+	}
+
+	/** The address with THREAD as its thread id */
+	[[nodiscard]] auto withThread(int thread) const -> SAddr
+	{
+		VERIFY(thread >= 0 && static_cast<Width>(thread) <= threadLimit);
+		return {(addr & ~threadMask) | (static_cast<Width>(thread) << threadStartBit)};
+	}
 
 	/** Whether two addresses are on the same storage */
 	[[nodiscard]] auto sameStorageAs(const SAddr &other) const -> bool

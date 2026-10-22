@@ -284,7 +284,6 @@ public:
 	SVal threadArg;
 	std::vector<llvm::ExecutionContext> ECStack;
 	std::vector<llvm::ExecutionContext> initEC;
-	std::unordered_map<const void *, llvm::GenericValue> tls;
 	BlockageType blocked{};
 	MyRNG rng;
 	GenMCDriver::EventDbgInfo currDbgInfo;
@@ -430,8 +429,9 @@ protected:
 	std::vector<std::filesystem::path> runtimeIncludeDirs_;
 	llvm::DenseMap<const llvm::DIFile *, bool> runtimeHeaders_;
 
-	/* List of thread-local variables, with their initializing values */
-	std::unordered_map<const void *, llvm::GenericValue> threadLocalVars;
+	/* The address of the main thread's copy of each thread-local variable
+	 * (another thread's copy has that thread's id: see SAddr) */
+	llvm::DenseMap<const GlobalVariable *, SAddr> threadLocalAddrs_;
 
 	/* Mapping between static allocation beginning and the actual addresses of
 	 * global variables (where their contents are stored) */
@@ -628,6 +628,9 @@ public:
 	bool isStaticallyAllocated(SAddr addr) const;
 	void *getStaticAddr(SAddr addr) const;
 	std::string getStaticName(SAddr addr) const;
+
+	/* Returns the executing thread's copy of the thread-local GV */
+	SAddr getThreadLocalAddr(const GlobalVariable *GV) const;
 
 	/// runAtExitHandlers - Run any functions registered by the program's calls to
 	/// atexit(3), which we intercept and store in AtExitHandlers.

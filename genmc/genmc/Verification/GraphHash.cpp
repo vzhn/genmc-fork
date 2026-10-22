@@ -217,14 +217,18 @@ struct ThreadNames {
 		return std::format("{}@{}", name(e.thread), e.index);
 	}
 
-	/* A dynamic address embeds the allocating thread's id (SAddr): rewrite it
-	 * as the thread's rank. (A value that looks like one is rewritten the same
-	 * way; small integers have thread 0, whose rank is 0.) */
+	/* A dynamic address embeds the allocating thread's id (SAddr), and so
+	 * does another thread's copy of a thread-local: rewrite it as the
+	 * thread's rank. (A value that looks like one is rewritten the same way;
+	 * small integers have thread 0, whose rank is 0.) */
 	[[nodiscard]] auto addr(SAddr::Width a) const -> std::string
 	{
-		if (SAddr(a).isStatic())
-			return std::format("G{:x}", a);
-		auto t = static_cast<int>((a & SAddr::threadMask) >> SAddr::threadStartBit);
+		auto t = SAddr(a).getThread();
+		if (SAddr(a).isStatic()) {
+			if (t == 0 || !isLive(t))
+				return std::format("G{:x}", a);
+			return std::format("G{:x}:{}", SAddr(a).withThread(0).get(), rank[t]);
+		}
 		if (!isLive(t))
 			return std::format("D{:x}", a);
 		auto storage = a & SAddr::storageMask;

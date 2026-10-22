@@ -140,11 +140,12 @@ struct MemObject {
 
 /*
  * Find the type of the memory PTR points to.  With opaque pointers the type
- * comes from the instruction that produced the pointer: an alloca, a global,
- * or the source element type of the GEP chain leading to it.  We walk the
- * whole constant-offset GEP chain, since LLVM canonicalizes field accesses to
- * byte offsets (getelementptr i8, ptr %p, i64 12), whose own type says
- * nothing about the memory.
+ * comes from the instruction that produced the pointer: an alloca, a global
+ * (a thread-local one through @llvm.threadlocal.address), or the source
+ * element type of the GEP chain leading to it.  We walk the whole
+ * constant-offset GEP chain, since LLVM canonicalizes field accesses to byte
+ * offsets (getelementptr i8, ptr %p, i64 12), whose own type says nothing
+ * about the memory.
  */
 static auto getMemObject(const DataLayout &DL, Value *ptr) -> std::optional<MemObject>
 {
@@ -164,6 +165,11 @@ static auto getMemObject(const DataLayout &DL, Value *ptr) -> std::optional<MemO
 			typ = gv->getValueType();
 			fromGEP = false;
 			break;
+		}
+		if (auto *ii = dyn_cast<IntrinsicInst>(base);
+		    ii && ii->getIntrinsicID() == Intrinsic::threadlocal_address) {
+			base = ii->getArgOperand(0);
+			continue;
 		}
 		auto *gep = dyn_cast<GEPOperator>(base);
 		auto next = offset;

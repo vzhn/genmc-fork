@@ -72,7 +72,6 @@ void Interpreter::resetThread(unsigned int id)
 	auto &thr = getThrById(id);
 	thr.thaw();
 	thr.ECStack = {};
-	thr.tls = threadLocalVars;
 	thr.blocked = BlockageType::NotBlocked;
 	thr.rng.seed(Thread::seed);
 	thr.currDbgInfo = {};
@@ -249,7 +248,6 @@ Thread &Interpreter::addNewThread(Thread &&thread)
 Thread &Interpreter::createAddMainThread()
 {
 	Thread main(mainFun, 0);
-	main.tls = threadLocalVars;
 	dynState.threads.clear(); /* make sure its empty */
 	dynState.globalInstructions.clear();
 	return addNewThread(std::move(main));
@@ -261,7 +259,6 @@ Thread &Interpreter::createAddNewThread(llvm::Function *F, SVal arg, int tid, in
 {
 	Thread thr(F, arg, tid, pid, SF);
 	thr.ECStack.push_back(SF);
-	thr.tls = threadLocalVars;
 	return addNewThread(std::move(thr));
 }
 
@@ -274,13 +271,6 @@ void Interpreter::collectStaticAddresses()
 		char *ptr = static_cast<char *>(GVTOP(getConstantValue(&v)));
 		const uint64_t typeSize = getDataLayout().getTypeAllocSize(v.getValueType());
 
-		/* Record whether this is a thread local variable or not */
-		if (v.isThreadLocal()) {
-			for (auto i = 0u; i < typeSize; i++)
-				threadLocalVars[ptr + i] = getConstantValue(v.getInitializer());
-			continue;
-		}
-
 		/* A zero-sized global (an empty struct, a zero-length array, or
 		 * the `external global [0 x ptr]` vtable that C++ type info
 		 * refers to) still needs an address of its own: reserve one
@@ -288,21 +278,26 @@ void Interpreter::collectStaticAddresses()
 		static const char zeroByte = 0;
 		const uint64_t allocSize = std::max<uint64_t>(typeSize, 1);
 
-		/* Allocate a symbolic address for this global via the driver API */
+		/* Allocate a symbolic address for this global via the driver API. A
+		 * thread-local has a copy per thread, each starting as the
+		 * initializer: this is the main thread's (see getOperandValue()) */
 		auto addr = driver->allocateGlobal(ASize(allocSize), v.getAlignment(),
 #if EMIT_NA_LABELS
 						   typeSize == 0 ? &zeroByte : ptr,
 #endif
 						   v.getSection() == "__genmc_persist",
-						   v.getAddressSpace() == 42);
+						   v.getAddressSpace() == 42, v.isThreadLocal());
 		ERROR_ON(addr == SAddr(), "Allocator is out of memory");
+		if (v.isThreadLocal())
+			threadLocalAddrs_[&v] = addr;
 		staticAllocas.insert(std::make_pair(addr, addr + ASize(allocSize - 1)));
 		staticValueMap[addr] = ptr;
 
 		/* ... and use that in the EE instead. Make sure to re-initialize it too;
-		 * it might contain the address of another global. A declaration
-		 * has no initializer: the EE bound it to the host's symbol, whose
-		 * contents are its initial value */
+		 * it might contain the address of another global (the EE does not
+		 * initialize a thread-local at all). A declaration has no
+		 * initializer: the EE bound it to the host's symbol, whose contents
+		 * are its initial value */
 		updateGlobalMapping(&v, (void *)addr.get());
 		if (v.hasInitializer())
 			toReinitialize.push_back(std::make_pair(&v, ptr));

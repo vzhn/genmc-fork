@@ -88,6 +88,45 @@ released.
   preludes, the one for preprocessed tasks included, and checks their
   verdicts.
 
+- `__thread` and `_Thread_local` variables lived outside the execution
+  graph, in a map per thread from address to value, with every thread's
+  copy at the same address (#90). A thread-local struct or array aborted
+  GenMC before exploration (`Constant unimplemented for type`), and a
+  thread-local pointer initialized with the address of a global laid out
+  after it, such as a string literal, pointed outside GenMC's memory. A
+  pointer to another thread's thread-local reached the accessing thread's
+  own copy: publishing a thread-local node, as lock implementations do
+  (e.g. Dat3M's `ticket_awnsb_mutex`), gave false assertion violations,
+  and a race through such a pointer went unreported. Each thread now has
+  its own copy of every thread-local, at an address of its own in static
+  memory, starting as the initializer, and accesses to it are events like
+  any other: they are checked for races, and carry dependencies under
+  `-imm` and `-lkmm`. An error trace names another thread's copy after
+  its thread (`tlx of thread 1`). Symmetric threads stay symmetric, but a
+  parent that accesses its own thread-locals between two spawns makes
+  them not symmetric, as the thread-local may be published
+  (`tests/correct/infr/{tls-aggregate,tls-init-address,tls-published}`,
+  `tests/wrong/racy/tls-published-race`,
+  `tests/wrong/infr/print-names-thread-local`,
+  `tests/correct/sr/{tls-symmetric,tls-between-spawns}`; the canonical
+  graph hash of `-exhaustive` names the copies by their threads' creation
+  paths: `GraphHashTest.ThreadLocalCopiesAreNamedByCreationPath`).
+- `memset()` on a thread-local, or `memcpy()` between two thread-locals,
+  aborted GenMC (`Invalid call to memset()!`, or `memcpy()`): clang takes
+  the address of a thread-local through `@llvm.threadlocal.address`,
+  behind which the promotion of memory intrinsics did not find the
+  variable's type, so it left the call whole, which GenMC cannot run. It
+  looks through the intrinsic now, and the call becomes an access per
+  field (`tests/correct/infr/tls-memintrinsics`).
+- An access to a thread's thread-local by another thread, through a
+  pointer the thread published, was not reported when it came after the
+  thread ended (e.g., after joining it) or concurrently with its end,
+  which natively is a use after free. A thread's copies of thread-locals
+  now end with it, as if freed by its end: such an access is reported as
+  an access to freed memory, with the thread's end as the conflicting
+  event. The main thread's copies last as long as the program
+  (`tests/wrong/memory/tls-access-ended`).
+
 ### Added
 
 - The other integer `__VERIFIER_nondet_X()` of SV-COMP (#48): `bool`,

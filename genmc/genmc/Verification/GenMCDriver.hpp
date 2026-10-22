@@ -188,16 +188,19 @@ public:
 	auto runFromCache() -> bool;
 
 	/** Should be called to register a static allocation, before the execution loop.
-	 *  Returns an SAddr.
+	 *  Returns an SAddr. For a thread-local variable, the address is the
+	 *  main thread's copy; another thread's copy is the address with that
+	 *  thread's id (SAddr::withThread()).
 	 *
 	 *  For EMIT_NA_LABELS=ON: @p initData must point to memory that will
 	 *  hold the initial bytes. The pointer must remain valid for the driver's lifetime. */
 #if EMIT_NA_LABELS
 	auto allocateGlobal(ASize size, uint64_t alignment, const void *initData,
-			    bool persistent = false, bool internal = false) -> SAddr;
+			    bool persistent = false, bool internal = false,
+			    bool threadLocal = false) -> SAddr;
 #else
 	auto allocateGlobal(ASize size, uint64_t alignment, bool persistent = false,
-			    bool internal = false) -> SAddr;
+			    bool internal = false, bool threadLocal = false) -> SAddr;
 #endif
 
 	/** Should be called at the beginning of each execution. Returns whether the frontend
@@ -926,6 +929,15 @@ private:
 	auto checkForMixedSize(MemAccessLabel *lab) -> std::optional<VerificationError>;
 
 	auto checkForRaces(const EventLabel *lab) -> std::optional<VerificationError>;
+
+	/** LAB accesses a thread-local of the thread ELAB ends: if LAB does not
+	 * happen before ELAB, reports an error */
+	auto checkThreadLocalEnd(const EventLabel *lab, const ThreadFinishLabel *eLab)
+		-> std::optional<VerificationError>;
+
+	/** Checks the accesses to the thread-locals of the thread ELAB ends */
+	auto checkEndedThreadLocals(const ThreadFinishLabel *eLab)
+		-> std::optional<VerificationError>;
 
 	void configureProbe(MemLabel *rLab, Event pos, SAddr addr, ASize size,
 			    const EventDeps &deps);
