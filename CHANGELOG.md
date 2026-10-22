@@ -11,6 +11,20 @@ released.
 
 ### Fixed
 
+- With `-disable-race-detection`, GenMC missed the errors of racy
+  programs under `-rc11`, `-imm` and `-sc` (#142): a non-atomic read read
+  only the latest write, and a non-atomic write went last in coherence,
+  which loses no execution only as long as races are reported. A plain
+  `if (flag) assert(data == 1)` racing with `data = 1; flag = 1` was
+  explored once and reported no errors (`-lkmm` found the violation).
+  Without race detection, non-atomic accesses are now explored like
+  atomic ones, as under `-lkmm`; programs without races have the same
+  executions as before (`tests/wrong/safety/plain-race-ignored`,
+  `tests/correct/infr/plain-race-ignored`). The memory-model detector
+  also no longer moves such a program to a stronger model, such as SC
+  for a program without atomics, since that keeps the outcomes of
+  race-free programs only (`scripts/check-race-detection-model.sh`, ctest
+  `race-detection-model`).
 - An installed GenMC compiled programs with the runtime headers of the
   source tree it was built from, whatever that tree had become since, as
   long as it existed; once it was gone, C++ programs no longer compiled,

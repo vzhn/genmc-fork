@@ -451,6 +451,17 @@ protected:
 		return std::holds_alternative<EstimationMode>(mode);
 	}
 
+	/** Whether plain (non-atomic) accesses are explored like atomic ones:
+	 * a plain read may read any write the model allows, a plain write take
+	 * any place in coherence. Otherwise a plain read reads the latest write
+	 * and a plain write is placed last, which loses no execution only as
+	 * long as every race is reported: LKMM has no DRF guarantee, and
+	 * -disable-race-detection reports none */
+	auto exploresPlainAccesses() const -> bool
+	{
+		return getConf()->model == ModelType::LKMM || getConf()->disableRaceDetection;
+	}
+
 	/** Returns true if we are currently running in random mode */
 	auto inRandomMode() const -> bool { return std::holds_alternative<RandomMode>(mode); }
 
