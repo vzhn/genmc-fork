@@ -19,6 +19,7 @@
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/ChoiceMap.hpp"
 #include "genmc/Verification/ExecutionFrame.hpp"
+#include "genmc/Verification/ExplorationStack.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/GraphHash.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
@@ -349,8 +350,8 @@ protected:
 	auto getConf() const -> const Config * { return userConf.get(); }
 
 	/** Returns a reference to the current execution */
-	auto getExec() -> Execution & { return execStack.back(); }
-	auto getExec() const -> const Execution & { return execStack.back(); }
+	auto getExec() -> Execution & { return stack_->top(); }
+	auto getExec() const -> const Execution & { return stack_->top(); }
 
 	/** Returns a reference to the current execution state */
 	auto getExecState() -> ExecutionState & { return execState_; }
@@ -924,7 +925,7 @@ private:
 	std::shared_ptr<const Config> userConf;
 
 	/** Execution stack */
-	std::vector<Execution> execStack;
+	std::unique_ptr<ExplorationStack> stack_;
 
 	/** Scheduler */
 	std::unique_ptr<Scheduler> scheduler_;
@@ -1025,8 +1026,8 @@ private:
 	std::unique_ptr<FreeLabel> freeProbeLab_;
 	std::unique_ptr<HpRetireLabel> retireProbeLab_;
 
-	/** Execution state owned by this driver.  All graphs on the execStack hold
-	 *  a non-owning pointer to this object (see ExecutionGraph::setStatePtr). */
+	/** Execution state owned by this driver. All graphs on the exploration
+	 *  stack hold a non-owning pointer to this object (see ExplorationStack). */
 	ExecutionState execState_;
 };
 

@@ -80,12 +80,9 @@ GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool /
 {
 	/* Set up the execution context */
 	consChecker = ConsistencyChecker::create(getConf());
-	auto cfg = ExecutionGraph::Config{.execState = &execState_,
-					  .memModel = &*consChecker,
-					  .emitNALabels = Config::emitNALabels};
-	auto execGraph = userConf->isDepTrackingModel ? std::make_unique<DepExecutionGraph>(cfg)
-						      : std::make_unique<ExecutionGraph>(cfg);
-	execStack.emplace_back(std::move(execGraph), LocalQueueT(), ChoiceMap());
+	stack_ = std::make_unique<ExplorationStack>(*consChecker, execState_,
+						    userConf->isDepTrackingModel);
+	stack_->reset(stack_->emptyFrame());
 
 	symmChecker = SymmetryChecker::create();
 	auto hasBounder = userConf->bound.has_value();
@@ -136,11 +133,7 @@ void GenMCDriver::repairDanglingReads(ExecutionGraph &g)
 }
 
 
-void GenMCDriver::pushExecution(Execution &&e)
-{
-	execStack.push_back(std::move(e));
-	getConsChecker().recomputeCacheCounters(getExec().getGraph());
-}
+void GenMCDriver::pushExecution(Execution &&e) { stack_->push(std::move(e)); }
 
 auto GenMCDriver::invariantContext(std::string_view where) const -> invariants::Context
 {
@@ -168,11 +161,11 @@ void GenMCDriver::checkAllocationInvariants(std::string_view where) const
 void GenMCDriver::restrictExecution(Stamp stamp, std::string_view where)
 {
 	if (!checksInvariants()) {
-		getExec().restrict(stamp);
+		stack_->restrict(stamp);
 		return;
 	}
 	auto plan = invariants::planCutToStamp(getExec().getGraph(), stamp);
-	getExec().restrict(stamp);
+	stack_->restrict(stamp);
 	checkGraphInvariants(getExec().getGraph(), where, &plan);
 }
 
@@ -186,16 +179,7 @@ static auto getLockRole(const WriteLabel *wLab) -> ExecutionState::LockRole
 	return ExecutionState::LockRole::None;
 }
 
-auto GenMCDriver::popExecution() -> bool
-{
-	if (execStack.empty())
-		return false;
-	execStack.pop_back();
-	if (execStack.empty())
-		return false;
-	getConsChecker().recomputeCacheCounters(getExec().getGraph());
-	return true;
-}
+auto GenMCDriver::popExecution() -> bool { return stack_->pop(); }
 
 void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 {
@@ -209,7 +193,7 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 					     "(target {}, buffered error: {})",
 					     target ? std::format("{}", *target) : "none",
 					     bufferedError_.has_value()),
-				 execStack.empty() ? static_cast<const ExecutionGraph *>(nullptr)
+				 stack_->empty() ? static_cast<const ExecutionGraph *>(nullptr)
 						   : &getExec().getGraph(),
 				 invariantContext("taking a task from the pool"));
 	}
@@ -224,13 +208,7 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 	dbgInfo_.clear();
 	pendingResume_ = nullptr;
 
-	execStack.clear();
-	execStack.emplace_back(std::move(exec->graph), LocalQueueT(), std::move(exec->choices));
-
-	getExec().getGraph().setMemModel(&getConsChecker());
-	getExec().getGraph().setState(&getExecState());
-
-	getConsChecker().recomputeCacheCounters(getExec().getGraph());
+	stack_->reset({std::move(exec->graph), LocalQueueT(), std::move(exec->choices)});
 }
 
 auto GenMCDriver::extractState() -> std::unique_ptr<GenMCDriver::Execution>
@@ -592,14 +570,7 @@ void GenMCDriver::maybeCutGraph(const EventLabel *lab)
 void GenMCDriver::restartExecution()
 {
 	pendingResume_ = nullptr;
-	auto cfg = ExecutionGraph::Config{.execState = &execState_,
-					  .memModel = &*consChecker,
-					  .emitNALabels = Config::emitNALabels};
-	auto execGraph = getConf()->isDepTrackingModel ? std::make_unique<DepExecutionGraph>(cfg)
-						       : std::make_unique<ExecutionGraph>(cfg);
-	execStack.clear();
-	execStack.emplace_back(std::move(execGraph), LocalQueueT(), ChoiceMap());
-	getConsChecker().recomputeCacheCounters(getExec().getGraph());
+	stack_->reset(stack_->emptyFrame());
 }
 
 auto GenMCDriver::done() -> bool
@@ -618,7 +589,6 @@ auto GenMCDriver::done() -> bool
 		getExec().getWorkqueue().truncate(runStartWork_);
 		restrictExecution(runStartStamp_,
 				  "restricting the graph to rerun after a relocation");
-		getConsChecker().recomputeCacheCounters(getExec().getGraph());
 		repairDanglingReads(getExec().getGraph());
 		return false;
 	}
@@ -631,7 +601,6 @@ auto GenMCDriver::done() -> bool
 		getExec().getWorkqueue().truncate(runStartWork_);
 		restrictExecution(runStartStamp_,
 				  "restricting the graph to rerun with eager checks");
-		getConsChecker().recomputeCacheCounters(getExec().getGraph());
 		repairDanglingReads(getExec().getGraph());
 		return false;
 	}
@@ -4487,8 +4456,6 @@ auto GenMCDriver::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 	if (const auto *wcf = genmc::dyn_cast<WeakCasFailureRevisit>(&*item))
 		stamp = std::max(stamp, g.getEventLabel(wcf->getRev())->getStamp());
 	restrictExecution(stamp, "restricting the graph for a revisit");
-	/* Cutting the graph bypasses the incremental counter updates */
-	getConsChecker().recomputeCacheCounters(getExec().getGraph());
 	repairDanglingReads(g);
 
 	pendingResume_ = nullptr;
