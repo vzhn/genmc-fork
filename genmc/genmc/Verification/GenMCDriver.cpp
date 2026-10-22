@@ -2517,8 +2517,7 @@ auto GenMCDriver::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal
 	if (err)
 		return {.result = *err}; /* This execution will be blocked */
 
-	/* Only LKMM's plain reads are explored like atomic ones */
-	VERIFY(!lab->isNotAtomic() || getConf()->model == ModelType::LKMM);
+	VERIFY(!lab->isNotAtomic() || exploresPlainAccesses());
 	/* Runtime sends the NA value lazily when adding next atomic access */
 	if (oldVal)
 		g.updateDeferredValue(lab->getAccess(), *oldVal);
@@ -2757,9 +2756,10 @@ auto GenMCDriver::handleNALoad(Event pos, SAddr loc, ASize size, const EventDeps
 	auto &g = getExec().getGraph();
 
 #if EMIT_NA_LABELS
-	/* LKMM has no DRF guarantee for plain accesses: a plain read may read
-	 * any write its model allows, so it is explored like a marked one */
-	if (getConf()->model == ModelType::LKMM)
+	/* Without the DRF guarantee (LKMM), or without its race reports
+	 * (-disable-race-detection), a plain read may read any write the model
+	 * allows, so it is explored like a marked one */
+	if (exploresPlainAccesses())
 		return handleLoad(ReadLabel::create(pos, MemOrdering::NotAtomic, loc, size, deps),
 				  std::nullopt);
 #endif
@@ -2823,8 +2823,8 @@ auto GenMCDriver::handleNAStore(Event pos, SAddr loc, ASize size, std::optional<
 	auto &g = getExec().getGraph();
 
 #if EMIT_NA_LABELS
-	/* LKMM's plain writes take any place in coherence its model allows */
-	if (getConf()->model == ModelType::LKMM)
+	/* Plain writes then take any place in coherence the model allows */
+	if (exploresPlainAccesses())
 		return handleStore(WriteLabel::create(pos, MemOrdering::NotAtomic, loc, size, *val,
 						      WriteAttr::None, deps),
 				   std::nullopt);
@@ -3187,7 +3187,7 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 	if (auto err = checkFinalAnnotations(lab).or_else([&] { return checkForRaces(lab); }); err)
 		return {.result = *err};
 
-	VERIFY(!lab->isNotAtomic() || getConf()->model == ModelType::LKMM);
+	VERIFY(!lab->isNotAtomic() || exploresPlainAccesses());
 	if (lab->isNotAtomic())
 		g.getState().onNAStore(lab->getPos(), lab->getAccess(),
 				       getConsChecker().getHbView(lab), std::nullopt);
