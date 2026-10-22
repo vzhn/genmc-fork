@@ -29,6 +29,31 @@ released.
   checked under `-lkmm`; fuzz seeds 101 and 496 of
   `scripts/lkmm/fuzz-ctrl.py` now have herd7's counts (3479, 554; were
   3756, 734) (`tests/correct/lkmm/ctrl-rmw-coe-cycle`).
+- A spin loop whose condition reads several locations, such as
+  `while (x == 0 || y == 0)`, did not revisit its later reads in place
+  (#92): the loop's failing assumption reached only the first branch
+  before it, so only the read of `x` was annotated. An iteration that
+  failed at `y` stayed blocked: each later write to `y` revisited the
+  read in a copy of the execution, and the blocked execution was explored
+  to its end as well. Every branch to the assumption now gets it
+  (`tests/correct/saver/spin-load-or`: no blocked execution, one before).
+- Nor did a spin loop that retries with `continue`, or by reaching the
+  end of its body, revisit its reads in place (#92), as in a seqlock
+  reader (`if (s & 1) continue; ... if (seq == s) break;`): such branches
+  reach the latch, where the failing assumption is, through blocks of
+  their own that only jump on, and the assumption did not get past them.
+  It now does (`tests/correct/saver/spin-seqlock-reader`: 5 blocked
+  executions, 13 before; a relaxed read of the data is still reported:
+  `tests/wrong/safety/seqlock-reader-relaxed-data`).
+- A read whose spin-loop condition takes a signed remainder, as in
+  `while (seq % 2 == 1)` on an `int`, was not annotated either (#92): the
+  annotator handled the unsigned remainder only, and such a read was not
+  revisited in place (`tests/correct/saver/spin-load-srem`: no blocked
+  execution, two before). With the three fixes, Dat3M's seqlock
+  benchmark with three readers explores 41,875 blocked executions instead
+  of 360,057, with 9 times fewer instructions; the remaining ones are
+  failed iterations that no later write can make succeed, for each
+  combination of the other readers' executions.
 - With `-disable-race-detection`, GenMC missed the errors of racy
   programs under `-rc11`, `-imm` and `-sc` (#142): a non-atomic read read
   only the latest write, and a non-atomic write went last in coherence,

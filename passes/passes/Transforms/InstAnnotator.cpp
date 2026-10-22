@@ -151,6 +151,9 @@ auto InstAnnotator::generateInstExpr(Instruction *curr) -> InstAnnotator::IRExpr
 		HANDLE_INST(URem, curr->getType()->getPrimitiveSizeInBits(),
 			    generateOperandExpr(mod, curr->getOperand(0)),
 			    generateOperandExpr(mod, curr->getOperand(1)));
+		HANDLE_INST(SRem, curr->getType()->getPrimitiveSizeInBits(),
+			    generateOperandExpr(mod, curr->getOperand(0)),
+			    generateOperandExpr(mod, curr->getOperand(1)));
 		HANDLE_INST(And, curr->getType()->getPrimitiveSizeInBits(),
 			    generateOperandExpr(mod, curr->getOperand(0)),
 			    generateOperandExpr(mod, curr->getOperand(1)));
