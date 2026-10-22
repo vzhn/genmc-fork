@@ -29,9 +29,9 @@ class VectorClock;
 class View;
 enum class ModelType : std::uint8_t;
 
-/** The options a memory model reads (from the user's Config). The field
- * names are those of Config, which the generated checkers read through
- * getConf() */
+/** The options a memory model reads (the verification layer takes them from
+ * the user's Config). The field names are those of Config, which the
+ * generated checkers read through getConf() */
 struct ModelOptions {
 	bool collectLinSpec = false; /**< Relinche collects a specification */
 	bool checkLinSpec = false;   /**< Relinche checks against a specification */
@@ -49,8 +49,10 @@ class ConsistencyChecker : public GraphModel,
 			   public ModelErrors {
 
 protected:
-	/* (CONF may be null: default options) */
-	ConsistencyChecker(const Config *conf);
+	/* The generated checkers' constructors take the user's Config and pass
+	 * it on; it is not read here (the options come from create()), so the
+	 * model layer does not depend on the verification layer's Config */
+	ConsistencyChecker(const Config * /*conf*/) {}
 
 public:
 	ConsistencyChecker() = delete;
@@ -60,7 +62,9 @@ public:
 	auto operator=(const ConsistencyChecker &) -> ConsistencyChecker & = delete;
 	auto operator=(ConsistencyChecker &&) -> ConsistencyChecker & = delete;
 
-	static auto create(const Config *conf) -> std::unique_ptr<ConsistencyChecker>;
+	/** The checker of MODEL, reading OPTS */
+	static auto create(ModelType model, ModelOptions opts = {})
+		-> std::unique_ptr<ConsistencyChecker>;
 
 	/** Returns the options the model reads */
 	[[nodiscard]] auto getConf() const -> const ModelOptions * { return &opts_; }

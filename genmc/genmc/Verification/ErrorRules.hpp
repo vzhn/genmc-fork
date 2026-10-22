@@ -11,7 +11,6 @@
  *     https://opensource.org/licenses/MIT
  */
 
-
 #ifndef GENMC_ERROR_RULES_HPP
 #define GENMC_ERROR_RULES_HPP
 
@@ -30,11 +29,14 @@
 #include <optional>
 #include <string>
 
+class BIncFaiWriteLabel;
+class EventLabel;
 class ExecutionGraph;
 class ExecutionState;
 class GraphModel;
 class MemAccessLabel;
 class ReadLabel;
+class ThreadFinishLabel;
 class WriteLabel;
 
 namespace error_rules {
@@ -71,6 +73,44 @@ auto wwRaceUpgrade(const ExecutionGraph &g, Event pos, VerificationError wcode,
 
 /** An atomic access that overlaps a differently-sized atomic one */
 auto mixedSizeAccess(const MemAccessLabel *lab) -> std::optional<ErrorDetails>;
+
+/** If LAB accesses another thread's copy of a thread-local (see SAddr),
+ * that thread, and 0 otherwise */
+auto threadLocalOwner(const EventLabel *lab) -> int;
+
+/** LAB, an access to a thread-local of the thread ELAB ends, does not happen
+ * before the end */
+auto threadLocalAfterEnd(const GraphModel &model, const EventLabel *lab,
+			 const ThreadFinishLabel *eLab) -> std::optional<ErrorDetails>;
+
+/** An access to a thread-local of the thread ELAB ends that does not happen
+ * before the end (the main thread's copies last as long as the program) */
+auto endedThreadLocal(const GraphModel &model, const ExecutionGraph &g,
+		      const ThreadFinishLabel *eLab) -> std::optional<ErrorDetails>;
+
+/** A store to a location with a final write that is not hb-before that
+ * write, or a second final write (-final-write) */
+auto finalWriteViolation(const GraphModel &model, const ExecutionGraph &g, const WriteLabel *wLab)
+	-> std::optional<ErrorDetails>;
+
+/** In-place revisiting: an annotated read RLAB of a location with unordered
+ * writes, which IPR relies on not being there */
+auto iprUnorderedWrites(const ExecutionGraph &g, const ReadLabel *rLab)
+	-> std::optional<ErrorDetails>;
+
+/** Blind-RMW reduction: RLAB observes the order of two identical blind RMWs */
+auto blindRMWOrderObserved(const GraphModel &model, const ExecutionGraph &g, const ReadLabel *rLab)
+	-> std::optional<ErrorDetails>;
+
+/** Blind-RMW reduction: SLAB, a write to a location of blind RMWs that is
+ * not one of them, is not hb-after them */
+auto blindRMWReorderedWith(const GraphModel &model, const ExecutionGraph &g, const WriteLabel *sLab)
+	-> std::optional<ErrorDetails>;
+
+/** BAM: the barrier increment SLAB does not follow the last completed
+ * round of its barrier in hb;po */
+auto barrierNotWellFormed(const GraphModel &model, const ExecutionGraph &g,
+			  const BIncFaiWriteLabel *sLab) -> std::optional<ErrorDetails>;
 
 } // namespace error_rules
 

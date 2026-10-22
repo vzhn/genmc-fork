@@ -1,0 +1,771 @@
+/*
+ * GenMC -- Generic Model Checking.
+ *
+ * This project is dual-licensed under the Apache License 2.0 and the MIT License.
+ * You may choose to use, distribute, or modify this software under either license.
+ *
+ * Apache License 2.0:
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * MIT License:
+ *     https://opensource.org/licenses/MIT
+ */
+
+#ifndef GENMC_EXPLORATION_CORE_HPP
+#define GENMC_EXPLORATION_CORE_HPP
+
+#include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
+#include "genmc/Execution/EventLabel.hpp"
+#include "genmc/Execution/ExecutionGraph.hpp"
+#include "genmc/Verification/BackwardRevisits.hpp"
+#include "genmc/Verification/ChoiceCandidates.hpp"
+#include "genmc/Verification/ExhaustiveConsistency.hpp"
+#include "genmc/Verification/ChoiceMap.hpp"
+#include "genmc/Verification/ExecutionFrame.hpp"
+#include "genmc/Verification/ExplorationStack.hpp"
+#include "genmc/Verification/Config.hpp"
+#include "genmc/Verification/DebugInfo.hpp"
+#include "genmc/Verification/ErrorReplay.hpp"
+#include "genmc/Verification/GraphHash.hpp"
+#include "genmc/Verification/KeptEventRuns.hpp"
+#include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
+#include "genmc/Verification/ResumePoint.hpp"
+#include "genmc/Verification/ResumePointStore.hpp"
+#include "genmc/Verification/RfReductions.hpp"
+#include "genmc/Verification/Scheduler.hpp"
+#include "genmc/Support/VerificationError.hpp"
+#include "genmc/Verification/VerificationResult.hpp"
+#include "genmc/Verification/WorkList.hpp"
+#include "genmc/Verification/WorkSharing.hpp"
+
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <memory>
+#include <random>
+#include <string_view>
+#include <unordered_set>
+#include <utility>
+#include <variant>
+
+namespace invariants {
+struct Context;
+struct RestrictionPlan;
+} // namespace invariants
+
+class ThreadPool;
+class EventProducer;
+class BoundDecider;
+class ConsistencyChecker;
+class SymmetryChecker;
+enum class BoundCalculationStrategy : std::uint8_t;
+
+/**
+ * The exploration: the stack of graphs still to explore (ExplorationStack),
+ * how a new event extends the current graph (the label handlers: which
+ * write a read reads from, where a write goes in coherence, which revisits
+ * the new event enables, the errors it causes), and how a revisit is taken
+ * (done(): restricting the graph and applying it). The memory model,
+ * maximality, reductions and error rules are pure modules it calls.
+ *
+ * GenMCDriver adds the protocol with the program that produces the events;
+ * this class never calls it.
+ */
+class ExplorationCore {
+
+protected:
+	using LocalQueueT = WorkList;
+
+public:
+	/** The operating mode of the driver */
+	struct VerificationMode {};
+	struct EstimationMode {
+		unsigned int budget;
+	};
+	/** A randomized verification mode: sample executions for a fixed budget */
+	struct RandomMode {
+		unsigned int budget;
+	};
+	using Mode = std::variant<VerificationMode, EstimationMode, RandomMode>;
+
+	/** Represents the execution at a given point */
+	using Execution = ExecutionFrame;
+
+	/** Scheduler result type */
+	struct Finished {};
+	struct Blocked {};
+	struct Error {};
+	using ScheduleResult = std::variant<Finished, Blocked, Error, int>;
+
+	/** Handler Result Types */
+	struct Reset {};
+	struct Invalid {};
+	template <typename T> using ResultType = std::variant<T, VerificationError, Reset, Invalid>;
+	template <typename T> struct HandleResult {
+		ResultType<T> result;
+		unsigned int count = 0;
+	};
+
+	/** CAS-read handlers also return whether the CAS performs its write.
+	 * This is necessary for weak CASes, which may spuriously fail. */
+	struct CasReadResult {
+		SVal val;
+		bool success = false;
+	};
+
+	using NALoadResult =
+		HandleResult<std::conditional_t<Config::emitNALabels, SVal, std::monostate>>;
+	using NAStoreResult =
+		HandleResult<std::conditional_t<Config::emitNALabels, bool, std::monostate>>;
+
+	/** Debug information for an instruction */
+	using EventDbgInfo = ::EventDbgInfo;
+
+	/** Packs together debug information for a graph */
+	using GraphDbgInfo = ::GraphDbgInfo;
+
+	/**** Generic actions ***/
+
+	/** With -check-replay-keys: the instruction instance the interpreter is
+	 * about to execute in the thread of @p base, whose events will follow
+	 * @p base. Labels added after it get the key; labels reused on replay
+	 * must have it. Cleared after the instruction's call to the driver. */
+	void setEventKey(std::shared_ptr<const EventKey> key, Event base)
+	{
+		currKey = std::move(key);
+		currKeyBase = base;
+	}
+	void clearEventKey() { currKey = nullptr; }
+	auto checksReplayKeys() const -> bool { return getConf()->checkReplayKeys; }
+
+	/** Lets forward revisits resume from saved runtime states: HOOK saves
+	 * the runtime's state at the event at POS, or returns null */
+	void setResumeHook(ResumePointStore::Hook hook) { resumePoints_.setHook(std::move(hook)); }
+
+	/** The state the execution about to start resumes from, if any
+	 * (cleared once taken; otherwise the runtime replays the graph) */
+	auto takePendingResumePoint() -> std::shared_ptr<ResumePoint>
+	{
+		return resumePoints_.takePending();
+	}
+
+	/** Under LKMM, a control dependency ends at the join of its branch */
+	auto scopesCtrlDeps() const -> bool
+	{
+		return getConf()->checkReplayKeys && getConf()->model == ModelType::LKMM;
+	}
+
+	/** Whether there are more executions to be explored */
+	auto done() -> bool;
+
+	/** The graph of the execution being explored (read-only: for producers
+	 * and observers, e.g. to read a complete execution's outcome) */
+	auto getCurrentGraph() const -> const ExecutionGraph & { return getExec().getGraph(); }
+
+	/** Returns the result of the verification procedure */
+	auto getResult() const -> const VerificationResult & { return result; }
+	auto getResult() -> VerificationResult & { return result; }
+
+	virtual ~ExplorationCore();
+
+	/** Non-copyable and non-movable (constructed via the protected factory below) */
+	ExplorationCore(const ExplorationCore &) = delete;
+	auto operator=(const ExplorationCore &) -> ExplorationCore & = delete;
+	ExplorationCore(ExplorationCore &&) = delete;
+	auto operator=(ExplorationCore &&) -> ExplorationCore & = delete;
+
+protected:
+
+	ExplorationCore(std::shared_ptr<const Config> conf, WorkSharing *pool = nullptr,
+			Mode /*mode*/ = VerificationMode{});
+
+	/** Returns a pointer to the user configuration */
+	auto getConf() const -> const Config * { return userConf.get(); }
+
+	/** Returns a reference to the current execution */
+	auto getExec() -> Execution & { return stack_->top(); }
+	auto getExec() const -> const Execution & { return stack_->top(); }
+
+	/** Returns a reference to the current execution state */
+	auto getExecState() -> ExecutionState & { return execState_; }
+	auto getExecState() const -> const ExecutionState & { return execState_; }
+
+	/** Returns a reference to the set consistency checker */
+	auto getConsChecker() -> ConsistencyChecker & { return *consChecker; }
+	auto getConsChecker() const -> const ConsistencyChecker & { return *consChecker; }
+
+	/** Returns a reference to the symmetry checker */
+	auto getSymmChecker() -> SymmetryChecker & { return *symmChecker; }
+	auto getSymmChecker() const -> const SymmetryChecker & { return *symmChecker; }
+
+	auto getRelinche() -> LinearizabilityChecker & { return *relinche; }
+	auto getRelinche() const -> const LinearizabilityChecker & { return *relinche; }
+
+	/** Returns a reference to the scheduler */
+	auto getScheduler() -> Scheduler & { return *scheduler_; }
+	auto getScheduler() const -> const Scheduler & { return *scheduler_; }
+
+	/** Stops the verification procedure when an error is found */
+	void halt(VerificationError status);
+
+	/** Pushes E to the execution stack. */
+	void pushExecution(Execution &&e);
+
+	/** Pops the top stack entry.
+	 * Returns false if the stack is empty or this was the last entry. */
+	auto popExecution() -> bool;
+
+	/** Gets/sets the thread pool this driver should account to */
+	auto getThreadPool() -> WorkSharing * { return pool; }
+	auto getThreadPool() const -> WorkSharing * { return pool; }
+	void setThreadPool(WorkSharing *threadPool) { pool = threadPool; }
+
+	/** Initializes the exploration from a given state */
+	void initFromState(std::unique_ptr<Execution> exec);
+
+	/** Extracts the current driver state.
+	 * The driver is left in an inconsistent form */
+	auto extractState() -> std::unique_ptr<Execution>;
+
+	/** Returns the value that a read is reading. This function should be
+	 * used when calculating the value that we should return to the
+	 * interpreter. */
+	auto getReadRetValue(const ReadLabel *rLab) -> HandleResult<SVal>;
+
+	/** If @p cLab is a weak CAS that just became a successful RMW, pushes a
+	 * worklist item to also explore its spurious-failure outcome. */
+	void maybePushWeakCasFailure(const CasReadLabel *cLab);
+
+	/** If @p lab is a weak CAS, pushes its spurious failure reading each
+	 * coherent write that @p kept (its rf approximation) left out */
+	void pushWeakCasFailuresOnDroppedRfs(ReadLabel *lab, const std::vector<EventLabel *> &kept);
+
+	/** Est: Returns true if we are currently running in estimation mode */
+	auto inEstimationMode() const -> bool
+	{
+		return std::holds_alternative<EstimationMode>(mode);
+	}
+
+	/** Whether plain (non-atomic) accesses are explored like atomic ones:
+	 * a plain read may read any write the model allows, a plain write take
+	 * any place in coherence. Otherwise a plain read reads the latest write
+	 * and a plain write is placed last, which loses no execution only as
+	 * long as every race is reported: LKMM has no DRF guarantee, and
+	 * -disable-race-detection reports none */
+	auto exploresPlainAccesses() const -> bool
+	{
+		return getConf()->model == ModelType::LKMM || getConf()->disableRaceDetection;
+	}
+
+	/** Returns true if we are currently running in random mode */
+	auto inRandomMode() const -> bool { return std::holds_alternative<RandomMode>(mode); }
+
+	/** Returns true if we are currently running in exhaustive verification mode */
+	auto inVerificationMode() const -> bool
+	{
+		return std::holds_alternative<VerificationMode>(mode);
+	}
+
+	/** Est: Returns true if the estimation seems "good enough" */
+	auto shouldStopEstimating() -> bool
+	{
+		auto remainingBudget = --std::get<EstimationMode>(mode).budget;
+		if (remainingBudget == 0)
+			return true;
+
+		auto totalExplored = result.explored + result.exploredBlocked;
+		auto sd = std::sqrt(result.estimationVariance);
+		return (totalExplored >= getConf()->estimationMin) &&
+		       (sd <= result.estimationMean / getConf()->sdThreshold ||
+			totalExplored > result.estimationMean);
+	}
+
+	/** Returns true if we have exhausted the budget */
+	auto shouldStopRandom() -> bool
+	{
+		auto remainingBudget = --std::get<RandomMode>(mode).budget;
+		return remainingBudget == 0;
+	}
+
+protected:
+	/*** Instruction handling (EventLabel) ***/
+
+	auto handleThreadFinish(std::unique_ptr<ThreadFinishLabel> eLab)
+		-> HandleResult<std::monostate>;
+	auto handleThreadKill(std::unique_ptr<ThreadKillLabel> lab) -> HandleResult<std::monostate>;
+	auto handleBlock(std::unique_ptr<BlockLabel> bLab) -> HandleResult<std::monostate>;
+	auto handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<SVal> oldVal)
+		-> HandleResult<SVal>;
+	auto handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SVal> oldVal)
+		-> HandleResult<bool>;
+	auto handleFence(std::unique_ptr<FenceLabel> fLab) -> HandleResult<std::monostate>;
+	auto handleThreadCreate(std::unique_ptr<ThreadCreateLabel> tcLab) -> HandleResult<int>;
+	auto handleThreadJoin(std::unique_ptr<ThreadJoinLabel> jLab) -> HandleResult<SVal>;
+	auto handleHelpingCas(std::unique_ptr<HelpingCasLabel> hLab)
+		-> HandleResult<std::monostate>;
+	auto handleOptional(std::unique_ptr<OptionalLabel> lab) -> HandleResult<bool>;
+	auto handleLoopBegin(std::unique_ptr<LoopBeginLabel> lab) -> HandleResult<std::monostate>;
+	auto handleSpinStart(std::unique_ptr<SpinStartLabel> lab) -> HandleResult<std::monostate>;
+	auto handleAwaitStart(std::unique_ptr<AwaitStartLabel> lab) -> HandleResult<std::monostate>;
+	auto handleFaiZNESpinEnd(std::unique_ptr<FaiZNESpinEndLabel> lab)
+		-> HandleResult<std::monostate>;
+	auto handleLockZNESpinEnd(std::unique_ptr<LockZNESpinEndLabel> lab)
+		-> HandleResult<std::monostate>;
+	auto handleDummy(std::unique_ptr<EventLabel> lab) -> HandleResult<std::monostate>;
+
+	auto handleNALoad(Event pos, SAddr loc, ASize size, const EventDeps &deps) -> NALoadResult;
+	auto handleNAStore(Event pos, SAddr loc, ASize size, std::optional<SVal> val,
+			   const EventDeps &deps) -> NAStoreResult;
+	auto handleMalloc(Event pos, ASize size, uint64_t alignment, StorageDuration sdur,
+			  StorageType styp, AddressSpace spc, const NameInfo *info,
+			  const std::string &name, const EventDeps &deps, bool zeroed = false,
+			  bool threadPrivate = false) -> HandleResult<SVal>;
+	auto handleFree(Event pos, SAddr loc, StorageDuration sdur, const EventDeps &deps)
+		-> HandleResult<std::monostate>;
+	auto handleRetire(Event pos, SAddr loc, const EventDeps &deps)
+		-> HandleResult<std::monostate>;
+
+	/** This method either blocks the offending thread (e.g., if the
+	 * execution is invalid), or aborts the exploration */
+	void reportError(Event pos, const ErrorDetails &details);
+
+	/** Helper that reports an unreported warning only if it hasn't reported before.
+	 * Returns true if the warning should be treated as an error according to the config. */
+	auto reportWarningOnce(Event pos, VerificationError wcode,
+			       const EventLabel *racyLab = nullptr) -> bool;
+
+	/*** For the driver (GenMCDriver): run state and replay checks ***/
+
+	/** Returns true if this driver is shutting down */
+	auto isHalting() const -> bool;
+
+	/** Returns true if this execution is moot */
+	auto isMoot() const -> bool { return isMootExecution; }
+
+	/** Opt: Mark current execution as moot/normal */
+	void moot() { isMootExecution = true; }
+
+	void unmoot() { isMootExecution = false; }
+
+	/** Returns true if the exploration is guided by a graph */
+	auto isExecutionDrivenByGraph(Event curr) -> bool;
+
+	/** Whether kept events are moved to their instruction (see alignKeptEvents()):
+	 * under LKMM, and under IMM with -exhaustive, where a revisit can keep
+	 * events after a CAS whose outcome changes, and so whether it writes */
+	auto relocatesKeptEvents() const -> bool
+	{
+		return getConf()->checkReplayKeys &&
+		       (getConf()->model == ModelType::LKMM ||
+			(getConf()->exhaustive && getConf()->model == ModelType::IMM));
+	}
+
+	/** -exhaustive under IMM: whether G (a complete execution, or the
+	 * graph of an error) is consistent, checked on a copy whose views are
+	 * computed anew */
+	auto isExecutionConsistent(const ExecutionGraph &g) -> bool;
+
+	/* Checks the whole graph if an event went before kept ones during the
+	 * run; if it is inconsistent, moots the run and has it repeated with
+	 * eager checks. Returns whether the run stands */
+	bool checkPendingKept();
+
+	auto executionExceedsBound(BoundCalculationStrategy strategy) const -> bool;
+
+	auto updateErrorInfoAndMaybeExit(Event pos, bool isNA, const EventDbgInfo *dbg)
+		-> std::optional<VerificationError>;
+
+	/** -check-invariants (see Invariants.hpp): whether the checks run */
+	[[nodiscard]] auto checksInvariants() const -> bool { return getConf()->checkInvariants; }
+
+	/** -check-invariants: the situation the checks report (WHERE names the
+	 * operation just performed) */
+	[[nodiscard]] auto invariantContext(std::string_view where) const -> invariants::Context;
+
+	/** -check-invariants: checks I3 on the current graph and state after WHERE */
+	void checkAllocationInvariants(std::string_view where) const;
+
+private:
+	/*** Exploration-related ***/
+
+	/** Returns whether a revisit results to a valid execution
+	 * (e.g., consistent, accessing allocated memory, etc) */
+	auto isRevisitValid(const Revisit &revisit) -> bool;
+
+	/** Blocks thread at POS with type T. Tries to moot afterward */
+	void blockThreadTryMoot(std::unique_ptr<BlockLabel> bLab);
+
+	/** If LOC is not the start of a live block of duration SDUR (i.e.,
+	 * cannot be freed), returns why */
+	auto getInvalidFreeReason(SAddr loc, StorageDuration sdur) const
+		-> std::optional<std::string>;
+
+	/** If LAB accesses a valid location, reports an error  */
+	auto checkAccessValidity(Event pos, const AAccess &access)
+		-> std::optional<VerificationError>;
+
+	/** If LAB accesses an uninitialized location, reports an error */
+	auto checkInitializedMem(const ReadLabel *lab) -> std::optional<VerificationError>;
+
+	/** If LAB accesses improperly initialized memory, reports an error */
+	auto checkInitializedMem(const WriteLabel *lab) -> std::optional<VerificationError>;
+
+	/** Reports VIOLATION, if any (see ErrorRules.hpp), and returns its type */
+	auto reportIfViolated(const std::optional<ErrorDetails> &violation)
+		-> std::optional<VerificationError>;
+
+	/** If LAB is an IPR read in a location with WW-races, reports an error */
+	auto checkIPRValidity(const ReadLabel *rLab) -> std::optional<VerificationError>;
+
+	/** Checks whether final annotations are used properly in a program:
+	 * if there are more than one stores annotated as final at the time WLAB
+	 * is added, reports an error */
+	auto checkFinalAnnotations(const WriteLabel *wLab) -> std::optional<VerificationError>;
+
+	/** Under LKMM, kept events of the current thread may sit where the
+	 * thread's new path does not reach them (a control dependency ends at the
+	 * join of its branch): moves them so that @p curr's instruction instance
+	 * meets its own event. Returns whether the label now at @p curr is the
+	 * instance's. A move ends the run, which is repeated (done()). */
+	auto alignKeptEvents(Event curr, const EventLabel *lab) -> bool;
+
+	/** Moves THREAD's events from FROM by DELTA in the current execution
+	 * (graph, work list, choices) */
+	void relocateExecution(int thread, int from, int delta);
+
+	/** relocateExecution(), and schedules a repeat of the run */
+	void relocateAndRerun(int thread, int from, int delta);
+
+	/** Stops with an internal error unless @p lab, reused on replay, comes
+	 * from the instruction instance being executed (as its @p sub-th event) */
+	void checkReplayKey(const EventLabel *lab, std::uint32_t sub) const;
+
+	/** Gives @p lab the key of the instruction instance being executed, if
+	 * it is one of its events (probe labels are reused: clears it otherwise) */
+	void assignEventKey(EventLabel *lab) const;
+
+	/** Error reporting: initiates an exploration to collect metadata */
+	void initiateErrorReplay(const ErrorDetails &details);
+
+	/** Error reporting: stops a metadata-collecting execution (and cleans up) */
+	void haltErrorReplay();
+
+	/** Opt: Caches LAB to optimize scheduling next time */
+	void cacheEventLabel(const EventLabel *lab);
+
+	/** Adds LAB to graph (maintains well-formedness).
+	 * If another label exists in the specified position, it is replaced. */
+	auto addLabelToGraph(std::unique_ptr<EventLabel> lab) -> EventLabel *;
+
+	/** Random: Replaces the current execution with a fresh one */
+	void restartExecution();
+
+	/** When LAB is the label about to be added, prunes the execution
+	 * graph if it exceeds a predefined size */
+	void maybeCutGraph(const EventLabel *lab);
+
+	/** Est: Picks (and sets) a random RF among some possible options */
+	auto pickRandomRf(ReadLabel *rLab, std::vector<EventLabel *> &stores) -> EventLabel *;
+
+	/** Est: Picks (and sets) a random CO among some possible options */
+	auto pickRandomCo(WriteLabel *sLab, std::vector<EventLabel *> &cos) -> EventLabel *;
+
+	/** BAM: Reports an error if the executions is not barrier-well-formed.
+	 * Returns whether the execution is well-formed */
+	auto checkBarrierWellFormedness(BIncFaiWriteLabel *sLab) -> bool;
+
+	/** BAM: Tries to optimize barrier-related revisits */
+	auto tryOptimizeBarrierRevisits(BIncFaiWriteLabel *sLab, std::vector<ReadLabel *> &loads)
+		-> bool;
+
+	/** IPR: Tries to revisit blocked reads in-place */
+	void tryOptimizeIPRs(const WriteLabel *sLab, std::vector<ReadLabel *> &loads);
+
+	/** IPR: Removes a CAS that blocks when reading from SLAB.
+	 * Returns whether if the label was removed
+	 * (Returns false if RLAB reads from unallocated memory.) */
+	auto removeCASReadIfBlocks(const ReadLabel *rLab, const EventLabel *sLab) -> bool;
+
+	/** Helper: Optimizes revisits of reads that will lead to a failed speculation */
+	void optimizeUnconfirmedRevisits(const WriteLabel *sLab, std::vector<ReadLabel *> &loads);
+
+	/** Opt: Tries to optimize revisiting from LAB. It may modify
+	 * LOADS, and returns whether we can skip revisiting altogether */
+	auto tryOptimizeRevisits(WriteLabel *lab, std::vector<ReadLabel *> &loads) -> bool;
+
+	/** -exhaustive under IMM: computes the views of G's labels anew, in G,
+	 * and drops their cached prefix views. Returns false if they do not
+	 * settle (an hb cycle) */
+	auto recomputeViews(ExecutionGraph &g) -> bool;
+
+	/** -exhaustive under IMM: whether G, with the views its labels have, is
+	 * consistent: coherence, the atomicity of its RMWs, the other axioms */
+	auto isGraphConsistent(const ExecutionGraph &g) -> bool;
+
+	/** The checks of -exhaustive under IMM (see ExhaustiveConsistency) */
+	auto getExhaustiveConsistency() -> ExhaustiveConsistency;
+
+	/** -exhaustive under IMM: runs CHECK on a copy of the current graph
+	 * whose views are computed anew (positions name the same events in
+	 * both) */
+	void checkWithViewsAnew(const std::function<void(const ExecutionGraph &)> &check);
+
+	/** -exhaustive: records the graph ITEM produced in the visited set.
+	 * Returns whether it is new (a repeated graph is not explored again) */
+	auto visitRevisitedGraph(const Revisit &item) -> bool;
+
+	/** Calculates all possible coherence placings for SLAB and
+	 * pushes them to the worklist. */
+	void calcCoOrderings(WriteLabel *sLab, const std::vector<EventLabel *> &cos);
+
+	/** Calculates revisit options and pushes them to the worklist */
+	void calcRevisits(WriteLabel *lab);
+
+	/** Modifies the graph accordingly when revisiting a write (MO).
+	 * May trigger backward-revisit explorations.
+	 * Returns whether the resulting graph should be explored. */
+	auto revisitWrite(const WriteForwardRevisit &ri) -> bool;
+
+	/** Modifies the graph accordingly when revisiting an optional.
+	 * Returns true if the resulting graph should be explored */
+	auto revisitOptional(const OptionalForwardRevisit &oi) -> bool;
+
+	/** Spuriously fails a weak CAS: the read keeps its rf,
+	 * but no write is performed (the CAS is marked).
+	 * Returns true if the resulting graph should be explored. */
+	auto revisitWeakCasFailure(const WeakCasFailureRevisit &ri) -> bool;
+
+	/** Modifies (but not restricts) the graph when we are revisiting a read.
+	 * Returns true if the resulting graph should be explored. */
+	auto revisitRead(const Revisit &ri) -> bool;
+
+	auto forwardRevisit(const ForwardRevisit &fr) -> bool;
+	auto backwardRevisit(const BackwardRevisit &br) -> bool;
+
+	/** Adjusts the graph and the worklist according to the backtracking option S.
+	 * Returns true if the resulting graph should be explored */
+	auto restrictAndRevisit(const WorkList::ItemT &item) -> bool;
+
+	/** If rLab is the read part of an RMW operation that now became
+	 * successful, this function adds the corresponding write part.
+	 * Returns a pointer to the newly added event, or nullptr
+	 * if the event was not an RMW, or was an unsuccessful one */
+	auto completeRevisitedRMW(const ReadLabel *rLab) -> WriteLabel *;
+
+	/** Updates the kept write part of RLAB, an RMW read executed anew,
+	 * from the read's rf (null if the RMW no longer writes) */
+	auto updateKeptRMWWrite(const ReadLabel *rLab) -> WriteLabel *;
+
+	/** Copies the current EG according to BR's view V.
+	 * May modify V but will not execute BR in the copy. */
+	auto copyGraph(const BackwardRevisit *br, VectorClock *v) const
+		-> std::unique_ptr<ExecutionGraph>;
+
+	auto isExecutionValid(const EventLabel *lab) -> bool;
+
+	/** Removes rfs from RFS until a consistent option for RLAB is found */
+	auto findConsistentRf(ReadLabel *rLab, std::vector<EventLabel *> &rfs) -> EventLabel *;
+
+	/** Remove cos from COS until a consistent option for WLAB is found */
+	auto findConsistentCo(WriteLabel *wLab, std::vector<EventLabel *> &cos) -> EventLabel *;
+
+	/** Whether the graph stays consistent with WLAB where it was placed in
+	 * coherence (see findConsistentCo()) */
+	auto isPlacementConsistent(const WriteLabel *wLab) const -> bool;
+
+	/** SAVer: Checks whether the addition of an event changes our
+	 * perspective of a potential spinloop */
+	void checkReconsiderFaiSpinloop(const MemAccessLabel *lab);
+
+	/** Opt: Remove possibly invalidated ReadOpt events */
+	void checkReconsiderReadOpts(const WriteLabel *sLab);
+
+	/** SAVer: Given the end of a potential FAI-ZNE spinloop,
+	 * returns true if it is indeed a spinloop */
+	auto areFaiZNEConstraintsSat(const FaiZNESpinEndLabel *lab) -> bool;
+
+	/** IPR: Performs BR in-place */
+	void revisitInPlace(const BackwardRevisit &br);
+
+	void repairDanglingReads(ExecutionGraph &g);
+
+	/** Opt: Finds the last memory access that is visible to other threads;
+	 * return nullptr if no such access is found */
+	auto getPreviousVisibleAccessLabel(const EventLabel *start) const -> const MemAccessLabel *;
+
+	/** Opt: Checks whether there is no need to explore the other threads
+	 * (e.g., `POS \in B` and will not be removed in all subsequent subexplorations),
+	 * and if so moots the current execution */
+	void mootExecutionIfFullyBlocked(EventLabel *bLab);
+
+	/** Helper: Wake up any threads blocked on a helping CAS */
+	void unblockWaitingHelping(const WriteLabel *lab);
+
+	auto writesBeforeHelpedContainedInView(const HelpedCasReadLabel *lab, const View &view)
+		-> bool;
+
+	/** Helper: Returns whether there is a valid helped-CAS which the helping-CAS
+	 * to be added will be helping. (If an invalid helped-CAS exists, this
+	 * method raises an error.) */
+	auto checkHelpingCasCondition(const HelpingCasLabel *lab) -> bool;
+
+	/* Whether the joiner of JLAB has joined the symmetric predecessors of the
+	 * thread it joins (see the definition) */
+	auto checkSymmetricJoinOrder(const ThreadJoinLabel *jLab) -> std::optional<VerificationError>;
+
+	/** SR: Returns the (greatest) ID of a thread that is symmetric to PARENT/INFO */
+	auto getSymmetricTidSR(const ThreadCreateLabel *tcLab, const ThreadInfo &info) const -> int;
+
+	/** SAVer: Filters stores that will lead to an assume-blocked execution */
+
+	/** Reports an error if SLAB is a write the blind-RMW reduction did not account for */
+	auto checkBlindRMWWellFormedness(const WriteLabel *sLab) -> bool;
+
+	/** Reports an error if RLAB observes an order the blind-RMW reduction fixed */
+	auto checkBlindRMWWellFormedness(const ReadLabel *rLab) -> bool;
+
+	/*** Estimation-related ***/
+
+	/*** Bound-related  ***/
+
+	auto partialExecutionExceedsBound() const -> bool;
+
+#ifdef ENABLE_GENMC_DEBUG
+#endif
+
+	/*** Output-related ***/
+
+	/** A block that has no metadata of its own takes those of the event
+	 * FROM (if any), whose instruction the thread stopped at */
+	void inheritDbgInfo(Event from, const BlockLabel *bLab);
+
+	void updateLabelViews(EventLabel *lab);
+
+	auto checkForMixedSize(MemAccessLabel *lab) -> std::optional<VerificationError>;
+
+	auto checkForRaces(const EventLabel *lab) -> std::optional<VerificationError>;
+
+	/** LAB accesses a thread-local of the thread ELAB ends: if LAB does not
+	 * happen before ELAB, reports an error */
+	auto checkThreadLocalEnd(const EventLabel *lab, const ThreadFinishLabel *eLab)
+		-> std::optional<VerificationError>;
+
+	/** Checks the accesses to the thread-locals of the thread ELAB ends */
+	auto checkEndedThreadLocals(const ThreadFinishLabel *eLab)
+		-> std::optional<VerificationError>;
+
+	/** Returns an approximation of consistent rfs for RLAB.
+	 * The rfs are ordered according to CO */
+	virtual auto getRfsApproximation(ReadLabel *rLab) -> std::vector<EventLabel *>;
+
+	/** Returns an approximation of the reads that SLAB can revisit.
+	 * The reads are ordered in reverse-addition order */
+	virtual auto getRevisitableApproximation(WriteLabel *sLab) -> std::vector<ReadLabel *>;
+
+	/** Returns a vector clock representing the prefix of e,
+	 * including e but not e's external dependencies (rf, threadCreate, threadEnd).
+	 * Depending on whether dependencies are tracked, the prefix can be
+	 * either (po U rf) or (AR U rf) */
+	auto getPrefixView(const EventLabel *lab) const -> const VectorClock &;
+
+	/** The backward revisits of the current graph (see BackwardRevisits) */
+	auto getBackwardRevisits() const -> BackwardRevisits;
+
+	/** The rf reductions on the current graph (see RfReductions) */
+	auto getRfReductions() const -> RfReductions;
+
+	/** The rf and revisit candidates on the current graph (see ChoiceCandidates) */
+	auto getChoiceCandidates() -> ChoiceCandidates;
+
+	/** The part of LAB's prefix its revisits take (not cached; see
+	 * ConsistencyChecker::calculateRevisitPrefixView()) */
+	auto getRevisitPrefixView(const EventLabel *lab) const -> std::unique_ptr<VectorClock>;
+
+	/** Random generator facilities used */
+	using MyRNG = std::mt19937;
+	using MyDist = std::uniform_int_distribution<MyRNG::result_type>;
+
+	/** The operating mode of the driver */
+	Mode mode = VerificationMode{};
+
+	/** The thread pool this driver may belong to */
+	WorkSharing *pool = nullptr;
+
+	/** User configuration */
+	std::shared_ptr<const Config> userConf;
+
+	/** Execution stack */
+	std::unique_ptr<ExplorationStack> stack_;
+
+	/** Scheduler */
+	std::unique_ptr<Scheduler> scheduler_;
+
+	/** Consistency checker (mm-specific) */
+	std::unique_ptr<ConsistencyChecker> consChecker;
+
+	/** Symmetry checker) */
+	std::unique_ptr<SymmetryChecker> symmChecker;
+
+	/** Decider used to bound the exploration */
+	std::unique_ptr<BoundDecider> bounder;
+
+	/** Linearizability checker */
+	std::unique_ptr<LinearizabilityChecker> relinche;
+
+	/** The instruction instance being executed (see setEventKey()) */
+	std::shared_ptr<const EventKey> currKey;
+	Event currKeyBase;
+
+	/** Opt: Whether this execution is moot (locking) */
+	bool isMootExecution = false;
+
+	/** Whether we are stopping the exploration (e.g., due to an error found) */
+	bool shouldHalt = false;
+
+	/** Random-number generators for estimation randomization */
+	MyRNG estRng;
+
+	/** -check-invariants: checks I1 on G after WHERE (with the restriction's
+	 * PLAN, if it was one); nothing with the option off */
+	void checkGraphInvariants(const ExecutionGraph &g, std::string_view where,
+				  const invariants::RestrictionPlan *plan = nullptr) const;
+
+	/** Restricts the current execution to STAMP (see Execution::restrict()),
+	 * checking I1 under -check-invariants */
+	void restrictExecution(Stamp stamp, std::string_view where);
+	/** -exhaustive: the canonical hashes of the graphs revisits produced
+	 * (see visitRevisitedGraph()) */
+	std::unordered_set<GraphHash> visitedGraphs_;
+
+	/** Saves the runtime state at the event at POS for the forward revisits
+	 * queued for it (null if the run cannot resume, see saveResumePoint()) */
+	auto saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>;
+
+	/** "Puppet" labels to be used for race detection */
+	std::unique_ptr<ReadLabel> readProbeLab_;
+	std::unique_ptr<WriteLabel> writeProbeLab_;
+	std::unique_ptr<MallocLabel> mallocProbeLab_;
+	std::unique_ptr<FreeLabel> freeProbeLab_;
+	std::unique_ptr<HpRetireLabel> retireProbeLab_;
+
+	/** Execution state owned by this driver. All graphs on the exploration
+	 *  stack hold a non-owning pointer to this object (see ExplorationStack). */
+	ExecutionState execState_;
+
+	void configureProbe(MemLabel *rLab, Event pos, SAddr addr, ASize size,
+			    const EventDeps &deps);
+
+protected:
+	/* State the driver reads too. (Last: resumePoints_ is initialized
+	 * from userConf, so it must be declared after it) */
+	/** Verification result to be returned to caller */
+	VerificationResult result;
+	/** The error being replayed for its report */
+	std::unique_ptr<ErrorReplay> errorReplay_;
+	/** When the current run repeats (kept events, see KeptEventRuns) */
+	KeptEventRuns keptRuns_;
+	/** The runtime states saved for forward revisits */
+	ResumePointStore resumePoints_;
+};
+
+#endif /* GENMC_EXPLORATION_CORE_HPP */

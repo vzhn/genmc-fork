@@ -350,3 +350,29 @@ auto failsReading(const ReadLabel *rLab, const WriteLabel *sLab) -> bool
 	return cLab && cLab->isRMW() &&
 	       !cLab->valueMakesRMWSucceed(sLab->getAccessValue(cLab->getAccess()));
 }
+
+/* The role of a write in a mutex, for spinloop detection */
+auto getLockRole(const WriteLabel *wLab) -> ExecutionState::LockRole
+{
+	if (genmc::isa<LockCasWriteLabel>(wLab))
+		return ExecutionState::LockRole::Acquire;
+	if (genmc::isa<UnlockWriteLabel>(wLab))
+		return ExecutionState::LockRole::Release;
+	return ExecutionState::LockRole::None;
+}
+
+/* The depth of the RCU read-side critical sections open in POS's thread
+ * before POS (an rcu_read_unlock() without a lock leaves it at zero) */
+auto getRcuNesting(const ExecutionGraph &g, Event pos) -> unsigned
+{
+	auto nesting = 0U;
+	for (auto i = 0; i < pos.index; i++) {
+		const auto *fLab =
+			genmc::dyn_cast_if_present<LkmmFenceLabel>(g.getEventLabelIfPresent(Event(pos.thread, i)));
+		if (fLab && fLab->getFenceKind() == LkmmFenceKind::RcuLock)
+			++nesting;
+		else if (fLab && fLab->getFenceKind() == LkmmFenceKind::RcuUnlock && nesting > 0)
+			--nesting;
+	}
+	return nesting;
+}

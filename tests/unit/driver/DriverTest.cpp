@@ -432,6 +432,29 @@ TEST(ScriptedDriverReductions, BlindIncrementsAreExploredInOneOrder)
 	EXPECT_EQ(on.outcomes, off.outcomes);
 }
 
+TEST(ScriptedDriverReductions, AReadThatObservesBlindIncrementOrderIsRejected)
+{
+	/* tests/wrong/infr/blind-rmw-wf-read: thread 1 reads x after its own
+	 * two increments, with thread 0's in the graph but not before the read
+	 * in hb: it observes an order the reduction fixed
+	 * (error_rules::blindRMWOrderObserved(), checked as the read is added) */
+	Program p{.numVars = 1,
+		  .threads = {{blindFai(X, 1)}, {blindFai(X, 1), blindFai(X, 1), ld(X)}}};
+	EXPECT_FALSE(explore(p, ModelType::RC11).error);
+	EXPECT_TRUE(explore(p, ModelType::RC11, {.blindRMWReduction = true}).error);
+}
+
+TEST(ScriptedDriverReductions, AnotherWriteToBlindIncrementsIsRejected)
+{
+	/* tests/wrong/infr/blind-rmw-wf-write: the reduction assumes the
+	 * identical blind increments are the only writes to x; an increment
+	 * whose value is used, added after them and not hb-after them, is not
+	 * (error_rules::blindRMWReorderedWith(), checked as the write is added) */
+	Program p{.numVars = 1, .threads = {{blindFai(X, 1)}, {blindFai(X, 1)}, {fai(X, 1)}}};
+	EXPECT_FALSE(explore(p, ModelType::RC11).error);
+	EXPECT_TRUE(explore(p, ModelType::RC11, {.blindRMWReduction = true}).error);
+}
+
 /*
  * The default exploration against the reference (-exhaustive, which takes
  * every revisit and dedups the graphs): the same executions, under every
