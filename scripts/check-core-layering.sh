@@ -62,6 +62,13 @@ while IFS= read -r file; do
 	done < <(sed -nE 's/^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"]([^>"]+)[>"].*/\1/p' "${file}")
 done < <(find genmc -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.def' | sort)
 
+# No declaration or use of LLVM's namespace either (a forward declaration
+# lets an LLVM type into a core interface without an include)
+while IFS= read -r hit; do
+	echo "FAIL: ${hit} (the core library must not name LLVM types)"
+	status=1
+done < <(grep -rnE '^[^/*]*(namespace[[:space:]]+llvm|llvm::)' genmc)
+
 sort -o "${found}" "${found}"
 while IFS= read -r line; do
 	grep -qxF "${line}" <(grep -v '^#' "${ALLOW}") ||

@@ -28,7 +28,10 @@
 namespace llvm {
 class Interpreter;
 class LLVMContext;
+class Module;
 } // namespace llvm
+struct LLIConfig;
+struct ModuleInfo;
 
 /*******************************************************************************
  **                           GlobalWorkQueue Class

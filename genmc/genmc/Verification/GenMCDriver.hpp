@@ -45,14 +45,8 @@ struct Context;
 struct RestrictionPlan;
 } // namespace invariants
 
-namespace llvm {
-class Interpreter;
-class Module;
-} // namespace llvm
-struct ModuleInfo;
 class ThreadPool;
 class EventProducer;
-struct LLIConfig;
 class BoundDecider;
 class ConsistencyChecker;
 class SymmetryChecker;
@@ -344,20 +338,9 @@ public:
 	auto operator=(GenMCDriver &&) -> GenMCDriver & = delete;
 
 protected:
-	friend class Scheduler;
-	friend class ArbitraryScheduler;
 	friend class ThreadPool;
 	friend class DriverHandlerDispatcher;
 	friend void explore(GenMCDriver &driver, EventProducer &producer);
-	friend auto estimate(const LLIConfig &lliConfig, std::shared_ptr<const Config> conf,
-			     const std::unique_ptr<llvm::Module> &mod,
-			     const std::unique_ptr<ModuleInfo> &modInfo) -> VerificationResult;
-	friend auto sample(const LLIConfig &lliConfig, std::shared_ptr<const Config> conf,
-			   std::unique_ptr<llvm::Module> mod, std::unique_ptr<ModuleInfo> modInfo)
-		-> VerificationResult;
-	friend auto verify(const LLIConfig &lliConfig, std::shared_ptr<const Config> conf,
-			   std::unique_ptr<llvm::Module> mod, std::unique_ptr<ModuleInfo> modInfo)
-		-> VerificationResult;
 
 	GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool = nullptr,
 		    Mode /*mode*/ = VerificationMode{});
