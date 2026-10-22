@@ -21,6 +21,7 @@
 #include <compare>
 #include <optional>
 #include <random>
+#include <utility>
 #include <vector>
 
 struct Config;
@@ -65,9 +66,15 @@ public:
 		return replaySchedule_;
 	}
 
-	/** Returns the next thread to run according to the specified policy  */
-	[[nodiscard]] auto schedule(ExecutionGraph &g, std::span<Action> runnable)
+	/** Returns the next thread to run according to the specified policy.
+	 * If every thread is blocked or done, a blocked read may be retried:
+	 * its thread is returned, and takeReadToUnblock() tells which read to
+	 * unblock before the thread runs (the scheduler does not change G) */
+	[[nodiscard]] auto schedule(const ExecutionGraph &g, std::span<Action> runnable)
 		-> std::optional<int>;
+
+	/** The read the last schedule chose to retry, once (see schedule()) */
+	auto takeReadToUnblock() -> std::optional<Event> { return std::exchange(readToUnblock_, {}); }
 
 	/** Prioritizes thread of POS */
 	void prioritize(Event pos) { threadPrios_ = {pos}; }
@@ -75,10 +82,16 @@ public:
 	/** Adds LAB to the cache. Should be called before LAB is added to G. */
 	void cacheEventLabel(const ExecutionGraph &g, const EventLabel *lab);
 
-	/** Returns the next labels to add by inspecting the cache. If the execution is full,
-	 * returns nullopt. If no cached information exists, returns Some(nullptr) */
-	[[nodiscard]] auto scheduleFromCache(ExecutionGraph &g)
-		-> std::optional<std::vector<std::unique_ptr<EventLabel>> *>;
+	/** The thread whose cached labels to add next; nullopt if the execution
+	 * is full. Like schedule(), it may choose a blocked read to retry (see
+	 * takeReadToUnblock()), which must be unblocked before
+	 * retrieveFromCache() */
+	[[nodiscard]] auto nextThreadFromCache(const ExecutionGraph &g) -> std::optional<int>;
+
+	/** Opt: Retrieves the next labels to add for THREAD from the cache.
+	 * Returns nullptr if no cached info exists. */
+	auto retrieveFromCache(const ExecutionGraph &g, int thread)
+		-> std::vector<std::unique_ptr<EventLabel>> *;
 
 	/** Opt: Whether the exploration should try to repair R */
 	[[nodiscard]] auto isRescheduledRead(Event r) const -> bool
@@ -118,11 +131,6 @@ private:
 		Trie<std::vector<CacheKey>, std::vector<std::unique_ptr<EventLabel>>>,
 		PairHasher<unsigned int, unsigned int>>;
 
-	/** Opt: Retrieves the next labels to add for THREAD from the cache.
-	 * Returns nullptr if no cached info exists. */
-	auto retrieveFromCache(const ExecutionGraph &g, int thread)
-		-> std::vector<std::unique_ptr<EventLabel>> *;
-
 	/** Opt: Checks whether SEQ has been seen before for <FUN_ID, TID> and
 	 * if so returns its successors. Returns nullptr otherwise. */
 	auto retrieveCachedSuccessors(std::pair<unsigned int, unsigned int> key,
@@ -140,7 +148,7 @@ private:
 	[[nodiscard]] auto schedulePrioritized(const ExecutionGraph &g) -> std::optional<int>;
 
 	/** Opt: Reschedules opt-blocked reads */
-	[[nodiscard]] auto rescheduleReads(ExecutionGraph &g) -> std::optional<int>;
+	[[nodiscard]] auto rescheduleReads(const ExecutionGraph &g) -> std::optional<int>;
 
 	/** Schedules according to the selected policy */
 	[[nodiscard]] virtual auto schedulePolicy(const ExecutionGraph &g,
@@ -158,6 +166,9 @@ private:
 
 	/** Opt: Whether a particular read needs to be repaired during rescheduling */
 	Event readToReschedule_ = Event::getInit();
+
+	/* The read schedule() chose to retry, for the driver to unblock */
+	std::optional<Event> readToUnblock_;
 
 	/** Opt: Thread priorities */
 	std::vector<Event> threadPrios_;

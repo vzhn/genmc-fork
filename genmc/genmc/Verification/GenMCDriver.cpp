@@ -717,8 +717,11 @@ auto GenMCDriver::scheduleNext(std::span<Action> runnable) -> ScheduleResult
 	if (isMoot())
 		return Blocked{};
 
-	if (auto next = getScheduler().schedule(g, runnable); next)
+	if (auto next = getScheduler().schedule(g, runnable); next) {
+		if (auto r = getScheduler().takeReadToUnblock())
+			unblockThread(g, *r);
 		return *next;
+	}
 	return g.isBlocked() ? ScheduleResult(Blocked{}) : ScheduleResult(Finished{});
 }
 
@@ -728,13 +731,17 @@ auto GenMCDriver::runFromCache() -> bool
 		return false;
 
 	do {
-		auto toAdd = getScheduler().scheduleFromCache(getExec().getGraph());
-		if (!toAdd)
+		auto &g = getExec().getGraph();
+		auto next = getScheduler().nextThreadFromCache(g);
+		if (!next)
 			return true;
-		if (*toAdd == nullptr)
+		if (auto r = getScheduler().takeReadToUnblock())
+			unblockThread(g, *r);
+		auto *toAdd = getScheduler().retrieveFromCache(g, *next);
+		if (toAdd == nullptr)
 			return false;
 
-		addLabelsToGraph(**toAdd);
+		addLabelsToGraph(*toAdd);
 	} while (!isMoot() && !isHalting());
 	return true;
 }

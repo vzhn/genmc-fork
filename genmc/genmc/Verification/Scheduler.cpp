@@ -212,23 +212,24 @@ auto Scheduler::schedulePrioritized(const ExecutionGraph &g) -> std::optional<in
 	return (result != threadPrios_.end()) ? std::make_optional(result->thread) : std::nullopt;
 }
 
-auto Scheduler::rescheduleReads(ExecutionGraph &g) -> std::optional<int>
+auto Scheduler::rescheduleReads(const ExecutionGraph &g) -> std::optional<int>
 {
 	auto result = std::ranges::find_if(g.thr_ids(), [this, &g](auto tid) {
-		auto *bLab =
+		const auto *bLab =
 			genmc::dyn_cast_if_present<ReadOptBlockLabel>(g.getLastThreadLabel(tid));
 		if (!bLab)
 			return false;
 
 		VERIFY(!getConf()->bound.has_value());
 		setRescheduledRead(bLab->getPos());
-		unblockThread(g, bLab->getPos());
+		readToUnblock_ = bLab->getPos();
 		return true;
 	});
 	return (result != g.thr_ids().end()) ? std::make_optional(*result) : std::nullopt;
 }
 
-auto Scheduler::schedule(ExecutionGraph &g, std::span<Action> runnable) -> std::optional<int>
+auto Scheduler::schedule(const ExecutionGraph &g, std::span<Action> runnable)
+	-> std::optional<int>
 {
 	std::optional<int> result;
 
@@ -351,16 +352,13 @@ auto Scheduler::retrieveFromCache(const ExecutionGraph &g, int thread)
 	return res;
 }
 
-auto Scheduler::scheduleFromCache(ExecutionGraph &g)
-	-> std::optional<std::vector<std::unique_ptr<EventLabel>> *>
+auto Scheduler::nextThreadFromCache(const ExecutionGraph &g) -> std::optional<int>
 {
 	auto tids = g.thr_ids();
 	auto nextIt = std::ranges::find_if(tids, [&](auto tid) { return isSchedulable(g, tid); });
 	if (nextIt != std::ranges::end(tids))
-		return std::make_optional(retrieveFromCache(g, *nextIt));
-
-	auto next = rescheduleReads(g);
-	return next.has_value() ? std::make_optional(retrieveFromCache(g, *next)) : std::nullopt;
+		return *nextIt;
+	return rescheduleReads(g);
 }
 
 static auto getFirstSchedulableSymmetric(const ExecutionGraph &g, int tid) -> int
