@@ -243,10 +243,21 @@ def main():
     ap.add_argument("--json", help="write one JSON result per line here")
     ap.add_argument("--tmp", default=None)
     ap.add_argument("--local-regs", action="store_true",
-                    help="translate registers as locals (litmus2c --local-regs)")
+                    help="translate registers as locals (litmus2c --local-regs; "
+                         "the default under --model lkmm)")
+    ap.add_argument("--global-regs", action="store_true",
+                    help="translate registers as globals: their values then pass "
+                         "through memory, which carries no dependency")
     ap.add_argument("--strict-counts", action="store_true",
                     help="treat a different number of executions as a disagreement")
     args = ap.parse_args()
+    # A register a branch sets carries the branch's dependency to its uses
+    # after the join only as a local (through a phi): a global register is a
+    # store and a load, which LKMM orders by nothing
+    if args.global_regs:
+        args.local_regs = False
+    elif not args.local_regs:
+        args.local_regs = args.model == "lkmm"
     args.litmus_root = os.path.realpath(args.litmus_root)
     args.genmc = os.path.realpath(args.genmc)
     args.header = os.path.realpath(args.header)

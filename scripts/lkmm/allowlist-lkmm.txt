@@ -17,3 +17,4 @@ manual/oota/C-JO-OOTA-1.litmus missing herd7's symbolic value (S<n>) of a thin-a
 manual/oota/C-JO-OOTA-2.litmus missing herd7's symbolic value (S<n>) of a thin-air cycle through plain accesses: no execution of the C program has it
 manual/oota/C-JO-OOTA-6.litmus missing herd7's symbolic value (S<n>) of a thin-air cycle through plain accesses: no execution of the C program has it
 manual/plain/C-OOTA.litmus missing herd7's symbolic value (S<n>) of a thin-air cycle through plain accesses: no execution of the C program has it
+manual/kernel/C-viro-2020.09.29a.litmus missing a value a branch sets, merged after the join, gets the branch condition's dependencies whichever path it came by (herd7 evaluates registers per path), so a read lands in a write's prefix: GenMC has 3 of herd7's 5 executions with registers as locals (the default; 5 with --global-regs) (#77)
