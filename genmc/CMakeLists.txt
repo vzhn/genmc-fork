@@ -64,6 +64,7 @@ set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/Relinche/Linearization.cpp
   genmc/Verification/Relinche/Observation.cpp
   genmc/Verification/Relinche/Specification.cpp
+  genmc/Verification/RevisitMaximality.cpp
   genmc/Verification/Scheduler.cpp
 )
 

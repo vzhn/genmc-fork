@@ -23,6 +23,7 @@
 #include "genmc/Verification/GraphHash.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
+#include "genmc/Verification/RevisitMaximality.hpp"
 #include "genmc/Verification/Scheduler.hpp"
 #include "genmc/Support/VerificationError.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
@@ -704,36 +705,6 @@ private:
 	 * both) */
 	void checkWithViewsAnew(const std::function<void(const ExecutionGraph &)> &check);
 
-	auto isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLabel *lab) -> bool;
-
-	/** Dependency-tracking models: whether LAB, an access the revisit R
-	 * deletes (or the read it revisits), reads from or follows the co-latest
-	 * write it can reach among the writes R keeps and those added before LAB */
-	auto isPlacedMaximallyInRevisit(const BackwardRevisit &r, const MemAccessLabel *lab) const
-		-> bool;
-
-	/** Whether LAB is in the prefix of a write that R keeps and that
-	 * revisited a read still reading it */
-	auto isKeptByKeptRevisit(const BackwardRevisit &r, const EventLabel *lab) const -> bool;
-
-	/** Whether LAB is a write that a write of the saved prefix, added after LAB
-	 * and to the same location, precedes in coherence */
-	auto isCoAfterLaterSavedWrite(const BackwardRevisit &r, const EventLabel *lab) -> bool;
-
-	auto coherenceSuccRemainInGraph(const BackwardRevisit &r) -> bool;
-
-	/** Returns true if all events to be removed by the revisit
-	 * RLAB <- SLAB form a maximal extension */
-	auto isMaximalExtension(const BackwardRevisit &r) -> bool;
-
-	/** -exhaustive: whether every read the revisit R keeps (but the
-	 * revisited one) keeps the write it reads from */
-	auto isRevisitViewClosed(const BackwardRevisit &r) -> bool;
-
-	/** -exhaustive: whether the graph R produces keeps an RMW that reads
-	 * from the write the revisiting RMW reads from (atomicity) */
-	auto keepsConflictingRMW(const BackwardRevisit &r) -> bool;
-
 	/** -exhaustive: records the graph ITEM produced in the visited set.
 	 * Returns whether it is new (a repeated graph is not explored again) */
 	auto visitRevisitedGraph(const Revisit &item) -> bool;
@@ -944,6 +915,9 @@ private:
 	 * Depending on whether dependencies are tracked, the prefix can be
 	 * either (po U rf) or (AR U rf) */
 	auto getPrefixView(const EventLabel *lab) const -> const VectorClock &;
+
+	/** The maximality checks for backward revisits of the current graph */
+	auto getMaximality() const -> RevisitMaximality;
 
 	/** The part of LAB's prefix its revisits take (not cached; see
 	 * ConsistencyChecker::calculateRevisitPrefixView()) */
