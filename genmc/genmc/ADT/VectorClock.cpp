@@ -14,14 +14,12 @@
 #include "VectorClock.hpp"
 #include "genmc/ADT/DepView.hpp"
 #include "genmc/ADT/View.hpp"
-#include "genmc/Execution/Event.hpp"
-#include "genmc/Execution/EventLabel.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Support/Cast.hpp"
 #include "genmc/Support/Error.hpp"
 
 #include <memory>
 
-auto VectorClock::contains(const EventLabel *lab) const -> bool { return contains(lab->getPos()); }
 
 auto VectorClock::clone() const -> std::unique_ptr<VectorClock>
 {

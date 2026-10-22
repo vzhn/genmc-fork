@@ -42,7 +42,7 @@
 #include "genmc/Verification/EventProducer.hpp"
 #include "genmc/Verification/GenMCDriver.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
-#include "genmc/Verification/VerificationError.hpp"
+#include "genmc/Support/VerificationError.hpp"
 #include "passes/InternalFunctions.hpp"
 #include "passes/LLVMUtils.hpp"
 #include "passes/ModuleInfo.hpp"

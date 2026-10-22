@@ -14,7 +14,7 @@
 #ifndef GENMC_GRAPH_FINGERPRINT_HPP
 #define GENMC_GRAPH_FINGERPRINT_HPP
 
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/Stamp.hpp"
 
 #include <cstddef>

@@ -28,7 +28,7 @@
 
 #include "genmc/ADT/VSet.hpp"
 #include "genmc/Support/Error.hpp"
-#include "genmc/Verification/VerificationError.hpp"
+#include "genmc/Support/VerificationError.hpp"
 
 #include <memory>
 #include <optional>

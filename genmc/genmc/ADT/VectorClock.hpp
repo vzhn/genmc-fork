@@ -14,7 +14,7 @@
 #ifndef GENMC_VECTOR_CLOCK_HPP
 #define GENMC_VECTOR_CLOCK_HPP
 
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 
 #include <cstdint>
 #include <format>
@@ -26,7 +26,6 @@
 
 class View;
 class DepView;
-class EventLabel;
 
 /**
  * An abstract class for modeling vector clocks. Contains the bare
@@ -80,7 +79,6 @@ public:
 
 	/** Returns true if this clock contains e */
 	[[nodiscard]] virtual auto contains(Event e) const -> bool = 0;
-	auto contains(const EventLabel *lab) const -> bool;
 
 	/** Updates the clock based on another clock **of the same kind** */
 	virtual auto update(const View &v) -> View & = 0;

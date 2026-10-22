@@ -15,7 +15,7 @@
 #define GENMC_SPECIFICATION_HPP
 
 #include "genmc/ADT/VSet.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Verification/Relinche/Linearization.hpp"
 #include "genmc/Verification/Relinche/Observation.hpp"
 

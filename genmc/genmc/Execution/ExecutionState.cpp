@@ -15,7 +15,7 @@
 #include "genmc/ADT/AdaptiveView.hpp"
 #include "genmc/ADT/IntervalMap.hpp"
 #include "genmc/ADT/IntervalSet.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Support/ASize.hpp"
 #include "genmc/Support/ActionEnums.hpp"
 #include "genmc/Support/Error.hpp"

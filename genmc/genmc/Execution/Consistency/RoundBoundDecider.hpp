@@ -17,7 +17,7 @@
 #include "genmc/config.h"
 
 #include "BoundDecider.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 
 /** Bound the number of round-robin scheduling rounds */
 class RoundBoundDecider : public BoundDecider {

@@ -14,7 +14,7 @@
 #ifndef GENMC_DEP_INFO_HPP
 #define GENMC_DEP_INFO_HPP
 
-#include "Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/ADT/VSet.hpp"
 
 #include <format>

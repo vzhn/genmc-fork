@@ -28,7 +28,7 @@
  */
 
 #include "Runtime/Interpreter.h"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Support/Error.hpp"
 #include "genmc/Support/SExprVisitor.hpp"
 #include "genmc/Verification/GenMCDriver.hpp"

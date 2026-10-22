@@ -13,7 +13,7 @@
 
 #include "genmc/Verification/Scheduler.hpp"
 #include "genmc/ADT/View.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/GraphUtils.hpp"
 #include "genmc/Support/ActionEnums.hpp"

@@ -13,7 +13,7 @@
 
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Support/Error.hpp"
-#include "genmc/Verification/MemoryModel.hpp"
+#include "genmc/Execution/MemoryModel.hpp"
 
 #include <filesystem>
 #include <random>

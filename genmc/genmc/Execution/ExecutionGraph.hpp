@@ -20,13 +20,13 @@
 #include "genmc/ADT/ilist.hpp"
 #include "genmc/Execution/CBIterator.hpp"
 #include "genmc/Execution/Consistency/ModelInterfaces.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionState.hpp"
 #include "genmc/Execution/Stamp.hpp"
 #include "genmc/Support/Hash.hpp"
 #include "genmc/Support/MemAccess.hpp"
-#include "genmc/Verification/VerificationError.hpp"
+#include "genmc/Support/VerificationError.hpp"
 
 #include <algorithm>
 #include <format>

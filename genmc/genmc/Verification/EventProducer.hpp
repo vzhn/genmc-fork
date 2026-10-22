@@ -15,7 +15,7 @@
 #ifndef GENMC_EVENT_PRODUCER_HPP
 #define GENMC_EVENT_PRODUCER_HPP
 
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Support/ThreadInfo.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
 

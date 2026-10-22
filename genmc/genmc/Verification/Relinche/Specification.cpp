@@ -16,7 +16,7 @@
 #include "genmc/ADT/Matrix2D.hpp"
 #include "genmc/ADT/SmallVector.hpp"
 #include "genmc/ADT/VSet.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Support/Cast.hpp"

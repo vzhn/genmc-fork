@@ -14,7 +14,7 @@
 #ifndef GENMC_CONFIG_HPP
 #define GENMC_CONFIG_HPP
 
-#include "genmc/Verification/MemoryModel.hpp"
+#include "genmc/Execution/MemoryModel.hpp"
 #include "genmc/config.h"
 
 #include <cstdint>

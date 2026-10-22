@@ -19,7 +19,7 @@
 #include "genmc/ADT/IntervalSet.hpp"
 #include "genmc/ADT/VSet.hpp"
 #include "genmc/ADT/View.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/LoopKey.hpp"
 #include "genmc/Support/ActionEnums.hpp"
 #include "genmc/Support/MemAccess.hpp"

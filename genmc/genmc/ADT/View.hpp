@@ -17,7 +17,7 @@
 #include "genmc/ADT/Rc.hpp"
 #include "genmc/ADT/SmallVector.hpp"
 #include "genmc/ADT/VectorClock.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Support/Cast.hpp"
 #include "genmc/Support/Error.hpp"
 

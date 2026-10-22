@@ -14,7 +14,7 @@
 #include "genmc/Verification/Relinche/Observation.hpp"
 #include "genmc/ADT/VSet.hpp"
 #include "genmc/Execution/Consistency/ModelInterfaces.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Support/Cast.hpp"

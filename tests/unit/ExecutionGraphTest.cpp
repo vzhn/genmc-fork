@@ -11,7 +11,7 @@
 #include "genmc/Execution/GraphUtils.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/Invariants.hpp"
-#include "genmc/Verification/MemoryModel.hpp"
+#include "genmc/Execution/MemoryModel.hpp"
 
 struct TestGraph {
 	StubChecker checker;

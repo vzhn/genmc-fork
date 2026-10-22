@@ -5,7 +5,7 @@
 #include "genmc/ADT/VSet.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/Relinche/Specification.hpp"
-#include "genmc/Verification/VerificationError.hpp"
+#include "genmc/Support/VerificationError.hpp"
 
 #include <memory>
 #include <string>

@@ -14,7 +14,7 @@
 #ifndef GENMC_RESUME_POINT_HPP
 #define GENMC_RESUME_POINT_HPP
 
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Verification/GraphFingerprint.hpp"
 
 #include <optional>

@@ -13,7 +13,7 @@
 
 #include "genmc/ADT/AdaptiveView.hpp"
 #include "genmc/ADT/View.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Support/Error.hpp"
 
 #include <algorithm>

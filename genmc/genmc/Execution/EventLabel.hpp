@@ -19,7 +19,7 @@
 #include "genmc/ADT/ilist.hpp"
 #include "genmc/ADT/value_ptr.hpp"
 #include "genmc/Execution/DepInfo.hpp"
-#include "genmc/Execution/Event.hpp"
+#include "genmc/Support/Event.hpp"
 #include "genmc/Execution/EventAttr.hpp"
 #include "genmc/Execution/EventKey.hpp"
 #include "genmc/Execution/LoadAnnotation.hpp"

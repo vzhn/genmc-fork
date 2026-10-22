@@ -45,7 +45,7 @@
 #include "genmc/Verification/Relinche/Specification.hpp"
 #include "genmc/Verification/Revisit.hpp"
 #include "genmc/Verification/Scheduler.hpp"
-#include "genmc/Verification/VerificationError.hpp"
+#include "genmc/Support/VerificationError.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
 #include "genmc/Verification/WorkList.hpp"
 #include "genmc/config.h"
@@ -4005,7 +4005,7 @@ static void updatePredsWithPrefixView(const ExecutionGraph &g, VectorClock &pred
 			const auto *lab = g.getEventLabel(Event(i, j));
 			if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab)) {
 				if (preds.contains(rLab->getPos()) &&
-				    !preds.contains(rLab->getRf())) {
+				    !preds.contains(rLab->getRf()->getPos())) {
 					if (rLab->getRf()->getThread() == rLab->getThread())
 						predsD.removeHole(rLab->getRf()->getPos());
 				}
@@ -4416,7 +4416,7 @@ auto GenMCDriver::coherenceSuccRemainInGraph(const BackwardRevisit &r) -> bool
 	if (std::ranges::empty(succs))
 		return true;
 
-	return r.getViewNoRel()->contains(&*std::ranges::begin(succs));
+	return r.getViewNoRel()->contains(std::ranges::begin(succs)->getPos());
 }
 
 static auto wasAddedMaximally(const EventLabel *lab) -> bool

@@ -1,28 +1,11 @@
 # Upward includes in the core library that exist today (see check-core-layering.sh).
 # Remove a line when its include goes away; never add one.
-genmc/ADT/AdaptiveView.cpp -> genmc/Execution/Event.hpp
-genmc/ADT/AdaptiveView.hpp -> genmc/Execution/Event.hpp
-genmc/ADT/DepView.cpp -> genmc/Execution/Event.hpp
-genmc/ADT/VectorClock.cpp -> genmc/Execution/Event.hpp
-genmc/ADT/VectorClock.cpp -> genmc/Execution/EventLabel.hpp
-genmc/ADT/VectorClock.hpp -> genmc/Execution/Event.hpp
-genmc/ADT/View.hpp -> genmc/Execution/Event.hpp
 genmc/Execution/Consistency/BoundDecider.cpp -> genmc/Verification/Config.hpp
 genmc/Execution/Consistency/ConsistencyChecker.cpp -> genmc/Verification/Config.hpp
-genmc/Execution/Consistency/ConsistencyChecker.cpp -> genmc/Verification/MemoryModel.hpp
 genmc/Execution/Consistency/IMMChecker.cpp -> genmc/Verification/Config.hpp
-genmc/Execution/Consistency/IMMChecker.cpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/LKMMChecker.cpp -> genmc/Verification/Config.hpp
-genmc/Execution/Consistency/LKMMChecker.cpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/LKMMRcuChecker.cpp -> genmc/Verification/Config.hpp
-genmc/Execution/Consistency/ModelInterfaces.hpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/RAChecker.cpp -> genmc/Verification/Config.hpp
-genmc/Execution/Consistency/RAChecker.cpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/RC11Checker.cpp -> genmc/Verification/Config.hpp
-genmc/Execution/Consistency/RC11Checker.cpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/SCChecker.cpp -> genmc/Verification/Config.hpp
-genmc/Execution/Consistency/SCChecker.cpp -> genmc/Verification/VerificationError.hpp
 genmc/Execution/Consistency/TSOChecker.cpp -> genmc/Verification/Config.hpp
-genmc/Execution/Consistency/TSOChecker.cpp -> genmc/Verification/VerificationError.hpp
-genmc/Execution/ExecutionGraph.hpp -> genmc/Verification/VerificationError.hpp
-genmc/Support/ActionEnums.hpp -> genmc/Execution/Event.hpp
