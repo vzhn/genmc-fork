@@ -12,18 +12,20 @@
  */
 
 
-#ifndef GENMC_REVISIT_MAXIMALITY_HPP
-#define GENMC_REVISIT_MAXIMALITY_HPP
+#ifndef GENMC_BACKWARD_REVISITS_HPP
+#define GENMC_BACKWARD_REVISITS_HPP
 
 /*
- * Which backward revisits the exploration takes: TruSt's maximality
- * condition, which makes every consistent graph reached by exactly one
- * revisit (the optimality of the exploration). Pure functions of the graph,
- * the model's prefix views and three options: nothing here changes the
- * graph or the driver.
+ * The backward revisits of a graph: what a revisit keeps (its view), and
+ * which revisits the exploration takes (TruSt's maximality condition, which
+ * makes every consistent graph reached by exactly one revisit: the
+ * optimality of the exploration). Pure functions of the graph, the model's
+ * prefix views and a few options: nothing here changes the graph or the
+ * driver.
  */
 
 #include "genmc/ADT/VectorClock.hpp"
+#include "genmc/Support/Event.hpp"
 
 #include <memory>
 
@@ -32,6 +34,8 @@ class EventLabel;
 class ExecutionGraph;
 class GraphModel;
 class MemAccessLabel;
+class ReadLabel;
+class WriteLabel;
 
 /** The prefix view of LAB under MODEL (computed once, cached on the label) */
 auto prefixView(const GraphModel &model, const EventLabel *lab) -> const VectorClock &;
@@ -41,7 +45,7 @@ auto prefixView(const GraphModel &model, const EventLabel *lab) -> const VectorC
 auto revisitPrefixView(const GraphModel &model, bool scopesCtrlDeps, const EventLabel *lab)
 	-> std::unique_ptr<VectorClock>;
 
-class RevisitMaximality {
+class BackwardRevisits {
 public:
 	struct Options {
 		/** The model tracks dependencies (IMM, LKMM) */
@@ -50,11 +54,24 @@ public:
 		bool disableBAM = false;
 		/** See revisitPrefixView() */
 		bool scopesCtrlDeps = false;
+		/** -exhaustive under IMM: a revisit keeps the value dependencies
+		 * of what it keeps (see keepValueDependencies()) */
+		bool exhaustiveIMM = false;
 	};
 
-	RevisitMaximality(const ExecutionGraph &g, const GraphModel &model, Options opts)
+	BackwardRevisits(const ExecutionGraph &g, const GraphModel &model, Options opts)
 		: g_(g), model_(model), opts_(opts)
 	{}
+
+	/** The revisit of RLAB by SLAB, with the view it keeps */
+	[[nodiscard]] auto construct(const ReadLabel *rLab, const WriteLabel *sLab) const
+		-> std::unique_ptr<BackwardRevisit>;
+
+	/** What the revisit of RLAB by SLAB keeps: the events before RLAB and
+	 * SLAB's prefix; null if no graph keeps it (-exhaustive under IMM, see
+	 * keepValueDependencies()) */
+	[[nodiscard]] auto revisitView(const ReadLabel *rLab, const WriteLabel *sLab) const
+		-> std::unique_ptr<VectorClock>;
 
 	/** Whether R, a backward revisit of the graph, is the one revisit that
 	 * reaches its graph: the events it deletes were added maximally */
@@ -89,6 +106,11 @@ private:
 	 * revisited a read still reading it */
 	auto isKeptByKeptRevisit(const BackwardRevisit &r, const EventLabel *lab) const -> bool;
 
+	/** -exhaustive under IMM: extends V with what the events it keeps
+	 * depend on for their values; false if that needs the read at R or an
+	 * event the graph does not have */
+	auto keepValueDependencies(Event r, VectorClock &v) const -> bool;
+
 	auto getPrefixView(const EventLabel *lab) const -> const VectorClock &
 	{
 		return prefixView(model_, lab);
@@ -103,4 +125,4 @@ private:
 	Options opts_;
 };
 
-#endif /* GENMC_REVISIT_MAXIMALITY_HPP */
+#endif /* GENMC_BACKWARD_REVISITS_HPP */

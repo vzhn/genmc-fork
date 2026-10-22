@@ -2432,12 +2432,13 @@ auto GenMCDriver::getRevisitPrefixView(const EventLabel *lab) const
 	return revisitPrefixView(getConsChecker(), scopesCtrlDeps(), lab);
 }
 
-auto GenMCDriver::getMaximality() const -> RevisitMaximality
+auto GenMCDriver::getBackwardRevisits() const -> BackwardRevisits
 {
 	return {getExec().getGraph(), getConsChecker(),
 		{.depTracking = getConf()->isDepTrackingModel,
 		 .disableBAM = getConf()->disableBAM,
-		 .scopesCtrlDeps = scopesCtrlDeps()}};
+		 .scopesCtrlDeps = scopesCtrlDeps(),
+		 .exhaustiveIMM = getConf()->exhaustive && getConf()->model == ModelType::IMM}};
 }
 
 auto GenMCDriver::getRfsApproximation(ReadLabel *lab) -> std::vector<EventLabel *>
@@ -2944,7 +2945,7 @@ auto GenMCDriver::handleNAStore(const EventDbgInfo *dbg, Event pos, SAddr loc, A
  * TruSt skips the stable ones (in a revisit's prefix, or not reading
  * maximally: their revisits are explored from the maximal path), and the
  * reads added after an RMW that conflicts with SLAB. With ALL (-exhaustive),
- * every such read is a candidate, and RevisitMaximality::keepsConflictingRMW()
+ * every such read is a candidate, and BackwardRevisits::keepsConflictingRMW()
  * drops the revisits whose graph would violate atomicity */
 static auto getRevisitable(WriteLabel *sLab, const VectorClock &before, bool all)
 	-> std::vector<ReadLabel *>
@@ -3012,16 +3013,11 @@ static auto hasReads(const ExecutionGraph &g, SAddr addr) -> bool
  * so that only its write part depends on the outcome, as under porf
  * (issue #137). The reference does not: such a CAS is revisitable all the
  * same when the write's value changes its ordering or makes it fail; the
- * revisit drops its write part (getRevisitView()), and the consistency of
- * the graph it produces decides (backwardRevisit()) */
-static auto failsReading(const ReadLabel *rLab, const WriteLabel *sLab) -> bool
-{
-	const auto *cLab = genmc::dyn_cast<CasReadLabel>(rLab);
-	return cLab && cLab->isRMW() &&
-	       !cLab->valueMakesRMWSucceed(sLab->getAccessValue(cLab->getAccess()));
-}
-
-/* Whether reading from SLAB changes the ordering or the write of the CAS RLAB */
+ * revisit drops its write part (BackwardRevisits::revisitView()), and the
+ * consistency of the graph it produces decides (backwardRevisit()).
+ *
+ * Whether reading from SLAB changes the ordering or the write of the CAS RLAB
+ * (failsReading(): whether the CAS fails reading SLAB) */
 static auto outcomeChanges(const ReadLabel *rLab, const WriteLabel *sLab) -> bool
 {
 	const auto *cLab = genmc::dyn_cast<CasReadLabel>(rLab);
@@ -3753,7 +3749,7 @@ auto GenMCDriver::tryOptimizeBarrierRevisits(BIncFaiWriteLabel *sLab,
 	/* Finally, revisit in place */
 	for (auto *lab : toRevisit) {
 		VERIFY(genmc::isa<BWaitReadLabel>(lab));
-		revisitInPlace(*constructBackwardRevisit(lab, sLab));
+		revisitInPlace(*getBackwardRevisits().construct(lab, sLab));
 	}
 	return true;
 }
@@ -3775,7 +3771,7 @@ void GenMCDriver::tryOptimizeIPRs(const WriteLabel *sLab, std::vector<ReadLabel 
 	});
 
 	for (auto *rLab : toIPR)
-		revisitInPlace(*constructBackwardRevisit(rLab, sLab));
+		revisitInPlace(*getBackwardRevisits().construct(rLab, sLab));
 
 	/* We also have to filter out some regular revisits */
 	const auto *confLab = findPendingRMW(sLab);
@@ -3904,124 +3900,8 @@ void GenMCDriver::revisitInPlace(const BackwardRevisit &br)
 			rLab->getPos(), sLab->getPos(), getExec().getGraph()););
 }
 
-static void updatePredsWithPrefixView(const ExecutionGraph &g, VectorClock &preds,
-				      const VectorClock &pporf)
-{
-	/* In addition to taking (preds U pporf), make sure pporf includes rfis */
-	preds.update(pporf);
 
-	if (!dynamic_cast<const DepExecutionGraph *>(&g))
-		return;
-	auto &predsD = *genmc::dyn_cast<DepView>(&preds);
-	for (auto i = 0; i < pporf.size(); i++) {
-		for (auto j = 1; j <= pporf.getMax(i); j++) {
-			const auto *lab = g.getEventLabel(Event(i, j));
-			if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab)) {
-				if (preds.contains(rLab->getPos()) &&
-				    !preds.contains(rLab->getRf()->getPos())) {
-					if (rLab->getRf()->getThread() == rLab->getThread())
-						predsD.removeHole(rLab->getRf()->getPos());
-				}
-			}
-			const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
-			if (wLab && wLab->isRMW() && pporf.contains(lab->getPos().prev()))
-				predsD.removeHole(lab->getPos());
-		}
-	}
-}
 
-auto GenMCDriver::getRevisitView(const ReadLabel *rLab, const WriteLabel *sLab) const
-	-> std::unique_ptr<VectorClock>
-{
-	const auto &g = getExec().getGraph();
-	auto preds = g.getPredsView(rLab->getPos());
-
-	/* A read in the write's prefix only through pctrl (-lkmm, see
-	 * getRevisitPrefixView()): the prefix has events computed from the read's
-	 * old value, so the revisit keeps the part of it without pctrl */
-	const auto &prefix = getPrefixView(sLab);
-	if (prefix.contains(rLab->getPos())) {
-		updatePredsWithPrefixView(g, *preds, *getRevisitPrefixView(sLab));
-		return preds;
-	}
-	updatePredsWithPrefixView(g, *preds, prefix);
-	if (getConf()->exhaustive && getConf()->model == ModelType::IMM) {
-		/* (a CAS that fails reading SLAB loses its write part) */
-		if (failsReading(rLab, sLab) && preds->contains(rLab->getPos().next()))
-			genmc::cast<DepView>(&*preds)->addHole(rLab->getPos().next());
-		if (!keepValueDependencies(rLab->getPos(), *preds))
-			return nullptr;
-	}
-	return preds;
-}
-
-/* -exhaustive under IMM. A revisit keeps the events added before the read and
- * the write's prefix, which is closed under (ppo | rfe)-predecessors; for a
- * kept read whose write is in its own thread, it also keeps the write (see
- * updatePredsWithPrefixView()), but not what the write depends on. That
- * write can be an RMW's write part whose read is not kept: its value is
- * then that of a read that is executed anew, and so is the value of the
- * kept read. The default exploration then updates the write when the read
- * is executed again (updateKeptRMWWrite()): it moves in coherence under the
- * readers it has, its revisits are queued with its old stamp (restricting
- * the graph to it cuts the read that completed it, and the revisiting
- * write), and its cached prefix view names events the graph no longer
- * has. Under -exhaustive, which takes revisits the maximality check
- * rejects, those cases end in crashes and in executions that are not
- * consistent or not executions of the program (issues #127, #135, #136).
- *
- * The reference keeps, instead, the graphs whose kept events are what the
- * program computes from the kept events: every event it keeps comes with
- * what its value and its existence depend on, its data, address, control
- * and CAS dependencies, an RMW's read for its write part, a read's write,
- * the creation of its thread, transitively. A revisit for which that
- * includes the revisited read, or an event the graph does not have, has no
- * such graph and is not taken. (A write is still kept without the events
- * it is merely ordered after: its value does not depend on them, and the
- * graph's consistency is checked once the revisit is done; see
- * backwardRevisit().) No kept write then changes when the threads fill
- * the holes, and none is completed anew */
-auto GenMCDriver::keepValueDependencies(Event r, VectorClock &v) const -> bool
-{
-	const auto &g = getExec().getGraph();
-	auto &dv = *genmc::cast<DepView>(&v);
-	/* (Every view contains the begins: a begin is not kept for its own sake
-	 * and keeps nothing, its thread's kept events keep the create) */
-	std::vector<Event> work;
-	for (const auto &lab : g.labels())
-		if (lab.getPos() != r && !genmc::isa<EmptyLabel>(&lab) &&
-		    !genmc::isa<ThreadStartLabel>(&lab) && v.contains(lab.getPos()))
-			work.push_back(lab.getPos());
-	while (!work.empty()) {
-		const auto *lab = g.getEventLabel(work.back());
-		work.pop_back();
-
-		std::vector<Event> deps;
-		const auto &d = lab->getDeps();
-		for (const auto *di : {&d.data, &d.addr, &d.ctrl, &d.cas})
-			std::ranges::copy(*di, std::back_inserter(deps));
-		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(lab); wLab && wLab->isRMW())
-			deps.push_back(lab->getPos().prev());
-		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab); rLab && rLab->getRf())
-			deps.push_back(rLab->getRf()->getPos());
-		if (const auto *bLab = g.getFirstThreadLabel(lab->getThread());
-		    bLab && bLab->getCreate())
-			deps.push_back(bLab->getCreate()->getPos());
-
-		for (auto e : deps) {
-			if (e == r)
-				return false;
-			if (e.isInitializer() || v.contains(e))
-				continue;
-			const auto *eLab = g.getEventLabelIfPresent(e);
-			if (!eLab || genmc::isa<EmptyLabel>(eLab))
-				return false;
-			dv.updateIdx(e);
-			work.push_back(e);
-		}
-	}
-	return true;
-}
 
 auto GenMCDriver::recomputeViews(ExecutionGraph &g) -> bool
 {
@@ -4149,11 +4029,6 @@ void GenMCDriver::checkWithViewsAnew(const std::function<void(const ExecutionGra
 	getConsChecker().recomputeCacheCounters(g);
 }
 
-auto GenMCDriver::constructBackwardRevisit(const ReadLabel *rLab, const WriteLabel *sLab) const
-	-> std::unique_ptr<BackwardRevisit>
-{
-	return std::make_unique<BackwardRevisit>(rLab, sLab, getRevisitView(rLab, sLab));
-}
 
 
 
@@ -4216,17 +4091,17 @@ void GenMCDriver::calcRevisits(WriteLabel *sLab)
 
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Revisitable (optimized): {}", loads););
 	for (auto *rLab : loads) {
-		auto br = constructBackwardRevisit(rLab, sLab);
-		auto maximality = getMaximality();
+		auto revisits = getBackwardRevisits();
+		auto br = revisits.construct(rLab, sLab);
 		/* -exhaustive: every revisit whose graph is well formed and can be
 		 * consistent (the visited set, not maximality, bounds the exploration) */
 		if (getConf()->exhaustive) {
-			if (br->getViewNoRel() && maximality.isRevisitViewClosed(*br) &&
-			    !maximality.keepsConflictingRMW(*br))
+			if (br->getViewNoRel() && revisits.isRevisitViewClosed(*br) &&
+			    !revisits.keepsConflictingRMW(*br))
 				getExec().getWorkqueue().add(std::move(br));
 			continue;
 		}
-		if (!maximality.isMaximalExtension(*br))
+		if (!revisits.isMaximalExtension(*br))
 			break;
 
 		getExec().getWorkqueue().add(std::move(br));
@@ -4398,7 +4273,8 @@ auto GenMCDriver::backwardRevisit(const BackwardRevisit &br) -> bool
 
 	/* Recalculate the view because some B labels might have been
 	 * removed */
-	auto v = getRevisitView(g.getReadLabel(br.getPos()), g.getWriteLabel(br.getRev()));
+	auto v = getBackwardRevisits().revisitView(g.getReadLabel(br.getPos()),
+						   g.getWriteLabel(br.getRev()));
 	if (!v) {
 		VERIFY(getConf()->exhaustive);
 		return false;

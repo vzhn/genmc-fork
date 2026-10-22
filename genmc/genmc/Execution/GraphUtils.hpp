@@ -46,6 +46,9 @@ auto isHazptrProtected(const MemAccessLabel *mLab) -> bool;
  * If no such event exists, returns nullptr */
 auto findMatchingLock(const UnlockWriteLabel *uLab) -> const CasWriteLabel *;
 
+/** Whether RLAB is a CAS that fails reading SLAB (has no write part then) */
+auto failsReading(const ReadLabel *rLab, const WriteLabel *sLab) -> bool;
+
 /** Returns the unlock that matches lLAB.
  *If no such event exists, returns nullptr */
 auto findMatchingUnlock(const CasWriteLabel *lLab) -> const UnlockWriteLabel *;

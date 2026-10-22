@@ -17,6 +17,7 @@
 #include "genmc/Execution/Consistency/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
+#include "genmc/Verification/BackwardRevisits.hpp"
 #include "genmc/Verification/ChoiceMap.hpp"
 #include "genmc/Verification/ExecutionFrame.hpp"
 #include "genmc/Verification/ExplorationStack.hpp"
@@ -24,7 +25,6 @@
 #include "genmc/Verification/GraphHash.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
-#include "genmc/Verification/RevisitMaximality.hpp"
 #include "genmc/Verification/Scheduler.hpp"
 #include "genmc/Support/VerificationError.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
@@ -652,23 +652,6 @@ private:
 	 * LOADS, and returns whether we can skip revisiting altogether */
 	auto tryOptimizeRevisits(WriteLabel *lab, std::vector<ReadLabel *> &loads) -> bool;
 
-	/** Constructs a BackwardRevisit representing RLAB <- SLAB */
-	auto constructBackwardRevisit(const ReadLabel *rLab, const WriteLabel *sLab) const
-		-> std::unique_ptr<BackwardRevisit>;
-
-	/** Given a revisit RLAB <- WLAB, returns the view of the resulting graph.
-	 * (This function can be abused and also be utilized for returning the view
-	 * of "fictional" revisits, e.g., the view of an event in a maximal path.)
-	 * -exhaustive under IMM: null when no well-formed graph results (see
-	 * keepValueDependencies()) */
-	auto getRevisitView(const ReadLabel *rLab, const WriteLabel *sLab) const
-		-> std::unique_ptr<VectorClock>;
-
-	/** -exhaustive under IMM: adds to V, the view of a revisit of R, what
-	 * the events it keeps depend on for their value and existence. Returns
-	 * false if that includes R or an event the graph does not have */
-	auto keepValueDependencies(Event r, VectorClock &v) const -> bool;
-
 	/** -exhaustive under IMM: adds to LOADS the CAS reads in PREFIX, SLAB's
 	 * prefix, whose ordering or write part reading from SLAB would change */
 	void addRevisitableCases(WriteLabel *sLab, const VectorClock &prefix,
@@ -904,8 +887,8 @@ private:
 	 * either (po U rf) or (AR U rf) */
 	auto getPrefixView(const EventLabel *lab) const -> const VectorClock &;
 
-	/** The maximality checks for backward revisits of the current graph */
-	auto getMaximality() const -> RevisitMaximality;
+	/** The backward revisits of the current graph (see BackwardRevisits) */
+	auto getBackwardRevisits() const -> BackwardRevisits;
 
 	/** The part of LAB's prefix its revisits take (not cached; see
 	 * ConsistencyChecker::calculateRevisitPrefixView()) */
