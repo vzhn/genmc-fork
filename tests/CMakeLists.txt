@@ -103,6 +103,14 @@ add_test(NAME install-headers
 set_tests_properties(install-headers PROPERTIES LABELS "integration;fast" TIMEOUT 300
     ENVIRONMENT "BUILD=${CMAKE_BINARY_DIR}")
 
+# The SV-COMP preludes build against the runtime headers (needs PyYAML; skipped without it)
+add_test(NAME svcomp-shim
+    COMMAND bash -c "${SCRIPT_DIR}/check-svcomp-shim.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(svcomp-shim PROPERTIES LABELS "integration;fast" TIMEOUT 300
+    SKIP_RETURN_CODE 77 ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(NAME liveness-report
     COMMAND bash -c "${SCRIPT_DIR}/check-liveness-report.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}

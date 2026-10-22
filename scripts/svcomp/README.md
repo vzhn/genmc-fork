@@ -11,6 +11,7 @@ part of this repository; fetch them first.
 | `svcomp-shim.h` | prelude for tasks that include `<pthread.h>` |
 | `svcomp-shim-pp.h` | prelude for preprocessed tasks, which declare the pthread API themselves |
 | `svcomp-shim-core.h` | the part both preludes share: nondeterminism, atomic sections, `main` |
+| `selftest/` | small tasks that `scripts/check-svcomp-shim.sh` (ctest `svcomp-shim`) runs through both preludes |
 
 ## Usage
 
@@ -26,10 +27,11 @@ Then run:
     scripts/svcomp/svcomp-run.py -j 12 -t 60 -o results build/bin/genmc \
         sv-benchmarks/c/pthread sv-benchmarks/c/weaver ...
 
-It needs Python 3 with PyYAML. Every task is run under `-rc11` (`-m` picks
-another model). The tasks are SC programs, so a race or assertion failure
-found under RC11 also exists under SC, unless it depends on weak behaviour of
-the task's atomics.
+It needs Python 3 with PyYAML, and a GenMC whose `pthread.h` has
+`pthread_once` (0.19.0-vzhn.14 or later). Every task is run under `-rc11`
+(`-m` picks another model). The tasks are SC programs, so a race or
+assertion failure found under RC11 also exists under SC, unless it depends
+on weak behaviour of the task's atomics.
 
 ## Verdicts
 
@@ -65,10 +67,12 @@ so a clean result holds only up to those bounds:
   it protects, so it can hide a data race that SV-COMP reports. SV-COMP also
   counts accesses inside atomic sections as atomic; GenMC does not, so a race
   with one side in an atomic section is labelled `ATOMIC-RACE`, with no verdict.
-- **Condition variables**, `pthread_once`, `pthread_detach`, mutex attributes
-  and recursive mutexes are modelled in the prelude; GenMC's `pthread.h` lacks
-  them. A condvar wait may wake up without a signal, at most
-  `--max-spurious` times per execution (default 1).
+- **`pthread_detach`, mutex attributes and recursive mutexes** are modelled
+  in the prelude; GenMC's `pthread.h` lacks them. Condition variables and
+  `pthread_once` come from GenMC's `pthread.h` (the generated tail of a
+  preprocessed task defines them the same way), except that a condvar wait
+  may wake up without a signal, at most `--max-spurious` times per
+  execution (default 1).
 - **`abort()`** and **`malloc(0)`** discard the execution. SV-COMP uses
   `abort()` to cut off paths, and GenMC itself would die on it (#44, #47).
 

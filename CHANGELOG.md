@@ -78,6 +78,15 @@ released.
   `pthread_create()` or a `pthread_join()` that followed was missing from
   the trace. Only a write at the creation's line is left out now
   (`tests/wrong/infr/trace-after-create`).
+- The SV-COMP prelude for tasks that include `<pthread.h>`
+  (`scripts/svcomp/svcomp-shim.h`) no longer compiled since `pthread.h`
+  got `pthread_once()` (#154): it defined its own `pthread_once_t` and
+  `pthread_once()`, so every such task was a compile error. It now uses
+  those of `pthread.h`, which work the same way.
+  `scripts/check-svcomp-shim.sh` (ctest `svcomp-shim`) runs
+  `svcomp-run.py` on small tasks (`scripts/svcomp/selftest`) through both
+  preludes, the one for preprocessed tasks included, and checks their
+  verdicts.
 
 ### Added
 
