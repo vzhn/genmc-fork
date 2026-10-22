@@ -36,7 +36,8 @@ released.
   reach the latch, where the failing assumption is, through blocks of
   their own that only jump on, and the assumption did not get past them.
   It now does (`tests/correct/saver/spin-seqlock-reader`: 5 blocked
-  executions, 13 before).
+  executions, 13 before; a relaxed read of the data is still reported:
+  `tests/wrong/safety/seqlock-reader-relaxed-data`).
 - A read whose spin-loop condition takes a signed remainder, as in
   `while (seq % 2 == 1)` on an `int`, was not annotated either (#92): the
   annotator handled the unsigned remainder only, and such a read was not

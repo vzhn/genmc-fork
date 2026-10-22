@@ -9,6 +9,13 @@
 #include <pthread.h>
 #include <stdatomic.h>
 
+/* (BUG_RELAXED_DATA: tests/wrong/safety/seqlock-reader-relaxed-data) */
+#ifdef BUG_RELAXED_DATA
+#define DATA_ORDER memory_order_relaxed
+#else
+#define DATA_ORDER memory_order_acquire
+#endif
+
 atomic_int seq;
 atomic_int data;
 
@@ -20,7 +27,7 @@ void *reader(void *arg)
 		s = atomic_load_explicit(&seq, memory_order_acquire);
 		if (s & 1)
 			continue;
-		d = atomic_load_explicit(&data, memory_order_acquire);
+		d = atomic_load_explicit(&data, DATA_ORDER);
 		if (atomic_load_explicit(&seq, memory_order_relaxed) == s)
 			break;
 	}
