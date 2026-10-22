@@ -25,6 +25,7 @@
 #include <llvm/IR/InstIterator.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/DynamicLibrary.h>
+#include <llvm/Support/FileSystem.h>
 
 #include <chrono>
 #include <cmath>
@@ -648,6 +649,23 @@ static auto getOutFilename(const LLIConfig & /* lliConfig */) -> std::string
 	return filename;
 }
 
+/* The directories of the runtime headers. A binary installed with its
+ * headers (INCLUDE_DIR_FROM_BIN from its own directory) uses those alone,
+ * wherever its prefix is now and whatever became of the source tree it was
+ * built from; a binary run from its build tree uses the source tree's */
+static auto getRuntimeIncludeDirs() -> std::vector<std::string>
+{
+	auto exe = llvm::sys::fs::getMainExecutable(nullptr, (void *)&getRuntimeIncludeDirs);
+	if (!exe.empty()) {
+		auto installed = (std::filesystem::path(exe).parent_path() / INCLUDE_DIR_FROM_BIN)
+					 .lexically_normal();
+		std::error_code ec;
+		if (std::filesystem::exists(installed / "genmc.h", ec))
+			return {installed.string()};
+	}
+	return {SRC_INCLUDE_DIR, INCLUDE_DIR};
+}
+
 static auto buildCompilationArgs(const LLIConfig &lliConfig) -> std::string
 {
 	std::string args;
@@ -659,8 +677,8 @@ static auto buildCompilationArgs(const LLIConfig &lliConfig) -> std::string
 	args += lliConfig.rust ? " -gdwarf-4" : " -g";
 	for (const auto &f : lliConfig.cflags)
 		args += " " + f;
-	args += " -I'" SRC_INCLUDE_DIR "'";
-	args += " -I'" INCLUDE_DIR "'";
+	for (const auto &dir : getRuntimeIncludeDirs())
+		args += " -I'" + dir + "'";
 	args += " -S -emit-llvm";
 	args += " -o " + getOutFilename(lliConfig);
 	args += " '" + lliConfig.inputFile + "'";

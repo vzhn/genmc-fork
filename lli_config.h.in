@@ -10,6 +10,7 @@
 /* Include directories. */
 #define INCLUDE_DIR "@INCLUDE_DIR@"
 #define SRC_INCLUDE_DIR "@SRC_INCLUDE_DIR@"
+#define INCLUDE_DIR_FROM_BIN "@INCLUDE_DIR_FROM_BIN@"
 
 /* Rust related defines. */
 #define RUST_DIR "@RUST_DIR@"

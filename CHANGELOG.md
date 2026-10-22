@@ -9,6 +9,19 @@ released.
 
 - Merge of MIXER [POPL'25] into mainline GenMC
 
+### Fixed
+
+- An installed GenMC compiled programs with the runtime headers of the
+  source tree it was built from, whatever that tree had become since, as
+  long as it existed; once it was gone, C++ programs no longer compiled,
+  because the C++ runtime headers (`atomic`, `cassert`, `cstdio`,
+  `cstdlib`, `thread`, which have no extension) were never installed.
+  Every runtime header is installed now, and an installed binary uses
+  only the headers installed with it, found from its own directory (a
+  moved prefix works too); a binary run from its build tree uses the
+  source tree's, as before (`scripts/check-install-headers.sh`, ctest
+  `install-headers`).
+
 
 ## [0.19.0-vzhn.14] - 2026.10.22
 

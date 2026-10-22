@@ -82,6 +82,13 @@ add_test(NAME lkmm-ww-warning
 set_tests_properties(lkmm-ww-warning PROPERTIES LABELS "integration;fast" TIMEOUT 120
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME install-headers
+    COMMAND bash -c "${SCRIPT_DIR}/check-install-headers.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(install-headers PROPERTIES LABELS "integration;fast" TIMEOUT 300
+    ENVIRONMENT "BUILD=${CMAKE_BINARY_DIR}")
+
 add_test(NAME liveness-report
     COMMAND bash -c "${SCRIPT_DIR}/check-liveness-report.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
