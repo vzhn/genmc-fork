@@ -97,6 +97,8 @@ using Outcome = std::vector<std::vector<std::uint32_t>>;
 struct Options {
 	bool symmetryReduction = false;
 	bool blindRMWReduction = false;
+	/** -exhaustive: the reference exploration (every revisit, no maximality) */
+	bool exhaustive = false;
 };
 
 class Producer : public EventProducer {
@@ -312,6 +314,11 @@ inline auto explore(const Program &prog, ModelType model, Options opts = {}) -> 
 	conf->warnOnGraphSize = 1024;
 	conf->symmetryReduction = opts.symmetryReduction;
 	conf->blindRMWReduction = opts.blindRMWReduction;
+	conf->exhaustive = opts.exhaustive;
+	if (opts.exhaustive) {
+		std::vector<std::string> warnings;
+		VERIFY(std::holds_alternative<std::monostate>(conf->validate(warnings)));
+	}
 	auto driver = GenMCDriver::create(conf);
 	Producer producer(*driver, prog);
 	::explore(*driver, producer);

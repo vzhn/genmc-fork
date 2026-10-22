@@ -431,3 +431,43 @@ TEST(ScriptedDriverReductions, BlindIncrementsAreExploredInOneOrder)
 	EXPECT_EQ(on.explored, 1U);
 	EXPECT_EQ(on.outcomes, off.outcomes);
 }
+
+/*
+ * The default exploration against the reference (-exhaustive, which takes
+ * every revisit and dedups the graphs): the same executions, under every
+ * model the scripted programs can use without event keys. No oracle is
+ * needed, so this covers TSO and RA too.
+ */
+namespace {
+
+auto checkAgainstExhaustive(const Program &p, ModelType model) -> void
+{
+	auto def = explore(p, model);
+	auto ref = explore(p, model, {.exhaustive = true});
+	RC_ASSERT(!def.error);
+	RC_ASSERT(!ref.error);
+	RC_ASSERT(def.explored == ref.explored);
+	RC_ASSERT(def.outcomes == ref.outcomes);
+}
+
+} // namespace
+
+RC_GTEST_PROP(ScriptedDriverExhaustive, SCMatchesTheReference, ())
+{
+	checkAgainstExhaustive(*genProgram(false), ModelType::SC);
+}
+
+RC_GTEST_PROP(ScriptedDriverExhaustive, TSOMatchesTheReference, ())
+{
+	checkAgainstExhaustive(*genProgram(false), ModelType::TSO);
+}
+
+RC_GTEST_PROP(ScriptedDriverExhaustive, RAMatchesTheReference, ())
+{
+	checkAgainstExhaustive(*genProgram(false), ModelType::RA);
+}
+
+RC_GTEST_PROP(ScriptedDriverExhaustive, RC11MatchesTheReference, ())
+{
+	checkAgainstExhaustive(*genProgram(false), ModelType::RC11);
+}
