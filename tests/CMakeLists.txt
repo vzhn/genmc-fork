@@ -6,6 +6,14 @@ add_test(
 )
 set_tests_properties(fast-driver PROPERTIES LABELS "integration;fast" TIMEOUT 600)
 
+# The correct/ tests under -sc, which fast-driver leaves out
+add_test(NAME sc-driver
+    COMMAND bash -c "${SCRIPT_DIR}/sc-driver.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(sc-driver PROPERTIES LABELS "integration;fast" TIMEOUT 600
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(
     NAME randomize-driver
     COMMAND bash -c "${SCRIPT_DIR}/randomize-driver.sh > ${SCRIPT_DIR}/randomize-driver.log"

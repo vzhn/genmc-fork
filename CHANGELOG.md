@@ -225,6 +225,17 @@ released.
   an access to freed memory, with the thread's end as the conflicting
   event. The main thread's copies last as long as the program
   (`tests/wrong/memory/tls-access-ended`).
+- The `-sc` expectations of 15 correct tests were stale, and so they failed
+  under `-sc`, which `scripts/driver.sh` does not run by default. Symmetry
+  reduction now covers threads spawned into a local `pthread_t` array or
+  with an argument they never read, and a loop that waits under a mutex is
+  a spinloop, but only the `-rc11` and `-imm` counts were updated. No
+  execution is lost under SC: with `-disable-sr`, and under `-exhaustive`,
+  every test has its old count, and the new counts are those of `-rc11`
+  (e.g., `saver/loop-peel2`: two readers each read 0 from the initial
+  value or from the writer's first write, 4 executions, 3 up to swapping
+  the readers). `scripts/sc-driver.sh` (ctest `sc-driver`) runs the
+  correct tests under `-sc` now.
 
 ### Added
 
