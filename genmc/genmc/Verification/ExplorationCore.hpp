@@ -19,6 +19,7 @@
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Verification/BackwardRevisits.hpp"
 #include "genmc/Verification/ChoiceCandidates.hpp"
+#include "genmc/Verification/ExhaustiveConsistency.hpp"
 #include "genmc/Verification/ChoiceMap.hpp"
 #include "genmc/Verification/ExecutionFrame.hpp"
 #include "genmc/Verification/ExplorationStack.hpp"
@@ -499,7 +500,10 @@ private:
 
 	/** -exhaustive under IMM: whether G, with the views its labels have, is
 	 * consistent: coherence, the atomicity of its RMWs, the other axioms */
-	auto isGraphConsistent(const ExecutionGraph &g) const -> bool;
+	auto isGraphConsistent(const ExecutionGraph &g) -> bool;
+
+	/** The checks of -exhaustive under IMM (see ExhaustiveConsistency) */
+	auto getExhaustiveConsistency() -> ExhaustiveConsistency;
 
 	/** -exhaustive under IMM: runs CHECK on a copy of the current graph
 	 * whose views are computed anew (positions name the same events in

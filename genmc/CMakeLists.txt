@@ -57,6 +57,7 @@ set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/Config.cpp
   genmc/Verification/ErrorRules.cpp
   genmc/Verification/ExecutionFrame.cpp
+  genmc/Verification/ExhaustiveConsistency.cpp
   genmc/Verification/Explorer.cpp
   genmc/Verification/ExplorationCore.cpp
   genmc/Verification/ExplorationStack.cpp
