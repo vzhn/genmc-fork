@@ -145,6 +145,19 @@ released.
   `svcomp-run.py` on small tasks (`scripts/svcomp/selftest`) through both
   preludes, the one for preprocessed tasks included, and checks their
   verdicts.
+- `scripts/svcomp/svcomp-run.py` verified a task's `.c` file, while SV-COMP
+  verifies its `input_files`, which for 745 of the 1154 concurrency tasks
+  is the preprocessed `.i`. The `.c` of some tasks includes headers the task
+  does not ship (`svcomp.h` in `pthread-driver-races`), and 32 tasks have no
+  `.c` at all. The runner now verifies the input file. Its self-test has a
+  task whose `.c` does not build (`scripts/svcomp/selftest/input-file`).
+  On the `.i` files, the tail that `svcomp-run.py` appends to preprocessed
+  tasks fell short of `svcomp-shim.h`: it took a call checked in
+  `if (pthread_create(...)) {` for a definition and left the function out,
+  ignored the mutex type, so a recursive mutex deadlocked on its second
+  lock and a reachable error was missed, and had no rwlocks or
+  thread-specific data. It now tells calls from definitions and has all
+  three, as `svcomp-shim.h` and `pthread.h` do (self-test tasks `pp-*`).
 
 - `__thread` and `_Thread_local` variables lived outside the execution
   graph, in a map per thread from address to value, with every thread's
