@@ -14,7 +14,7 @@
 #include "Runtime/Interpreter.h"
 #include "genmc/Support/Error.hpp"
 #include "genmc/Support/Logger.hpp"
-#include "genmc/Support/ThreadPool.hpp"
+#include "ThreadPool.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/GenMCDriver.hpp"
 #include "genmc/lli_config.h"

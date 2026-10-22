@@ -32,6 +32,7 @@ set(LIB_SOURCES
   genmc/Support/ThreadPinner.cpp
   genmc/Verification/ChoiceMap.cpp
   genmc/Verification/Config.cpp
+  genmc/Verification/ExecutionFrame.cpp
   genmc/Verification/GenMCDriver.cpp
   genmc/Verification/GraphHash.cpp
   genmc/Verification/GraphPrinting.cpp

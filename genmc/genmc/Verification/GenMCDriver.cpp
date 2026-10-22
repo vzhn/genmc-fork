@@ -36,7 +36,6 @@
 #include "genmc/Support/NameInfo.hpp"
 #include "genmc/Support/SExprVisitor.hpp"
 #include "genmc/Support/ThreadInfo.hpp"
-#include "genmc/Support/ThreadPool.hpp"
 #include "genmc/Support/Verbosity.hpp"
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/DriverHandlerDispatcher.hpp"
@@ -74,7 +73,7 @@ using namespace std::string_literals;
  ** GENERIC MODEL CHECKING DRIVER
  ***********************************************************/
 
-GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, ThreadPool *pool /* = nullptr */,
+GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool /* = nullptr */,
 			 Mode mode /* = VerificationMode{} */)
 	: mode(mode), pool(pool), userConf(std::move(conf))
 {
@@ -117,11 +116,6 @@ GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, ThreadPool *pool /*
 
 GenMCDriver::~GenMCDriver() = default;
 
-GenMCDriver::Execution::Execution(std::unique_ptr<ExecutionGraph> g, LocalQueueT &&w,
-				  ChoiceMap &&map)
-	: graph(std::move(g)), workqueue(std::move(w)), choices(std::move(map))
-{}
-GenMCDriver::Execution::~Execution() = default;
 
 static void repairRead(ExecutionGraph &g, ReadLabel *lab)
 {
@@ -140,12 +134,6 @@ void GenMCDriver::repairDanglingReads(ExecutionGraph &g)
 	}
 }
 
-void GenMCDriver::Execution::restrict(Stamp stamp)
-{
-	auto &g = getGraph();
-	g.cutToStamp(stamp);
-	getChoiceMap().cut(*g.getViewFromStamp(stamp));
-}
 
 void GenMCDriver::pushExecution(Execution &&e)
 {

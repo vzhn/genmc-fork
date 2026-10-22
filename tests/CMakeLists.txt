@@ -163,6 +163,13 @@ add_test(NAME check-pass-deps
 set_tests_properties(check-pass-deps PROPERTIES LABELS "integration" TIMEOUT 1800
     SKIP_RETURN_CODE 77 ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+# The core library's include layering (no LLVM/interpreter/pass headers, no new upward includes)
+add_test(NAME core-layering
+    COMMAND bash -c "${SCRIPT_DIR}/check-core-layering.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(core-layering PROPERTIES LABELS "fast" TIMEOUT 60)
+
 # Unit tests
 add_subdirectory(unit)
 

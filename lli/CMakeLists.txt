@@ -2,7 +2,7 @@ set(LLI_SOURCES
   Runtime/Execution.cpp
   Runtime/ExternalFunctions.cpp
   Runtime/Interpreter.cpp
-  ${CMAKE_SOURCE_DIR}/genmc/genmc/Support/ThreadPool.cpp
+  ThreadPool.cpp
 )
 
 add_executable(${PROJECT_NAME} main.cpp ${LLI_SOURCES})
