@@ -25,6 +25,7 @@
 #include "genmc/Verification/GraphHash.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/ResumePoint.hpp"
+#include "genmc/Verification/ResumePointStore.hpp"
 #include "genmc/Verification/RfReductions.hpp"
 #include "genmc/Verification/Scheduler.hpp"
 #include "genmc/Support/VerificationError.hpp"
@@ -137,16 +138,13 @@ public:
 
 	/** Lets forward revisits resume from saved runtime states: HOOK saves
 	 * the runtime's state at the event at POS, or returns null */
-	void setResumeHook(std::function<std::shared_ptr<ResumePoint>(Event)> hook)
-	{
-		resumeHook_ = std::move(hook);
-	}
+	void setResumeHook(ResumePointStore::Hook hook) { resumePoints_.setHook(std::move(hook)); }
 
 	/** The state the execution about to start resumes from, if any
 	 * (cleared once taken; otherwise the runtime replays the graph) */
 	auto takePendingResumePoint() -> std::shared_ptr<ResumePoint>
 	{
-		return std::exchange(pendingResume_, nullptr);
+		return resumePoints_.takePending();
 	}
 
 	/** Under LKMM, a control dependency ends at the join of its branch */
@@ -976,10 +974,8 @@ private:
 	 * queued for it (null if the run cannot resume, see saveResumePoint()) */
 	auto saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>;
 
-	std::function<std::shared_ptr<ResumePoint>(Event)> resumeHook_;
-	/** The newest saved states; a revisit whose state was dropped replays */
-	std::deque<std::shared_ptr<ResumePoint>> resumePoints_;
-	std::shared_ptr<ResumePoint> pendingResume_;
+	/** The runtime states saved for forward revisits */
+	ResumePointStore resumePoints_;
 
 	/** "Puppet" labels to be used for race detection */
 	std::unique_ptr<ReadLabel> readProbeLab_;

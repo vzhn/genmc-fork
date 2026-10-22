@@ -66,6 +66,7 @@ set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/Relinche/Linearization.cpp
   genmc/Verification/Relinche/Observation.cpp
   genmc/Verification/Relinche/Specification.cpp
+  genmc/Verification/ResumePointStore.cpp
   genmc/Verification/RfReductions.cpp
   genmc/Verification/BackwardRevisits.cpp
   genmc/Verification/Scheduler.cpp

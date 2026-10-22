@@ -77,7 +77,7 @@ using namespace std::string_literals;
 
 GenMCDriver::GenMCDriver(std::shared_ptr<const Config> conf, WorkSharing *pool /* = nullptr */,
 			 Mode mode /* = VerificationMode{} */)
-	: mode(mode), pool(pool), userConf(std::move(conf))
+	: mode(mode), pool(pool), userConf(std::move(conf)), resumePoints_(userConf->resumePoints)
 {
 	/* Set up the execution context */
 	consChecker = ConsistencyChecker::create(getConf());
@@ -207,7 +207,7 @@ void GenMCDriver::initFromState(std::unique_ptr<Execution> exec)
 	getScheduler().setErrorReplayEvent(std::nullopt);
 	bufferedError_ = std::nullopt;
 	dbgInfo_.clear();
-	pendingResume_ = nullptr;
+	resumePoints_.clearPending();
 
 	stack_->reset({std::move(exec->graph), LocalQueueT(), std::move(exec->choices)});
 }
@@ -335,7 +335,7 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	getScheduler().resetExplorationOptions(g);
 	/* A resumed execution is driven through the holes before its kept
 	 * events as a replayed one is (I4) */
-	if (pendingResume_ && checksInvariants())
+	if (resumePoints_.pending() && checksInvariants())
 		invariants::checkResumeSchedule(g, getScheduler().getReplaySchedule(),
 						invariantContext("starting a resumed execution"));
 	return getScheduler().inErrorReplay();
@@ -570,7 +570,7 @@ void GenMCDriver::maybeCutGraph(const EventLabel *lab)
 
 void GenMCDriver::restartExecution()
 {
-	pendingResume_ = nullptr;
+	resumePoints_.clearPending();
 	stack_->reset(stack_->emptyFrame());
 }
 
@@ -2811,7 +2811,7 @@ auto GenMCDriver::saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>
 	 * relocated kept events (LKMM) move within a run, replay keys count
 	 * from the start, and labels added from the instruction cache have no
 	 * runtime state behind them */
-	if (!resumeHook_ || getConf()->resumePoints == 0 || !inVerificationMode() ||
+	if (!resumePoints_.hasHook() || getConf()->resumePoints == 0 || !inVerificationMode() ||
 	    getScheduler().inErrorReplay() || relocatesKeptEvents() || checksReplayKeys() ||
 	    getConf()->instructionCaching)
 		return nullptr;
@@ -2822,14 +2822,9 @@ auto GenMCDriver::saveResumePoint(Event pos) -> std::shared_ptr<ResumePoint>
 	const auto &g = getExec().getGraph();
 	if (g.getMaxStamp() != g.getEventLabel(pos)->getStamp())
 		return nullptr;
-	auto rp = resumeHook_(pos);
-	if (!rp)
-		return nullptr;
-	if (checksInvariants())
+	auto rp = resumePoints_.save(pos);
+	if (rp && checksInvariants())
 		rp->fingerprint = invariants::fingerprint(g, pos);
-	resumePoints_.push_back(rp);
-	if (resumePoints_.size() > getConf()->resumePoints)
-		resumePoints_.pop_front();
 	return rp;
 }
 
@@ -4034,16 +4029,14 @@ auto GenMCDriver::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 	restrictExecution(stamp, "restricting the graph for a revisit");
 	repairDanglingReads(g);
 
-	pendingResume_ = nullptr;
+	resumePoints_.clearPending();
 	if (auto *fr = genmc::dyn_cast<ForwardRevisit>(&*item)) {
 		/* The graph is now what it was when the event was added: its
 		 * runtime state, if kept, is where the next execution resumes */
-		pendingResume_ = fr->getResumePoint();
-		if (pendingResume_ && --pendingResume_->pending == 0)
-			std::erase(resumePoints_, pendingResume_); /* its last revisit */
-		if (pendingResume_ && checksInvariants() && pendingResume_->fingerprint)
-			invariants::checkResume(g, *pendingResume_->fingerprint,
-						pendingResume_->threadPositions(),
+		resumePoints_.resumeAt(fr->getResumePoint());
+		const auto &rp = resumePoints_.pending();
+		if (rp && checksInvariants() && rp->fingerprint)
+			invariants::checkResume(g, *rp->fingerprint, rp->threadPositions(),
 						invariantContext("restricting the graph for a "
 								 "resumed revisit"));
 		return forwardRevisit(*fr);
