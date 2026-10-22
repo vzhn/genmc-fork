@@ -11,6 +11,16 @@ released.
 
 ### Fixed
 
+- `-imm` explored executions that IMM forbids through a `fetch_add`, an
+  `exchange` or another read-modify-write (#156): IMM orders the read of
+  an RMW, an exclusive read, before all later events of its thread
+  (`[Rex] ; po`), GenMC's IMM only before the RMW's write part. A
+  load-buffering cycle through a relaxed `fetch_add` was consistent, and
+  an assertion that holds under IMM was reported as violated (as in
+  upstream GenMC). The read of an RMW now orders those events, as a CAS's
+  does. On fuzz seeds 249, 637 and 1070 the default exploration no longer
+  disagrees with `-exhaustive` or depends on the schedule: 55, 460 and
+  4123 executions, as under rc11.
 - `-imm` segfaulted (in `Interpreter::run()`), lost executions and
   repeated others on programs with a compare-exchange whose expected value
   is not used afterwards (#145, #137, since the fix of #125). IMM orders
