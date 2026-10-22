@@ -35,13 +35,14 @@
 
 namespace scripted {
 
-enum class OpKind : std::uint8_t { Load, Store, Fence, FetchAdd };
+enum class OpKind : std::uint8_t { Load, Store, Fence, FetchAdd, CompareSwap };
 
 struct Op {
 	OpKind kind;
 	unsigned var = 0;
 	std::uint32_t val = 0;
 	MemOrdering ord = MemOrdering::Relaxed;
+	std::uint32_t expected = 0; /* CompareSwap: swaps in VAL if it reads this */
 };
 
 inline auto ld(unsigned var, MemOrdering ord = MemOrdering::Relaxed) -> Op
@@ -56,6 +57,14 @@ inline auto st(unsigned var, std::uint32_t val, MemOrdering ord = MemOrdering::R
 inline auto fai(unsigned var, std::uint32_t val, MemOrdering ord = MemOrdering::Relaxed) -> Op
 {
 	return {.kind = OpKind::FetchAdd, .var = var, .val = val, .ord = ord};
+}
+
+/** A strong compare-and-swap of VAL for EXPECTED (its read's value is part
+ * of the outcome) */
+inline auto cas(unsigned var, std::uint32_t expected, std::uint32_t val,
+		MemOrdering ord = MemOrdering::Relaxed) -> Op
+{
+	return {.kind = OpKind::CompareSwap, .var = var, .val = val, .ord = ord, .expected = expected};
 }
 
 inline auto fence(MemOrdering ord = MemOrdering::SequentiallyConsistent) -> Op
@@ -145,7 +154,8 @@ private:
 			return;
 		const auto &o = ops(tid);
 		acts_[tid].kind = (pc_[tid] < o.size() && (o[pc_[tid]].kind == OpKind::Load ||
-							     o[pc_[tid]].kind == OpKind::FetchAdd))
+							     o[pc_[tid]].kind == OpKind::FetchAdd ||
+							     o[pc_[tid]].kind == OpKind::CompareSwap))
 					  ? ActionKind::Load
 					  : ActionKind::NonLoad;
 	}
@@ -196,6 +206,27 @@ private:
 		case OpKind::Fence:
 			advance(tid, driver_.handleFence(nullptr, pos, op.ord, EventDeps()));
 			break;
+		case OpKind::CompareSwap: {
+			/* As the interpreter issues a strong cmpxchg: the CAS read, and
+			 * the CAS write only if the read succeeds */
+			auto r = driver_.handleCasRead(nullptr, pos, op.ord, op.ord, addrs_[op.var],
+						       ASize(kSize), SVal(op.expected), SVal(op.val),
+						       WriteAttr::None, false, nullptr, std::nullopt,
+						       EventDeps());
+			acts_[tid].event.index += static_cast<int>(r.count);
+			const auto *res = std::get_if<GenMCDriver::CasReadResult>(&r.result);
+			if (!res)
+				break;
+			if (!res->success) {
+				++pc_[tid];
+				updateKind(tid);
+				break;
+			}
+			advance(tid, driver_.handleCasWrite(nullptr, acts_[tid].event, op.ord,
+							    addrs_[op.var], ASize(kSize), SVal(op.val),
+							    WriteAttr::None, EventDeps()));
+			break;
+		}
 		case OpKind::FetchAdd: {
 			/* One instruction, two events (as the interpreter issues an
 			 * atomicrmw): the read, then the write of the sum. If either is

@@ -43,6 +43,8 @@ inline void showValue(const Program &p, std::ostream &os)
 				os << "v" << op.var << "=" << op.val;
 			else if (op.kind == OpKind::FetchAdd)
 				os << "r=fai(v" << op.var << "," << op.val << ")";
+			else if (op.kind == OpKind::CompareSwap)
+				os << "r=cas(v" << op.var << "," << op.expected << "->" << op.val << ")";
 			else
 				os << "fence";
 			os << "." << kOrd[static_cast<int>(op.ord)];
@@ -212,6 +214,32 @@ TEST(ScriptedDriver, AnIncrementRevisitedByAPlainStore)
 	expectMatchesOracle(p, ModelType::SC);
 }
 
+TEST(ScriptedDriver, OnlyOneOfTwoLocksSucceeds)
+{
+	/* Two CASes from 0 to their thread's id: exactly one wins */
+	Program p{.numVars = 1, .threads = {{cas(X, 0, 1)}, {cas(X, 0, 2)}}};
+	auto r = explore(p, ModelType::RC11);
+	EXPECT_EQ(r.explored, 2U);
+	EXPECT_EQ(r.outcomes, (std::set<Outcome>{outcome({{0}, {1}}), outcome({{2}, {0}})}));
+	expectMatchesOracle(p, ModelType::RC11);
+	expectMatchesOracle(p, ModelType::SC);
+}
+
+TEST(ScriptedDriver, AFailedCasWritesNothing)
+{
+	/* The CAS fails reading 5 (no write), succeeds reading 0 */
+	Program p{.numVars = 1, .threads = {{cas(X, 0, 1), ld(X)}, {st(X, 5)}}};
+	expectMatchesOracle(p, ModelType::RC11);
+	expectMatchesOracle(p, ModelType::SC);
+}
+
+TEST(ScriptedDriver, CasAfterAnIncrement)
+{
+	Program p{.numVars = 1, .threads = {{fai(X, 1)}, {cas(X, 1, 7)}, {ld(X)}}};
+	expectMatchesOracle(p, ModelType::RC11);
+	expectMatchesOracle(p, ModelType::SC);
+}
+
 /*
  * Random programs: up to three threads of up to three accesses to two
  * variables. The driver explores exactly the graphs the axioms allow and
@@ -229,9 +257,11 @@ auto genOp(bool relaxedOnly) -> rc::Gen<Op>
 				return ld(var, o == rel ? rlx : o);
 			if (kind == 1)
 				return st(var, val, o == acq ? rlx : o);
-			return fai(var, val, o);
+			if (kind == 2)
+				return fai(var, val, o);
+			return cas(var, val - 1, val, o); /* expects 0..2: may fail or succeed */
 		},
-		rc::gen::inRange(0U, 3U), rc::gen::inRange(0U, 2U), rc::gen::inRange(1U, 4U),
+		rc::gen::inRange(0U, 4U), rc::gen::inRange(0U, 2U), rc::gen::inRange(1U, 4U),
 		rc::gen::inRange(0U, 4U));
 }
 
