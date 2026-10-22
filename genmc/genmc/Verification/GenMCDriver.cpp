@@ -1034,24 +1034,43 @@ void GenMCDriver::configureProbe(MemLabel *rLab, Event pos, SAddr addr, ASize si
 
 auto GenMCDriver::checkForRaces(const EventLabel *lab) -> std::optional<VerificationError>
 {
-	if (getConf()->disableRaceDetection || inEstimationMode())
+	if (inEstimationMode())
 		return {};
 
 	/* Check for hard errors */
-	const EventLabel *racyLab = nullptr;
-	if (auto err = getConsChecker().checkErrors(lab, racyLab); err) {
-		reportError(lab->getPos(), {lab->getPos(), *err, "", racyLab});
-		return err;
+	if (!getConf()->disableRaceDetection) {
+		const EventLabel *racyLab = nullptr;
+		if (auto err = getConsChecker().checkErrors(lab, racyLab); err) {
+			reportError(lab->getPos(), {lab->getPos(), *err, "", racyLab});
+			return err;
+		}
 	}
 
+	/* Unordered writes are an error under SR and IPR once the graph has
+	 * symmetric threads, or annotated reads of their location (see
+	 * reportWarningOnce()), which it may only have after the first ones,
+	 * depending on the schedule: while SR or IPR is on, they are checked at
+	 * every write, and without race detection too (#130) */
+	auto checksWWRaces = getConf()->symmetryReduction || getConf()->ipr;
+	if (getConf()->disableRaceDetection && !checksWWRaces)
+		return {};
+
 	/* Check whether there are any unreported warnings... */
+	const auto &known = getResult().warnings;
+	auto recheck = checksWWRaces && known.contains(VerificationError::VE_WWRace);
+	auto unordered = known;
+	if (recheck)
+		unordered.erase(VerificationError::VE_WWRace);
 	std::vector<const EventLabel *> races;
-	auto newWarnings = getConsChecker().checkWarnings(lab, getResult().warnings, races);
+	auto newWarnings = getConsChecker().checkWarnings(lab, recheck ? unordered : known, races);
 
 	/* ... and report them */
 	auto i = 0;
 	for (auto &wcode : newWarnings) {
-		if (reportWarningOnce(lab->getPos(), wcode, races[i++]))
+		const auto *racyLab = races[i++];
+		if (getConf()->disableRaceDetection && wcode != VerificationError::VE_WWRace)
+			continue;
+		if (reportWarningOnce(lab->getPos(), wcode, racyLab))
 			return {wcode};
 	}
 	return {};
@@ -2068,6 +2087,30 @@ auto GenMCDriver::handleThreadCreate(std::unique_ptr<ThreadCreateLabel> tcLab) -
 						 lab->getChildInfo(), symm));
 	if (symm != -1)
 		g.getFirstThreadLabel(symm)->setSymmSuccTid(cid);
+
+	/* Unordered writes are an error under SR once the graph has symmetric
+	 * threads (see reportWarningOnce()), also when they were found first:
+	 * which comes first depends on the schedule (#130) */
+	if (symm != -1 && getResult().warnings.contains(VerificationError::VE_WWRace)) {
+		getResult().inferredSymmetryError =
+			lab->getChildInfo().symmId == -1 &&
+			std::ranges::none_of(g.thr_ids(), [&](auto tid) {
+				const auto *bLab = g.getFirstThreadLabel(tid);
+				return bLab->getSymmPredTid() != -1 &&
+				       bLab->getThreadInfo().symmId != -1;
+			});
+		auto msg = std::format(
+			"Thread {} is symmetric to thread {}, and the program has unordered "
+			"writes.\n"
+			"Unordered writes do not constitute a bug per se, though they often "
+			"indicate faulty design.\n"
+			"This warning is treated as an error due to symmetry reduction (SR).\n"
+			"You can use -disable-sr to disable it.",
+			cid, symm);
+		reportError(lab->getPos(), {lab->getPos(), VerificationError::VE_WWRace, msg});
+		return {.result = VerificationError::VE_WWRace};
+	}
+
 	return {.result = cid, .count = 1U};
 }
 
@@ -4581,10 +4624,15 @@ auto GenMCDriver::forwardRevisit(const ForwardRevisit &fr) -> bool
 	if (genmc::isa<RerunForwardRevisit>(&fr))
 		return true;
 	if (const auto *rr = genmc::dyn_cast<ReplayForwardRevisit>(&fr)) {
+		/* The replay runs up to the event that added the last one: a block
+		 * is added after its thread's last event, a thread's begin by its
+		 * create */
 		auto *errLab = g.getEventLabel(fr.getPos());
-		getScheduler().setErrorReplayEvent(genmc::isa<BlockLabel>(errLab)
-							   ? errLab->getPos().prev()
-							   : errLab->getPos());
+		const auto *bLab = genmc::dyn_cast<ThreadStartLabel>(errLab);
+		getScheduler().setErrorReplayEvent(
+			genmc::isa<BlockLabel>(errLab) ? errLab->getPos().prev()
+			: bLab && bLab->getCreate()    ? bLab->getCreate()->getPos()
+						       : errLab->getPos());
 		bufferedError_ = rr->getDetails();
 		return true;
 	}
