@@ -1,0 +1,6 @@
+(malloc@print-names-heap.c:26.key, 1)
+(malloc@print-names-heap.c:21.next, 0)
+(calloc@print-names-heap.c:28[2].next, 0)
+(malloc@print-names-heap.c:29[5], 120)
+(malloc@print-names-heap.c:30+8, 7)
+(calloc@print-names-heap.c:33#2.key, 2)

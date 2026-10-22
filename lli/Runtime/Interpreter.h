@@ -349,6 +349,18 @@ enum class ProgramState { Ctors, Main, Dtors };
 /* The state of the current execution */
 enum class ExecutionState { Normal, Replay };
 
+/* The name of a block of memory: its variable's (or its allocation site's),
+ * with the names of its fields. A block larger than ELEMSIZE (if non-zero)
+ * is an array of it */
+struct BlockName {
+	std::string name;
+	const NameInfo *fields{};
+	uint64_t elemSize{};
+
+	/* (Adjacent blocks with equal names are merged) */
+	auto operator==(const BlockName &) const -> bool = default;
+};
+
 struct DynamicComponents {
 
 	DynamicComponents() : nameInfo(imapAllocator) {}
@@ -365,11 +377,12 @@ struct DynamicComponents {
 	ProgramState programState = ProgramState::Main; /* Pers */
 
 	/* Whether we should collect dbg info + naming info during error runs */
-	using AddrIntervalMap = IntervalMap<SAddr, std::pair<std::string, const NameInfo *>, 16,
-					    IntervalMapHalfOpenInfo<SAddr>>;
+	using AddrIntervalMap = IntervalMap<SAddr, BlockName, 16, IntervalMapHalfOpenInfo<SAddr>>;
 	bool collectDbgInfo = false;
 	AddrIntervalMap::Allocator imapAllocator;
 	AddrIntervalMap nameInfo;
+	/* How many blocks each allocation site made (see nameHeapBlock()) */
+	std::unordered_map<std::string, unsigned> heapSites;
 
 	GenericValue ExitValue; // The return value of the called function
 
@@ -839,7 +852,11 @@ private: // Helper functions
 
 	/* The location THR's current instruction is reported at: outside
 	 * GenMC's runtime headers if possible (see isRuntimeHeader()) */
-	auto getReportedLoc(Thread &thr) -> const llvm::DILocation *;
+	auto getReportedLoc(Thread &thr, const llvm::DISubprogram **callee = nullptr)
+		-> const llvm::DILocation *;
+
+	/* Names the heap block of SIZE bytes at ADDR, which F allocates */
+	void nameHeapBlock(Function *F, SVal addr, uint64_t size);
 
 	/* Whether LOC is in one of GenMC's runtime headers (e.g., <pthread.h>) */
 	auto isRuntimeHeader(const llvm::DILocation &loc) -> bool;

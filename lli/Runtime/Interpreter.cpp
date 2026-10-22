@@ -189,6 +189,7 @@ auto Interpreter::resumeFrom(const ResumePoint &rp, const std::vector<ThreadInfo
 	dynState.AtExitHandlers = irp.atExitHandlers;
 	dynState.collectDbgInfo = false;
 	dynState.nameInfo.clear();
+	dynState.heapSites.clear();
 	for (const auto &ti : tis)
 		if (ti.id >= getNumThreads())
 			constructAddThreadFromInfo(ti);
@@ -206,6 +207,7 @@ void Interpreter::reset()
 	dynState.currentThread = 0;
 	dynState.collectDbgInfo = false;
 	dynState.nameInfo.clear();
+	dynState.heapSites.clear();
 	dynState.AtExitHandlers.clear();
 	std::for_each(threads_begin(), threads_end(), [this](Thread &thr) { resetThread(thr.id); });
 }
@@ -444,7 +446,16 @@ std::string Interpreter::getAccessedVarName(const std::optional<SAddr> &loc)
 	auto it = dynState.nameInfo.find(*loc);
 	if (it == dynState.nameInfo.end())
 		return "";
-	return it.value().first + it.value().second->getNameAtOffset(*loc - it.start());
+	const auto &[name, fields, elemSize] = it.value();
+	auto offset = *loc - it.start();
+	std::string index;
+	if (elemSize != 0 && it.stop() - it.start() > elemSize) {
+		index = std::format("[{}]", offset / elemSize);
+		offset %= elemSize;
+	}
+	if (fields && !fields->empty())
+		return name + index + fields->getNameAtOffset(offset);
+	return name + index + (offset != 0 ? std::format("+{}", offset) : "");
 }
 
 auto Interpreter::isRuntimeHeader(const llvm::DILocation &loc) -> bool
@@ -468,9 +479,11 @@ auto Interpreter::isRuntimeHeader(const llvm::DILocation &loc) -> bool
  * program's line is the first one outside the headers, going out through
  * the locations the instruction was inlined at, and then the calls on the
  * stack. Without one, the instruction's own location is reported */
-auto Interpreter::getReportedLoc(Thread &thr) -> const llvm::DILocation *
+auto Interpreter::getReportedLoc(Thread &thr, const llvm::DISubprogram **callee /* = nullptr */)
+	-> const llvm::DILocation *
 {
 	const llvm::DILocation *own = nullptr;
+	const llvm::DILocation *header = nullptr;
 	for (auto i = thr.ECStack.size(); i-- > 0;) {
 		auto &SF = thr.ECStack[i];
 		auto *I = i + 1 == thr.ECStack.size() ? SF.CurInst->getPrevNode() : &SF.Caller;
@@ -478,13 +491,52 @@ auto Interpreter::getReportedLoc(Thread &thr) -> const llvm::DILocation *
 		if (!loc)
 			break;
 		for (; loc; loc = loc->getInlinedAt()) {
-			if (!isRuntimeHeader(*loc))
+			if (!isRuntimeHeader(*loc)) {
+				/* (The program called the wrapper the last header line is in) */
+				if (callee)
+					*callee = header ? header->getScope()->getSubprogram()
+							 : nullptr;
 				return loc;
+			}
+			header = loc;
 			if (!own)
 				own = loc;
 		}
 	}
 	return own;
+}
+
+/* A heap block is named after the program's call that allocated it (e.g.,
+ * calloc@locs.c:18), numbered if the call made several, with the fields of
+ * the type its result is stored as, if known (see MDataInfo::collectHeapInfo()) */
+void Interpreter::nameHeapBlock(Function *F, SVal addr, uint64_t size)
+{
+	if (!dynState.collectDbgInfo)
+		return;
+
+	const llvm::DISubprogram *callee = nullptr;
+	const auto *loc = getReportedLoc(getCurThr(), &callee);
+	if (!loc)
+		return;
+
+	auto fun = callee ? callee->getName().str() : F->getName().str();
+	if (fun == "_Znwm" || fun == "_Znam")
+		fun = "new";
+	auto name = std::format("{}@{}:{}", fun,
+				std::filesystem::path(loc->getFilename().str()).filename().string(),
+				loc->getLine());
+	if (auto n = ++dynState.heapSites[name]; n > 1)
+		name += std::format("#{}", n);
+
+	auto block = BlockName{.name = name};
+	const auto *call = getCurThr().ECStack.back().CurInst->getPrevNode();
+	if (auto key = call ? getHeapInfoKey(*call) : std::nullopt; key) {
+		const auto &info = MI->varInfo.heapInfo.at(*key);
+		block.fields = info.fields.get();
+		block.elemSize = info.size;
+	}
+	dynState.nameInfo.insert(SAddr(addr.get()), SAddr(addr.get()) + std::max<uint64_t>(size, 1),
+				 block);
 }
 
 const GenMCDriver::EventDbgInfo *Interpreter::currDbgInfo(std::optional<SAddr> loc)

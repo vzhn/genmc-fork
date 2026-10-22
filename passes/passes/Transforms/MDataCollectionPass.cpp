@@ -40,6 +40,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_set>
 
 using namespace llvm;
 
@@ -229,6 +230,60 @@ void MDataInfo::collectLocalInfo(Value *address, DILocalVariable *var)
 		*info = collectVarName(ditc);
 }
 
+/* The type DIT points to, if it is a pointer type */
+static auto getPointeeType(DIType *dit) -> DIType *
+{
+	auto *ptr = dyn_cast_or_null<DIDerivedType>(stripDIType(dit));
+	if (!ptr || ptr->getTag() != dwarf::DW_TAG_pointer_type)
+		return nullptr;
+	return stripDIType(ptr->getBaseType());
+}
+
+auto MDataInfo::getHeapType(CallBase *cb) -> DIType *
+{
+	for (auto *u : cb->users()) {
+		if (auto *si = dyn_cast<StoreInst>(u); si && si->getValueOperand() == cb) {
+			auto *dst = si->getPointerOperand()->stripPointerCasts();
+			if (auto *ai = dyn_cast<AllocaInst>(dst); ai && allocaMData.contains(ai))
+				return getPointeeType(allocaMData[ai]->getType());
+			if (auto *gv = dyn_cast<GlobalVariable>(dst)) {
+				auto *dive = dyn_cast_or_null<DIGlobalVariableExpression>(
+					gv->getMetadata("dbg"));
+				if (dive)
+					return getPointeeType(dive->getVariable()->getType());
+			}
+		}
+		if (isa<ReturnInst>(u)) {
+			auto *sp = cb->getFunction()->getSubprogram();
+			if (sp && sp->getType() && sp->getType()->getTypeArray().size() > 0)
+				return getPointeeType(sp->getType()->getTypeArray()[0]);
+		}
+	}
+	return nullptr;
+}
+
+void MDataInfo::collectHeapInfo(CallBase *cb)
+{
+	/* (clang has inlined the wrappers of <stdlib.h> already) */
+	static const std::unordered_set<std::string> allocs = {
+		"__VERIFIER_malloc", "__VERIFIER_calloc", "__VERIFIER_malloc_aligned", "_Znwm",
+		"_Znam"};
+	auto *callee = cb->getCalledFunction();
+	if (!callee || !allocs.contains(callee->getName().str()))
+		return;
+
+	auto *dit = getHeapType(cb);
+	if (!dit || dit->getSizeInBits() == 0)
+		return;
+
+	/* The call keeps the key through inlining and cloning */
+	auto key = std::to_string(PMI.varInfo.heapInfo.size());
+	auto &ctx = cb->getContext();
+	cb->setMetadata(heapInfoMDKind, MDNode::get(ctx, MDString::get(ctx, key)));
+	PMI.varInfo.heapInfo[key] = {.fields = std::make_shared<NameInfo>(collectVarName(dit)),
+				     .size = dit->getSizeInBits() / 8};
+}
+
 void MDataInfo::collectMemCpyInfo(MemCpyInst *mi)
 {
 	/*
@@ -281,6 +336,12 @@ auto MDataInfo::run(Module &M, ModuleAnalysisManager & /*AM*/) -> Result
 				collectMemCpyInfo(mi);
 		}
 	}
+
+	/* And for heap allocations, from the variables their results are stored to */
+	for (auto &F : M)
+		for (auto &I : instructions(F))
+			if (auto *cb = dyn_cast<CallBase>(&I))
+				collectHeapInfo(cb);
 	return PMI;
 }
 

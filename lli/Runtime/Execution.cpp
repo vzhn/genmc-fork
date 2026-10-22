@@ -1521,7 +1521,7 @@ void Interpreter::visitAllocaInst(AllocaInst &I)
 	auto result = *retVal;
 	if (dynState.collectDbgInfo && info)
 		dynState.nameInfo.insert(SAddr(result.get()), SAddr(result.get()) + MemToAlloc,
-					 std::make_pair(I.getName().str(), info));
+					 BlockName{.name = I.getName().str(), .fields = info});
 	ECStack().back().Allocas.add((void *)result.get());
 
 	updateDataDeps(getCurThr().id, &I, currPos());
@@ -3125,6 +3125,7 @@ void Interpreter::callMalloc(Function *F, const std::vector<GenericValue> &ArgVa
 	auto result = std::get_if<SVal>(&ret);
 	if (!result)
 		return;
+	nameHeapBlock(F, *result, size);
 	returnValueToCaller(F->getReturnType(), SVAL_TO_GV(*result, F->getReturnType()));
 	return;
 }
@@ -3143,6 +3144,7 @@ void Interpreter::callMallocAligned(Function *F, const std::vector<GenericValue>
 	auto result = std::get_if<SVal>(&ret);
 	if (!result)
 		return;
+	nameHeapBlock(F, *result, size);
 	returnValueToCaller(F->getReturnType(), SVAL_TO_GV(*result, F->getReturnType()));
 	return;
 }
@@ -3162,6 +3164,7 @@ void Interpreter::callCalloc(Function *F, const std::vector<GenericValue> &ArgVa
 	auto result = std::get_if<SVal>(&ret);
 	if (!result)
 		return;
+	nameHeapBlock(F, *result, nmemb * size);
 	returnValueToCaller(F->getReturnType(), SVAL_TO_GV(*result, F->getReturnType()));
 }
 

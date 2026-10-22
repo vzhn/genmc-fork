@@ -180,6 +180,7 @@ static void initializeVariableInfo(ModuleInfo &MI, PassModuleInfo &PI)
 			MI.varInfo.localInfo[MI.idInfo.VID.at(kv.first)] = kv.second;
 	}
 	MI.varInfo.internalInfo = PI.varInfo.internalInfo;
+	MI.varInfo.heapInfo = PI.varInfo.heapInfo;
 }
 
 static void initializeAnnotationInfo(ModuleInfo &MI, PassModuleInfo &PI)
