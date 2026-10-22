@@ -1092,10 +1092,25 @@ auto GenMCDriver::checkForRaces(const EventLabel *lab) -> std::optional<Verifica
 			return err;
 	}
 
+	/* -exhaustive under IMM: what the views leave unordered is checked
+	 * again with the views computed anew (see checkWithViewsAnew()) */
+	const auto checksAnew = getConf()->exhaustive && getConf()->model == ModelType::IMM;
+	auto inGraph = [&g](const EventLabel *oLab) {
+		return oLab ? g.getEventLabel(oLab->getPos()) : nullptr;
+	};
+
 	/* Check for hard errors */
 	if (!getConf()->disableRaceDetection) {
 		const EventLabel *racyLab = nullptr;
-		if (auto err = getConsChecker().checkErrors(lab, racyLab); err) {
+		auto err = getConsChecker().checkErrors(lab, racyLab);
+		auto checkAnew = [&](const ExecutionGraph &cg) {
+			err = getConsChecker().checkErrors(cg.getEventLabel(lab->getPos()),
+							   racyLab);
+			racyLab = inGraph(racyLab);
+		};
+		if (err && checksAnew)
+			checkWithViewsAnew(checkAnew);
+		if (err) {
 			reportError(lab->getPos(), {lab->getPos(), *err, "", racyLab});
 			return err;
 		}
@@ -1118,6 +1133,14 @@ auto GenMCDriver::checkForRaces(const EventLabel *lab) -> std::optional<Verifica
 		unordered.erase(VerificationError::VE_WWRace);
 	std::vector<const EventLabel *> races;
 	auto newWarnings = getConsChecker().checkWarnings(lab, recheck ? unordered : known, races);
+	auto checkAnew = [&](const ExecutionGraph &cg) {
+		races.clear();
+		newWarnings = getConsChecker().checkWarnings(cg.getEventLabel(lab->getPos()),
+							     recheck ? unordered : known, races);
+		std::ranges::transform(races, races.begin(), inGraph);
+	};
+	if (!newWarnings.empty() && checksAnew)
+		checkWithViewsAnew(checkAnew);
 
 	/* ... and report them */
 	auto i = 0;
@@ -3620,14 +3643,24 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 
 	/* Not an execution: a thread stopped before events that others observe
 	 * (see alignKeptEvents()), or an event went before kept ones and the
-	 * graph has not been checked since */
+	 * graph has not been checked since. Under -exhaustive and IMM, the
+	 * views of the events kept after holes lack what fills them, and the
+	 * run may have chosen what they allow and the views computed anew do
+	 * not (a read of a write the reader's thread has seen overwritten):
+	 * the graph is checked with its views computed anew (an inconsistent
+	 * graph stays so as events are added) */
 	if (relocatesKeptEvents() && !scheduler.inErrorReplay()) {
 		if (lkmm::hasThreadBlockedBeforeKept(g)) {
 			++result.relocationsLost;
 			moot();
 			return;
 		}
-		if (addedBeforeKept_) {
+		if (getConf()->exhaustive && getConf()->model == ModelType::IMM) {
+			if (!isExecutionConsistent(g)) {
+				moot();
+				return;
+			}
+		} else if (addedBeforeKept_) {
 			addedBeforeKept_ = false;
 			if (!getConsChecker().isConsistent(g)) {
 				moot();
@@ -4192,6 +4225,27 @@ auto GenMCDriver::isExecutionConsistent(const ExecutionGraph &g) -> bool
 	const auto consistent = recomputeViews(*copy) && isGraphConsistent(*copy);
 	getConsChecker().recomputeCacheCounters(g);
 	return consistent;
+}
+
+/* The errors and warnings found at an event (checkForRaces()) are pairs
+ * the views leave unordered: a race, unordered writes, an access to freed
+ * memory. Under -exhaustive and IMM, the events a revisit kept after a
+ * hole keep the views they had when they were kept (see
+ * isExecutionConsistent()), and so do the events added after them: what
+ * the event that fills the hole orders before them is missing (e.g., the
+ * write a kept write's thread now reads with acquire before it). Such a
+ * pair can be ordered once the views are computed anew, and the views
+ * computed anew only grow: what they leave unordered is all that is.
+ * (Whether the graph is consistent is checked before an error is
+ * reported, see reportError().) */
+void GenMCDriver::checkWithViewsAnew(const std::function<void(const ExecutionGraph &)> &check)
+{
+	const auto &g = getExec().getGraph();
+	auto copy = g.clone();
+	getConsChecker().recomputeCacheCounters(*copy);
+	recomputeViews(*copy);
+	check(*copy);
+	getConsChecker().recomputeCacheCounters(g);
 }
 
 auto GenMCDriver::constructBackwardRevisit(const ReadLabel *rLab, const WriteLabel *sLab) const

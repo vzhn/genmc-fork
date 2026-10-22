@@ -715,9 +715,15 @@ private:
 	 * consistent: coherence, the atomicity of its RMWs, the other axioms */
 	auto isGraphConsistent(const ExecutionGraph &g) const -> bool;
 
-	/** -exhaustive under IMM: whether the complete execution G is
-	 * consistent, checked on a copy whose views are computed anew */
+	/** -exhaustive under IMM: whether G (a complete execution, or the
+	 * graph of an error) is consistent, checked on a copy whose views are
+	 * computed anew */
 	auto isExecutionConsistent(const ExecutionGraph &g) -> bool;
+
+	/** -exhaustive under IMM: runs CHECK on a copy of the current graph
+	 * whose views are computed anew (positions name the same events in
+	 * both) */
+	void checkWithViewsAnew(const std::function<void(const ExecutionGraph &)> &check);
 
 	auto isCoBeforeSavedPrefix(const BackwardRevisit &r, const EventLabel *lab) -> bool;
 

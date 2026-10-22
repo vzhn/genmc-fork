@@ -608,7 +608,11 @@ tracking), the reference keeps its graphs well formed and consistent:
   fills a hole and that the kept events leave no coherent choice ends
   the run;
 - a complete execution is counted only if it is consistent when checked
-  anew; the `Exhaustive:` line says how many were not;
+  anew; the `Exhaustive:` line says how many were not. The events kept
+  after holes keep their views while the threads fill the holes, and so
+  do the events added after them: an error is reported only if the graph
+  is consistent with its views computed anew, and a race (or unordered
+  writes) only if the views computed anew leave the accesses unordered;
 - kept events are moved to their instruction when a CAS before them
   gains or loses its write part (as under `-lkmm`, with replay keys), and
   a CAS that succeeds is revisitable by a write that would make it fail
