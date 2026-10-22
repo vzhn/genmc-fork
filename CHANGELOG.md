@@ -9,6 +9,11 @@ released.
 
 - Merge of MIXER [POPL'25] into mainline GenMC
 
+
+## [0.19.0-vzhn.14] - 2026.10.22
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
 ### Fixed
 
 - `-imm` explored executions that IMM forbids through a `fetch_add`, an
@@ -21,19 +26,15 @@ released.
   does. On fuzz seeds 249, 637 and 1070 the default exploration no longer
   disagrees with `-exhaustive` or depends on the schedule: 55, 460 and
   4123 executions, as under rc11.
-- `-imm` segfaulted (in `Interpreter::run()`), lost executions and
-  repeated others on programs with a compare-exchange whose expected value
-  is not used afterwards (#145, #137, since the fix of #125). IMM orders
-  the read of a CAS, a failing one's included, before all later events of
-  its thread (`[Rex] ; po`); GenMC took that ordering from the control
-  dependency of the branch that stores the expected value, which a branch
-  with one target no longer opens. A backward revisit could then keep
-  events after a CAS whose outcome it changed, and with the outcome
-  whether the CAS has a write part, i.e., where those events are. The read
-  of a CAS now orders them under IMM whatever follows it, and `-exhaustive`
-  no longer counts the load-buffering executions through a failing CAS
-  that this allowed (fuzz seed 64: 458, as the default exploration and
-  rc11, instead of 474).
+- Under `-imm`, the read of a CAS is ordered before the later events of its
+  thread whatever branches follow the CAS, as IMM orders it (`[Rex] ; po`,
+  a failing CAS's read included). Before, the ordering came only from the
+  control dependency of the branch storing the expected value. Between
+  vzhn.13 and this release (#133), a branch with one target, which is what
+  JumpThreadingPass leaves when that store is dead, stopped opening one,
+  and `-imm` crashed and lost and repeated executions (#145, #137, #155).
+  `-exhaustive` also stopped counting load-buffering executions through a
+  failing CAS.
 - A spinloop nested in another one restarted the outer loop's spinloop
   detection: the outer loop's next iteration was judged by what followed
   the inner loop's last spin start only (#147). An outer iteration whose
@@ -87,6 +88,43 @@ released.
   global now gets one byte, reading as zero, and a declared one keeps the
   contents of the host symbol the interpreter bound it to
   (`tests/correct/infr/{cpp-vtable-global,global-zero-size,global-extern-decl}`).
+- A weak CAS lost executions in three ways: its spurious-failure flag
+  survived into the forward revisits that followed (#116); the failure
+  revisit of a CAS that a backward revisit made succeed cut the write it
+  reads from (an internal failure under rc11 and imm, #117); and its
+  spurious failure reading a write that a settled RMW reads was never
+  explored (#118).
+- `-imm` segfaulted when a revisit kept a `fetch_add`'s write part without
+  its read part (#120), and left that write stale (an inconsistent
+  execution) or relocated it when the read was executed anew (#122).
+- `-imm` and `-lkmm` lost and repeated executions when a backward revisit
+  deleted an access of a thread and kept later accesses of it (#121, #128,
+  and #119's losses): a deleted access was judged by whether it had been
+  added maximally, against the graph of the time, and a kept write whose
+  prefix reaches the thread past the access did not count as an
+  alternative to it. Deleted accesses are now judged against the writes
+  they can reach in the revisited graph (#146).
+- `-imm` lost executions with resume points, the default since vzhn.13
+  (#111; fuzz seed 562: 518 of 540): an execution resumed from a saved
+  state had no replay schedule, so the holes before kept events were not
+  filled first (#126).
+- A `malloc(0)` block live across a revisit was not registered again when
+  the allocation map was rebuilt, and freeing it aborted, under every
+  model (#115, #126).
+- `free()` of a global, a stack variable, a wild pointer or a pointer into
+  a heap block was an internal failure, a different error at a later event,
+  or no error: it is now reported at the `free()` as "Attempt to free
+  non-allocated memory", with the reason (#139, #140).
+- `-lkmm` warned "Unordered writes" about writes that a grace period
+  orders (a write in an RCU read-side critical section and one after
+  `synchronize_rcu()`, #113, #114).
+- `-lkmm`: a conditional branch with one target, which JumpThreadingPass
+  leaves where a compare-exchange's expected value is dead, opened a
+  control dependency, ordering after a failed `cmpxchg_relaxed()` what
+  LKMM does not (#125, #133).
+- The annotation-expression evaluator gave the minimum value back, not
+  its convention 0, for a signed division overflow (`min / -1`) at widths
+  below 64 (#107, #108).
 
 ### Added
 
@@ -102,31 +140,29 @@ released.
 - The expression evaluator's arithmetic is in `genmc/Support/SExprOps.hpp`,
   as functions of the operands' values and width; `scripts/prove-sexpr-ops.sh`
   proves them equal to LLVM's integer semantics for all inputs with Alive2.
-- Debugging options for the transformation passes: `-output-llvm-passes=<dir>`
-  writes the module before and after each pass that changes it, in a form
-  Alive2 can check (and, for spin-assume and the load annotations, with
-  what they claim), and `-verify-pass-analyses` checks the dominator trees
-  passes declare preserved. `scripts/check-passes.sh` runs both over test
-  programs and checks every pass with Alive2's `alive-tv`.
 - `-exhaustive`, a reference exploration for small programs: every
   consistent backward revisit is explored, graphs are deduplicated by a
   canonical hash (threads named by their creation path), and every
   reduction is off. `scripts/oracle-diff.sh` compares the default
   exploration with it over the test suite (ctest target `oracle-diff`),
   and `scripts/fuzz-c11.py` over random C11 programs, under arbitrary
-  schedules and without resume points too.
-
-### Fixed
-
-- A weak CAS lost executions in three ways: its spurious-failure flag
-  survived into the forward revisits that followed (#116); the failure
-  revisit of a CAS that a backward revisit made succeed cut the write it
-  reads from (an internal failure under rc11 and imm, #117); and its
-  spurious failure reading a write that a settled RMW reads was never
-  explored (#118).
-- `-imm` segfaulted when a revisit kept a `fetch_add`'s write part without
-  its read part (#120), and left that write stale (an inconsistent
-  execution) or relocated it when the read was executed anew (#122).
+  schedules and without resume points too. Under `-imm` it keeps
+  what the events a revisit keeps depend on, and checks each revisited
+  graph and each execution for consistency (#127, #135, #136).
+- `-check-invariants` (off by default, on in `ENABLE_GENMC_DEBUG` builds):
+  runtime checks of graph restriction, error replay, the allocation map
+  rebuilt at each execution start, and the states forward revisits resume
+  from; a violation is an internal failure naming the invariant (#126,
+  `scripts/check-invariants-fast.sh`, ctest `invariants-fast`).
+- The pass checker checks under `-imm` and `-lkmm` that every pass keeps
+  the dependencies of every event (`scripts/check-pass-deps.sh`, ctest
+  `check-pass-deps`), with a hidden `-disable-jump-threading` (#133).
+- TLA+ models of the error replay and the worker pool, with a TLC
+  configuration reproducing each past bug there (`models/tla`,
+  `scripts/check-tla.sh`, ctest `tla-models` when `tlc` is found, #112).
+- Unit tests of the expression evaluator and the RMW operations against
+  LLVM's `APInt` and `atomicrmw`, and `scripts/prove-rmw-ops.sh`, which
+  proves the RMW operations with Alive2 (#108).
 
 
 ## [0.19.0-vzhn.13] - 2026.10.21
