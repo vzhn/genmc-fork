@@ -8,6 +8,7 @@
  - `BUILD_DOCS`: builds documentation (default: OFF)
  - `SANITIZE`: comma-separated sanitizers to enable, e.g. `address,undefined` or `thread` (default: empty)
  - `GENMC_TCMALLOC`: link `genmc` against tcmalloc (faster allocator): `AUTO` (default, if found) / `ON` (required) / `OFF`. Needs `libgoogle-perftools-dev`; disabled under `SANITIZE`. Pin `ON`/`OFF` for reproducible builds.
+ - `GENMC_CCACHE`: compile through [ccache](https://ccache.dev): `AUTO` (default, if found) / `ON` (required) / `OFF`. A launcher set with `CMAKE_CXX_COMPILER_LAUNCHER` takes precedence. Rebuilding code compiled before in the same build directory (after a rebase, or switching branches) then takes seconds instead of minutes. To share the cache between build directories and worktrees, let ccache rewrite absolute paths (`ccache -o base_dir=$HOME -o hash_dir=false`); with debug info, objects taken from the cache then name the directory they were first compiled in. A few build directories need a cache of about 20 GB (`ccache -M 20G`).
 
 # Testing GenMC
 

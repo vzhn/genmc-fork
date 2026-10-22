@@ -27,6 +27,27 @@ set(RUST_DIR "${CMAKE_SOURCE_DIR}/lli/runtime-include/rust")
 # Executable output goes to bin/ to avoid conflict with genmc/ library directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+### Compile through ccache: a rebuild of code compiled before (another branch,
+### a rebase, another build directory) takes cache hits instead of compiles
+set(GENMC_CCACHE "AUTO" CACHE STRING "Compile through ccache: AUTO (use if found), ON (required), OFF")
+set_property(CACHE GENMC_CCACHE PROPERTY STRINGS AUTO ON OFF)
+if(NOT GENMC_CCACHE STREQUAL "OFF" AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    message(STATUS "ccache: ${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  elseif(GENMC_CCACHE STREQUAL "ON")
+    message(FATAL_ERROR "ccache not found")
+  endif()
+endif()
+
+### GenMC uses no C++ modules: skip the per-target module dependency scan
+### that CMake >= 3.28 runs for C++20 and later
+if(NOT DEFINED CMAKE_CXX_SCAN_FOR_MODULES)
+  set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+endif()
+
 ### Whether debugging infra is enabled
 option(GENMC_DEBUG "Enable GenMC debugging infrastructure (ON for Debug)" OFF)
 
