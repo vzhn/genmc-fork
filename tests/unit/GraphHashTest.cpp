@@ -18,7 +18,7 @@
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Execution/ExecutionState.hpp"
 #include "genmc/Support/ThreadInfo.hpp"
-#include "genmc/Verification/GraphHash.hpp"
+#include "genmc/Verification/Checks/GraphHash.hpp"
 
 namespace {
 

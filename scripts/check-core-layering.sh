@@ -7,6 +7,19 @@
 #   layer 2: Models          -- the memory models             (genmc_models)
 #   layer 3: Verification    -- exploration, driver, configuration (genmc_verification)
 #
+# Inside Verification/, the directories are ordered in the same way (a file
+# may include its own directory and those before it):
+#
+#   Relinche  -- linearizability checking
+#   (top)     -- Config, VerificationResult, VerificationError
+#   Report    -- error reports and their debug information
+#   Checks    -- graph invariants and hashes
+#   State     -- the exploration's state: stack, frames, scheduler, resume
+#                points, kept-event runs, error replay, choice map
+#   Rules     -- pure functions of the graph: revisits, rf candidates and
+#                reductions, error rules, symmetry
+#   Core      -- the exploration core, the driver and the producer interface
+#
 # A core file may include headers of its own layer or below, and never an
 # LLVM, interpreter (Runtime/, lli) or pass (passes/) header. Upward includes
 # that exist today are listed in core-layering-allow.txt; the check fails on
@@ -31,10 +44,30 @@ layer() {
 	ADT | Support) echo 0 ;;
 	Execution) echo 1 ;;
 	Models) echo 2 ;;
-	Verification) echo 3 ;;
+	Verification/Relinche) echo 3.0 ;;
+	Verification) echo 3.1 ;;
+	Verification/Report) echo 3.2 ;;
+	Verification/Checks) echo 3.3 ;;
+	Verification/State) echo 3.4 ;;
+	Verification/Rules) echo 3.5 ;;
+	Verification/Core) echo 3.6 ;;
 	*) echo 9 ;;
 	esac
 }
+
+# The unit of a path below genmc/: its directory, and its subdirectory
+# inside Verification/
+unit() {
+	local rest=${1#genmc/}
+	local top=${rest%%/*}
+	rest=${rest#*/}
+	if [[ "${top}" == Verification && "${rest}" == */* ]]; then
+		echo "Verification/${rest%%/*}"
+	else
+		echo "${top}"
+	fi
+}
+above() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a > b) }'; }
 
 status=0
 found=$(mktemp)
@@ -42,9 +75,7 @@ trap 'rm -f "${found}"' EXIT
 
 cd "${ROOT}" || exit 1
 while IFS= read -r file; do
-	dir=${file#genmc/}
-	dir=${dir%%/*}
-	own=$(layer "${dir}")
+	own=$(layer "$(unit "${file}")")
 	while IFS= read -r inc; do
 		case "${inc}" in
 		llvm/* | Runtime/* | passes/* | lli*)
@@ -56,9 +87,8 @@ while IFS= read -r file; do
 		*) continue ;;
 		esac
 		target=${inc#genmc/}
-		target=${target%%/*}
-		[[ "${target}" == *.h || "${target}" == *.hpp ]] && continue # config headers
-		if (($(layer "${target}") > own)); then
+		[[ "${target}" != */* ]] && continue # config headers
+		if above "$(layer "$(unit "${inc}")")" "${own}"; then
 			echo "${file} -> ${inc}" >> "${found}"
 		fi
 	done < <(sed -nE 's/^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"]([^>"]+)[>"].*/\1/p' "${file}")

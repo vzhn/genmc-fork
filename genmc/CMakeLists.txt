@@ -52,28 +52,28 @@ set(GENMC_MODELS_SOURCES
   genmc/Models/TSOChecker.cpp
 )
 set(GENMC_VERIFICATION_SOURCES
-  genmc/Verification/ChoiceCandidates.cpp
-  genmc/Verification/ChoiceMap.cpp
+  genmc/Verification/Rules/ChoiceCandidates.cpp
+  genmc/Verification/State/ChoiceMap.cpp
   genmc/Verification/Config.cpp
-  genmc/Verification/ErrorRules.cpp
-  genmc/Verification/ExecutionFrame.cpp
-  genmc/Verification/ExhaustiveConsistency.cpp
-  genmc/Verification/Explorer.cpp
-  genmc/Verification/ExplorationCore.cpp
-  genmc/Verification/ExplorationStack.cpp
-  genmc/Verification/GenMCDriver.cpp
-  genmc/Verification/GraphHash.cpp
-  genmc/Verification/GraphPrinting.cpp
-  genmc/Verification/Invariants.cpp
+  genmc/Verification/Rules/ErrorRules.cpp
+  genmc/Verification/State/ExecutionFrame.cpp
+  genmc/Verification/Rules/ExhaustiveConsistency.cpp
+  genmc/Verification/Core/Explorer.cpp
+  genmc/Verification/Core/ExplorationCore.cpp
+  genmc/Verification/State/ExplorationStack.cpp
+  genmc/Verification/Core/GenMCDriver.cpp
+  genmc/Verification/Checks/GraphHash.cpp
+  genmc/Verification/Report/GraphPrinting.cpp
+  genmc/Verification/Checks/Invariants.cpp
   genmc/Verification/Relinche/LinearizabilityChecker.cpp
   genmc/Verification/Relinche/Linearization.cpp
   genmc/Verification/Relinche/Observation.cpp
   genmc/Verification/Relinche/Specification.cpp
-  genmc/Verification/ResumePointStore.cpp
-  genmc/Verification/RfReductions.cpp
-  genmc/Verification/BackwardRevisits.cpp
-  genmc/Verification/Scheduler.cpp
-  genmc/Verification/SymmetricThreads.cpp
+  genmc/Verification/State/ResumePointStore.cpp
+  genmc/Verification/Rules/RfReductions.cpp
+  genmc/Verification/Rules/BackwardRevisits.cpp
+  genmc/Verification/State/Scheduler.cpp
+  genmc/Verification/Rules/SymmetricThreads.cpp
 )
 
 find_package(Threads REQUIRED)

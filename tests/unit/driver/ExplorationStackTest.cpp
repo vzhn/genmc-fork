@@ -13,14 +13,14 @@
 
 
 /*
- * The exploration stack (Verification/ExplorationStack.hpp) on its own:
+ * The exploration stack (Verification/State/ExplorationStack.hpp) on its own:
  * frame order, and the binding of every frame to the stack's model.
  */
 
 #include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/ExecutionState.hpp"
 #include "genmc/Execution/MemoryModel.hpp"
-#include "genmc/Verification/ExplorationStack.hpp"
+#include "genmc/Verification/State/ExplorationStack.hpp"
 
 #include <gtest/gtest.h>
 

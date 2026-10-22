@@ -101,7 +101,7 @@ To add a new label, follow these steps:
 3. Add a case for the new label in `genmc/genmc/Execution/LabelVisitor.hpp`
 4. Define how the label should be printed in `genmc/genmc/Execution/EventLabel.cpp`
    (optionally: LabelPrinterBase too)
-5. Create a handler for the new label in `genmc/genmc/Verification/GenMCDriver.{hpp,cpp}`
+5. Create a handler for the new label in `genmc/genmc/Verification/Core/GenMCDriver.{hpp,cpp}`
    (if necessary), and at DriverHandlerDispatcher
 6. In case a new LLVM-IR function leads to the creation of
    the new label:

@@ -9,7 +9,7 @@
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Execution/GraphUtils.hpp"
-#include "genmc/Verification/Invariants.hpp"
+#include "genmc/Verification/Checks/Invariants.hpp"
 #include "genmc/Execution/MemoryModel.hpp"
 
 struct TestGraph {

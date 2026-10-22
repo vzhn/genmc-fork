@@ -31,7 +31,7 @@
 #include "genmc/Support/Event.hpp"
 #include "genmc/Support/Error.hpp"
 #include "genmc/Support/SExprVisitor.hpp"
-#include "genmc/Verification/GenMCDriver.hpp"
+#include "genmc/Verification/Core/GenMCDriver.hpp"
 #include "passes/LLVMUtils.hpp"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Statistic.h"

@@ -15,9 +15,9 @@
 #define GENMC_THREAD_POOL_HPP
 
 #include "genmc/Support/ThreadPinner.hpp"
-#include "genmc/Verification/GenMCDriver.hpp"
+#include "genmc/Verification/Core/GenMCDriver.hpp"
 #include "genmc/Verification/VerificationResult.hpp"
-#include "genmc/Verification/WorkSharing.hpp"
+#include "genmc/Verification/Core/WorkSharing.hpp"
 
 #include <atomic>
 #include <future>

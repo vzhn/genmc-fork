@@ -6,7 +6,7 @@ Gladstein, Vafeiadis, POPL 2022), which is the exploration algorithm at the
 core of GenMC (`CHANGELOG.md`, 0.7: "Core algorithm now follows TruSt").
 
 The goal is a verified reference model of the algorithm against which the
-C++ implementation in `genmc/genmc/Verification/GenMCDriver.cpp` can be
+C++ implementation in `genmc/genmc/Verification/Core/GenMCDriver.cpp` can be
 checked by differential testing, and eventually proofs of the three
 theorems of Section 4.3: soundness, completeness, optimality.
 

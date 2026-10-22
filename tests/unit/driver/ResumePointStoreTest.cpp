@@ -13,11 +13,11 @@
 
 
 /*
- * The resume-point store (Verification/ResumePointStore.hpp) with a fake
+ * The resume-point store (Verification/State/ResumePointStore.hpp) with a fake
  * producer hook: which saved states are kept, and when they are dropped.
  */
 
-#include "genmc/Verification/ResumePointStore.hpp"
+#include "genmc/Verification/State/ResumePointStore.hpp"
 
 #include <gtest/gtest.h>
 
