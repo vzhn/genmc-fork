@@ -10,12 +10,13 @@
  * Compile a task with: -include svcomp-shim.h. The shim renames the task's
  * main and its __VERIFIER_nondet_* calls with #defines, since GenMC passes
  * -D flags through the shell unquoted. Nondeterminism, atomic sections and
- * main are handled in svcomp-shim-core.h.
+ * main are handled in svcomp-shim-core.h. The shim must not define what
+ * GenMC's pthread.h defines, such as pthread_once; scripts/check-svcomp-shim.sh
+ * builds tasks with it.
  *
  * - pthread_cond_wait: GenMC's pthread.h models condition variables, but its
  *   wait only returns after a signal or broadcast. Here a wait may also
  *   return without any signal (see svcomp-shim-core.h).
- * - pthread_once: a three-state word (0 not run, 1 running, 2 done).
  * - Recursive mutexes: with SVC_RECURSIVE_MUTEX=1 (svcomp-run.py sets it
  *   when the task mentions PTHREAD_MUTEX_RECURSIVE), a mutex initialised
  *   with that type keeps an owner and a count around GenMC's mutex.
@@ -140,23 +141,6 @@ static int __svc_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
 	return 0;
 }
 #define pthread_cond_wait(c, m) __svc_cond_wait(c, m)
-
-/* pthread_once */
-typedef atomic_int pthread_once_t;
-
-int pthread_once(pthread_once_t *once, void (*fn)(void))
-{
-	int s = 0;
-
-	if (atomic_compare_exchange_strong_explicit(once, &s, 1, memory_order_acquire,
-						    memory_order_acquire)) {
-		fn();
-		atomic_store_explicit(once, 2, memory_order_release);
-		return 0;
-	}
-	__VERIFIER_await(atomic_load_explicit(once, memory_order_acquire) == 2);
-	return 0;
-}
 
 #define malloc __svc_malloc
 #define abort __svc_abort
