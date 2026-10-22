@@ -1,0 +1,2 @@
+[main] trace-after-create.c: 26: pthread_create(&t2, NULL, idle, NULL);
+[main] trace-after-create.c: 27: pthread_join(t1, NULL);

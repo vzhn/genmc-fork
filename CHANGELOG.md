@@ -57,6 +57,12 @@ released.
   line. A block the error replay does not re-execute, such as that of a
   `pthread_join()` waiting for a stuck thread, still has no location
   (`scripts/check-call-site-locs.sh`, ctest `call-site-locs`).
+- `-print-error-trace` left out the event right after a thread's
+  creation, taking it for the store of the new thread's ID: when the
+  `pthread_t` was kept in a register, which has no such store, a second
+  `pthread_create()` or a `pthread_join()` that followed was missing from
+  the trace. Only a write at the creation's line is left out now
+  (`tests/wrong/infr/trace-after-create`).
 
 ### Added
 
