@@ -1959,6 +1959,19 @@ auto GenMCDriver::findConsistentRf(ReadLabel *rLab, std::vector<EventLabel *> &r
 	return nullptr;
 }
 
+auto GenMCDriver::isPlacementConsistent(const WriteLabel *wLab) const -> bool
+{
+	/* A write placed last in coherence keeps a consistent graph consistent
+	 * (extensibility), which findConsistentCo() relies on. The write of an
+	 * RMW goes right after the write its read part read, which need not be
+	 * the last one; under LKMM its coe edges then start prop, and can close
+	 * an hb cycle (R ->ctrl W ->coe W' ->po-rel W'' ->rfe R) that the
+	 * checks of the read part could not see */
+	const auto &g = *wLab->getParent();
+	return getConf()->model != ModelType::LKMM || g.co_max(wLab->getAddr()) == wLab ||
+	       getConsChecker().isConsistent(wLab);
+}
+
 auto GenMCDriver::findConsistentCo(WriteLabel *wLab, std::vector<EventLabel *> &cos) -> EventLabel *
 {
 
@@ -3265,7 +3278,7 @@ auto GenMCDriver::handleStore(std::unique_ptr<WriteLabel> wLab, std::optional<SV
 		return {.result = lab->wasAddedMax(), .count = 1U};
 
 	calcRevisits(lab);
-	if (!co || violatesAtomicity(lab)) {
+	if (!co || violatesAtomicity(lab) || !isPlacementConsistent(lab)) {
 		moot();
 		return {.result = Invalid{}, .count = 1U};
 	}
