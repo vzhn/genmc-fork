@@ -15,6 +15,7 @@
 #define GENMC_GRAPH_UTILS_HPP
 
 #include "EventLabel.hpp"
+#include "genmc/Execution/ExecutionState.hpp"
 #include "genmc/Support/MemAccess.hpp"
 #include "genmc/Support/SVal.hpp"
 
@@ -45,6 +46,13 @@ auto isHazptrProtected(const MemAccessLabel *mLab) -> bool;
 /** Returns the lock that matches ULAB.
  * If no such event exists, returns nullptr */
 auto findMatchingLock(const UnlockWriteLabel *uLab) -> const CasWriteLabel *;
+
+/** The role of a write in a mutex, for spinloop detection */
+auto getLockRole(const WriteLabel *wLab) -> ExecutionState::LockRole;
+
+/** The depth of the RCU read-side critical sections open in POS's thread
+ * before POS (an rcu_read_unlock() without a lock leaves it at zero) */
+auto getRcuNesting(const ExecutionGraph &g, Event pos) -> unsigned;
 
 /** Whether RLAB is a CAS that fails reading SLAB (has no write part then) */
 auto failsReading(const ReadLabel *rLab, const WriteLabel *sLab) -> bool;
