@@ -23,7 +23,9 @@ void __VERIFIER_output(const char *msg);
 /*
  * Models a limited amount of non-determinism by returning
  * a pseudo-random sequence of integers. This sequence
- * is always the same per execution for each thread
+ * is always the same per execution for each thread, so
+ * only one value per call is explored: GenMC warns when
+ * a program uses these functions.
  *
  * The other variants SV-COMP defines return such a value
  * in their type. (__VERIFIER_nondet_u32, _loff_t and

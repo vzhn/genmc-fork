@@ -91,8 +91,9 @@ Note that, since GenMC is a stateless model checker,
 does not actually provide support for it. More specifically, the sequence
 of numbers they produce for each thread remains the same across
 different executions: GenMC explores one value per call, so a run that
-finds no errors does not cover the other values. The `float`, `double`
-and pointer variants are not supported.
+finds no errors does not cover the other values. GenMC prints a warning
+when a program calls any of them. The `float`, `double` and pointer
+variants are not supported.
 
 ## Rust APIs
 

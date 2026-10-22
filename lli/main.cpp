@@ -558,11 +558,38 @@ static auto hasFinalWrites(llvm::Module &mod) -> bool
 	return false;
 }
 
+/* Warns that GenMC explores one value per __VERIFIER_nondet_X() call, if the
+ * program calls any. Once per run: here, not at the calls, which each worker
+ * and each execution makes again */
+static void warnAboutNondet(const llvm::Module &mod)
+{
+	std::vector<std::string> used;
+	for (const auto &F : mod) {
+		auto it = internalFunNames.find(F.getName().str());
+		if (!F.use_empty() && it != internalFunNames.end() &&
+		    it->second == InternalFunctions::NondetInt)
+			used.push_back(F.getName().str() + "()");
+	}
+	if (used.empty())
+		return;
+
+	std::string names;
+	for (auto i = 0U; i < used.size(); ++i)
+		names += (i == 0 ? "" : i + 1 < used.size() ? ", " : " or ") + used[i];
+	LOG(VerbosityLevel::Warning,
+	    "Each call to {} returns the same pseudo-random value in every execution, so GenMC "
+	    "explores one value per call: a run that finds no errors does not cover the other "
+	    "values.",
+	    names);
+}
+
 static void adjustConfig(llvm::Module &mod, const ModuleInfo &modInfo, Config &conf)
 {
 	/* Without final writes, there are no final-write annotations to check */
 	if (conf.finalWrite && !hasFinalWrites(mod))
 		conf.finalWrite = false;
+
+	warnAboutNondet(mod);
 
 	/* Warn if BAM is enabled and barrier results might be used */
 	if (!conf.disableBAM && modInfo.barrierResultsUsed.has_value() &&
