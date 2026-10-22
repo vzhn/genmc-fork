@@ -43,6 +43,26 @@ released.
   the warning names the functions called and says that a run that finds
   no errors does not cover their other values. Each call still returns
   one value (`scripts/check-nondet-warning.sh`, ctest `nondet-warning`).
+- Error reports located the events of the runtime headers' wrappers at
+  the header's line, not the program's (#143): a `pthread_mutex_lock()`,
+  `free()` or `pthread_create()` showed as `pthread.h:401`, `stdlib.h:29`
+  or `pthread.h:148`, in the graph and in `-print-error-trace`, so a
+  deadlock or a use of freed memory did not say which call took the lock
+  or freed the block, and the block of a thread stuck at a lock had no
+  location at all. Such an event is now reported at the program's line
+  that calls the header (`locs.c:8`), found through the locations the
+  wrapper was inlined at or the calls on the interpreter's stack; this
+  covers `std::atomic`, and a wrapper that calls another one
+  (`pthread_cond_wait()`). A block after a lock is reported at the lock's
+  line. A block the error replay does not re-execute, such as that of a
+  `pthread_join()` waiting for a stuck thread, still has no location
+  (`scripts/check-call-site-locs.sh`, ctest `call-site-locs`).
+- `-print-error-trace` left out the event right after a thread's
+  creation, taking it for the store of the new thread's ID: when the
+  `pthread_t` was kept in a register, which has no such store, a second
+  `pthread_create()` or a `pthread_join()` that followed was missing from
+  the trace. Only a write at the creation's line is left out now
+  (`tests/wrong/infr/trace-after-create`).
 
 ### Added
 

@@ -24,6 +24,8 @@ struct LLIConfig {
 	/*** Compilation options ***/
 	std::vector<std::string> cflags;
 	std::string inputFile;
+	/* The directories of GenMC's runtime headers (<pthread.h>, ...) */
+	std::vector<std::string> runtimeIncludeDirs;
 
 	/*** Exploration options ***/
 	unsigned int threads{};

@@ -32,6 +32,20 @@
 #include <system_error>
 #include <utility>
 
+/* Whether LAB is the store of the PID of the thread created just before it,
+ * at the creation's line (a PID kept in a register has no store: the event
+ * after the creation is then the program's next one) */
+static auto isPidStore(const EventLabel &lab, const GenMCDriver::GraphDbgInfo &dbgInfo) -> bool
+{
+	const auto *cLab = lab.getParent()->po_imm_pred(&lab);
+	if (!genmc::isa<WriteLabel>(&lab) || !genmc::isa_and_present<ThreadCreateLabel>(cLab) ||
+	    !dbgInfo.contains(lab.getPos()) || !dbgInfo.contains(cLab->getPos()))
+		return false;
+	const auto &wInfo = dbgInfo.at(lab.getPos());
+	const auto &cInfo = dbgInfo.at(cLab->getPos());
+	return wInfo.file == cInfo.file && wInfo.line == cInfo.line;
+}
+
 void printTraceBefore(const GenMCDriver::GraphDbgInfo &dbgInfo, const EventLabel *lab,
 		      std::ostream &s /* = std::cerr */)
 {
@@ -46,10 +60,9 @@ void printTraceBefore(const GenMCDriver::GraphDbgInfo &dbgInfo, const EventLabel
 		 * the same as the previous one */
 		if (genmc::isa<CasWriteLabel>(&oLab) || genmc::isa<FaiWriteLabel>(&oLab))
 			continue;
-		/* Similarly for a Wna just after the creation of a thread
-		 * (it is the store of the PID) */
-		if (const auto *pLab = g.po_imm_pred(&oLab);
-		    genmc::isa_and_present<ThreadCreateLabel>(pLab))
+		/* Similarly for the store of the PID just after the creation of
+		 * a thread */
+		if (isPidStore(oLab, dbgInfo))
 			continue;
 
 		/* Skip if we don't have anything to print */

@@ -1074,14 +1074,18 @@ auto GenMCDriver::getReadRetValue(const ReadLabel *rLab) -> HandleResult<SVal>
 	/* Return nullopt for reads that require an interpreter reset */
 	if (getConf()->ipr && rLab->getAnnot() &&
 	    !Evaluator().evaluate(&*rLab->getAnnot()->expr, res)) {
-		blockThread(g, BlockLabel::createAssumeBlock(rLab->getPos().next(),
-							     rLab->getAnnot()->type));
+		auto bLab = BlockLabel::createAssumeBlock(rLab->getPos().next(),
+							  rLab->getAnnot()->type);
+		inheritDbgInfo(rLab->getPos(), &*bLab);
+		blockThread(g, std::move(bLab));
 		return scheduler.inErrorReplay() ? Result(Invalid(), 1U) : Result(Reset(), 0U);
 	}
 	if (genmc::isa<BWaitReadLabel>(rLab) &&
 	    !readsBarrierUnblockingValue(genmc::cast<BWaitReadLabel>(rLab))) {
-		blockThread(g, BlockLabel::createAssumeBlock(rLab->getPos().next(),
-							     AssumeType::Barrier));
+		auto bLab =
+			BlockLabel::createAssumeBlock(rLab->getPos().next(), AssumeType::Barrier);
+		inheritDbgInfo(rLab->getPos(), &*bLab);
+		blockThread(g, std::move(bLab));
 		return scheduler.inErrorReplay() ? Result(Invalid(), 1U) : Result(Reset(), 0U);
 	}
 	return {.result = res, .count = 1U};
@@ -3543,6 +3547,10 @@ void GenMCDriver::reportError(Event pos, const ErrorDetails &details)
 	auto *errLab = details.pos ? g.getEventLabel(*details.pos) : nullptr;
 	if (errLab && isInvalidAccessError(details.type) && genmc::isa<ReadLabel>(errLab))
 		genmc::dyn_cast<ReadLabel>(errLab)->setRf(nullptr);
+	/* An error at a block is replayed up to the event before it (see
+	 * forwardRevisit()): the block was not re-executed */
+	if (const auto *bLab = genmc::dyn_cast_if_present<BlockLabel>(errLab))
+		inheritDbgInfo(bLab->getPos().prev(), bLab);
 
 	/* Print basic error message (graph) */
 	std::ostringstream out;
@@ -5011,4 +5019,10 @@ auto GenMCDriver::getDbgInfo(Event pos) -> const GenMCDriver::EventDbgInfo *
 	if (!dbgInfo_.contains(pos))
 		return nullptr;
 	return &dbgInfo_.at(pos);
+}
+
+void GenMCDriver::inheritDbgInfo(Event from, const BlockLabel *bLab)
+{
+	if (auto it = dbgInfo_.find(from); it != dbgInfo_.end())
+		dbgInfo_.try_emplace(bLab->getPos(), it->second);
 }
