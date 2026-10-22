@@ -23,6 +23,11 @@
  *   SC:            acyclic(po | rf | co | fr)
  *   RC11, relaxed: acyclic(po-loc | rf | co | fr) per location
  *                  and acyclic(po | rf)            (no out-of-thin-air)
+ *   both:          atomicity: an RMW's write comes right after, in co,
+ *                  the write its read reads from
+ *
+ * An RMW (fetch-and-add) is a read and a write of the same location; its
+ * write's value is the value its read reads plus the operand.
  *
  * The RC11 rule holds only when every access is relaxed (no hb beyond po).
  */
@@ -49,6 +54,7 @@ struct Ev {
 	bool write;
 	unsigned var;
 	std::uint32_t val;
+	int rmwRead = -1; /* the write of an RMW: the event of its read */
 };
 
 /* Whether the graph on N nodes with edges E is acyclic */
@@ -88,12 +94,21 @@ inline auto enumerate(const scripted::Program &prog, ModelType model) -> Result
 		auto idx = 0;
 		for (const auto &op : prog.threads[t]) {
 			VERIFY(op.kind != scripted::OpKind::Fence);
+			auto isRMW = op.kind == scripted::OpKind::FetchAdd;
 			evs.push_back({.thr = static_cast<int>(t),
 				       .fun = static_cast<int>(t),
 				       .idx = idx++,
 				       .write = op.kind == scripted::OpKind::Store,
 				       .var = op.var,
 				       .val = op.val});
+			if (isRMW)
+				evs.push_back({.thr = static_cast<int>(t),
+					       .fun = static_cast<int>(t),
+					       .idx = idx++,
+					       .write = true,
+					       .var = op.var,
+					       .val = op.val, /* the operand */
+					       .rmwRead = static_cast<int>(evs.size()) - 1});
 		}
 	}
 	const auto n = static_cast<unsigned>(evs.size());
@@ -149,6 +164,18 @@ inline auto enumerate(const scripted::Program &prog, ModelType model) -> Result
 						e.push_back(p);
 			return e;
 		};
+		/* Atomicity: an RMW's write right after its read's write in co */
+		std::vector<int> rfOf(n, -1);
+		for (auto k = 0U; k < reads.size(); k++)
+			rfOf[reads[k]] = rf[k];
+		for (auto w = 0U; w < n; w++) {
+			if (evs[w].rmwRead < 0)
+				continue;
+			auto src = rfOf[evs[w].rmwRead];
+			if (coPos[w] != coPos[src] + 1)
+				return;
+		}
+
 		bool ok = true;
 		if (model == ModelType::SC) {
 			ok = detail::acyclic(n, all([](auto *, auto) { return true; }));
@@ -164,9 +191,16 @@ inline auto enumerate(const scripted::Program &prog, ModelType model) -> Result
 		if (!ok)
 			return;
 		++res.graphs;
+		/* The value of each write (an RMW's from what its read read; the
+		 * chain is finite: atomicity rules out cycles) */
+		std::function<std::uint32_t(int)> valueOf = [&](int w) -> std::uint32_t {
+			if (evs[w].rmwRead < 0)
+				return evs[w].val;
+			return valueOf(rfOf[evs[w].rmwRead]) + evs[w].val;
+		};
 		scripted::Outcome out(prog.threads.size());
 		for (auto k = 0U; k < reads.size(); k++)
-			out[evs[reads[k]].fun].push_back(evs[rf[k]].val);
+			out[evs[reads[k]].fun].push_back(valueOf(rf[k]));
 		res.outcomes.insert(out);
 	};
 

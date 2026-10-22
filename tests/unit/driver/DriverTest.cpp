@@ -41,6 +41,8 @@ inline void showValue(const Program &p, std::ostream &os)
 				os << "r=v" << op.var;
 			else if (op.kind == OpKind::Store)
 				os << "v" << op.var << "=" << op.val;
+			else if (op.kind == OpKind::FetchAdd)
+				os << "r=fai(v" << op.var << "," << op.val << ")";
 			else
 				os << "fence";
 			os << "." << kOrd[static_cast<int>(op.ord)];
@@ -179,6 +181,37 @@ TEST(ScriptedDriver, CoherenceOfReadReadForbidsGoingBack)
 	expectMatchesOracle(p, ModelType::RC11);
 }
 
+TEST(ScriptedDriver, ConcurrentIncrementsAreNeverLost)
+{
+	/* Two increments: each order is one execution, and the counter ends at 2 */
+	Program p{.numVars = 1, .threads = {{fai(X, 1)}, {fai(X, 1)}, {}}};
+	p.threads[2] = {}; /* (an empty third thread) */
+	auto r = explore(p, ModelType::RC11);
+	EXPECT_EQ(r.explored, 2U);
+	EXPECT_EQ(r.outcomes, (std::set<Outcome>{outcome({{0}, {1}, {}}), outcome({{1}, {0}, {}})}));
+	expectMatchesOracle(p, ModelType::RC11);
+	expectMatchesOracle(p, ModelType::SC);
+}
+
+TEST(ScriptedDriver, AReadAfterIncrementsSeesEveryPrefix)
+{
+	Program p{.numVars = 1, .threads = {{fai(X, 1)}, {fai(X, 2)}, {ld(X)}}};
+	auto r = explore(p, ModelType::RC11);
+	for (auto v : {0U, 1U, 2U, 3U})
+		EXPECT_TRUE(std::ranges::any_of(r.outcomes, [v](auto &o) { return o[2] == std::vector{v}; }))
+			<< "the reader never sees " << v;
+	expectMatchesOracle(p, ModelType::RC11);
+	expectMatchesOracle(p, ModelType::SC);
+}
+
+TEST(ScriptedDriver, AnIncrementRevisitedByAPlainStore)
+{
+	/* The store can go before the increment (it reads 5) or after it */
+	Program p{.numVars = 1, .threads = {{fai(X, 1), ld(X)}, {st(X, 5)}}};
+	expectMatchesOracle(p, ModelType::RC11);
+	expectMatchesOracle(p, ModelType::SC);
+}
+
 /*
  * Random programs: up to three threads of up to three accesses to two
  * variables. The driver explores exactly the graphs the axioms allow and
@@ -189,14 +222,16 @@ namespace {
 auto genOp(bool relaxedOnly) -> rc::Gen<Op>
 {
 	return rc::gen::apply(
-		[relaxedOnly](bool load, unsigned var, unsigned val, unsigned ord) {
+		[relaxedOnly](unsigned kind, unsigned var, unsigned val, unsigned ord) {
 			static constexpr MemOrdering kOrds[] = {rlx, acq, rel, sc};
 			auto o = relaxedOnly ? rlx : kOrds[ord];
-			if (load)
+			if (kind == 0)
 				return ld(var, o == rel ? rlx : o);
-			return st(var, val, o == acq ? rlx : o);
+			if (kind == 1)
+				return st(var, val, o == acq ? rlx : o);
+			return fai(var, val, o);
 		},
-		rc::gen::arbitrary<bool>(), rc::gen::inRange(0U, 2U), rc::gen::inRange(1U, 4U),
+		rc::gen::inRange(0U, 3U), rc::gen::inRange(0U, 2U), rc::gen::inRange(1U, 4U),
 		rc::gen::inRange(0U, 4U));
 }
 

@@ -35,7 +35,7 @@
 
 namespace scripted {
 
-enum class OpKind : std::uint8_t { Load, Store, Fence };
+enum class OpKind : std::uint8_t { Load, Store, Fence, FetchAdd };
 
 struct Op {
 	OpKind kind;
@@ -52,6 +52,12 @@ inline auto st(unsigned var, std::uint32_t val, MemOrdering ord = MemOrdering::R
 {
 	return {.kind = OpKind::Store, .var = var, .val = val, .ord = ord};
 }
+/** An atomic fetch-and-add of VAL (its read's value is part of the outcome) */
+inline auto fai(unsigned var, std::uint32_t val, MemOrdering ord = MemOrdering::Relaxed) -> Op
+{
+	return {.kind = OpKind::FetchAdd, .var = var, .val = val, .ord = ord};
+}
+
 inline auto fence(MemOrdering ord = MemOrdering::SequentiallyConsistent) -> Op
 {
 	return {.kind = OpKind::Fence, .ord = ord};
@@ -138,7 +144,8 @@ private:
 		if (tid == 0)
 			return;
 		const auto &o = ops(tid);
-		acts_[tid].kind = (pc_[tid] < o.size() && o[pc_[tid]].kind == OpKind::Load)
+		acts_[tid].kind = (pc_[tid] < o.size() && (o[pc_[tid]].kind == OpKind::Load ||
+							     o[pc_[tid]].kind == OpKind::FetchAdd))
 					  ? ActionKind::Load
 					  : ActionKind::NonLoad;
 	}
@@ -189,6 +196,23 @@ private:
 		case OpKind::Fence:
 			advance(tid, driver_.handleFence(nullptr, pos, op.ord, EventDeps()));
 			break;
+		case OpKind::FetchAdd: {
+			/* One instruction, two events (as the interpreter issues an
+			 * atomicrmw): the read, then the write of the sum. If either is
+			 * reset, the instruction runs again */
+			auto r = driver_.handleFaiRead(nullptr, pos, op.ord, addrs_[op.var],
+						       ASize(kSize), RMWBinOp::Add, SVal(op.val),
+						       WriteAttr::None, nullptr, std::nullopt, EventDeps());
+			acts_[tid].event.index += static_cast<int>(r.count);
+			const auto *old = std::get_if<SVal>(&r.result);
+			if (!old)
+				break;
+			auto sum = static_cast<std::uint32_t>(old->get() + op.val);
+			advance(tid, driver_.handleFaiWrite(nullptr, acts_[tid].event, op.ord,
+							    addrs_[op.var], ASize(kSize), SVal(sum),
+							    WriteAttr::None, EventDeps()));
+			break;
+		}
 		}
 	}
 
