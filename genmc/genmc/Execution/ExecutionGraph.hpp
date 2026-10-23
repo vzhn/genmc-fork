@@ -534,12 +534,14 @@ public:
 	{
 		using RangeType = decltype(co_succs(static_cast<const WriteLabel *>(nullptr)));
 		const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
+		VERIFY(!wLab || wLab->isInCo());
 		return wLab ? co_succs(wLab) : RangeType{};
 	}
 	auto co_succs(EventLabel *lab)
 	{
 		using RangeType = decltype(co_succs(static_cast<WriteLabel *>(nullptr)));
 		auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
+		VERIFY(!wLab || wLab->isInCo());
 		return wLab ? co_succs(wLab) : RangeType{};
 	}
 
