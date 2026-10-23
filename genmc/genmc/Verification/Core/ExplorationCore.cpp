@@ -873,11 +873,13 @@ auto ExplorationCore::isPlacementConsistent(const WriteLabel *wLab) const -> boo
 	/* A write placed last in coherence keeps a consistent graph consistent
 	 * (extensibility), which findConsistentCo() relies on. The write of an
 	 * RMW goes right after the write its read part read, which need not be
-	 * the last one; under LKMM its coe edges then start prop, and can close
-	 * an hb cycle (R ->ctrl W ->coe W' ->po-rel W'' ->rfe R) that the
-	 * checks of the read part could not see */
+	 * the last one, and its coe edges can then close a cycle that the checks
+	 * of the read part could not see: under LKMM through prop (R ->ctrl W
+	 * ->coe W' ->po-rel W'' ->rfe R), under TSO through tso (W ->mo W' ->po
+	 * RMW ->mo W'' ->po W, tests/correct/infr/tso-rmw-placement). Which
+	 * models need the check: see rmwPlacementNeedsCheck() */
 	const auto &g = *wLab->getParent();
-	return getConf()->model != ModelType::LKMM || g.co_max(wLab->getAddr()) == wLab ||
+	return !rmwPlacementNeedsCheck(getConf()->model) || g.co_max(wLab->getAddr()) == wLab ||
 	       getConsChecker().isConsistent(wLab);
 }
 
