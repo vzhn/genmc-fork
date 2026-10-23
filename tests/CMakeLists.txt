@@ -181,6 +181,17 @@ set_tests_properties(core-layering PROPERTIES LABELS "fast" TIMEOUT 60)
 # Unit tests
 add_subdirectory(unit)
 
+# Alloy proofs (proofs/alloy) and the code tables that rely on them:
+# rmwPlacementNeedsCheck() against proofs/alloy/rmw-placement.als
+find_program(ALLOY_EXECUTABLE alloy)
+if(ALLOY_EXECUTABLE)
+  add_test(NAME formal-models
+      COMMAND bash -c "ALLOY=${ALLOY_EXECUTABLE} ${SCRIPT_DIR}/check-alloy-proofs.sh"
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  )
+  set_tests_properties(formal-models PROPERTIES LABELS "models" TIMEOUT 900 SKIP_RETURN_CODE 77)
+endif()
+
 # TLA+ models of the error replay and the worker pool (models/tla): the fixed
 # configurations must pass, the bug configurations must reproduce their bug
 find_program(TLC_EXECUTABLE tlc)

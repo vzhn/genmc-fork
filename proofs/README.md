@@ -65,3 +65,17 @@ by the algorithm itself.
    show no configuration is reached twice.
 3. Extract `next`/`visit` as a reference checker for small programs and
    compare its set of explored graphs against `genmc -print-exec-graphs`.
+
+## Alloy: proofs/alloy
+
+- `rmw-placement.als`: whether putting an RMW's write right after the write
+  its read part reads (not necessarily the last one) keeps a consistent
+  graph consistent, under SC, TSO, RA and RC11 (relaxed, release and
+  acquire accesses, up to 7 events, 3 threads, 2 locations). It does under
+  SC, RA and RC11; TSO has a counterexample (the bug of
+  `tests/correct/infr/tso-rmw-placement`). The models are transcribed from
+  Kater's `kat/*-genmc.kat`, whose hashes are in `rmw-placement.kat.sha256`.
+- `scripts/check-alloy-proofs.sh` (ctest `formal-models`, label `models`)
+  runs the checks and fails if `rmwPlacementNeedsCheck()`
+  (`genmc/genmc/Execution/MemoryModel.hpp`) disagrees with them, or, with
+  `KATER_SRC` set, if a transcribed Kater model changed.
