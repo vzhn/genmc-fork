@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater b25657f-dirty (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater 914a4ed (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -32404,6 +32404,7 @@ bool LKMMChecker::visitLHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &w
 				break;
 			}
 
+			cexLab = lab;
 			return false;
 			[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -32556,6 +32557,7 @@ bool LKMMChecker::visitLHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &w
 				break;
 			}
 
+			cexLab = lab;
 			return false;
 			[[maybe_unused]] auto &g = *lab->getParent();
 

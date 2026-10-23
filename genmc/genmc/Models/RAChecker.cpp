@@ -13,6 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
+ * From kat/ra-genmc.kat, Kater 914a4ed (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -27,7 +28,7 @@
 
 bool RAChecker::isDepTracking() const { return 0; }
 
-bool RAChecker::visitCalc70Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
+bool RAChecker::visitCalc71Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -117,7 +118,7 @@ bool RAChecker::visitCalc70Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 	return true;
 }
 
-View RAChecker::visitCalc70(const EventLabel *lab) const
+View RAChecker::visitCalc71(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
@@ -127,22 +128,20 @@ View RAChecker::visitCalc70(const EventLabel *lab) const
 	/* Explore from all accepting states using DFS */
 	std::vector<DFSWorklistEntry> startStates = {
 		{2, lab},
-		{1, lab},
-		{0, lab},
 	};
 
-	visitCalc70Iterative(startStates, calcRes);
+	visitCalc71Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto RAChecker::checkCalc70(const EventLabel *lab) const
+auto RAChecker::checkCalc71(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc70(lab);
+	return visitCalc71(lab);
 }
 
-bool RAChecker::visitCalc80Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
+bool RAChecker::visitCalc77Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -158,19 +157,6 @@ bool RAChecker::visitCalc80Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 			break;
 		}
 		case 1: {
-			if (isFinishing) {
-				break;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = lab; true)
-				if (calcRes.update(pLab->view(3)); true) {
-					worklist.emplace_back(0, pLab);
-				}
-
-			break;
-		}
-		case 2: {
 			if (isFinishing) {
 				break;
 			}
@@ -178,84 +164,6 @@ bool RAChecker::visitCalc80Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = lab; true)
 				if (calcRes.update(pLab->view(1)); true) {
-					worklist.emplace_back(0, pLab);
-				}
-			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
-			    iLab) {
-				calcRes.update(
-					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 3));
-			}
-			if (auto pLab = g.rf_pred(lab); pLab) {
-				if (!genmc::isa<InitLabel>(pLab)) {
-					worklist.emplace_back(1, pLab);
-				}
-			}
-
-			break;
-		}
-		case 3: {
-			if (isFinishing) {
-				break;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				worklist.emplace_back(2, pLab);
-			}
-
-			break;
-		}
-		default:
-			UNREACHABLE();
-		}
-	}
-	return true;
-}
-
-View RAChecker::visitCalc80(const EventLabel *lab) const
-{
-	[[maybe_unused]] auto &g = *lab->getParent();
-	View calcRes;
-
-	/* Explore from all accepting states using DFS */
-	std::vector<DFSWorklistEntry> startStates = {
-		{3, lab},
-	};
-
-	visitCalc80Iterative(startStates, calcRes);
-	return calcRes;
-}
-
-auto RAChecker::checkCalc80(const EventLabel *lab) const
-{
-	[[maybe_unused]] auto &g = *lab->getParent();
-
-	return visitCalc80(lab);
-}
-
-bool RAChecker::visitCalc79Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
-{
-	while (!worklist.empty()) {
-		auto [stateId, lab, isFinishing] = worklist.back();
-		worklist.pop_back();
-		switch (stateId) {
-		case 0: {
-			if (isFinishing) {
-				break;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-
-			break;
-		}
-		case 1: {
-			if (isFinishing) {
-				break;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = lab; true)
-				if (calcRes.update(pLab->view(2)); true) {
 					worklist.emplace_back(0, pLab);
 				}
 
@@ -284,21 +192,14 @@ bool RAChecker::visitCalc79Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 				if (calcRes.updateIdx(pLab->getPos()); true) {
 					worklist.emplace_back(0, pLab);
 				}
-			if (true && lab->isAtLeastAcquire() && genmc::isa<FenceLabel>(lab))
-				if (auto pLab = lab; true)
-					if (calcRes.update(pLab->view(1)); true) {
-						worklist.emplace_back(0, pLab);
-					}
-			if (true && lab->isAtLeastAcquire() && genmc::isa<ThreadJoinLabel>(lab))
-				if (auto pLab = lab; true)
-					if (calcRes.update(pLab->view(1)); true) {
-						worklist.emplace_back(0, pLab);
-					}
-			if (true && lab->isAtLeastAcquire() && genmc::isa<ThreadStartLabel>(lab))
-				if (auto pLab = lab; true)
-					if (calcRes.update(pLab->view(1)); true) {
-						worklist.emplace_back(0, pLab);
-					}
+			if (true && lab->isAtLeastAcquire())
+				if (auto pLab = g.rf_pred(lab); pLab)
+					if (true && pLab->isAtLeastRelease())
+						if (calcRes.updateIdx(pLab->getPos()); true) {
+							if (!genmc::isa<InitLabel>(pLab)) {
+								worklist.emplace_back(0, pLab);
+							}
+						}
 			for (auto &tmp : g.lin_preds(lab))
 				if (auto *pLab = &tmp; true) {
 					worklist.emplace_back(1, pLab);
@@ -317,12 +218,76 @@ bool RAChecker::visitCalc79Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 					    genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
 				    iLab) {
 					calcRes.update(iLab->locView(
-						genmc::cast<ReadLabel>(lab)->getAddr(), 3));
+						genmc::cast<ReadLabel>(lab)->getAddr(), 1));
+				}
+			if (true && lab->isAtLeastAcquire())
+				if (auto pLab = g.rf_pred(lab); pLab)
+					if (true && pLab->isAtLeastRelease()) {
+						if (!genmc::isa<InitLabel>(pLab)) {
+							worklist.emplace_back(1, pLab);
+						}
+					}
+			if (true && lab->isAtLeastAcquire())
+				if (auto *iLab =
+					    genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+				    iLab) {
+					calcRes.update(iLab->locView(
+						genmc::cast<ReadLabel>(lab)->getAddr(), 1));
 				}
 			if (true && lab->isAtLeastAcquire())
 				if (auto pLab = g.rf_pred(lab); pLab) {
 					if (!genmc::isa<InitLabel>(pLab)) {
-						worklist.emplace_back(3, pLab);
+						auto status = visitedCalc77_3.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(3, pLab);
+						}
+					}
+				}
+			if (true && lab->isAtLeastAcquire())
+				if (auto *iLab =
+					    genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+				    iLab) {
+					calcRes.update(iLab->locView(
+						genmc::cast<ReadLabel>(lab)->getAddr(), 1));
+				}
+			if (true && lab->isAtLeastAcquire())
+				if (auto pLab = g.rf_pred(lab); pLab)
+					if (true && genmc::isa<WriteLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						if (!genmc::isa<InitLabel>(pLab)) {
+							auto status = visitedCalc77_5.getStatus(
+								pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(5, pLab);
+							}
+						}
+					}
+			if (true && lab->isAtLeastAcquire() && genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status =
+						visitedCalc77_6.getStatus(pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					}
+				}
+			if (true && lab->isAtLeastAcquire() && genmc::isa<ThreadJoinLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status =
+						visitedCalc77_6.getStatus(pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					}
+				}
+			if (true && lab->isAtLeastAcquire() && genmc::isa<ThreadStartLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status =
+						visitedCalc77_6.getStatus(pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
 					}
 				}
 
@@ -330,88 +295,16 @@ bool RAChecker::visitCalc79Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 		}
 		case 3: {
 			if (isFinishing) {
+				visitedCalc77_3.setStatus(lab->getStamp().get(), NodeStatus::left);
 				break;
 			}
 
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = lab; true)
-				if (calcRes.update(pLab->view(3)); true) {
-					worklist.emplace_back(0, pLab);
-				}
-
-			break;
-		}
-		default:
-			UNREACHABLE();
-		}
-	}
-	return true;
-}
-
-View RAChecker::visitCalc79(const EventLabel *lab) const
-{
-	[[maybe_unused]] auto &g = *lab->getParent();
-	View calcRes;
-
-	calcRes.updateIdx(lab->getPos());
-
-	/* Explore from all accepting states using DFS */
-	std::vector<DFSWorklistEntry> startStates = {
-		{0, lab},
-		{2, lab},
-	};
-
-	visitCalc79Iterative(startStates, calcRes);
-	return calcRes;
-}
-
-auto RAChecker::checkCalc79(const EventLabel *lab) const
-{
-	[[maybe_unused]] auto &g = *lab->getParent();
-
-	return visitCalc79(lab);
-}
-
-bool RAChecker::visitCalc81Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
-{
-	while (!worklist.empty()) {
-		auto [stateId, lab, isFinishing] = worklist.back();
-		worklist.pop_back();
-		switch (stateId) {
-		case 0: {
-			if (isFinishing) {
-				break;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-
-			break;
-		}
-		case 1: {
-			if (isFinishing) {
-				break;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = lab; true)
-				if (calcRes.update(pLab->view(2)); true) {
-					worklist.emplace_back(0, pLab);
-				}
-
-			break;
-		}
-		case 2: {
-			if (isFinishing) {
-				visitedCalc81_2.setStatus(lab->getStamp().get(), NodeStatus::left);
-				break;
-			}
-
-			auto status = visitedCalc81_2.getStatus(lab->getStamp().get());
+			auto status = visitedCalc77_3.getStatus(lab->getStamp().get());
 			if (status != NodeStatus::unseen)
 				break; /* already explored */
 
-			worklist.emplace_back(2, lab, true);
-			visitedCalc81_2.setStatus(lab->getStamp().get(), NodeStatus::entered);
+			worklist.emplace_back(3, lab, true);
+			visitedCalc77_3.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
@@ -448,90 +341,11 @@ bool RAChecker::visitCalc81Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 					worklist.emplace_back(1, pLab);
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCalc81_2.getStatus(pLab->getStamp().get());
+				auto status = visitedCalc77_3.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(2, pLab);
+					worklist.emplace_back(3, pLab);
 				}
 			}
-
-			break;
-		}
-		case 3: {
-			if (isFinishing) {
-				break;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (true && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && pLab->isAtLeastRelease() &&
-					    genmc::isa<FenceLabel>(pLab))
-						if (calcRes.updateIdx(pLab->getPos()); true) {
-							worklist.emplace_back(0, pLab);
-						}
-			if (true && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && pLab->isAtLeastRelease() &&
-					    genmc::isa<ThreadCreateLabel>(pLab))
-						if (calcRes.updateIdx(pLab->getPos()); true) {
-							worklist.emplace_back(0, pLab);
-						}
-			if (true && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && pLab->isAtLeastRelease() &&
-					    genmc::isa<ThreadFinishLabel>(pLab))
-						if (calcRes.updateIdx(pLab->getPos()); true) {
-							worklist.emplace_back(0, pLab);
-						}
-			if (true && lab->isAtLeastRelease() && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = lab; true)
-					if (calcRes.update(pLab->view(2)); true) {
-						worklist.emplace_back(0, pLab);
-					}
-			if (true && lab->isAtLeastRelease() && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = lab; true)
-					if (calcRes.updateIdx(pLab->getPos()); true) {
-						worklist.emplace_back(0, pLab);
-					}
-			if (true && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && pLab->isAtLeastRelease() &&
-					    genmc::isa<FenceLabel>(pLab)) {
-						worklist.emplace_back(1, pLab);
-					}
-			if (true && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && pLab->isAtLeastRelease() &&
-					    genmc::isa<ThreadCreateLabel>(pLab)) {
-						worklist.emplace_back(1, pLab);
-					}
-			if (true && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && pLab->isAtLeastRelease() &&
-					    genmc::isa<ThreadFinishLabel>(pLab)) {
-						worklist.emplace_back(1, pLab);
-					}
-			if (true && genmc::isa<WriteLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status =
-						visitedCalc81_2.getStatus(pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(2, pLab);
-					}
-				}
-			if (true && genmc::isa<WriteLabel>(lab) &&
-			    ((genmc::isa<ReadLabel>(lab) &&
-			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
-			     (genmc::isa<WriteLabel>(lab) &&
-			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    ((genmc::isa<ReadLabel>(pLab) &&
-					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-					     (genmc::isa<WriteLabel>(pLab) &&
-					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-						worklist.emplace_back(5, pLab);
-					}
 
 			break;
 		}
@@ -541,27 +355,154 @@ bool RAChecker::visitCalc81Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = lab; true)
-				if (calcRes.update(pLab->view(3)); true) {
-					worklist.emplace_back(0, pLab);
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease())
+					if (calcRes.updateIdx(pLab->getPos()); true) {
+						if (!genmc::isa<InitLabel>(pLab)) {
+							worklist.emplace_back(0, pLab);
+						}
+					}
+			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+			    iLab) {
+				calcRes.update(
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 1));
+			}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
+					if (!genmc::isa<InitLabel>(pLab)) {
+						worklist.emplace_back(1, pLab);
+					}
+				}
+			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+			    iLab) {
+				calcRes.update(
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 1));
+			}
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				if (!genmc::isa<InitLabel>(pLab)) {
+					auto status =
+						visitedCalc77_3.getStatus(pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(3, pLab);
+					}
+				}
+			}
+			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+			    iLab) {
+				calcRes.update(
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 1));
+			}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					if (!genmc::isa<InitLabel>(pLab)) {
+						auto status = visitedCalc77_5.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(5, pLab);
+						}
+					}
 				}
 
 			break;
 		}
 		case 5: {
 			if (isFinishing) {
+				visitedCalc77_5.setStatus(lab->getStamp().get(), NodeStatus::left);
 				break;
 			}
 
+			auto status = visitedCalc77_5.getStatus(lab->getStamp().get());
+			if (status != NodeStatus::unseen)
+				break; /* already explored */
+
+			worklist.emplace_back(5, lab, true);
+			visitedCalc77_5.setStatus(lab->getStamp().get(), NodeStatus::entered);
+
 			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					worklist.emplace_back(4, pLab);
+				}
+
+			break;
+		}
+		case 6: {
+			if (isFinishing) {
+				visitedCalc77_6.setStatus(lab->getStamp().get(), NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedCalc77_6.getStatus(lab->getStamp().get());
+			if (status != NodeStatus::unseen)
+				break; /* already explored */
+
+			worklist.emplace_back(6, lab, true);
+			visitedCalc77_6.setStatus(lab->getStamp().get(), NodeStatus::entered);
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease())
+					if (calcRes.updateIdx(pLab->getPos()); true) {
+						if (!genmc::isa<InitLabel>(pLab)) {
+							worklist.emplace_back(0, pLab);
+						}
+					}
 			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
 			    iLab) {
 				calcRes.update(
-					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 3));
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 1));
+			}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
+					if (!genmc::isa<InitLabel>(pLab)) {
+						worklist.emplace_back(1, pLab);
+					}
+				}
+			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+			    iLab) {
+				calcRes.update(
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 1));
 			}
 			if (auto pLab = g.rf_pred(lab); pLab) {
 				if (!genmc::isa<InitLabel>(pLab)) {
-					worklist.emplace_back(4, pLab);
+					auto status =
+						visitedCalc77_3.getStatus(pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(3, pLab);
+					}
+				}
+			}
+			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+			    iLab) {
+				calcRes.update(
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 1));
+			}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					if (!genmc::isa<InitLabel>(pLab)) {
+						auto status = visitedCalc77_5.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(5, pLab);
+						}
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status = visitedCalc77_6.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(6, pLab);
 				}
 			}
 
@@ -574,30 +515,33 @@ bool RAChecker::visitCalc81Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 	return true;
 }
 
-View RAChecker::visitCalc81(const EventLabel *lab) const
+View RAChecker::visitCalc77(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
 
-	visitedCalc81_2.maybeClearResize(g.getMaxStamp().get() + 1);
+	calcRes.updateIdx(lab->getPos());
+	visitedCalc77_3.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedCalc77_5.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedCalc77_6.maybeClearResize(g.getMaxStamp().get() + 1);
 
 	/* Explore from all accepting states using DFS */
 	std::vector<DFSWorklistEntry> startStates = {
-		{3, lab},
+		{2, lab},
 	};
 
-	visitCalc81Iterative(startStates, calcRes);
+	visitCalc77Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto RAChecker::checkCalc81(const EventLabel *lab) const
+auto RAChecker::checkCalc77(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc81(lab);
+	return visitCalc77(lab);
 }
 
-bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
+bool RAChecker::visitCalc78Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -619,7 +563,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = lab; true)
-				if (calcRes.update(pLab->view(4)); true) {
+				if (calcRes.update(pLab->view(2)); true) {
 					worklist.emplace_back(0, pLab);
 				}
 
@@ -676,7 +620,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 					    genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
 				    iLab) {
 					calcRes.update(iLab->locView(
-						genmc::cast<ReadLabel>(lab)->getAddr(), 4));
+						genmc::cast<ReadLabel>(lab)->getAddr(), 2));
 				}
 			if (true && lab->isAtLeastAcquire() &&
 			    !(genmc::isa<AbstractLockCasReadLabel>(lab)))
@@ -688,14 +632,30 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 					}
 			if (true && lab->isAtLeastAcquire() &&
 			    !(genmc::isa<AbstractLockCasReadLabel>(lab)))
+				if (auto *iLab =
+					    genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+				    iLab) {
+					calcRes.update(iLab->locView(
+						genmc::cast<ReadLabel>(lab)->getAddr(), 2));
+				}
+			if (true && lab->isAtLeastAcquire() &&
+			    !(genmc::isa<AbstractLockCasReadLabel>(lab)))
 				if (auto pLab = g.rf_pred(lab); pLab) {
 					if (!genmc::isa<InitLabel>(pLab)) {
-						auto status = visitedCalc82_3.getStatus(
+						auto status = visitedCalc78_3.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(3, pLab);
 						}
 					}
+				}
+			if (true && lab->isAtLeastAcquire() &&
+			    !(genmc::isa<AbstractLockCasReadLabel>(lab)))
+				if (auto *iLab =
+					    genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+				    iLab) {
+					calcRes.update(iLab->locView(
+						genmc::cast<ReadLabel>(lab)->getAddr(), 2));
 				}
 			if (true && lab->isAtLeastAcquire() &&
 			    !(genmc::isa<AbstractLockCasReadLabel>(lab)))
@@ -706,7 +666,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 					     (genmc::isa<WriteLabel>(pLab) &&
 					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						if (!genmc::isa<InitLabel>(pLab)) {
-							auto status = visitedCalc82_5.getStatus(
+							auto status = visitedCalc78_5.getStatus(
 								pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
 								worklist.emplace_back(5, pLab);
@@ -717,7 +677,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 			    !(genmc::isa<AbstractLockCasReadLabel>(lab)))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
 					auto status =
-						visitedCalc82_6.getStatus(pLab->getStamp().get());
+						visitedCalc78_6.getStatus(pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(6, pLab);
 					}
@@ -726,7 +686,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 			    !(genmc::isa<AbstractLockCasReadLabel>(lab)))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
 					auto status =
-						visitedCalc82_6.getStatus(pLab->getStamp().get());
+						visitedCalc78_6.getStatus(pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(6, pLab);
 					}
@@ -735,7 +695,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 			    !(genmc::isa<AbstractLockCasReadLabel>(lab)))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
 					auto status =
-						visitedCalc82_6.getStatus(pLab->getStamp().get());
+						visitedCalc78_6.getStatus(pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(6, pLab);
 					}
@@ -745,16 +705,16 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 		}
 		case 3: {
 			if (isFinishing) {
-				visitedCalc82_3.setStatus(lab->getStamp().get(), NodeStatus::left);
+				visitedCalc78_3.setStatus(lab->getStamp().get(), NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedCalc82_3.getStatus(lab->getStamp().get());
+			auto status = visitedCalc78_3.getStatus(lab->getStamp().get());
 			if (status != NodeStatus::unseen)
 				break; /* already explored */
 
 			worklist.emplace_back(3, lab, true);
-			visitedCalc82_3.setStatus(lab->getStamp().get(), NodeStatus::entered);
+			visitedCalc78_3.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
@@ -791,7 +751,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 					worklist.emplace_back(1, pLab);
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCalc82_3.getStatus(pLab->getStamp().get());
+				auto status = visitedCalc78_3.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(3, pLab);
 				}
@@ -815,7 +775,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
 			    iLab) {
 				calcRes.update(
-					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 4));
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 2));
 			}
 			if (auto pLab = g.rf_pred(lab); pLab)
 				if (true && pLab->isAtLeastRelease()) {
@@ -823,14 +783,24 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 						worklist.emplace_back(1, pLab);
 					}
 				}
+			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+			    iLab) {
+				calcRes.update(
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 2));
+			}
 			if (auto pLab = g.rf_pred(lab); pLab) {
 				if (!genmc::isa<InitLabel>(pLab)) {
 					auto status =
-						visitedCalc82_3.getStatus(pLab->getStamp().get());
+						visitedCalc78_3.getStatus(pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(3, pLab);
 					}
 				}
+			}
+			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+			    iLab) {
+				calcRes.update(
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 2));
 			}
 			if (auto pLab = g.rf_pred(lab); pLab)
 				if (true && genmc::isa<WriteLabel>(pLab) &&
@@ -839,7 +809,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					if (!genmc::isa<InitLabel>(pLab)) {
-						auto status = visitedCalc82_5.getStatus(
+						auto status = visitedCalc78_5.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(5, pLab);
@@ -851,16 +821,16 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 		}
 		case 5: {
 			if (isFinishing) {
-				visitedCalc82_5.setStatus(lab->getStamp().get(), NodeStatus::left);
+				visitedCalc78_5.setStatus(lab->getStamp().get(), NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedCalc82_5.getStatus(lab->getStamp().get());
+			auto status = visitedCalc78_5.getStatus(lab->getStamp().get());
 			if (status != NodeStatus::unseen)
 				break; /* already explored */
 
 			worklist.emplace_back(5, lab, true);
-			visitedCalc82_5.setStatus(lab->getStamp().get(), NodeStatus::entered);
+			visitedCalc78_5.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
@@ -876,16 +846,16 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 		}
 		case 6: {
 			if (isFinishing) {
-				visitedCalc82_6.setStatus(lab->getStamp().get(), NodeStatus::left);
+				visitedCalc78_6.setStatus(lab->getStamp().get(), NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedCalc82_6.getStatus(lab->getStamp().get());
+			auto status = visitedCalc78_6.getStatus(lab->getStamp().get());
 			if (status != NodeStatus::unseen)
 				break; /* already explored */
 
 			worklist.emplace_back(6, lab, true);
-			visitedCalc82_6.setStatus(lab->getStamp().get(), NodeStatus::entered);
+			visitedCalc78_6.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.rf_pred(lab); pLab)
@@ -898,7 +868,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
 			    iLab) {
 				calcRes.update(
-					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 4));
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 2));
 			}
 			if (auto pLab = g.rf_pred(lab); pLab)
 				if (true && pLab->isAtLeastRelease()) {
@@ -906,14 +876,24 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 						worklist.emplace_back(1, pLab);
 					}
 				}
+			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+			    iLab) {
+				calcRes.update(
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 2));
+			}
 			if (auto pLab = g.rf_pred(lab); pLab) {
 				if (!genmc::isa<InitLabel>(pLab)) {
 					auto status =
-						visitedCalc82_3.getStatus(pLab->getStamp().get());
+						visitedCalc78_3.getStatus(pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(3, pLab);
 					}
 				}
+			}
+			if (auto *iLab = genmc::dyn_cast_if_present<InitLabel>(g.rf_pred(lab));
+			    iLab) {
+				calcRes.update(
+					iLab->locView(genmc::cast<ReadLabel>(lab)->getAddr(), 2));
 			}
 			if (auto pLab = g.rf_pred(lab); pLab)
 				if (true && genmc::isa<WriteLabel>(pLab) &&
@@ -922,7 +902,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 					if (!genmc::isa<InitLabel>(pLab)) {
-						auto status = visitedCalc82_5.getStatus(
+						auto status = visitedCalc78_5.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(5, pLab);
@@ -930,7 +910,7 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCalc82_6.getStatus(pLab->getStamp().get());
+				auto status = visitedCalc78_6.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(6, pLab);
 				}
@@ -945,32 +925,30 @@ bool RAChecker::visitCalc82Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 	return true;
 }
 
-View RAChecker::visitCalc82(const EventLabel *lab) const
+View RAChecker::visitCalc78(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
 
 	calcRes.updateIdx(lab->getPos());
-	visitedCalc82_3.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedCalc82_5.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedCalc82_6.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedCalc78_3.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedCalc78_5.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedCalc78_6.maybeClearResize(g.getMaxStamp().get() + 1);
 
 	/* Explore from all accepting states using DFS */
 	std::vector<DFSWorklistEntry> startStates = {
 		{2, lab},
-		{1, lab},
-		{0, lab},
 	};
 
-	visitCalc82Iterative(startStates, calcRes);
+	visitCalc78Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto RAChecker::checkCalc82(const EventLabel *lab) const
+auto RAChecker::checkCalc78(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc82(lab);
+	return visitCalc78(lab);
 }
 
 void RAChecker::calculateSaved([[maybe_unused]] EventLabel *lab) {}
@@ -978,28 +956,21 @@ void RAChecker::calculateSaved([[maybe_unused]] EventLabel *lab) {}
 void RAChecker::calculateViews(EventLabel *lab)
 {
 	lab->setViews({});
+
 	{
 		lab->addView({});
-		lab->setView(std::move(checkCalc70(lab)), 0);
-	}
-	{
-		lab->addView({});
-		lab->setView(std::move(checkCalc80(lab)), 1);
-	}
-	{
-		lab->addView({});
-		lab->setView(std::move(checkCalc79(lab)), 2);
-	}
-	{
-		lab->addView({});
-		lab->setView(std::move(checkCalc81(lab)), 3);
+		lab->setView(std::move(checkCalc71(lab)), 0);
 	}
 
+	{
+		lab->addView({});
+		lab->setView(std::move(checkCalc77(lab)), 1);
+	}
 	if (!getConf()->collectLinSpec && !getConf()->checkLinSpec)
 		lab->addView({});
 	else {
 		lab->addView({});
-		lab->setView(std::move(checkCalc82(lab)), 4);
+		lab->setView(std::move(checkCalc78(lab)), 2);
 	}
 }
 
@@ -1012,7 +983,7 @@ void RAChecker::updateMMViews(EventLabel *lab)
 
 static auto isWriteRfBefore(const WriteLabel *wLab, const EventLabel *lab) -> bool
 {
-	auto &before = lab->view(2);
+	auto &before = lab->view(1);
 	return before.contains(wLab->getPos()) ||
 	       std::ranges::any_of(wLab->readers(),
 				   [&](auto &rLab) { return before.contains(rLab.getPos()); });
@@ -1020,9 +991,9 @@ static auto isWriteRfBefore(const WriteLabel *wLab, const EventLabel *lab) -> bo
 
 static auto isHbOptRfBefore(const EventLabel *lab, const WriteLabel *wLab) -> bool
 {
-	return wLab->view(2).contains(lab->getPos()) ||
+	return wLab->view(1).contains(lab->getPos()) ||
 	       std::ranges::any_of(wLab->readers(), [&](auto &rLab) {
-		       return rLab.view(2).contains(lab->getPos());
+		       return rLab.view(1).contains(lab->getPos());
 	       });
 }
 
@@ -1040,13 +1011,13 @@ static auto splitLocMOAfterHb(ReadLabel *rLab) -> ExecutionGraph::co_iterator
 {
 	auto &g = *rLab->getParent();
 	if (std::ranges::any_of(g.getInitLabel()->rfs(rLab->getAddr()), [rLab](auto &rfLab) {
-		    return rfLab.view(2).contains(rLab->getPos());
+		    return rfLab.view(1).contains(rLab->getPos());
 	    }))
 		return std::ranges::begin(g.co(rLab->getAddr()));
 
 	auto it = std::ranges::find_if(g.co(rLab->getAddr()),
 				       [&](auto &wLab) { return isHbOptRfBefore(rLab, &wLab); });
-	if (it == std::ranges::end(g.co(rLab->getAddr())) || it->view(2).contains(rLab->getPos()))
+	if (it == std::ranges::end(g.co(rLab->getAddr())) || it->view(1).contains(rLab->getPos()))
 		return it;
 	return ++it;
 }
@@ -1056,6 +1027,21 @@ static auto splitLocMOAfter(WriteLabel *wLab) -> ExecutionGraph::co_iterator
 	auto &g = *wLab->getParent();
 	return std::ranges::find_if(g.co(wLab->getAddr()),
 				    [&](auto &sLab) { return isHbOptRfBefore(wLab, &sLab); });
+}
+
+/* Whether END is reachable from BEGIN in ADDR's coherence order. It is not
+ * when coherence contradicts hb, which a consistent graph never does, but an
+ * event added before events kept further on in its thread can see before
+ * the graph is checked again, typically because of a kept event the new path
+ * skips (it goes once the thread passes its place): then every position is a
+ * candidate, and GenMC's later checks drop the inconsistent ones */
+static auto isCoRange(ExecutionGraph &g, SAddr addr, ExecutionGraph::co_iterator begin,
+		      ExecutionGraph::co_iterator end) -> bool
+{
+	for (auto it = begin; it != end; ++it)
+		if (it == std::ranges::end(g.co(addr)))
+			return false;
+	return true;
 }
 
 auto RAChecker::getCoherentStores(ReadLabel *rLab) -> std::vector<EventLabel *>
@@ -1089,6 +1075,12 @@ auto RAChecker::getCoherentStores(ReadLabel *rLab) -> std::vector<EventLabel *>
 	 */
 	auto endIt = (isDepTracking()) ? splitLocMOAfterHb(rLab)
 				       : std::ranges::end(g.co(rLab->getAddr()));
+	if (!isCoRange(g, rLab->getAddr(), begIt, endIt)) {
+		stores.clear();
+		stores.push_back(g.getInitLabel());
+		begIt = std::ranges::begin(g.co(rLab->getAddr()));
+		endIt = std::ranges::end(g.co(rLab->getAddr()));
+	}
 	std::transform(begIt, endIt, std::back_inserter(stores), [&](auto &lab) { return &lab; });
 	return stores;
 }
@@ -1161,7 +1153,7 @@ void RAChecker::filterCoherentRevisits(WriteLabel *sLab, std::vector<ReadLabel *
 	auto optRfs = getMOOptRfAfter(sLab);
 	ls.erase(std::remove_if(ls.begin(), ls.end(),
 				[&](auto &eLab) {
-					auto &before = g.po_imm_pred(eLab)->view(2); // hb;sb
+					auto &before = g.po_imm_pred(eLab)->view(1); // hb;sb
 					return std::any_of(
 						optRfs.begin(), optRfs.end(), [&](auto &evLab) {
 							return before.contains(evLab->getPos());
@@ -1176,7 +1168,7 @@ void RAChecker::filterCoherentRevisits(WriteLabel *sLab, std::vector<ReadLabel *
 
 	/* Otherwise, we also have to exclude hb-before loads */
 	ls.erase(std::remove_if(ls.begin(), ls.end(),
-				[&](auto &eLab) { return sLab->view(2).contains(eLab->getPos()); }),
+				[&](auto &eLab) { return sLab->view(1).contains(eLab->getPos()); }),
 		 ls.end());
 
 	/* ...and also exclude (mo^-1; rf?; (hb^-1)?; sb^-1)-after reads in the *resulting* graph */
@@ -1191,7 +1183,7 @@ void RAChecker::filterCoherentRevisits(WriteLabel *sLab, std::vector<ReadLabel *
 					 moInvOptRfs.begin(), moInvOptRfs.end(), [&](auto &evLab) {
 						 return v->contains(evLab->getPos()) && // stays in
 											// graph?
-							g.po_imm_pred(evLab)->view(2).contains(
+							g.po_imm_pred(evLab)->view(1).contains(
 								eLab->getPos()); // po-pred to check
 										 // evLab != rLab
 					 });
@@ -1218,6 +1210,10 @@ auto RAChecker::getCoherentPlacings(WriteLabel *wLab) -> std::vector<EventLabel 
 	auto rangeBegin = splitLocMOBefore(wLab->getAddr(), wLab);
 	auto rangeEnd = (isDepTracking()) ? splitLocMOAfter(wLab)
 					  : std::ranges::end(g.co(wLab->getAddr()));
+	if (!isCoRange(g, wLab->getAddr(), rangeBegin, rangeEnd)) {
+		rangeBegin = std::ranges::begin(g.co(wLab->getAddr()));
+		rangeEnd = std::ranges::end(g.co(wLab->getAddr()));
+	}
 	auto cos = std::ranges::subrange(rangeBegin, rangeEnd) |
 		   std::views::filter([&](auto &sLab) { return !sLab.isRMW(); }) |
 		   std::views::transform([&](auto &sLab) {
@@ -1241,91 +1237,12 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 		switch (stateId) {
 		case 0: {
 			if (isFinishing) {
-				visitedCoherence_0.setStatus(lab->getStamp().get(),
-							     NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedCoherence_0.getStatus(lab->getStamp().get());
-			if (status != NodeStatus::unseen)
-				break; /* already explored */
-
-			worklist.emplace_back(0, lab, true);
-			visitedCoherence_0.setStatus(lab->getStamp().get(), NodeStatus::entered);
 			if (lab == initLab)
 				return false;
-
 			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedCoherence_0.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(0, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_0.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(0, pLab);
-				}
-			}
-			if (auto pLab = g.tc_pred(lab); pLab) {
-				auto status = visitedCoherence_0.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(0, pLab);
-				}
-			}
-			if (auto pLab = g.tj_pred(lab); pLab) {
-				auto status = visitedCoherence_0.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(0, pLab);
-				}
-			}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedCoherence_2.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(2, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() &&
-				    genmc::isa<ThreadJoinLabel>(pLab)) {
-					auto status = visitedCoherence_2.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(2, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() &&
-				    genmc::isa<ThreadStartLabel>(pLab)) {
-					auto status = visitedCoherence_2.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(2, pLab);
-					}
-				}
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && pLab->isAtLeastAcquire()) {
-						auto status = visitedCoherence_3.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(3, pLab);
-						}
-					}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire()) {
-					auto status = visitedCoherence_3.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(3, pLab);
-					}
-				}
 
 			break;
 		}
@@ -1337,27 +1254,19 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			[[maybe_unused]] auto &g = *lab->getParent();
 			for (auto &tmp : g.lin_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedCoherence_6.getStatus(
+					auto status = visitedCoherence_8.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
-					}
-				}
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedCoherence_7.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(7, pLab);
+						worklist.emplace_back(8, pLab);
 					}
 				}
 			for (auto &tmp : g.lin_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && pLab->isAtLeastAcquire()) {
-						auto status = visitedCoherence_9.getStatus(
+						auto status = visitedCoherence_10.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(9, pLab);
+							worklist.emplace_back(10, pLab);
 						}
 					}
 
@@ -1378,18 +1287,89 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_2.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					worklist.emplace_back(0, pLab);
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				worklist.emplace_back(0, pLab);
+			}
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				worklist.emplace_back(0, pLab);
+			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				worklist.emplace_back(0, pLab);
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedCoherence_2.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(2, pLab);
+					}
+				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status = visitedCoherence_2.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(2, pLab);
 				}
 			}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_3.getStatus(pLab->getStamp().get());
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				auto status = visitedCoherence_2.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(3, pLab);
+					worklist.emplace_back(2, pLab);
 				}
 			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status = visitedCoherence_2.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(2, pLab);
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isAtLeastAcquire()) {
+						auto status = visitedCoherence_4.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(4, pLab);
+						}
+					}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedCoherence_4.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(4, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedCoherence_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<ThreadJoinLabel>(pLab)) {
+					auto status = visitedCoherence_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<ThreadStartLabel>(pLab)) {
+					auto status = visitedCoherence_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					}
+				}
 
 			break;
 		}
@@ -1408,39 +1388,71 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_3.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.rf_pred(lab); pLab)
+			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedCoherence_0.getStatus(
+				    genmc::isa<FenceLabel>(pLab)) {
+					worklist.emplace_back(0, pLab);
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadCreateLabel>(pLab)) {
+					worklist.emplace_back(0, pLab);
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadFinishLabel>(pLab)) {
+					worklist.emplace_back(0, pLab);
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedCoherence_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(0, pLab);
+						worklist.emplace_back(2, pLab);
 					}
 				}
-			if (auto pLab = g.rf_pred(lab); pLab)
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadCreateLabel>(pLab)) {
+					auto status = visitedCoherence_2.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(2, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadFinishLabel>(pLab)) {
+					auto status = visitedCoherence_2.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(2, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_3.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(3, pLab);
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedCoherence_3.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(3, pLab);
-					}
-				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab)) {
+				    genmc::isa<FenceLabel>(pLab)) {
 					auto status = visitedCoherence_4.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(4, pLab);
 					}
 				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					worklist.emplace_back(5, pLab);
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedCoherence_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					}
 				}
 
 			break;
@@ -1460,57 +1472,40 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_4.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedCoherence_0.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(0, pLab);
-					}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
+					worklist.emplace_back(0, pLab);
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<ThreadCreateLabel>(pLab)) {
-					auto status = visitedCoherence_0.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(0, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<ThreadFinishLabel>(pLab)) {
-					auto status = visitedCoherence_0.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(0, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
 					auto status = visitedCoherence_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(2, pLab);
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedCoherence_3.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(3, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_4.getStatus(pLab->getStamp().get());
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				auto status = visitedCoherence_3.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(4, pLab);
+					worklist.emplace_back(3, pLab);
 				}
 			}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease()) {
+					auto status = visitedCoherence_4.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(4, pLab);
+					}
+				}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					worklist.emplace_back(5, pLab);
+				}
 
 			break;
 		}
@@ -1526,10 +1521,10 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedCoherence_3.getStatus(
+					auto status = visitedCoherence_4.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(3, pLab);
+						worklist.emplace_back(4, pLab);
 					}
 				}
 
@@ -1550,66 +1545,13 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_6.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.fr_imm_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedCoherence_0.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(0, pLab);
-					}
-				}
-			if (auto pLab = g.co_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_0.getStatus(pLab->getStamp().get());
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_4.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(0, pLab);
+					worklist.emplace_back(4, pLab);
 				}
 			}
-			if (auto pLab = g.rf_pred(lab); pLab) {
-				auto status = visitedCoherence_0.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(0, pLab);
-				}
-			}
-			for (auto &tmp : g.fr_imm_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && pLab->isAtLeastAcquire()) {
-						auto status = visitedCoherence_3.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(3, pLab);
-						}
-					}
-			if (auto pLab = g.co_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire()) {
-					auto status = visitedCoherence_3.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(3, pLab);
-					}
-				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire()) {
-					auto status = visitedCoherence_3.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(3, pLab);
-					}
-				}
-			for (auto &tmp : g.fr_imm_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedCoherence_6.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
-					}
-				}
-			if (auto pLab = g.co_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_6.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(6, pLab);
-				}
-			}
-			if (auto pLab = g.rf_pred(lab); pLab) {
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status = visitedCoherence_6.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(6, pLab);
@@ -1633,33 +1575,52 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_7.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.lin_preds(lab))
+			for (auto &tmp : g.fr_imm_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedCoherence_6.getStatus(
+					auto status = visitedCoherence_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(2, pLab);
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_6.getStatus(pLab->getStamp().get());
+			if (auto pLab = g.co_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_2.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(6, pLab);
+					worklist.emplace_back(2, pLab);
 				}
 			}
-			if (auto pLab = g.tc_pred(lab); pLab) {
-				auto status = visitedCoherence_6.getStatus(pLab->getStamp().get());
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				auto status = visitedCoherence_2.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(6, pLab);
+					worklist.emplace_back(2, pLab);
 				}
 			}
-			if (auto pLab = g.tj_pred(lab); pLab) {
-				auto status = visitedCoherence_6.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(6, pLab);
+			for (auto &tmp : g.fr_imm_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isAtLeastAcquire()) {
+						auto status = visitedCoherence_4.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(4, pLab);
+						}
+					}
+			if (auto pLab = g.co_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedCoherence_4.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(4, pLab);
+					}
 				}
-			}
-			for (auto &tmp : g.lin_preds(lab))
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedCoherence_4.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(4, pLab);
+					}
+				}
+			for (auto &tmp : g.fr_imm_preds(lab))
 				if (auto *pLab = &tmp; true) {
 					auto status = visitedCoherence_7.getStatus(
 						pLab->getStamp().get());
@@ -1667,68 +1628,18 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 						worklist.emplace_back(7, pLab);
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
+			if (auto pLab = g.co_imm_pred(lab); pLab) {
 				auto status = visitedCoherence_7.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(7, pLab);
 				}
 			}
-			if (auto pLab = g.tc_pred(lab); pLab) {
+			if (auto pLab = g.rf_pred(lab); pLab) {
 				auto status = visitedCoherence_7.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(7, pLab);
 				}
 			}
-			if (auto pLab = g.tj_pred(lab); pLab) {
-				auto status = visitedCoherence_7.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(7, pLab);
-				}
-			}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedCoherence_8.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() &&
-				    genmc::isa<ThreadJoinLabel>(pLab)) {
-					auto status = visitedCoherence_8.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() &&
-				    genmc::isa<ThreadStartLabel>(pLab)) {
-					auto status = visitedCoherence_8.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
-					}
-				}
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && pLab->isAtLeastAcquire()) {
-						auto status = visitedCoherence_9.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(9, pLab);
-						}
-					}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire()) {
-					auto status = visitedCoherence_9.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(9, pLab);
-					}
-				}
 
 			break;
 		}
@@ -1747,18 +1658,102 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_8.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedCoherence_7.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(7, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_7.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(7, pLab);
+				}
+			}
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				auto status = visitedCoherence_7.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(7, pLab);
+				}
+			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status = visitedCoherence_7.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(7, pLab);
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedCoherence_8.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(8, pLab);
+					}
+				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status = visitedCoherence_8.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(8, pLab);
 				}
 			}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_9.getStatus(pLab->getStamp().get());
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				auto status = visitedCoherence_8.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(9, pLab);
+					worklist.emplace_back(8, pLab);
 				}
 			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status = visitedCoherence_8.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(8, pLab);
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isAtLeastAcquire()) {
+						auto status = visitedCoherence_10.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(10, pLab);
+						}
+					}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedCoherence_10.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(10, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedCoherence_12.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(12, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<ThreadJoinLabel>(pLab)) {
+					auto status = visitedCoherence_12.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(12, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<ThreadStartLabel>(pLab)) {
+					auto status = visitedCoherence_12.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(12, pLab);
+					}
+				}
 
 			break;
 		}
@@ -1777,48 +1772,83 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_9.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.rf_pred(lab); pLab)
+			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedCoherence_6.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
-					}
-				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<WriteLabel>(pLab)) {
+				    genmc::isa<FenceLabel>(pLab)) {
 					auto status = visitedCoherence_7.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(7, pLab);
 					}
 				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedCoherence_9.getStatus(
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadCreateLabel>(pLab)) {
+					auto status = visitedCoherence_7.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(9, pLab);
+						worklist.emplace_back(7, pLab);
 					}
 				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab)) {
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadFinishLabel>(pLab)) {
+					auto status = visitedCoherence_7.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(7, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedCoherence_8.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(8, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadCreateLabel>(pLab)) {
+					auto status = visitedCoherence_8.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(8, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadFinishLabel>(pLab)) {
+					auto status = visitedCoherence_8.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(8, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_9.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(9, pLab);
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
 					auto status = visitedCoherence_10.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(10, pLab);
 					}
 				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					worklist.emplace_back(11, pLab);
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedCoherence_12.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(12, pLab);
+					}
 				}
 
 			break;
@@ -1838,84 +1868,44 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_10.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedCoherence_6.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<ThreadCreateLabel>(pLab)) {
-					auto status = visitedCoherence_6.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<ThreadFinishLabel>(pLab)) {
-					auto status = visitedCoherence_6.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
 					auto status = visitedCoherence_7.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(7, pLab);
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<ThreadCreateLabel>(pLab)) {
-					auto status = visitedCoherence_7.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(7, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<ThreadFinishLabel>(pLab)) {
-					auto status = visitedCoherence_7.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(7, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
 					auto status = visitedCoherence_8.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(8, pLab);
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedCoherence_9.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(9, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_10.getStatus(pLab->getStamp().get());
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				auto status = visitedCoherence_9.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(10, pLab);
+					worklist.emplace_back(9, pLab);
 				}
 			}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease()) {
+					auto status = visitedCoherence_10.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(10, pLab);
+					}
+				}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					worklist.emplace_back(11, pLab);
+				}
 
 			break;
 		}
@@ -1931,12 +1921,42 @@ bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedCoherence_9.getStatus(
+					auto status = visitedCoherence_10.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(9, pLab);
+						worklist.emplace_back(10, pLab);
 					}
 				}
+
+			break;
+		}
+		case 12: {
+			if (isFinishing) {
+				visitedCoherence_12.setStatus(lab->getStamp().get(),
+							      NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedCoherence_12.getStatus(lab->getStamp().get());
+			if (status != NodeStatus::unseen)
+				break; /* already explored */
+
+			worklist.emplace_back(12, lab, true);
+			visitedCoherence_12.setStatus(lab->getStamp().get(), NodeStatus::entered);
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_10.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(10, pLab);
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_12.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(12, pLab);
+				}
+			}
 
 			break;
 		}
@@ -1953,7 +1973,6 @@ bool RAChecker::visitCoherenceRelinche(const ExecutionGraph &g) const
 		if (!genmc::isa<MethodBeginLabel>(&lab))
 			continue;
 
-		visitedCoherence_0.maybeClearResize(g.getMaxStamp().get() + 1);
 		visitedCoherence_2.maybeClearResize(g.getMaxStamp().get() + 1);
 		visitedCoherence_3.maybeClearResize(g.getMaxStamp().get() + 1);
 		visitedCoherence_4.maybeClearResize(g.getMaxStamp().get() + 1);
@@ -1962,6 +1981,7 @@ bool RAChecker::visitCoherenceRelinche(const ExecutionGraph &g) const
 		visitedCoherence_8.maybeClearResize(g.getMaxStamp().get() + 1);
 		visitedCoherence_9.maybeClearResize(g.getMaxStamp().get() + 1);
 		visitedCoherence_10.maybeClearResize(g.getMaxStamp().get() + 1);
+		visitedCoherence_12.maybeClearResize(g.getMaxStamp().get() + 1);
 
 		/* Explore from this accepting state using DFS */
 		std::vector<DFSWorklistEntry> startState = {{1, &lab}};
@@ -2020,7 +2040,7 @@ bool RAChecker::visitUnlessError1(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	auto &v = lab->view(2);
+	auto &v = lab->view(1);
 
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
@@ -2053,6 +2073,7 @@ bool RAChecker::visitLHSUnlessError2Iterative(std::vector<DFSWorklistEntry> &wor
 				break;
 			}
 
+			cexLab = lab;
 			return false;
 			[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -2193,7 +2214,7 @@ bool RAChecker::visitUnlessError3(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	auto &v = lab->view(2);
+	auto &v = lab->view(1);
 
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
@@ -2226,6 +2247,7 @@ bool RAChecker::visitLHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &wor
 				break;
 			}
 
+			cexLab = lab;
 			return false;
 			[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -2345,7 +2367,7 @@ bool RAChecker::visitUnlessError5(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	auto &v = lab->view(2);
+	auto &v = lab->view(1);
 
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
@@ -2378,6 +2400,7 @@ bool RAChecker::visitLHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &wor
 				break;
 			}
 
+			cexLab = lab;
 			return false;
 			[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -2389,8 +2412,6 @@ bool RAChecker::visitLHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &wor
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			/* retire_pos() is a map lookup, isHazptrProtected() a walk over
-			 * the thread's prefix: ask the cheap one first */
 			if (true && genmc::isa<MemAccessLabel>(lab) &&
 			    genmc::dyn_cast<MemAccessLabel>(lab)->getAddr().isDynamic() &&
 			    g.retire_pos(lab).has_value() &&
@@ -2532,7 +2553,7 @@ bool RAChecker::visitUnlessError7(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	auto &v = lab->view(2);
+	auto &v = lab->view(1);
 
 	/* Explore from all accepting states in LHS using DFS */
 	std::vector<DFSWorklistEntry> startStatesLHS = {
@@ -2709,6 +2730,11 @@ View RAChecker::calcPPoRfBefore(const EventLabel *lab) const
 std::unique_ptr<VectorClock> RAChecker::calculatePrefixView(const EventLabel *lab) const
 {
 	return std::make_unique<View>(calcPPoRfBefore(lab));
+}
+
+std::unique_ptr<VectorClock> RAChecker::calculateRevisitPrefixView(const EventLabel *lab) const
+{
+	return calculatePrefixView(lab);
 }
 
 void RAChecker::recomputeCacheCounters([[maybe_unused]] const ExecutionGraph &g) const {}
