@@ -19,11 +19,14 @@ Run some quick tests:
 ./scripts/fast-driver.sh
 ```
 
+`fast-driver.sh` runs the tests of `scripts/driver.sh` in parallel (`scripts/parallel-driver.sh`): one job per model and test category, `JOBS` at a time (default: the number of cores). Its table has a row per kind of test (correct or wrong), model and category; a failing job's log follows the table. `FAST_DRIVER_SERIAL=1`, or setting `CORRECT_DIRS` or `WRONG_DIRS`, runs it as one `driver.sh`, as before.
+
 Environment variables to affect the testing scripts:
 ```shell
   GenMC="path/to/genmc/executable"  # Select the GenMC executable to use for the test (default: `${SCRIPT_DIR}/../RelWithDebInfo/bin/genmc`)
   GENMCFLAGS="--flag --another"     # Pass extra flags to any GenMC invocation.
   GENMC_MEMORY_LIMIT=16000000       # Virtual memory per process, in KiB, or "unlimited" (default: 16000000; sanitizer builds: unlimited)
+  JOBS=8                            # Jobs at a time for fast-driver.sh (default: the number of cores)
 ```
 
 `scripts/driver.sh` runs everything under that limit, so that a test that runs away (for example, a `tests/wrong` test with an unbounded loop under a model that lacks its bounding arguments) fails out of memory instead of exhausting the machine.
