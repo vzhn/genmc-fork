@@ -40,6 +40,7 @@
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/Core/DriverHandlerDispatcher.hpp"
 #include "genmc/Verification/Rules/ErrorRules.hpp"
+#include "genmc/Verification/Rules/SpinloopRules.hpp"
 #include "genmc/Verification/Report/GraphPrinting.hpp"
 #include "genmc/Verification/Checks/Invariants.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
@@ -1135,36 +1136,15 @@ void ExplorationCore::checkReconsiderFaiSpinloop(const MemAccessLabel *lab)
 {
 	auto &g = getExec().getGraph();
 
-	for (auto i = 0; i < g.getNumThreads(); i++) {
-		/* Is there any thread blocked on a potential spinloop? */
-		auto *eLab = genmc::dyn_cast_if_present<FaiZNEBlockLabel>(g.getLastThreadLabel(i));
-		if (!eLab)
-			continue;
-
-		/* Check whether this access affects the spinloop variable */
-		auto epreds = g.po_preds(eLab);
-		auto faiLabIt = std::ranges::find_if(
-			epreds, [](auto &lab) { return genmc::isa<FaiWriteLabel>(&lab); });
-		VERIFY(faiLabIt != std::ranges::end(epreds));
-
-		auto *faiLab = genmc::dyn_cast<FaiWriteLabel>(&*faiLabIt);
-		if (faiLab->getAddr() != lab->getAddr())
-			continue;
-
-		/* FAIs on the same variable are OK... */
-		if (genmc::isa<FaiReadLabel>(lab) || genmc::isa<FaiWriteLabel>(lab))
-			continue;
-
-		/* If it does, and also breaks the assumptions, unblock thread */
-		if (!getConsChecker().getHbView(faiLab).contains(lab->getPos())) {
-			auto pos = eLab->getPos();
-			auto key = eLab->getSharedKey();
-			auto keySub = eLab->getKeySub();
-			unblockThread(g, pos);
-			auto zLab = FaiZNESpinEndLabel::create(pos);
-			zLab->setKey(std::move(key), keySub);
-			addLabelToGraph(std::move(zLab));
-		}
+	/* The blocked threads spin again: their next iteration ends here */
+	for (const auto *eLab : spin_rules::faiSpinloopsBrokenBy(g, getConsChecker(), *lab)) {
+		auto pos = eLab->getPos();
+		auto key = eLab->getSharedKey();
+		auto keySub = eLab->getKeySub();
+		unblockThread(g, pos);
+		auto zLab = FaiZNESpinEndLabel::create(pos);
+		zLab->setKey(std::move(key), keySub);
+		addLabelToGraph(std::move(zLab));
 	}
 }
 
@@ -2484,8 +2464,8 @@ auto ExplorationCore::handleSpinStart(std::unique_ptr<SpinStartLabel> lab)
 	auto *stLab = addLabelToGraph(std::move(lab));
 
 	/* Check for side-effects only if it's not the first spin-start */
-	const auto *lbLab = genmc::dyn_cast<LoopBeginLabel>(g.po_imm_pred(stLab));
-	if ((lbLab && lbLab->getLoop() == loop) || frontier.onSpinStart(stLab->getPos(), loop))
+	if (spin_rules::startsFirstIteration(g, *genmc::cast<SpinStartLabel>(stLab)) ||
+	    frontier.onSpinStart(stLab->getPos(), loop))
 		return {.result = std::monostate(), .count = 1U};
 
 	/* Spinloop detected */
@@ -2503,49 +2483,13 @@ auto ExplorationCore::handleAwaitStart(std::unique_ptr<AwaitStartLabel> lab)
 	return handleDummy(std::move(lab));
 }
 
-auto ExplorationCore::areFaiZNEConstraintsSat(const FaiZNESpinEndLabel *lab) -> bool
-{
-	auto &g = getExec().getGraph();
-
-	/* Check that there are no other side-effects since the previous iteration.
-	 * We don't have to look for a BEGIN label since ZNE labels are always
-	 * preceded by a spin-start */
-	auto preds = g.po_preds(lab);
-	auto ssLabIt = std::ranges::find_if(
-		preds, [](auto &lab) { return genmc::isa<SpinStartLabel>(&lab); });
-	VERIFY(ssLabIt != preds.end());
-	const auto *ssLab = &*ssLabIt;
-	for (auto i = ssLab->getIndex() + 1; i < lab->getIndex(); ++i) {
-		auto *oLab = g.getEventLabel(Event(ssLab->getThread(), i));
-		if (genmc::isa<WriteLabel>(oLab) && !genmc::isa<FaiWriteLabel>(oLab))
-			return false;
-	}
-
-	auto wLabIt = std::ranges::find_if(
-		preds, [](auto &lab) { return genmc::isa<FaiWriteLabel>(&lab); });
-	VERIFY(wLabIt != preds.end());
-
-	/* All stores in the RMW chain need to be read from at most 1 read,
-	 * and there need to be no other stores that are not hb-before lab */
-	const auto *wLab = genmc::dyn_cast<FaiWriteLabel>(&*wLabIt);
-	for (auto &lab : g.labels()) {
-		if (auto *mLab = genmc::dyn_cast<MemAccessLabel>(&lab)) {
-			if (mLab->getAddr() == wLab->getAddr() && !genmc::isa<FaiReadLabel>(mLab) &&
-			    !genmc::isa<FaiWriteLabel>(mLab) &&
-			    !getConsChecker().getHbView(wLab).contains(mLab->getPos()))
-				return false;
-		}
-	}
-	return true;
-}
-
 auto ExplorationCore::handleFaiZNESpinEnd(std::unique_ptr<FaiZNESpinEndLabel> lab)
 	-> HandleResult<std::monostate>
 {
 	auto &g = getExec().getGraph();
 
 	auto *zLab = genmc::dyn_cast<FaiZNESpinEndLabel>(addLabelToGraph(std::move(lab)));
-	if (!inRandomMode() && areFaiZNEConstraintsSat(zLab))
+	if (!inRandomMode() && spin_rules::faiZNEConstraintsSat(g, getConsChecker(), *zLab))
 		blockThread(g, FaiZNEBlockLabel::create(zLab->getPos())); /* no moot desired */
 	return {.result = std::monostate(), .count = 1U};
 }

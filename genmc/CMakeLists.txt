@@ -71,6 +71,7 @@ set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/Relinche/Specification.cpp
   genmc/Verification/State/ResumePointStore.cpp
   genmc/Verification/Rules/RfReductions.cpp
+  genmc/Verification/Rules/SpinloopRules.cpp
   genmc/Verification/Rules/BackwardRevisits.cpp
   genmc/Verification/State/Scheduler.cpp
   genmc/Verification/Rules/SymmetricThreads.cpp

@@ -580,10 +580,6 @@ private:
 	/** Opt: Remove possibly invalidated ReadOpt events */
 	void checkReconsiderReadOpts(const WriteLabel *sLab);
 
-	/** SAVer: Given the end of a potential FAI-ZNE spinloop,
-	 * returns true if it is indeed a spinloop */
-	auto areFaiZNEConstraintsSat(const FaiZNESpinEndLabel *lab) -> bool;
-
 	/** IPR: Performs BR in-place */
 	void revisitInPlace(const BackwardRevisit &br);
 
