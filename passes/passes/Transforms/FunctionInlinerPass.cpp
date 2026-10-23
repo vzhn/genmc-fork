@@ -16,6 +16,7 @@
 
 #include <llvm/ADT/SCCIterator.h>
 #include <llvm/Analysis/CallGraph.h>
+#include <llvm/Analysis/InlineCost.h>
 #include <llvm/Analysis/PostDominators.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/InstIterator.h>
@@ -81,6 +82,11 @@ auto FunctionInlinerPass::run(Module &M, ModuleAnalysisManager & /*AM*/) -> Pres
 			 * and GenMC's own functions */
 			if (F == nullptr || F->empty() || F->isDeclaration() ||
 			    isInternalFunction(F->getName().str()))
+				continue;
+			/* Nor functions that cannot be inlined: e.g., a variadic
+			 * one that calls va_start() (its copy would call it in a
+			 * function that is not variadic: a broken module) */
+			if (!isInlineViable(*F).isSuccess())
 				continue;
 			changed |= inlineFunction(*F);
 		}
