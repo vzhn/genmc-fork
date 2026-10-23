@@ -1,10 +1,16 @@
 include(FetchContent)
 
+# The test libraries are for the tests only: `cmake --install` leaves them
+# out (EXCLUDE_FROM_ALL drops their install rules; INSTALL_GTEST for a CMake
+# before 3.28, which ignores it)
+
 # Fetch googletest
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+  EXCLUDE_FROM_ALL
 )
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 # set(CMAKE_CXX_STANDARD 20)
 FetchContent_MakeAvailable(googletest)
 
@@ -12,6 +18,7 @@ FetchContent_MakeAvailable(googletest)
 FetchContent_Declare(
   rapidcheck
   URL https://github.com/emil-e/rapidcheck/archive/6e8dadfdafa3a74eabb52ead87f8787f72eccd0b.zip
+  EXCLUDE_FROM_ALL
 )
 set(RC_ENABLE_GTEST ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(rapidcheck)
