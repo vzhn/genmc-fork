@@ -60,6 +60,7 @@ set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/Rules/ExhaustiveConsistency.cpp
   genmc/Verification/Rules/HelpingCasRules.cpp
   genmc/Verification/Rules/InPlaceRevisits.cpp
+  genmc/Verification/Rules/KeptEventAlignment.cpp
   genmc/Verification/Core/Explorer.cpp
   genmc/Verification/Core/ExplorationCore.cpp
   genmc/Verification/State/ExplorationStack.cpp

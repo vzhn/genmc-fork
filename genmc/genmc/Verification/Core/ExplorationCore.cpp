@@ -42,6 +42,7 @@
 #include "genmc/Verification/Rules/ErrorRules.hpp"
 #include "genmc/Verification/Rules/HelpingCasRules.hpp"
 #include "genmc/Verification/Rules/InPlaceRevisits.hpp"
+#include "genmc/Verification/Rules/KeptEventAlignment.hpp"
 #include "genmc/Verification/Rules/SpinloopRules.hpp"
 #include "genmc/Verification/Report/GraphPrinting.hpp"
 #include "genmc/Verification/Checks/Invariants.hpp"
@@ -412,11 +413,9 @@ auto ExplorationCore::isExecutionDrivenByGraph(Event curr) -> bool
 
 auto ExplorationCore::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 {
-	auto &g = getExec().getGraph();
+	using Kind = kept_events::Alignment::Kind;
+
 	auto sub = curr.index - currKeyBase.index;
-	auto isOwn = [&](const EventLabel *oLab) {
-		return oLab->getKey() && *oLab->getKey() == *currKey && oLab->getKeySub() == sub;
-	};
 	/* No such run: it is dropped, and the event being aligned is not added
 	 * (handleLoad(), handleStore() and handleThreadFinish() reset their
 	 * instruction; the other kinds go into the hole, harmlessly). Before,
@@ -428,52 +427,37 @@ auto ExplorationCore::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 		keptRuns_.dropRun();
 		moot();
 	};
-	auto later = [&g, curr] {
-		auto size = g.getThreadSize(curr.thread);
-		return std::views::iota(std::min(curr.index + 1, size), size) |
-		       std::views::transform([&g, curr](int i) {
-			       return g.getEventLabel(Event(curr.thread, i));
-		       }) |
-		       std::views::filter([](auto *oLab) { return !genmc::isa<EmptyLabel>(oLab); });
-	};
 
-	if (lab != nullptr && !genmc::isa<EmptyLabel>(lab)) {
-		if (isOwn(lab))
-			return true;
-		if (!lab->getKey())
-			checkReplayKey(lab, sub); /* a missing key is an error still */
-
-		/* A new event before kept ones. If the kept events include this
-		 * instance's, the ones in between would be skipped: no such run */
-		auto skipsKept = std::ranges::any_of(later(), isOwn);
-		if (skipsKept) {
-			relocateExecution(curr.thread, curr.index, 1);
-			dropRun();
-			return false;
-		}
-		/* Open a gap (doubling on repeats; the surplus is closed later) */
+	auto alignment = kept_events::align(getExec().getGraph(), curr, *currKey, sub);
+	switch (alignment.kind) {
+	case Kind::Own:
+		return true;
+	case Kind::MissingKey:
+		checkReplayKey(lab, sub); /* a missing key is an error still */
+		return false;
+	case Kind::ShiftAndDrop:
+		relocateExecution(curr.thread, curr.index, 1);
+		dropRun();
+		return false;
+	case Kind::OpenGap:
+		/* (Doubling on repeats; the surplus is closed later) */
 		relocateAndRerun(curr.thread, curr.index,
 				 1 << std::min(keptRuns_.relocationsInRun(), 10U));
 		return false;
-	}
-
-	/* A hole: fill it, unless this instance's event is kept further on:
-	 * after holes only (the old path was longer), move it here; after other
-	 * kept events, those would be skipped: no such run, as above */
-	auto rest = later();
-	auto first = std::ranges::begin(rest);
-	if (first == std::ranges::end(rest))
+	case Kind::FillHole:
 		return false;
-	if (!isOwn(*first)) {
-		if (std::ranges::any_of(rest, isOwn)) {
-			dropRun();
-			return false;
-		}
+	case Kind::Drop:
+		dropRun();
+		return false;
+	case Kind::FillBeforeKept:
 		keptRuns_.addedBeforeKept();
 		return false;
+	case Kind::MoveHere:
+		relocateAndRerun(curr.thread, alignment.from, curr.index - alignment.from);
+		return true;
 	}
-	relocateAndRerun(curr.thread, (*first)->getIndex(), curr.index - (*first)->getIndex());
-	return true;
+	UNREACHABLE();
+	return false;
 }
 
 void ExplorationCore::relocateExecution(int thread, int from, int delta)
