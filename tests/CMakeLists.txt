@@ -4,7 +4,8 @@ add_test(
     COMMAND bash -c "${SCRIPT_DIR}/fast-driver.sh > ${SCRIPT_DIR}/fast-driver.log"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-set_tests_properties(fast-driver PROPERTIES LABELS "integration;fast" TIMEOUT 600)
+set_tests_properties(fast-driver PROPERTIES LABELS "integration;fast" TIMEOUT 600
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
 # The correct/ tests under -sc, which fast-driver leaves out
 add_test(NAME sc-driver
@@ -57,7 +58,7 @@ set_tests_properties(run-relinche-spec PROPERTIES LABELS "integration;relinche" 
 
 if(SANITIZE MATCHES "address")
   set(_asan_env "ASAN_OPTIONS=detect_leaks=0:halt_on_error=0")
-  set_tests_properties(fast-driver randomize-driver run-parallel PROPERTIES
+  set_property(TEST fast-driver randomize-driver run-parallel APPEND PROPERTY
       ENVIRONMENT "${_asan_env}")
 endif()
 
