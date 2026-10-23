@@ -17,6 +17,18 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 GenMC="${GenMC:-$DIR/../RelWithDebInfo/bin/genmc}"
 GENMCFLAGS="${GENMCFLAGS:-}"
+
+# A memory limit for everything this script runs (KiB of virtual memory, or
+# "unlimited"): a test that runs away, e.g. an unbounded loop under a model
+# without the test's bounding arguments (#188), then fails instead of
+# exhausting the machine. A soft limit, so a stricter one already set stays.
+# Sanitizer builds reserve terabytes of address space: they run without it.
+GENMC_MEMORY_LIMIT="${GENMC_MEMORY_LIMIT:-16000000}"
+if grep -qaE '__(asan|tsan|msan)_init' "${GenMC}" 2>/dev/null; then
+	GENMC_MEMORY_LIMIT=unlimited
+fi
+ulimit -S -v "${GENMC_MEMORY_LIMIT}" ||
+	{ echo "driver.sh: cannot set the memory limit to ${GENMC_MEMORY_LIMIT} (GENMC_MEMORY_LIMIT)" >&2; exit 1; }
 # The models to test (space-separated in the MODELS environment variable, e.g. MODELS="sc rc11")
 MODELS=(${MODELS:-rc11 imm lkmm})
 

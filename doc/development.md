@@ -23,7 +23,10 @@ Environment variables to affect the testing scripts:
 ```shell
   GenMC="path/to/genmc/executable"  # Select the GenMC executable to use for the test (default: `${SCRIPT_DIR}/../RelWithDebInfo/bin/genmc`)
   GENMCFLAGS="--flag --another"     # Pass extra flags to any GenMC invocation.
+  GENMC_MEMORY_LIMIT=16000000       # Virtual memory per process, in KiB, or "unlimited" (default: 16000000; sanitizer builds: unlimited)
 ```
+
+`scripts/driver.sh` runs everything under that limit, so that a test that runs away (for example, a `tests/wrong` test with an unbounded loop under a model that lacks its bounding arguments) fails out of memory instead of exhausting the machine.
 
 Example:
 ```shell
