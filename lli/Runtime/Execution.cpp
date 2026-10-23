@@ -1045,6 +1045,38 @@ void Interpreter::visitFCmpInst(FCmpInst &I)
 	SetValue(&I, R, SF);
 }
 
+/* The only unary operator is fneg (-x on floating-point values) */
+void Interpreter::visitUnaryOperator(UnaryOperator &I)
+{
+	ExecutionContext &SF = ECStack().back();
+	Type *Ty = I.getOperand(0)->getType();
+	GenericValue Src = getOperandValue(I.getOperand(0), SF);
+	GenericValue R; // Result
+
+	updateDataDeps(getCurThr().id, &I, I.getOperand(0));
+
+	if (I.getOpcode() != Instruction::FNeg) {
+		dbgs() << "Don't know how to handle this unary operator!\n-->" << I;
+		llvm_unreachable(nullptr);
+	}
+	auto negate = [&](const GenericValue &v, Type *elemTy, GenericValue &r) {
+		if (elemTy->isFloatTy())
+			r.FloatVal = -v.FloatVal;
+		else if (elemTy->isDoubleTy())
+			r.DoubleVal = -v.DoubleVal;
+		else
+			llvm_unreachable("Unhandled type for FNeg instruction");
+	};
+	if (auto *VTy = dyn_cast<VectorType>(Ty)) {
+		R.AggregateVal.resize(Src.AggregateVal.size());
+		for (unsigned i = 0; i < R.AggregateVal.size(); ++i)
+			negate(Src.AggregateVal[i], VTy->getElementType(), R.AggregateVal[i]);
+	} else {
+		negate(Src, Ty, R);
+	}
+	SetValue(&I, R, SF);
+}
+
 void Interpreter::visitBinaryOperator(BinaryOperator &I)
 {
 	ExecutionContext &SF = ECStack().back();
