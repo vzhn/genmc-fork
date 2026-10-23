@@ -574,7 +574,14 @@ void ExecutionGraph::copyGraphUpTo(ExecutionGraph &other, const VectorClock &v) 
 		/* Skip the initializer */
 		if (i != 0)
 			other.addLabelToGraph(getEventLabel(Event(i, 0))->clone());
-		for (auto j = 1; j <= v.getMax(i); j++) {
+		/* A hole stands for an event before kept ones, so the copy of a
+		 * thread ends at its last event that v contains and that is not
+		 * a hole itself (cf. DepExecutionGraph::cutToStamp()) */
+		auto last = v.getMax(i);
+		while (last > 0 && (!v.contains(Event(i, last)) ||
+				    genmc::isa<EmptyLabel>(getEventLabel(Event(i, last)))))
+			--last;
+		for (auto j = 1; j <= last; j++) {
 			if (!v.contains(Event(i, j))) {
 				other.addLabelToGraph(createHoleLabel(Event(i, j)));
 				continue;

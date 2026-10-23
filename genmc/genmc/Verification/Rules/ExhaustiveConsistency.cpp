@@ -43,10 +43,15 @@ auto ExhaustiveConsistency::recomputeViews(ExecutionGraph &g) -> bool
 			settled &= had && same(old, lab.view(hb));
 		}
 	}
+	dropPrefixViews(g);
+	return settled;
+}
+
+void ExhaustiveConsistency::dropPrefixViews(ExecutionGraph &g)
+{
 	for (auto &lab : g.labels())
 		if (!genmc::isa<InitLabel>(&lab))
 			lab.setPrefixView(nullptr);
-	return settled;
 }
 
 auto ExhaustiveConsistency::isGraphConsistent(const ExecutionGraph &g) const -> bool
