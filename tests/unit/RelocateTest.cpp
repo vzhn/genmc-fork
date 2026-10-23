@@ -162,3 +162,28 @@ TEST(RelocateTest, ViewWithPendingDiffMovesDown)
 	EXPECT_EQ(v.getMax(1), 3);
 	EXPECT_EQ(v.getMax(2), 4);
 }
+
+TEST(RelocateTest, ALabelFillsAHoleInTheLastSlot)
+{
+	/* A hole can be a thread's last label: the events a revisit kept after
+	 * it are gone (#180). The label for its position fills it; it used to
+	 * be appended after it, at a slot its position does not name, which
+	 * DepExecutionGraph::cutToStamp() then freed but kept listed */
+	TestGraph g;
+	g.addFence(); /* (0, 1) */
+	g.addFence(); /* (0, 2) */
+	g.graph.relocateThread(0, 2, 1);
+	g.graph.removeLast(0); /* the fence moved to (0, 3) */
+	ASSERT_EQ(g.graph.getThreadSize(0), 3);
+	ASSERT_TRUE(genmc::isa<EmptyLabel>(g.graph.getEventLabel(Event(0, 2))));
+
+	auto lab = FenceLabel::create(Event(0, 2), MemOrdering::SequentiallyConsistent);
+	lab->setViews({View()});
+	auto *added = g.graph.add(std::move(lab));
+
+	EXPECT_EQ(g.graph.getThreadSize(0), 3);
+	EXPECT_EQ(g.graph.getEventLabel(Event(0, 2)), added);
+	EXPECT_EQ(added->getPos(), Event(0, 2));
+	EXPECT_EQ(g.graph.getLastThreadLabel(0), added);
+	EXPECT_EQ(g.graph.po_imm_pred(added)->getPos(), Event(0, 1));
+}

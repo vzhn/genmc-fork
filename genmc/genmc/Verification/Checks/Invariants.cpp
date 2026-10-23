@@ -95,6 +95,9 @@ void checkThreads(const ExecutionGraph &g, const Context &ctx)
 	for (auto t : g.thr_ids()) {
 		if (g.isThreadEmpty(t))
 			failI1(std::format("thread {} has no labels", t));
+		/* A hole stands for an event before ones a revisit kept (#180) */
+		if (genmc::isa<EmptyLabel>(g.getLastThreadLabel(t)))
+			failI1(std::format("thread {} ends with a hole", t));
 		const auto *first = g.getEventLabelIfPresent(Event(t, 0));
 		if (first == nullptr)
 			failI1(std::format("thread {} has no label at index 0", t));
