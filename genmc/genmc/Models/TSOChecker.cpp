@@ -1732,10 +1732,12 @@ bool TSOChecker::visitLHSUnlessError3Iterative(std::vector<DFSWorklistEntry> &wo
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (true && genmc::isa<FreeLabel>(lab) && !genmc::isa<HpRetireLabel>(lab))
 				if (auto tmpE = g.free_pos(lab); tmpE) {
+					cexLab = g.getEventLabelIfPresent(*tmpE);
 					return false;
 				}
 			if (true && genmc::isa<HpRetireLabel>(lab))
 				if (auto tmpE = g.free_pos(lab); tmpE) {
+					cexLab = g.getEventLabelIfPresent(*tmpE);
 					return false;
 				}
 
@@ -1903,10 +1905,12 @@ bool TSOChecker::visitLHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &wo
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (true && genmc::isa<ReadLabel>(lab))
 				if (auto tmpE = g.free_pos(lab); tmpE) {
+					cexLab = g.getEventLabelIfPresent(*tmpE);
 					return false;
 				}
 			if (true && genmc::isa<WriteLabel>(lab))
 				if (auto tmpE = g.free_pos(lab); tmpE) {
+					cexLab = g.getEventLabelIfPresent(*tmpE);
 					return false;
 				}
 
@@ -2058,6 +2062,7 @@ bool TSOChecker::visitLHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &wo
 			    g.retire_pos(lab).has_value() &&
 			    !isHazptrProtected(genmc::dyn_cast<MemAccessLabel>(lab)))
 				if (auto tmpE = g.retire_pos(lab); tmpE) {
+					cexLab = g.getEventLabelIfPresent(*tmpE);
 					return false;
 				}
 
