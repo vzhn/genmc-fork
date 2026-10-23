@@ -597,9 +597,6 @@ private:
 	/** Helper: Wake up any threads blocked on a helping CAS */
 	void unblockWaitingHelping(const WriteLabel *lab);
 
-	auto writesBeforeHelpedContainedInView(const HelpedCasReadLabel *lab, const View &view)
-		-> bool;
-
 	/** Helper: Returns whether there is a valid helped-CAS which the helping-CAS
 	 * to be added will be helping. (If an invalid helped-CAS exists, this
 	 * method raises an error.) */

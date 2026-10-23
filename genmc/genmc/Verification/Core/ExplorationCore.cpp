@@ -40,6 +40,8 @@
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/Core/DriverHandlerDispatcher.hpp"
 #include "genmc/Verification/Rules/ErrorRules.hpp"
+#include "genmc/Verification/Rules/HelpingCasRules.hpp"
+#include "genmc/Verification/Rules/InPlaceRevisits.hpp"
 #include "genmc/Verification/Rules/SpinloopRules.hpp"
 #include "genmc/Verification/Report/GraphPrinting.hpp"
 #include "genmc/Verification/Checks/Invariants.hpp"
@@ -796,45 +798,16 @@ void ExplorationCore::unblockWaitingHelping(const WriteLabel *lab)
 	}
 }
 
-auto ExplorationCore::writesBeforeHelpedContainedInView(const HelpedCasReadLabel *lab, const View &view)
-	-> bool
-{
-	auto &g = getExec().getGraph();
-	const auto &hb = getConsChecker().getHbView(lab);
-
-	for (auto i = 0; i < hb.size(); i++) {
-		auto j = hb.getMax(i);
-		while (!genmc::isa<WriteLabel>(g.getEventLabel(Event(i, j))) && j > 0)
-			--j;
-		if (j > 0 && !view.contains(Event(i, j)))
-			return false;
-	}
-	return true;
-}
-
 auto ExplorationCore::checkHelpingCasCondition(const HelpingCasLabel *hLab) -> bool
 {
 	auto &g = getExec().getGraph();
-
-	auto hsView = g.labels() | std::views::filter([hLab](auto &lab) {
-			      auto *rLab = genmc::dyn_cast<HelpedCasReadLabel>(&lab);
-			      return rLab && rLab->isRMW() && rLab->getAddr() == hLab->getAddr() &&
-				     rLab->getSize() == hLab->getSize() &&
-				     rLab->getOrdering() == hLab->getOrdering() &&
-				     rLab->getExpected() == hLab->getExpected() &&
-				     rLab->getSwapVal() == hLab->getSwapVal();
-		      });
-
-	/* (Against the helping CAS's view: the helped CAS's own view contains
-	 * them all) */
-	if (std::ranges::any_of(hsView, [this, hLab](auto &lab) {
-		    auto *helped = genmc::dyn_cast<HelpedCasReadLabel>(&lab);
-		    return !writesBeforeHelpedContainedInView(helped,
-							      getConsChecker().getHbView(hLab));
+	auto helped = helping_cas::helpedCases(g, *hLab);
+	if (std::ranges::any_of(helped, [&](auto *rLab) {
+		    return !helping_cas::seesStoresBeforeHelped(g, getConsChecker(), *rLab, *hLab);
 	    }))
 		ERROR("Helped/Helping CAS annotation error! "
 		      "Not all stores before helped-CAS are visible to helping-CAS!");
-	return std::ranges::begin(hsView) != std::ranges::end(hsView);
+	return !helped.empty();
 }
 
 auto ExplorationCore::findConsistentRf(ReadLabel *rLab, std::vector<EventLabel *> &rfs) -> EventLabel *
@@ -1904,29 +1877,10 @@ auto ExplorationCore::tryOptimizeBarrierRevisits(BIncFaiWriteLabel *sLab,
 	if (!checkBarrierWellFormedness(sLab) || !isLastInBarrierRound(sLab))
 		return true;
 
-	/* Find reads to revisit. `loads` is disregarded because it
-	 * might not contain some valid revisits (e.g., discarded due to
-	 * maximality-related optimizations) */
-	auto &g = *sLab->getParent();
-	auto *wLab = genmc::dyn_cast<ReadLabel>(g.po_imm_pred(sLab))->getRf();
-	VERIFY(wLab);
-	std::vector<ReadLabel *> toRevisit;
-
-	while (genmc::isa<BIncFaiWriteLabel>(wLab) &&
-	       !isLastInBarrierRound(genmc::dyn_cast<BIncFaiWriteLabel>(wLab))) {
-		auto *nLab = g.po_imm_succ(wLab);
-		if (nLab) {
-			VERIFY(genmc::isa<BWaitReadLabel>(nLab));
-			toRevisit.push_back(genmc::cast<ReadLabel>(nLab));
-		}
-		wLab = genmc::dyn_cast<ReadLabel>(g.po_imm_pred(wLab))->getRf();
-	}
-
 	/* Finally, revisit in place */
-	for (auto *lab : toRevisit) {
-		VERIFY(genmc::isa<BWaitReadLabel>(lab));
-		revisitInPlace(*getBackwardRevisits().construct(lab, sLab));
-	}
+	auto &g = getExec().getGraph();
+	for (auto pos : in_place::barrierWaits(*sLab))
+		revisitInPlace(*getBackwardRevisits().construct(g.getReadLabel(pos), sLab));
 	return true;
 }
 
@@ -1937,10 +1891,7 @@ void ExplorationCore::tryOptimizeIPRs(const WriteLabel *sLab, std::vector<ReadLa
 
 	std::vector<ReadLabel *> toIPR;
 	std::erase_if(loads, [&](auto *rLab) {
-		/* Treatment of blocked CASes is different */
-		auto blocked =
-			!genmc::isa<CasReadLabel>(rLab) && rLab->getAnnot() &&
-			!rLab->valueMakesAssumeSucceed(rLab->getAccessValue(rLab->getAccess()));
+		auto blocked = in_place::blocksOnAnnotation(*rLab);
 		if (blocked)
 			toIPR.push_back(rLab);
 		return blocked;

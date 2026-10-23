@@ -40,6 +40,7 @@
 #include "genmc/Verification/Config.hpp"
 #include "genmc/Verification/Core/DriverHandlerDispatcher.hpp"
 #include "genmc/Verification/Rules/ErrorRules.hpp"
+#include "genmc/Verification/Rules/HelpingCasRules.hpp"
 #include "genmc/Verification/Report/GraphPrinting.hpp"
 #include "genmc/Verification/Checks/Invariants.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
@@ -196,47 +197,8 @@ auto GenMCDriver::handleExecutionStart() -> bool
 
 void GenMCDriver::checkHelpingCasAnnotation()
 {
-	/* If we were waiting for a helped CAS that did not appear, complain */
-	auto &g = getExec().getGraph();
-	for (auto i = 0; i < g.getNumThreads(); i++) {
-		if (genmc::isa<HelpedCASBlockLabel>(g.getLastThreadLabel(i)))
-			ERROR("Helped/Helping CAS annotation error! Does helped CAS always "
-			      "execute?");
-	}
-
-	/* Next, we need to check whether there are any extraneous
-	 * stores, not visible to the helped/helping CAS */
-	for (auto &lab : g.labels() | std::views::filter([](auto &lab) {
-				 return genmc::isa<HelpingCasLabel>(&lab);
-			 })) {
-		auto *hLab = genmc::dyn_cast<HelpingCasLabel>(&lab);
-
-		/* Check that all stores that would make this helping
-		 * CAS succeed are read by a helped CAS.
-		 * We don't need to check the swap value of the helped CAS */
-		if (std::ranges::any_of(g.co(hLab->getAddr()), [&](auto &sLab) {
-			    return hLab->getExpected() == sLab.getVal() &&
-				   std::ranges::none_of(sLab.readers(), [&](auto &rLab) {
-					   return genmc::isa<HelpedCasReadLabel>(&rLab);
-				   });
-		    }))
-			ERROR("Helped/Helping CAS annotation error! "
-			      "Unordered store to helping CAS location!");
-
-		/* Special case for the initializer (as above) */
-		if (hLab->getAddr().isStatic() &&
-		    hLab->getExpected() == g.getInitVal(hLab->getAccess())) {
-			auto rsView = g.labels() | std::views::filter([hLab](auto &lab) {
-					      auto *rLab = genmc::dyn_cast<ReadLabel>(&lab);
-					      return rLab && rLab->getAddr() == hLab->getAddr();
-				      });
-			if (std::ranges::none_of(rsView, [&](auto &lab) {
-				    return genmc::isa<HelpedCasReadLabel>(&lab);
-			    }))
-				ERROR("Helped/Helping CAS annotation error! "
-				      "Unordered store to helping CAS location!");
-		}
-	}
+	if (auto error = helping_cas::annotationError(getExec().getGraph()))
+		ERROR("Helped/Helping CAS annotation error! {}", *error);
 }
 
 #ifdef ENABLE_GENMC_DEBUG
