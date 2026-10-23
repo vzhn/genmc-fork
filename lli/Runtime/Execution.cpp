@@ -1251,20 +1251,6 @@ void Interpreter::freeAllocas(const AllocaHolder &allocas)
 			    StorageDuration::SD_Automatic, GET_DEPS(deps));
 }
 
-void Interpreter::exitCalled(GenericValue GV)
-{
-	// runAtExitHandlers() assumes there are no stack frames, but
-	// if exit() was called, then it had a stack frame. Blow away
-	// the stack before interpreting atexit handlers.
-	WARN_ONCE("exit-called", "Usage of exit() is not thread-safe!\n");
-	while (ECStack().size() > 0) {
-		freeAllocas(ECStack().back().Allocas);
-		ECStack().pop_back(); /* FIXME: Now assumes the user has properly used it */
-	}
-	runAtExitHandlers();
-	// exit(GV.IntVal.zextOrTrunc(32).getZExtValue());
-}
-
 /// Pop the last stack frame off of ECStack and then copy the result
 /// back into the result variable if we are not returning void. The
 /// result variable may be the ExitValue, or the Value of the calling
@@ -3597,6 +3583,24 @@ void Interpreter::callFunction(Function *F, const std::vector<GenericValue> &Arg
 	/* abort() ends the program with an error, not GenMC */
 	if (F->isDeclaration() && F->getName() == "abort") {
 		CALL_DRIVER(handleError, currDbgInfo(), currPos(), "Program aborted");
+		return;
+	}
+
+	/* exit() ends the calling thread, as returning its status from the
+	 * thread's function would (for main, after the atexit() handlers; the
+	 * other threads go on, as they do after main returns) */
+	if (F->isDeclaration() && F->getName() == "exit") {
+		WARN_ONCE("exit-called", "Usage of exit() is not thread-safe!\n");
+		DepInfo exitDeps;
+		if (const auto *d =
+			    getDataDeps(getCurThr().id, ECStack().back().Caller.arg_begin()[0]))
+			exitDeps = *d;
+		while (ECStack().size() > 1) {
+			freeAllocas(ECStack().back().Allocas);
+			ECStack().pop_back();
+		}
+		popStackAndReturnValueToCaller(F->getFunctionType()->getParamType(0), ArgVals[0],
+					       nullptr, exitDeps);
 		return;
 	}
 

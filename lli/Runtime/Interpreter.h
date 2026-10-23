@@ -777,7 +777,6 @@ public:
 	}
 
 	GenericValue callExternalFunction(Function *F, const std::vector<GenericValue> &ArgVals);
-	void exitCalled(GenericValue GV);
 
 	void addAtExitHandler(Function *F) { dynState.AtExitHandlers.push_back(F); }
 
