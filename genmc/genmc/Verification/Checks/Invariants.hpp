@@ -161,6 +161,12 @@ void checkResume(const ExecutionGraph &g, const GraphFingerprint &saved,
 void checkResumeSchedule(const ExecutionGraph &g, const std::vector<Event> &schedule,
 			 const Context &ctx);
 
+/** I5: G, a complete execution the exploration counts, satisfies the memory
+ * model's axioms as a whole (CONSISTENT: the model's whole-graph check).
+ * The exploration checks each event as it adds it, and relies on those
+ * checks implying the whole-graph one */
+void checkConsistency(const ExecutionGraph &g, bool consistent, const Context &ctx);
+
 /** Reports a violation of INVARIANT (WHAT describes it) and aborts; G is printed if given */
 [[noreturn]] void fail(std::string_view invariant, const std::string &what, const ExecutionGraph *g,
 		       const Context &ctx,

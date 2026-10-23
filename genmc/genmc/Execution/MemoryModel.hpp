@@ -22,6 +22,33 @@
 
 enum class ModelType : std::uint8_t { SC = 0, TSO = 1, RA = 2, RC11 = 3, IMM = 4, LKMM = 5 };
 
+/** Whether, under MODEL, putting an RMW's write part right after the write
+ * its read part reads (not necessarily the last write of the location) can
+ * make a consistent graph inconsistent, so that the graph must be checked
+ * again once the write is placed (ExplorationCore::isPlacementConsistent()).
+ * proofs/alloy/rmw-placement.als finds a counterexample under TSO and none
+ * under SC, RA and RC11 (scripts/check-alloy-proofs.sh, ctest formal-models,
+ * checks this table against it); IMM and LKMM are not modelled, and are
+ * checked (LKMM: a cycle through prop is known) */
+constexpr auto rmwPlacementNeedsCheck(ModelType model) -> bool
+{
+	switch (model) {
+	case ModelType::SC:
+		return false;
+	case ModelType::TSO:
+		return true;
+	case ModelType::RA:
+		return false;
+	case ModelType::RC11:
+		return false;
+	case ModelType::IMM:
+		return true;
+	case ModelType::LKMM:
+		return true;
+	}
+	return true;
+}
+
 /** Make `ModelType` formattable with `std::format`. */
 template <> struct std::formatter<ModelType> {
 	constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }

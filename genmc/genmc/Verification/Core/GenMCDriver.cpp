@@ -371,6 +371,17 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 
 	GENMC_DEBUG(if (getConf()->boundsHistogram && inVerificationMode()) trackExecutionBound(););
 
+	/* The checks made as events are added must imply that the execution
+	 * satisfies the model's axioms as a whole (I5) */
+	if (checksInvariants() || executionHook_) {
+		const auto consistent = getConsChecker().isConsistent(g);
+		if (executionHook_)
+			executionHook_(g, consistent);
+		if (checksInvariants())
+			invariants::checkConsistency(g, consistent,
+						     invariantContext("completing an execution"));
+	}
+
 	++result.explored;
 	if (fullExecutionExceedsBound())
 		++result.boundExceeding;

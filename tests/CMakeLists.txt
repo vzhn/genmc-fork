@@ -14,6 +14,14 @@ add_test(NAME sc-driver
 set_tests_properties(sc-driver PROPERTIES LABELS "integration;fast" TIMEOUT 600
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+# The correct/infr tests under -tso (a test runs iff it has an expected.tso.mo.in)
+add_test(NAME tso-driver
+    COMMAND bash -c "e=$(mktemp -d) && MODELS=tso CORRECT_DIRS=${CMAKE_SOURCE_DIR}/tests/correct/infr WRONG_DIRS=$e ${SCRIPT_DIR}/driver.sh --fast; rc=$?; rmdir $e; exit $rc"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(tso-driver PROPERTIES LABELS "integration;fast" TIMEOUT 300
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 # The test scripts run a last configuration line without a newline too (#176)
 add_test(NAME driver-last-line
     COMMAND bash -c "${SCRIPT_DIR}/check-driver-last-line.sh"
@@ -172,6 +180,17 @@ set_tests_properties(core-layering PROPERTIES LABELS "fast" TIMEOUT 60)
 
 # Unit tests
 add_subdirectory(unit)
+
+# Alloy proofs (proofs/alloy) and the code tables that rely on them:
+# rmwPlacementNeedsCheck() against proofs/alloy/rmw-placement.als
+find_program(ALLOY_EXECUTABLE alloy)
+if(ALLOY_EXECUTABLE)
+  add_test(NAME formal-models
+      COMMAND bash -c "ALLOY=${ALLOY_EXECUTABLE} ${SCRIPT_DIR}/check-alloy-proofs.sh"
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  )
+  set_tests_properties(formal-models PROPERTIES LABELS "models" TIMEOUT 900 SKIP_RETURN_CODE 77)
+endif()
 
 # TLA+ models of the error replay and the worker pool (models/tla): the fixed
 # configurations must pass, the bug configurations must reproduce their bug
