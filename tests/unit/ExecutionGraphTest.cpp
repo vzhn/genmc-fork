@@ -6,6 +6,7 @@
 #include "StubChecker.hpp"
 #include "genmc/ADT/DepView.hpp"
 #include "genmc/Models/ConsistencyChecker.hpp"
+#include "genmc/Execution/DepExecutionGraph.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Execution/GraphUtils.hpp"
@@ -461,4 +462,35 @@ TEST(ExecutionGraphTest, InvariantRejectsBeginWithCutCreate)
 	g.graph.cutToStamp(g.graph.getEventLabel(Event(0, 0))->getStamp());
 	EXPECT_EQ(g.graph.getNumThreads(), 1);
 	invariants::checkGraph(g.graph, ctx);
+}
+
+/* -exhaustive under IMM (#180): restricting a dependency-tracking graph to a
+ * stamp keeps each thread up to its last label at or below the stamp, and a
+ * hole can be that label, with the events a revisit kept after it above the
+ * stamp. The thread must not end with that hole: the thread's next event
+ * would go to the hole's slot and follow holes that stand for nothing (and,
+ * before ExecutionGraph::addLabelToGraph() filled such a hole, it went after
+ * it, at a slot its position did not name) */
+TEST(ExecutionGraphTest, CutToStampLeavesNoTrailingHole)
+{
+	StubChecker checker;
+	DepExecutionGraph g{ExecutionGraph::Config{.memModel = &checker}};
+	auto fence = [&](int i) {
+		auto lab = FenceLabel::create(Event(0, i), MemOrdering::SequentiallyConsistent);
+		lab->setViews({View()});
+		return g.add(std::move(lab));
+	};
+	fence(1);
+	fence(2);
+	g.relocateThread(0, 2, 1); /* a hole at (0, 2), the fence moves to (0, 3) */
+	g.removeLast(0);
+	ASSERT_TRUE(genmc::isa<EmptyLabel>(g.getEventLabel(Event(0, 2))));
+	fence(3); /* kept after the hole, with a later stamp */
+
+	/* The hole at the stamp, the event after it above it */
+	g.cutToStamp(g.getEventLabel(Event(0, 2))->getStamp());
+
+	EXPECT_EQ(g.getThreadSize(0), 2);
+	EXPECT_FALSE(genmc::isa<EmptyLabel>(g.getLastThreadLabel(0)));
+	invariants::checkGraph(g, invariants::Context{.where = "a unit test"});
 }

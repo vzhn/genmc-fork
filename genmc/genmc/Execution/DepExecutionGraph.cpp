@@ -120,6 +120,29 @@ void DepExecutionGraph::cutToStamp(Stamp stamp)
 			poLists[i].insert(it, *getEventLabel(Event(i, j)));
 		}
 	}
+
+	/* A hole stands for an event before ones a revisit kept. The view's last
+	 * event of a thread can be one the view does not contain: the hole it
+	 * becomes would be the thread's last label, with nothing kept after it,
+	 * and the thread's next event, which goes to its slot, would then follow
+	 * holes that stand for nothing (#180). Such holes go */
+	auto trimmed = false;
+	for (auto i = 0; i < getNumThreads(); i++) {
+		auto &thr = events[i];
+		while (!thr.empty() && genmc::isa<EmptyLabel>(&*thr.back())) {
+			auto &hole = *thr.back();
+			poLists[i].remove(hole);
+			insertionOrder.remove(hole);
+			thr.pop_back();
+			trimmed = true;
+		}
+	}
+	/* (and the stamps stay dense) */
+	if (trimmed) {
+		resetStamp(0U);
+		for (auto &lab : labels())
+			lab.setStamp(nextStamp());
+	}
 }
 
 auto DepExecutionGraph::getCopyUpTo(const VectorClock &v) const -> std::unique_ptr<ExecutionGraph>

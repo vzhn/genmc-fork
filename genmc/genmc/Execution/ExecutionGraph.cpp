@@ -165,9 +165,12 @@ auto ExecutionGraph::addLabelToGraph(std::unique_ptr<EventLabel> lab) -> EventLa
 		accessMap_[dLab->getAddr()].push_back(&*lab);
 	}
 
+	/* A label for a slot the thread has fills the hole there: one before
+	 * events a revisit kept, or one that is the thread's last label, when
+	 * the kept events after it are gone (#180). Appending it instead would
+	 * put it at a slot its position does not name */
 	auto pos = lab->getPos();
-	auto *lastLab = getLastThreadLabel(pos.thread);
-	if (lastLab && pos.index < lastLab->getIndex()) {
+	if (std::cmp_less(pos.index, events[pos.thread].size())) {
 		auto *eLab = getEventLabel(pos);
 		ASSERT(!eLab || genmc::isa<EmptyLabel>(eLab));
 		auto &oldLab = *events[pos.thread][pos.index];
