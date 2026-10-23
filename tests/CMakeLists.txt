@@ -14,6 +14,14 @@ add_test(NAME sc-driver
 set_tests_properties(sc-driver PROPERTIES LABELS "integration;fast" TIMEOUT 600
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+# The correct/infr tests under -tso (a test runs iff it has an expected.tso.mo.in)
+add_test(NAME tso-driver
+    COMMAND bash -c "e=$(mktemp -d) && MODELS=tso CORRECT_DIRS=${CMAKE_SOURCE_DIR}/tests/correct/infr WRONG_DIRS=$e ${SCRIPT_DIR}/driver.sh --fast; rc=$?; rmdir $e; exit $rc"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(tso-driver PROPERTIES LABELS "integration;fast" TIMEOUT 300
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 # The test scripts run a last configuration line without a newline too (#176)
 add_test(NAME driver-last-line
     COMMAND bash -c "${SCRIPT_DIR}/check-driver-last-line.sh"

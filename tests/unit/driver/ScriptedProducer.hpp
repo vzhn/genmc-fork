@@ -302,6 +302,8 @@ struct Exploration {
 	unsigned blocked = 0;
 	bool error = false;
 	std::set<Outcome> outcomes;
+	/** Counted executions the model's whole-graph check rejects */
+	unsigned inconsistent = 0;
 };
 
 inline auto explore(const Program &prog, ModelType model, Options opts = {}) -> Exploration
@@ -321,12 +323,17 @@ inline auto explore(const Program &prog, ModelType model, Options opts = {}) -> 
 	}
 	auto driver = GenMCDriver::create(conf);
 	Producer producer(*driver, prog);
+	auto inconsistent = 0U;
+	driver->setExecutionHook([&inconsistent](const ExecutionGraph &, bool consistent) {
+		inconsistent += consistent ? 0 : 1;
+	});
 	::explore(*driver, producer);
 	const auto &res = driver->getResult();
 	return {.explored = res.explored,
 		.blocked = res.exploredBlocked,
 		.error = res.status.has_value(),
-		.outcomes = producer.outcomes};
+		.outcomes = producer.outcomes,
+		.inconsistent = inconsistent};
 }
 
 } // namespace scripted

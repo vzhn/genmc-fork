@@ -494,3 +494,55 @@ RC_GTEST_PROP(ScriptedDriverExhaustive, RC11MatchesTheReference, ())
 {
 	checkAgainstExhaustive(*genProgram(false), ModelType::RC11);
 }
+
+/*
+ * The exploration checks each event as it adds it; those checks must imply
+ * that every execution it counts satisfies the model's axioms as a whole
+ * (the -check-invariants check I5).
+ */
+namespace {
+
+auto checkCountedExecutionsConsistent(const Program &p, ModelType model) -> void
+{
+	auto res = explore(p, model);
+	RC_ASSERT(!res.error);
+	RC_ASSERT(res.inconsistent == 0U);
+}
+
+} // namespace
+
+RC_GTEST_PROP(ScriptedDriverConsistency, SCCountsOnlyConsistentExecutions, ())
+{
+	checkCountedExecutionsConsistent(*genProgram(false), ModelType::SC);
+}
+
+RC_GTEST_PROP(ScriptedDriverConsistency, TSOCountsOnlyConsistentExecutions, ())
+{
+	checkCountedExecutionsConsistent(*genProgram(false), ModelType::TSO);
+}
+
+RC_GTEST_PROP(ScriptedDriverConsistency, RACountsOnlyConsistentExecutions, ())
+{
+	checkCountedExecutionsConsistent(*genProgram(false), ModelType::RA);
+}
+
+RC_GTEST_PROP(ScriptedDriverConsistency, RC11CountsOnlyConsistentExecutions, ())
+{
+	checkCountedExecutionsConsistent(*genProgram(false), ModelType::RC11);
+}
+
+TEST(ScriptedDriverConsistency, TSORMWWriteCannotCloseACycle)
+{
+	/* tests/correct/infr/tso-rmw-placement: the write part of thread 1's
+	 * fetch-and-add goes right after thread 2's, co-before thread 2's store
+	 * of y; with thread 2's store of x co-before thread 1's, that closes a
+	 * tso cycle (x ->mo x ->po fai ->mo y ->po x). The 12 executions are
+	 * those of SC */
+	Program p{.numVars = 2,
+		  .threads = {{ld(X)}, {st(X, 1), fai(Y, 1)}, {fai(Y, 1), st(Y, 1), st(X, 1)}}};
+	auto tso = explore(p, ModelType::TSO);
+	EXPECT_EQ(tso.inconsistent, 0U);
+	EXPECT_EQ(tso.explored, 12U);
+	EXPECT_EQ(tso.explored, explore(p, ModelType::TSO, {.exhaustive = true}).explored);
+	EXPECT_EQ(tso.outcomes, explore(p, ModelType::SC).outcomes);
+}
