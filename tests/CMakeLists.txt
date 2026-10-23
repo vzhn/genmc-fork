@@ -178,6 +178,14 @@ add_test(NAME core-layering
 )
 set_tests_properties(core-layering PROPERTIES LABELS "fast" TIMEOUT 60)
 
+# driver.sh runs genmc under a memory limit (#188)
+add_test(NAME driver-memory-limit
+    COMMAND bash -c "${SCRIPT_DIR}/check-driver-memory-limit.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(driver-memory-limit PROPERTIES LABELS "integration;fast" TIMEOUT 300
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 # Unit tests
 add_subdirectory(unit)
 
