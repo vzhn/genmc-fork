@@ -112,6 +112,19 @@ auto blindRMWReorderedWith(const GraphModel &model, const ExecutionGraph &g, con
 auto barrierNotWellFormed(const GraphModel &model, const ExecutionGraph &g,
 			  const BIncFaiWriteLabel *sLab) -> std::optional<ErrorDetails>;
 
+/** A data race of an hb-based model (C11, IMM) that involves LAB: an access
+ * of another thread that overlaps it, with a write and a non-atomic access
+ * between the two, ordered with it by hb in neither direction. With
+ * SKIPAFTERHOLES, accesses that come after a hole in their thread are not
+ * considered (see ExplorationCore::checkForRaces()). The racy label is the
+ * other access */
+auto hbRaceWith(const GraphModel &model, const ExecutionGraph &g, const EventLabel *lab,
+		bool skipAfterHoles) -> std::optional<ErrorDetails>;
+
+/** A data race of an hb-based model anywhere in G, reported at the access
+ * added later (by stamp) */
+auto hbRace(const GraphModel &model, const ExecutionGraph &g) -> std::optional<ErrorDetails>;
+
 } // namespace error_rules
 
 #endif /* GENMC_ERROR_RULES_HPP */

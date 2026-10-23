@@ -307,4 +307,48 @@ auto barrierNotWellFormed(const GraphModel &model, const ExecutionGraph &g,
 			    "Execution not barrier-well-formed!\n"};
 }
 
+static auto isAfterHole(const ExecutionGraph &g, const EventLabel *lab) -> bool
+{
+	for (auto i = 1; i < lab->getIndex(); i++)
+		if (genmc::isa<EmptyLabel>(g.getEventLabel(Event(lab->getThread(), i))))
+			return true;
+	return false;
+}
+
+static auto conflict(const MemAccessLabel *a, const MemAccessLabel *b) -> bool
+{
+	return a->getThread() != b->getThread() && a->getAccess().overlaps(b->getAccess()) &&
+	       (genmc::isa<WriteLabel>(a) || genmc::isa<WriteLabel>(b)) &&
+	       (a->isNotAtomic() || b->isNotAtomic());
+}
+
+auto hbRaceWith(const GraphModel &model, const ExecutionGraph &g, const EventLabel *lab,
+		bool skipAfterHoles) -> std::optional<ErrorDetails>
+{
+	const auto *mLab = genmc::dyn_cast<MemAccessLabel>(lab);
+	if (!mLab)
+		return {};
+	for (const auto &oLab : g.labels()) {
+		const auto *oaLab = genmc::dyn_cast<MemAccessLabel>(&oLab);
+		if (!oaLab || !conflict(mLab, oaLab) || (skipAfterHoles && isAfterHole(g, oaLab)))
+			continue;
+		if (!model.getHbView(mLab).contains(oaLab->getPos()) &&
+		    !model.getHbView(oaLab).contains(mLab->getPos()))
+			return ErrorDetails{mLab->getPos(), VerificationError::VE_RaceNotAtomic, "",
+					    oaLab};
+	}
+	return {};
+}
+
+auto hbRace(const GraphModel &model, const ExecutionGraph &g) -> std::optional<ErrorDetails>
+{
+	for (const auto &lab : g.labels()) {
+		auto race = hbRaceWith(model, g, &lab, false);
+		if (!race || race->racyLab->getStamp() > lab.getStamp())
+			continue; /* (found again from the later access) */
+		return race;
+	}
+	return {};
+}
+
 } // namespace error_rules

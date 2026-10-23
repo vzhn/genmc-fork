@@ -7,6 +7,8 @@
  * with the copy (#181). The revisit view could also end a thread at one of
  * the graph's holes, which the copy then ended with (I1).
  *
- * (-disable-race-detection: the false race of #179.)
+ * (-disable-race-detection: plain accesses are then explored in full,
+ * the exploration in which this showed; with race detection, see
+ * imm-exhaustive-fill-race.)
  */
 #include "../../pthread-cond/variants/pthread-cond.c"

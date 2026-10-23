@@ -265,6 +265,10 @@ private:
 	/** Under LKMM, reports a data race of the complete execution */
 	auto checkLkmmRace() -> std::optional<VerificationError>;
 
+	/** -exhaustive under IMM: a data race in the execution, once its
+	 * threads have reached their kept events */
+	auto checkExhaustiveRace() -> std::optional<VerificationError>;
+
 	/** Under LKMM, checks a complete execution for a misuse of SRCU (the
 	 * kernel model's flags) */
 	auto checkLkmmSrcu() -> std::optional<VerificationError>;

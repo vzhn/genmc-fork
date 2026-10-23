@@ -585,8 +585,20 @@ auto ExplorationCore::checkForRaces(const EventLabel *lab) -> std::optional<Veri
 		const EventLabel *racyLab = nullptr;
 		auto err = getConsChecker().checkErrors(lab, racyLab);
 		auto checkAnew = [&](const ExecutionGraph &cg) {
-			err = getConsChecker().checkErrors(cg.getEventLabel(lab->getPos()),
-							   racyLab);
+			const auto *cLab = cg.getEventLabel(lab->getPos());
+			err = getConsChecker().checkErrors(cLab, racyLab);
+			/* The model's race check takes each thread's last access to
+			 * the location for one added before LAB. Not so if LAB fills a
+			 * hole: a kept access after it can be after LAB in hb, and one
+			 * after a hole in its own thread is not reached yet (its thread
+			 * may move or drop it). LAB is checked against the others,
+			 * both ways; the rest are checked once the execution is
+			 * complete (see GenMCDriver::checkExhaustiveRace()) (#179) */
+			if (err == VerificationError::VE_RaceNotAtomic) {
+				auto race = error_rules::hbRaceWith(getConsChecker(), cg, cLab, true);
+				err = race ? err : std::nullopt;
+				racyLab = race ? race->racyLab : nullptr;
+			}
 			racyLab = inGraph(racyLab);
 		};
 		if (err && checksAnew)
