@@ -538,9 +538,13 @@ public:
 	[[nodiscard]] auto co() const -> Rel
 	{
 		Rel r(size());
+		/* (A store is checked before it is placed in coherence: an error
+		 * it causes is reported, and the graph checked, without its
+		 * position, #202) */
 		for (auto i = 0U; i < size(); i++)
-			if (genmc::isa_and_present<WriteLabel>(labs[i]))
-				for (const auto &sLab : g.co_succs(labs[i]))
+			if (const auto *wLab = genmc::dyn_cast_if_present<WriteLabel>(labs[i]);
+			    wLab && wLab->isInCo())
+				for (const auto &sLab : g.co_succs(wLab))
 					if (auto j = idx(&sLab); j >= 0)
 						r.set(i, j);
 		return r;
