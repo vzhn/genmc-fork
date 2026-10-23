@@ -72,9 +72,16 @@ auto View::contains(const View &v) const -> bool
 	/* Then, check whether we have to check bases as well */
 	if (!v.base_ || base_ == v.base_)
 		return true;
-	if (!base_)
-		return v.base_->empty();
-	return base_->contains(*v.base_); /* Tough luck */
+	if (base_ && base_->contains(*v.base_))
+		return true;
+
+	/* Our diff may hold what our base lacks: compare V's base with the
+	 * whole view (a view that adds its diff to a shared base equals one
+	 * that holds them all in its base) */
+	for (auto t = 0; t < v.base_->size(); t++)
+		if (v.base_->getMax(t) > getMax(t))
+			return false;
+	return true;
 }
 
 auto View::contains(const AdaptiveView &me) const -> bool { return me.containedIn(*this); }
