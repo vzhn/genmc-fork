@@ -199,7 +199,8 @@ static llvm::cl::opt<bool> clCheckInvariants(
 	llvm::cl::init(true),
 #endif
 	llvm::cl::desc("Check the invariants of graph restriction, error replay, the allocation "
-		       "map and resume points at run time (internal failure on a violation)"));
+		       "map and resume points, and that every complete execution satisfies the "
+		       "memory model, at run time (internal failure on a violation)"));
 static llvm::cl::opt<bool>
 	clDisableStopOnSystemError("disable-stop-on-system-error", llvm::cl::cat(clGeneral),
 				   llvm::cl::desc("Do not stop verification on system errors"));

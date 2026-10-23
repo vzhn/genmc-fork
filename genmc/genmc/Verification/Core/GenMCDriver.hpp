@@ -16,6 +16,7 @@
 
 #include "genmc/Verification/Core/ExplorationCore.hpp"
 
+#include <functional>
 #include <unordered_set>
 
 /**
@@ -30,6 +31,11 @@
 class GenMCDriver : public ExplorationCore {
 
 public:
+	/** Called with every complete execution the exploration counts, and
+	 * whether the memory model's whole-graph check accepts it (for tests) */
+	using ExecutionHook = std::function<void(const ExecutionGraph &, bool consistent)>;
+	void setExecutionHook(ExecutionHook hook) { executionHook_ = std::move(hook); }
+
 	template <typename... Ts> static auto create(Ts &&...params) -> std::unique_ptr<GenMCDriver>
 	{
 		return std::unique_ptr<GenMCDriver>(new GenMCDriver(std::forward<Ts>(params)...));
@@ -247,6 +253,9 @@ protected:
 	auto toCasResult(HandleResult<SVal> res, Event pos) -> HandleResult<CasReadResult>;
 
 private:
+	/** See setExecutionHook() */
+	ExecutionHook executionHook_;
+
 	/** Liveness: Reports an error on liveness violations */
 	auto checkLiveness() -> std::optional<VerificationError>;
 

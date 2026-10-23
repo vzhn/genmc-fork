@@ -61,6 +61,7 @@ namespace {
 constexpr std::string_view kI1 = "I1 (restriction)";
 constexpr std::string_view kI3 = "I3 (allocation map)";
 constexpr std::string_view kI4 = "I4 (resume point)";
+constexpr std::string_view kI5 = "I5 (consistency)";
 
 /** Whether LAB, a pointer another label stores, is a label of G */
 auto inGraph(const ExecutionGraph &g, const EventLabel *lab) -> bool
@@ -720,6 +721,13 @@ auto resumeMismatch(const ExecutionGraph &g, const GraphFingerprint &saved,
 		}
 	}
 	return mismatch;
+}
+
+void checkConsistency(const ExecutionGraph &g, bool consistent, const Context &ctx)
+{
+	if (!consistent)
+		fail(kI5, "the execution violates the memory model's axioms (whole-graph check)", &g,
+		     ctx);
 }
 
 void checkResume(const ExecutionGraph &g, const GraphFingerprint &saved,
