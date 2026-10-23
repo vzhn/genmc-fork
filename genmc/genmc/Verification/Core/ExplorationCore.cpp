@@ -824,10 +824,12 @@ auto ExplorationCore::checkHelpingCasCondition(const HelpingCasLabel *hLab) -> b
 				     rLab->getSwapVal() == hLab->getSwapVal();
 		      });
 
-	if (std::ranges::any_of(hsView, [this](auto &lab) {
-		    auto *hLab = genmc::dyn_cast<HelpedCasReadLabel>(&lab);
-		    auto &view = getConsChecker().getHbView(hLab);
-		    return !writesBeforeHelpedContainedInView(hLab, view);
+	/* (Against the helping CAS's view: the helped CAS's own view contains
+	 * them all) */
+	if (std::ranges::any_of(hsView, [this, hLab](auto &lab) {
+		    auto *helped = genmc::dyn_cast<HelpedCasReadLabel>(&lab);
+		    return !writesBeforeHelpedContainedInView(helped,
+							      getConsChecker().getHbView(hLab));
 	    }))
 		ERROR("Helped/Helping CAS annotation error! "
 		      "Not all stores before helped-CAS are visible to helping-CAS!");

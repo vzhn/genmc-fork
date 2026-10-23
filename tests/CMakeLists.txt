@@ -121,6 +121,13 @@ add_test(NAME nondet-warning
 set_tests_properties(nondet-warning PROPERTIES LABELS "integration;fast" TIMEOUT 120
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME helping-cas-annotation
+    COMMAND bash -c "${SCRIPT_DIR}/check-helping-cas-annotation.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(helping-cas-annotation PROPERTIES LABELS "integration;fast" TIMEOUT 120
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(NAME install-headers
     COMMAND bash -c "${SCRIPT_DIR}/check-install-headers.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
