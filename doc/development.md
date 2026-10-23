@@ -4,7 +4,7 @@
 
  - `GENMC_DEBUG`: this CMake option will enable diagnostics for GenMC (enabled by default for `Debug` builds)
  - `GENMC_WERROR`: treat compiler warnings as errors for GenMC's own code (`genmc/` and `passes/`); default: OFF, enabled in CI
- - `ENABLE_COVERAGE`: enables coverage reporting (default: OFF)
+ - `ENABLE_COVERAGE`: instruments the build for coverage (default: OFF); with clang, adds the `coverage` and `coverage-full` targets (see "Coverage" below)
  - `BUILD_DOCS`: builds documentation (default: OFF)
  - `SANITIZE`: comma-separated sanitizers to enable, e.g. `address,undefined` or `thread` (default: empty)
  - `GENMC_TCMALLOC`: link `genmc` against tcmalloc (faster allocator): `AUTO` (default, if found) / `ON` (required) / `OFF`. Needs `libgoogle-perftools-dev`; disabled under `SANITIZE`. Pin `ON`/`OFF` for reproducible builds.
@@ -52,6 +52,21 @@ GenMC=./Asan/bin/genmc ASAN_OPTIONS=detect_leaks=0 ./scripts/fast-driver.sh
 `ASAN_OPTIONS=detect_leaks=0` suppresses leak reports from LLVM's arena allocators, which
 intentionally do not free on exit. For ThreadSanitizer use `SANITIZE=thread`.
 `address` and `thread` are mutually exclusive.
+
+## Coverage
+
+With clang, `ENABLE_COVERAGE=ON` builds with source-based coverage and adds two targets:
+
+```bash
+cmake -S . -B Cov -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_C_COMPILER=clang -DBUILD_TESTS=ON -DENABLE_COVERAGE=ON
+cmake --build Cov --target coverage        # unit_tests and driver_tests (seconds)
+cmake --build Cov --target coverage-full   # also scripts/driver.sh --fast (minutes)
+```
+
+Both write `Cov/coverage/`: `html/index.html` (annotated sources), `report.txt` (per file), `summary.txt` (per directory, one row per layer and group of `genmc/genmc`, plus `lli` and `passes`), and `coverage.lcov`. `llvm-profdata` and `llvm-cov` are taken from the compiler's directory, so that they read its profile format. Test sources, the build directory and system headers are left out. The regression suite runs under `driver.sh`'s memory limit (`GENMC_MEMORY_LIMIT`). `llvm-cov` warns about functions with "mismatched data": inline functions compiled into several binaries with different settings (`driver_tests` has no LLVM). The warning is harmless.
+
+With GCC, `ENABLE_COVERAGE=ON` adds `--coverage` (gcov) and no report targets.
 
 # Modifying GenMC
 

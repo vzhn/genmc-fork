@@ -138,8 +138,23 @@ endif()
 ### Coverage/linting
 option(ENABLE_COVERAGE "Enable coverage reporting" OFF)
 if(ENABLE_COVERAGE)
-  add_compile_options(-g --coverage)
-  add_link_options(--coverage)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # Source-based coverage; the coverage and coverage-full targets (below)
+    # run the tests and write the report to coverage/ (doc/development.md)
+    add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+    add_link_options(-fprofile-instr-generate)
+    # The tools must match the compiler's profile format: look next to it first
+    get_filename_component(_genmc_cc_dir "${CMAKE_CXX_COMPILER}" REALPATH)
+    get_filename_component(_genmc_cc_dir "${_genmc_cc_dir}" DIRECTORY)
+    find_program(LLVM_PROFDATA llvm-profdata HINTS "${_genmc_cc_dir}")
+    find_program(LLVM_COV llvm-cov HINTS "${_genmc_cc_dir}")
+    if(NOT LLVM_PROFDATA OR NOT LLVM_COV)
+      message(WARNING "coverage: llvm-profdata or llvm-cov not found, no coverage targets")
+    endif()
+  else()
+    add_compile_options(-g --coverage)
+    add_link_options(--coverage)
+  endif()
 endif()
 
 ### Enable treating warnings as errors (genmc/ and passes/ only)
@@ -190,6 +205,30 @@ endif()
 option(BUILD_TESTS "Enable test building" OFF)
 if(BUILD_TESTS)
 add_subdirectory(tests)
+endif()
+
+### Coverage report (ENABLE_COVERAGE with clang): `coverage` runs the unit
+### and driver tests, `coverage-full` also the fast regression suite
+if(ENABLE_COVERAGE AND LLVM_PROFDATA AND LLVM_COV)
+  set(_genmc_cov_deps)
+  foreach(_t genmc unit_tests driver_tests)
+    if(TARGET ${_t})
+      list(APPEND _genmc_cov_deps ${_t})
+    endif()
+  endforeach()
+  foreach(_kind coverage coverage-full)
+    set(_args)
+    if(_kind STREQUAL "coverage-full")
+      set(_args --full)
+    endif()
+    add_custom_target(${_kind}
+      COMMAND ${CMAKE_COMMAND} -E env LLVM_PROFDATA=${LLVM_PROFDATA} LLVM_COV=${LLVM_COV}
+              ${CMAKE_SOURCE_DIR}/scripts/coverage-report.sh ${CMAKE_BINARY_DIR} ${_args}
+      DEPENDS ${_genmc_cov_deps}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      USES_TERMINAL
+      COMMENT "Coverage report in ${CMAKE_BINARY_DIR}/coverage")
+  endforeach()
 endif()
 
 OPTION(BUILD_DOC "Enable documentation building" OFF)
