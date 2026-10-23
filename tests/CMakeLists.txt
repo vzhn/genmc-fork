@@ -107,6 +107,13 @@ add_test(NAME exhaustive-kept-create
 set_tests_properties(exhaustive-kept-create PROPERTIES LABELS "integration;fast" TIMEOUT 120
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME free-conflict
+    COMMAND bash -c "${SCRIPT_DIR}/check-free-conflict.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(free-conflict PROPERTIES LABELS "integration;fast" TIMEOUT 300
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(NAME lkmm-ww-warning
     COMMAND bash -c "${SCRIPT_DIR}/check-lkmm-ww-warning.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
