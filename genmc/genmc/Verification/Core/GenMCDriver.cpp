@@ -296,6 +296,8 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 			++result.spinBlocked;
 		if (getConf()->printBlockedExecs)
 			printGraph(g, errorReplay_->dbgInfo());
+		if (const auto err = checkExhaustiveRace())
+			return err;
 		if (getConf()->checkLiveness)
 			return checkLiveness();
 		return {};
@@ -322,6 +324,8 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		++result.exploredInconsistent;
 		return {};
 	}
+	if (const auto err = checkExhaustiveRace())
+		return err;
 
 	/* -exhaustive reaches an execution by every path to it: count each once */
 	if (getConf()->exhaustive && !countedExecutions_.insert(canonicalGraphHash(g)).second) {
@@ -634,6 +638,33 @@ auto GenMCDriver::checkLkmmRace() -> std::optional<VerificationError>
 					       ").\n",
 				       first});
 	return {VerificationError::VE_RaceNotAtomic};
+}
+
+auto GenMCDriver::checkExhaustiveRace() -> std::optional<VerificationError>
+{
+	/* -exhaustive under IMM: a race with an access a revisit kept after a
+	 * hole is not reported when the other access is added (see
+	 * checkForRaces()), and two kept accesses are not checked against each
+	 * other; the execution is checked as a whole, with its views computed
+	 * anew, once its threads have reached their kept events: when it is
+	 * complete, or blocked (a run with a thread stopped before kept events
+	 * is dropped before). Every race must be reported: plain accesses are
+	 * explored as if there were none (see exploresPlainAccesses()) (#179) */
+	if (!getConf()->exhaustive || getConf()->model != ModelType::IMM ||
+	    getConf()->disableRaceDetection || inEstimationMode() || isHalting())
+		return {};
+
+	const auto &g = getExec().getGraph();
+	std::optional<ErrorDetails> race;
+	checkWithViewsAnew([&](const ExecutionGraph &cg) {
+		race = error_rules::hbRace(getConsChecker(), cg);
+		if (race)
+			race->racyLab = g.getEventLabel(race->racyLab->getPos());
+	});
+	if (!race)
+		return {};
+	reportError(*race->pos, *race);
+	return {race->type};
 }
 
 auto GenMCDriver::checkLkmmSrcu() -> std::optional<VerificationError>

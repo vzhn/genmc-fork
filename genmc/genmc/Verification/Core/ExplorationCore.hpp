@@ -365,6 +365,11 @@ protected:
 	 * computed anew */
 	auto isExecutionConsistent(const ExecutionGraph &g) -> bool;
 
+	/** -exhaustive under IMM: runs CHECK on a copy of the current graph
+	 * whose views are computed anew (positions name the same events in
+	 * both) */
+	void checkWithViewsAnew(const std::function<void(const ExecutionGraph &)> &check);
+
 	/* Checks the whole graph if an event went before kept ones during the
 	 * run; if it is inconsistent, moots the run and has it repeated with
 	 * eager checks. Returns whether the run stands */
@@ -504,11 +509,6 @@ private:
 
 	/** The checks of -exhaustive under IMM (see ExhaustiveConsistency) */
 	auto getExhaustiveConsistency() -> ExhaustiveConsistency;
-
-	/** -exhaustive under IMM: runs CHECK on a copy of the current graph
-	 * whose views are computed anew (positions name the same events in
-	 * both) */
-	void checkWithViewsAnew(const std::function<void(const ExecutionGraph &)> &check);
 
 	/** -exhaustive: records the graph ITEM produced in the visited set.
 	 * Returns whether it is new (a repeated graph is not explored again) */
