@@ -13,13 +13,14 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
+ * From kat/tso-genmc.kat, Kater 914a4ed (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_TSO_CHECKER_HPP
 #define GENMC_TSO_CHECKER_HPP
 
-#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include <concepts>
 #include <cstdint>
 #include <vector>
@@ -156,7 +157,7 @@ private:
 public:
 	TSOChecker(const Config *conf) : ConsistencyChecker(conf) {};
 
-private:
+protected: // subclasses may refine the generated checks (e.g., hand-written axioms)
 	bool isConsistent(const EventLabel *lab) const override;
 	bool isConsistent(const ExecutionGraph &g) const override;
 	bool isCoherentRelinche(const ExecutionGraph &g) const override;
@@ -170,6 +171,8 @@ private:
 	std::vector<EventLabel *> getCoherentPlacings(WriteLabel *sLab) override;
 	void updateMMViews(EventLabel *lab) override;
 	std::unique_ptr<VectorClock> calculatePrefixView(const EventLabel *lab) const override;
+	std::unique_ptr<VectorClock>
+	calculateRevisitPrefixView(const EventLabel *lab) const override;
 	bool isDepTracking() const override;
 	void calculateSaved(EventLabel *lab);
 	void calculateViews(EventLabel *lab);
@@ -179,17 +182,6 @@ private:
 	void maybeDecreaseCacheCounters(const EventLabel *lab) const override;
 	void maybeIncreaseCacheCounters(const EventLabel *lab) const override;
 
-	mutable NodeStatusVector<uint32_t> visitedCalc71_0;
-	mutable NodeStatusVector<uint32_t> visitedCalc71_1;
-	mutable NodeStatusVector<uint32_t> visitedCalc71_2;
-
-	bool visitCalc71Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
-
-	View visitCalc71(const EventLabel *lab) const;
-	auto getPorfView(const EventLabel *lab) const -> const View & { return lab->view(0); }
-	auto getPorfViewIndex() const -> unsigned { return 0; }
-
-	auto checkCalc71(const EventLabel *lab) const;
 	mutable NodeStatusVector<uint32_t> visitedCalc72_0;
 	mutable NodeStatusVector<uint32_t> visitedCalc72_1;
 	mutable NodeStatusVector<uint32_t> visitedCalc72_2;
@@ -197,7 +189,8 @@ private:
 	bool visitCalc72Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
 	View visitCalc72(const EventLabel *lab) const;
-	auto getHbViewIndex() const -> unsigned { return 1; }
+	auto getPorfView(const EventLabel *lab) const -> const View & { return lab->view(0); }
+	auto getPorfViewIndex() const -> unsigned { return 0; }
 
 	auto checkCalc72(const EventLabel *lab) const;
 	mutable NodeStatusVector<uint32_t> visitedCalc73_0;
@@ -207,16 +200,27 @@ private:
 	bool visitCalc73Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
 	View visitCalc73(const EventLabel *lab) const;
+	auto getHbViewIndex() const -> unsigned { return 1; }
+
+	auto checkCalc73(const EventLabel *lab) const;
+	mutable NodeStatusVector<uint32_t> visitedCalc74_0;
+	mutable NodeStatusVector<uint32_t> visitedCalc74_1;
+	mutable NodeStatusVector<uint32_t> visitedCalc74_2;
+
+	bool visitCalc74Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
+
+	View visitCalc74(const EventLabel *lab) const;
 	auto getHbRelincheView(const EventLabel *lab) const -> const View & { return lab->view(2); }
 	auto getHbRelincheViewIndex() const -> unsigned { return 2; }
 
-	auto checkCalc73(const EventLabel *lab) const;
+	auto checkCalc74(const EventLabel *lab) const;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_0;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_1;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_2;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_3;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_4;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_5;
+	mutable NodeStatusVector<uint32_t> visitedCoherence_6;
 
 	bool visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 				     const EventLabel *initLab) const;

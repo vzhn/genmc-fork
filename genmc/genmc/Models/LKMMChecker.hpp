@@ -13,14 +13,14 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater b25657f-dirty (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater 914a4ed (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_LKMM_CHECKER_HPP
 #define GENMC_LKMM_CHECKER_HPP
 
-#include "genmc/Models/ConsistencyChecker.hpp"
 #include "genmc/Execution/EventLabel.hpp"
+#include "genmc/Models/ConsistencyChecker.hpp"
 #include <concepts>
 #include <cstdint>
 #include <vector>

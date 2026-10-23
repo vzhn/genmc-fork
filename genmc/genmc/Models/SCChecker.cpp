@@ -13,6 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
+ * From kat/sc-genmc.kat, Kater 914a4ed (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -27,7 +28,7 @@
 
 bool SCChecker::isDepTracking() const { return 0; }
 
-bool SCChecker::visitCalc71Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
+bool SCChecker::visitCalc72Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -117,7 +118,7 @@ bool SCChecker::visitCalc71Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 	return true;
 }
 
-View SCChecker::visitCalc71(const EventLabel *lab) const
+View SCChecker::visitCalc72(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
@@ -127,22 +128,20 @@ View SCChecker::visitCalc71(const EventLabel *lab) const
 	/* Explore from all accepting states using DFS */
 	std::vector<DFSWorklistEntry> startStates = {
 		{2, lab},
-		{1, lab},
-		{0, lab},
 	};
 
-	visitCalc71Iterative(startStates, calcRes);
+	visitCalc72Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto SCChecker::checkCalc71(const EventLabel *lab) const
+auto SCChecker::checkCalc72(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc71(lab);
+	return visitCalc72(lab);
 }
 
-bool SCChecker::visitCalc72Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
+bool SCChecker::visitCalc73Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -238,7 +237,7 @@ bool SCChecker::visitCalc72Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 	return true;
 }
 
-View SCChecker::visitCalc72(const EventLabel *lab) const
+View SCChecker::visitCalc73(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
@@ -248,22 +247,20 @@ View SCChecker::visitCalc72(const EventLabel *lab) const
 	/* Explore from all accepting states using DFS */
 	std::vector<DFSWorklistEntry> startStates = {
 		{2, lab},
-		{1, lab},
-		{0, lab},
 	};
 
-	visitCalc72Iterative(startStates, calcRes);
+	visitCalc73Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto SCChecker::checkCalc72(const EventLabel *lab) const
+auto SCChecker::checkCalc73(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc72(lab);
+	return visitCalc73(lab);
 }
 
-bool SCChecker::visitCalc73Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
+bool SCChecker::visitCalc74Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -362,7 +359,7 @@ bool SCChecker::visitCalc73Iterative(std::vector<DFSWorklistEntry> &worklist, Vi
 	return true;
 }
 
-View SCChecker::visitCalc73(const EventLabel *lab) const
+View SCChecker::visitCalc74(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
@@ -372,19 +369,17 @@ View SCChecker::visitCalc73(const EventLabel *lab) const
 	/* Explore from all accepting states using DFS */
 	std::vector<DFSWorklistEntry> startStates = {
 		{2, lab},
-		{1, lab},
-		{0, lab},
 	};
 
-	visitCalc73Iterative(startStates, calcRes);
+	visitCalc74Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto SCChecker::checkCalc73(const EventLabel *lab) const
+auto SCChecker::checkCalc74(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc73(lab);
+	return visitCalc74(lab);
 }
 
 void SCChecker::calculateSaved([[maybe_unused]] EventLabel *lab) {}
@@ -392,20 +387,21 @@ void SCChecker::calculateSaved([[maybe_unused]] EventLabel *lab) {}
 void SCChecker::calculateViews(EventLabel *lab)
 {
 	lab->setViews({});
+
 	{
 		lab->addView({});
-		lab->setView(std::move(checkCalc71(lab)), 0);
-	}
-	{
-		lab->addView({});
-		lab->setView(std::move(checkCalc72(lab)), 1);
+		lab->setView(std::move(checkCalc72(lab)), 0);
 	}
 
+	{
+		lab->addView({});
+		lab->setView(std::move(checkCalc73(lab)), 1);
+	}
 	if (!getConf()->collectLinSpec && !getConf()->checkLinSpec)
 		lab->addView({});
 	else {
 		lab->addView({});
-		lab->setView(std::move(checkCalc73(lab)), 2);
+		lab->setView(std::move(checkCalc74(lab)), 2);
 	}
 }
 
@@ -464,6 +460,21 @@ static auto splitLocMOAfter(WriteLabel *wLab) -> ExecutionGraph::co_iterator
 				    [&](auto &sLab) { return isHbOptRfBefore(wLab, &sLab); });
 }
 
+/* Whether END is reachable from BEGIN in ADDR's coherence order. It is not
+ * when coherence contradicts hb, which a consistent graph never does, but an
+ * event added before events kept further on in its thread can see before
+ * the graph is checked again, typically because of a kept event the new path
+ * skips (it goes once the thread passes its place): then every position is a
+ * candidate, and GenMC's later checks drop the inconsistent ones */
+static auto isCoRange(ExecutionGraph &g, SAddr addr, ExecutionGraph::co_iterator begin,
+		      ExecutionGraph::co_iterator end) -> bool
+{
+	for (auto it = begin; it != end; ++it)
+		if (it == std::ranges::end(g.co(addr)))
+			return false;
+	return true;
+}
+
 auto SCChecker::getCoherentStores(ReadLabel *rLab) -> std::vector<EventLabel *>
 {
 	auto &g = *rLab->getParent();
@@ -495,6 +506,12 @@ auto SCChecker::getCoherentStores(ReadLabel *rLab) -> std::vector<EventLabel *>
 	 */
 	auto endIt = (isDepTracking()) ? splitLocMOAfterHb(rLab)
 				       : std::ranges::end(g.co(rLab->getAddr()));
+	if (!isCoRange(g, rLab->getAddr(), begIt, endIt)) {
+		stores.clear();
+		stores.push_back(g.getInitLabel());
+		begIt = std::ranges::begin(g.co(rLab->getAddr()));
+		endIt = std::ranges::end(g.co(rLab->getAddr()));
+	}
 	std::transform(begIt, endIt, std::back_inserter(stores), [&](auto &lab) { return &lab; });
 	return stores;
 }
@@ -624,6 +641,10 @@ auto SCChecker::getCoherentPlacings(WriteLabel *wLab) -> std::vector<EventLabel 
 	auto rangeBegin = splitLocMOBefore(wLab->getAddr(), wLab);
 	auto rangeEnd = (isDepTracking()) ? splitLocMOAfter(wLab)
 					  : std::ranges::end(g.co(wLab->getAddr()));
+	if (!isCoRange(g, wLab->getAddr(), rangeBegin, rangeEnd)) {
+		rangeBegin = std::ranges::begin(g.co(wLab->getAddr()));
+		rangeEnd = std::ranges::end(g.co(wLab->getAddr()));
+	}
 	auto cos = std::ranges::subrange(rangeBegin, rangeEnd) |
 		   std::views::filter([&](auto &sLab) { return !sLab.isRMW(); }) |
 		   std::views::transform([&](auto &sLab) {
@@ -647,80 +668,12 @@ bool SCChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 		switch (stateId) {
 		case 0: {
 			if (isFinishing) {
-				visitedCoherence_0.setStatus(lab->getStamp().get(),
-							     NodeStatus::left);
 				break;
 			}
 
-			auto status = visitedCoherence_0.getStatus(lab->getStamp().get());
-			if (status != NodeStatus::unseen)
-				break; /* already explored */
-
-			worklist.emplace_back(0, lab, true);
-			visitedCoherence_0.setStatus(lab->getStamp().get(), NodeStatus::entered);
 			if (lab == initLab)
 				return false;
-
 			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedCoherence_0.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(0, pLab);
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_0.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(0, pLab);
-				}
-			}
-			if (auto pLab = g.tc_pred(lab); pLab) {
-				auto status = visitedCoherence_0.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(0, pLab);
-				}
-			}
-			if (auto pLab = g.tj_pred(lab); pLab) {
-				auto status = visitedCoherence_0.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(0, pLab);
-				}
-			}
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedCoherence_2.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(2, pLab);
-						}
-					}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedCoherence_2.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(2, pLab);
-					}
-				}
-			if (auto pLab = g.tc_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedCoherence_2.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(2, pLab);
-					}
-				}
-			if (auto pLab = g.tj_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedCoherence_2.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(2, pLab);
-					}
-				}
 
 			break;
 		}
@@ -732,27 +685,19 @@ bool SCChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			[[maybe_unused]] auto &g = *lab->getParent();
 			for (auto &tmp : g.lin_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedCoherence_3.getStatus(
+					auto status = visitedCoherence_5.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(3, pLab);
-					}
-				}
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedCoherence_4.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(4, pLab);
+						worklist.emplace_back(5, pLab);
 					}
 				}
 			for (auto &tmp : g.lin_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedCoherence_5.getStatus(
+						auto status = visitedCoherence_6.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(5, pLab);
+							worklist.emplace_back(6, pLab);
 						}
 					}
 
@@ -773,20 +718,76 @@ bool SCChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_2.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedCoherence_0.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(0, pLab);
-					}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					worklist.emplace_back(0, pLab);
 				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				worklist.emplace_back(0, pLab);
+			}
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				worklist.emplace_back(0, pLab);
+			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				worklist.emplace_back(0, pLab);
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
 					auto status = visitedCoherence_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(2, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_2.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(2, pLab);
+				}
+			}
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				auto status = visitedCoherence_2.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(2, pLab);
+				}
+			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status = visitedCoherence_2.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(2, pLab);
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedCoherence_3.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(3, pLab);
+						}
+					}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedCoherence_3.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(3, pLab);
+					}
+				}
+			if (auto pLab = g.tc_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedCoherence_3.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(3, pLab);
+					}
+				}
+			if (auto pLab = g.tj_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedCoherence_3.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(3, pLab);
 					}
 				}
 
@@ -807,42 +808,9 @@ bool SCChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_3.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.fr_imm_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedCoherence_0.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(0, pLab);
-					}
-				}
-			if (auto pLab = g.co_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_0.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(0, pLab);
-				}
-			}
-			if (auto pLab = g.rf_pred(lab); pLab) {
-				auto status = visitedCoherence_0.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(0, pLab);
-				}
-			}
-			for (auto &tmp : g.fr_imm_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedCoherence_2.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(2, pLab);
-						}
-					}
-			if (auto pLab = g.co_imm_pred(lab); pLab)
+			if (auto pLab = g.rf_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedCoherence_2.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(2, pLab);
-					}
+					worklist.emplace_back(0, pLab);
 				}
 			if (auto pLab = g.rf_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic())) {
@@ -852,26 +820,14 @@ bool SCChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 						worklist.emplace_back(2, pLab);
 					}
 				}
-			for (auto &tmp : g.fr_imm_preds(lab))
-				if (auto *pLab = &tmp; true) {
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
 					auto status = visitedCoherence_3.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(3, pLab);
 					}
 				}
-			if (auto pLab = g.co_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_3.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(3, pLab);
-				}
-			}
-			if (auto pLab = g.rf_pred(lab); pLab) {
-				auto status = visitedCoherence_3.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(3, pLab);
-				}
-			}
 
 			break;
 		}
@@ -890,33 +846,52 @@ bool SCChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_4.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.lin_preds(lab))
+			for (auto &tmp : g.fr_imm_preds(lab))
 				if (auto *pLab = &tmp; true) {
+					auto status = visitedCoherence_2.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(2, pLab);
+					}
+				}
+			if (auto pLab = g.co_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_2.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(2, pLab);
+				}
+			}
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				auto status = visitedCoherence_2.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(2, pLab);
+				}
+			}
+			for (auto &tmp : g.fr_imm_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedCoherence_3.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(3, pLab);
+						}
+					}
+			if (auto pLab = g.co_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
 					auto status = visitedCoherence_3.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(3, pLab);
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status = visitedCoherence_3.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(3, pLab);
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedCoherence_3.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(3, pLab);
+					}
 				}
-			}
-			if (auto pLab = g.tc_pred(lab); pLab) {
-				auto status = visitedCoherence_3.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(3, pLab);
-				}
-			}
-			if (auto pLab = g.tj_pred(lab); pLab) {
-				auto status = visitedCoherence_3.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(3, pLab);
-				}
-			}
-			for (auto &tmp : g.lin_preds(lab))
+			for (auto &tmp : g.fr_imm_preds(lab))
 				if (auto *pLab = &tmp; true) {
 					auto status = visitedCoherence_4.getStatus(
 						pLab->getStamp().get());
@@ -924,57 +899,18 @@ bool SCChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 						worklist.emplace_back(4, pLab);
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
+			if (auto pLab = g.co_imm_pred(lab); pLab) {
 				auto status = visitedCoherence_4.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(4, pLab);
 				}
 			}
-			if (auto pLab = g.tc_pred(lab); pLab) {
+			if (auto pLab = g.rf_pred(lab); pLab) {
 				auto status = visitedCoherence_4.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(4, pLab);
 				}
 			}
-			if (auto pLab = g.tj_pred(lab); pLab) {
-				auto status = visitedCoherence_4.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(4, pLab);
-				}
-			}
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && !(pLab->isNotAtomic())) {
-						auto status = visitedCoherence_5.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(5, pLab);
-						}
-					}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedCoherence_5.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(5, pLab);
-					}
-				}
-			if (auto pLab = g.tc_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedCoherence_5.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(5, pLab);
-					}
-				}
-			if (auto pLab = g.tj_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedCoherence_5.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(5, pLab);
-					}
-				}
 
 			break;
 		}
@@ -993,14 +929,109 @@ bool SCChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 			visitedCoherence_5.setStatus(lab->getStamp().get(), NodeStatus::entered);
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && !(pLab->isNotAtomic())) {
-					auto status = visitedCoherence_3.getStatus(
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedCoherence_4.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(3, pLab);
+						worklist.emplace_back(4, pLab);
 					}
 				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_4.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(4, pLab);
+				}
+			}
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				auto status = visitedCoherence_4.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(4, pLab);
+				}
+			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status = visitedCoherence_4.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(4, pLab);
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedCoherence_5.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(5, pLab);
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status = visitedCoherence_5.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(5, pLab);
+				}
+			}
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				auto status = visitedCoherence_5.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(5, pLab);
+				}
+			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status = visitedCoherence_5.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(5, pLab);
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && !(pLab->isNotAtomic())) {
+						auto status = visitedCoherence_6.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(6, pLab);
+						}
+					}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedCoherence_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					}
+				}
+			if (auto pLab = g.tc_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedCoherence_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					}
+				}
+			if (auto pLab = g.tj_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedCoherence_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					}
+				}
+
+			break;
+		}
+		case 6: {
+			if (isFinishing) {
+				visitedCoherence_6.setStatus(lab->getStamp().get(),
+							     NodeStatus::left);
+				break;
+			}
+
+			auto status = visitedCoherence_6.getStatus(lab->getStamp().get());
+			if (status != NodeStatus::unseen)
+				break; /* already explored */
+
+			worklist.emplace_back(6, lab, true);
+			visitedCoherence_6.setStatus(lab->getStamp().get(), NodeStatus::entered);
+
+			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.rf_pred(lab); pLab)
 				if (true && !(pLab->isNotAtomic())) {
 					auto status = visitedCoherence_4.getStatus(
@@ -1015,6 +1046,14 @@ bool SCChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(5, pLab);
+					}
+				}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && !(pLab->isNotAtomic())) {
+					auto status = visitedCoherence_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
 					}
 				}
 
@@ -1033,11 +1072,11 @@ bool SCChecker::visitCoherenceRelinche(const ExecutionGraph &g) const
 		if (!genmc::isa<MethodBeginLabel>(&lab))
 			continue;
 
-		visitedCoherence_0.maybeClearResize(g.getMaxStamp().get() + 1);
 		visitedCoherence_2.maybeClearResize(g.getMaxStamp().get() + 1);
 		visitedCoherence_3.maybeClearResize(g.getMaxStamp().get() + 1);
 		visitedCoherence_4.maybeClearResize(g.getMaxStamp().get() + 1);
 		visitedCoherence_5.maybeClearResize(g.getMaxStamp().get() + 1);
+		visitedCoherence_6.maybeClearResize(g.getMaxStamp().get() + 1);
 
 		/* Explore from this accepting state using DFS */
 		std::vector<DFSWorklistEntry> startState = {{1, &lab}};
@@ -1308,6 +1347,7 @@ bool SCChecker::visitLHSUnlessError3Iterative(std::vector<DFSWorklistEntry> &wor
 				break;
 			}
 
+			cexLab = lab;
 			return false;
 			[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -1481,6 +1521,7 @@ bool SCChecker::visitLHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &wor
 				break;
 			}
 
+			cexLab = lab;
 			return false;
 			[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -1633,6 +1674,7 @@ bool SCChecker::visitLHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &wor
 				break;
 			}
 
+			cexLab = lab;
 			return false;
 			[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -1644,8 +1686,6 @@ bool SCChecker::visitLHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &wor
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			/* retire_pos() is a map lookup, isHazptrProtected() a walk over
-			 * the thread's prefix: ask the cheap one first */
 			if (true && genmc::isa<MemAccessLabel>(lab) &&
 			    genmc::dyn_cast<MemAccessLabel>(lab)->getAddr().isDynamic() &&
 			    g.retire_pos(lab).has_value() &&
@@ -1972,6 +2012,11 @@ View SCChecker::calcPPoRfBefore(const EventLabel *lab) const
 std::unique_ptr<VectorClock> SCChecker::calculatePrefixView(const EventLabel *lab) const
 {
 	return std::make_unique<View>(calcPPoRfBefore(lab));
+}
+
+std::unique_ptr<VectorClock> SCChecker::calculateRevisitPrefixView(const EventLabel *lab) const
+{
+	return calculatePrefixView(lab);
 }
 
 void SCChecker::recomputeCacheCounters([[maybe_unused]] const ExecutionGraph &g) const {}

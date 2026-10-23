@@ -11,7 +11,8 @@
 # rc11 imm); the checker class is its upper-case name (SCChecker, ...).
 # The files go to <out-dir> (default: a new temporary directory); with
 # --install they replace the checked-in ones. Environment: KATER_SRC, a
-# built Kater checkout (default: ~/.local/src/kater; binary in Release/).
+# built Kater checkout (default: ~/.local/src/kater), and KATER, its binary
+# (default: $KATER_SRC/Release/kater).
 #
 # GenMC 0.19's checker interface needs Kater's genmc-0.19-export branch
 # (see README.md); the public Kater 0.4.0 exports for an older interface.
@@ -22,7 +23,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${DIR}/../.." && pwd)"
 CONS="${ROOT}/genmc/genmc/Models"
 KATER_SRC="${KATER_SRC:-${HOME}/.local/src/kater}"
-KATER="${KATER_SRC}/Release/kater"
+KATER="${KATER:-${KATER_SRC}/Release/kater}"
 
 out=""
 if test "${1:-}" = "--install"; then

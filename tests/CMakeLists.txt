@@ -114,6 +114,12 @@ add_test(NAME free-conflict
 set_tests_properties(free-conflict PROPERTIES LABELS "integration;fast" TIMEOUT 300
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME kater-drift
+    COMMAND bash -c "${SCRIPT_DIR}/check-kater-drift.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(kater-drift PROPERTIES LABELS "models" TIMEOUT 120 SKIP_RETURN_CODE 77)
+
 add_test(NAME lkmm-ww-warning
     COMMAND bash -c "${SCRIPT_DIR}/check-lkmm-ww-warning.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
