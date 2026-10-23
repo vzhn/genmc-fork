@@ -494,3 +494,38 @@ TEST(ExecutionGraphTest, CutToStampLeavesNoTrailingHole)
 	EXPECT_FALSE(genmc::isa<EmptyLabel>(g.getLastThreadLabel(0)));
 	invariants::checkGraph(g, invariants::Context{.where = "a unit test"});
 }
+
+TEST(ExecutionGraphTest, CopyLeavesNoTrailingHole)
+{
+	StubChecker checker;
+	DepExecutionGraph g{ExecutionGraph::Config{.memModel = &checker}};
+	auto fence = [&](int i) {
+		auto lab = FenceLabel::create(Event(0, i), MemOrdering::SequentiallyConsistent);
+		lab->setViews({View()});
+		return g.add(std::move(lab));
+	};
+	fence(1);
+	fence(2);
+	g.relocateThread(0, 2, 1); /* a hole at (0, 2), the fence moves to (0, 3) */
+	g.removeLast(0);
+	ASSERT_TRUE(genmc::isa<EmptyLabel>(g.getEventLabel(Event(0, 2))));
+	fence(3);
+
+	/* A view whose last event of the thread is the graph's hole, and one
+	 * whose last event it does not contain (#181) */
+	auto upTo = [](int index) {
+		DepView v; /* (setMax() makes holes of the events it skips) */
+		for (auto i = 1; i <= index; i++)
+			v.setMax(Event(0, i));
+		return v;
+	};
+	auto atHole = upTo(2);
+	auto beforeHole = upTo(3);
+	beforeHole.addHole(Event(0, 3));
+	for (const auto *v : {&atHole, &beforeHole}) {
+		auto og = g.getCopyUpTo(*v);
+		EXPECT_EQ(og->getThreadSize(0), 2);
+		EXPECT_FALSE(genmc::isa<EmptyLabel>(og->getLastThreadLabel(0)));
+		invariants::checkGraph(*og, invariants::Context{.where = "a unit test"});
+	}
+}

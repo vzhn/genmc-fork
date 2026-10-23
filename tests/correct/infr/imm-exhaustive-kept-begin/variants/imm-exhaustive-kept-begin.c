@@ -5,11 +5,13 @@
  * main's creation of t3, but not the join of t1 before it, a hole. The
  * views of the kept create (and so of t3) were computed without the join,
  * and stayed so once the hole was filled: t3's write raced with t1's (a
- * false "Non-atomic race!"; the default exploration finds none). The
- * begin of t3, kept with the create, also kept its cached prefix view,
- * which names t1's end, an event the copy does not have
- * (-check-invariants: I1). A begin keeps nothing: t3 starts anew after
- * the join.
+ * false "Non-atomic race!"; the default exploration finds none). A begin
+ * keeps nothing: t3 starts anew after the join.
+ *
+ * (The views are now computed anew after a revisit, which hides the race,
+ * and the copy no longer keeps cached prefix views, through which
+ * -check-invariants caught it: see imm-exhaustive-kept-create, where the
+ * revisits that kept the create make inconsistent graphs.)
  *
  * (Reduced from tests/correct/saver/spin-fmutex.)
  */

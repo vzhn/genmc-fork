@@ -45,6 +45,10 @@ public:
 	 * prefix views. Returns false if they do not settle (an hb cycle) */
 	auto recomputeViews(ExecutionGraph &g) -> bool;
 
+	/** Drops the cached prefix views of G's labels: those of the events a
+	 * revisit keeps without their prefix name events G does not have */
+	static void dropPrefixViews(ExecutionGraph &g);
+
 	/** Whether G, whose views are up to date, is consistent: coherence,
 	 * the atomicity of its RMWs, the other axioms */
 	auto isGraphConsistent(const ExecutionGraph &g) const -> bool;

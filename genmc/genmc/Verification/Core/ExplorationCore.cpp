@@ -2049,6 +2049,13 @@ auto ExplorationCore::copyGraph(const BackwardRevisit *br, VectorClock *v) const
 	auto plan = checksInvariants() ? std::optional(invariants::planCopyUpTo(g, *v))
 				       : std::nullopt;
 	auto og = g.getCopyUpTo(*v);
+	/* -exhaustive under IMM: the events a revisit keeps without their
+	 * prefix (see BackwardRevisits::keepValueDependencies()) have cached
+	 * prefix views that name events the copy does not have.
+	 * backwardRevisit() computes the views anew, which drops them; they go
+	 * now, so that no check or rule sees them in between (#181) */
+	if (getConf()->exhaustive && getConf()->model == ModelType::IMM)
+		ExhaustiveConsistency::dropPrefixViews(*og);
 	checkGraphInvariants(*og, "copying the graph for a backward revisit",
 			     plan ? &*plan : nullptr);
 
