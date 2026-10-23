@@ -1,1 +1,2 @@
 -disable-estimation |
+-disable-estimation -cache-instructions |
