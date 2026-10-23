@@ -2,7 +2,9 @@
 #
 # Source-based coverage of GenMC (a build configured with ENABLE_COVERAGE=ON
 # and clang): runs the unit and driver tests, with --full also the fast
-# regression suite through the instrumented genmc, and writes to
+# regression suite and the integration ctests (the check scripts, Relinche,
+# the pass checks with alive-tv, parallel and randomized runs) through the
+# instrumented genmc, and writes to
 # <build>/coverage:
 #
 #   html/index.html   the annotated sources
@@ -53,6 +55,19 @@ if [[ -x "${BUILD}/bin/genmc" ]]; then
 		# (driver.sh runs each genmc under GENMC_MEMORY_LIMIT, see #188)
 		GenMC="${BUILD}/bin/genmc" "${ROOT}/scripts/driver.sh" --fast > "${OUT}/driver.log" 2>&1 ||
 			{ echo "FAIL: driver.sh --fast (see ${OUT}/driver.log)"; status=1; }
+		echo "--- integration ctests"
+		# (not fast-driver: the suite above; not the ThreadSanitizer run.
+		# The parallel and randomized runs go without ctest's timeouts,
+		# which the instrumented genmc would exceed)
+		GenMC="${BUILD}/bin/genmc" ctest --test-dir "${BUILD}" -L integration -j "$(nproc)" \
+			-E '^(fast-driver|tsan-parallel|run-parallel|randomize-driver)$' \
+			> "${OUT}/ctest.log" 2>&1 ||
+			{ echo "FAIL: integration ctests (see ${OUT}/ctest.log)"; status=1; }
+		(cd "${ROOT}" &&
+			GenMC="${BUILD}/bin/genmc" scripts/run-parallel.sh &&
+			GenMC="${BUILD}/bin/genmc" iterations=1 scripts/randomize-driver.sh) \
+			> "${OUT}/parallel.log" 2>&1 ||
+			{ echo "FAIL: parallel and randomized runs (see ${OUT}/parallel.log)"; status=1; }
 	fi
 fi
 [[ ${#objects[@]} -gt 0 ]] || { echo "no test binaries in ${BUILD}/bin"; exit 1; }

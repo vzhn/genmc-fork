@@ -61,10 +61,10 @@ With clang, `ENABLE_COVERAGE=ON` builds with source-based coverage and adds two 
 cmake -S . -B Cov -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_C_COMPILER=clang -DBUILD_TESTS=ON -DENABLE_COVERAGE=ON
 cmake --build Cov --target coverage        # unit_tests and driver_tests (seconds)
-cmake --build Cov --target coverage-full   # also scripts/driver.sh --fast (minutes)
+cmake --build Cov --target coverage-full   # also driver.sh --fast and the integration ctests (~30 minutes)
 ```
 
-Both write `Cov/coverage/`: `html/index.html` (annotated sources), `report.txt` (per file), `summary.txt` (per directory, one row per layer and group of `genmc/genmc`, plus `lli` and `passes`), and `coverage.lcov`. `llvm-profdata` and `llvm-cov` are taken from the compiler's directory, so that they read its profile format. Test sources, the build directory and system headers are left out. The regression suite runs under `driver.sh`'s memory limit (`GENMC_MEMORY_LIMIT`). `llvm-cov` warns about functions with "mismatched data": inline functions compiled into several binaries with different settings (`driver_tests` has no LLVM). The warning is harmless.
+Both write `Cov/coverage/`: `html/index.html` (annotated sources), `report.txt` (per file), `summary.txt` (per directory, one row per layer and group of `genmc/genmc`, plus `lli` and `passes`), and `coverage.lcov`. `llvm-profdata` and `llvm-cov` are taken from the compiler's directory, so that they read its profile format. Test sources, the build directory and system headers are left out. The regression suite runs under `driver.sh`'s memory limit (`GENMC_MEMORY_LIMIT`). `coverage-full` also runs the ctests labelled `integration` (the check scripts, Relinche, the pass checks if `alive-tv` is installed; `Cov/coverage/ctest.log`), and the parallel and randomized runs without their ctest timeouts (`parallel.log`). `llvm-cov` warns about functions with "mismatched data": inline functions compiled into several binaries with different settings (`driver_tests` has no LLVM). The warning is harmless.
 
 With GCC, `ENABLE_COVERAGE=ON` adds `--coverage` (gcov) and no report targets.
 
