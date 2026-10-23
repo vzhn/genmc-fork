@@ -49,6 +49,33 @@ constexpr auto rmwPlacementNeedsCheck(ModelType model) -> bool
 	return true;
 }
 
+/** Whether closing a thread's open read-side critical sections, the events
+ * it must add next, can make a consistent graph inconsistent: an error found
+ * inside one must then be checked with the sections closed before it is
+ * reported (ExplorationCore::reportError()). proofs/alloy/open-section.als
+ * finds a counterexample under LKMM (rcu_read_unlock() orders the section's
+ * events against the grace periods, rcu-order) and none under SC, TSO, RA
+ * and RC11, where a trailing fence takes part in po only (ctest
+ * formal-models checks this table against it); IMM has no sections */
+constexpr auto openSectionsNeedCheck(ModelType model) -> bool
+{
+	switch (model) {
+	case ModelType::SC:
+		return false;
+	case ModelType::TSO:
+		return false;
+	case ModelType::RA:
+		return false;
+	case ModelType::RC11:
+		return false;
+	case ModelType::IMM:
+		return false;
+	case ModelType::LKMM:
+		return true;
+	}
+	return true;
+}
+
 /** Make `ModelType` formattable with `std::format`. */
 template <> struct std::formatter<ModelType> {
 	constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }

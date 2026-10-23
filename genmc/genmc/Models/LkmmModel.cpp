@@ -1086,10 +1086,10 @@ auto lkmm::hasGracePeriod(const ExecutionGraph &g) -> bool
 	return false;
 }
 
-auto lkmm::evaluate(const ExecutionGraph &g, bool full) -> Verdict
+auto lkmm::evaluate(const ExecutionGraph &g, bool full, bool closeOpen) -> Verdict
 {
 	auto plain = hasPreRace(g);
-	Model m(g, false, !full && !plain);
+	Model m(g, closeOpen, !full && !plain);
 	Relations r(m, full);
 	auto v = r.verdict;
 	if (!v.hb || !v.pb)

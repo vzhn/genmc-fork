@@ -62,6 +62,7 @@ constexpr std::string_view kI1 = "I1 (restriction)";
 constexpr std::string_view kI3 = "I3 (allocation map)";
 constexpr std::string_view kI4 = "I4 (resume point)";
 constexpr std::string_view kI5 = "I5 (consistency)";
+constexpr std::string_view kI6 = "I6 (error graph)";
 
 /** Whether LAB, a pointer another label stores, is a label of G */
 auto inGraph(const ExecutionGraph &g, const EventLabel *lab) -> bool
@@ -731,6 +732,15 @@ void checkConsistency(const ExecutionGraph &g, bool consistent, const Context &c
 	if (!consistent)
 		fail(kI5, "the execution violates the memory model's axioms (whole-graph check)", &g,
 		     ctx);
+}
+
+void checkErrorConsistency(const ExecutionGraph &g, bool consistent, const Context &ctx)
+{
+	if (!consistent)
+		fail(kI6,
+		     "the graph of the error is inconsistent once its open read-side critical "
+		     "sections are closed: no execution has it",
+		     &g, ctx);
 }
 
 void checkResume(const ExecutionGraph &g, const GraphFingerprint &saved,

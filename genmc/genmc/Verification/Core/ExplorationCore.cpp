@@ -1788,6 +1788,22 @@ void ExplorationCore::reportError(Event pos, const ErrorDetails &details)
 			return;
 	}
 
+	/* An error inside an open read-side critical section: the unlock the
+	 * thread adds next orders the section's events against the grace
+	 * periods (LKMM's rcu-order), and can make the graph inconsistent. The
+	 * error is then on a prefix no execution has (#201;
+	 * proofs/alloy/open-section.als): the graph is checked with its open
+	 * sections closed, and the run dropped as it would be at the unlock
+	 * (see GenMCDriver::handleLkmmFence()). A misuse of RCU (an unlock
+	 * without a lock, a grace period inside a section) is reported as it
+	 * is: the model has nothing to say about such a graph */
+	const auto misusesRcu = details.type == VerificationError::VE_InvalidRcu;
+	if (openSectionsNeedCheck(getConf()->model) && !misusesRcu && !scheduler.inErrorReplay() &&
+	    !getConsChecker().isConsistentWithSectionsClosed(g)) {
+		moot();
+		return;
+	}
+
 	/* If under estimation, ignore soft errors; they're gonna be reported later on
 	 * anyway */
 	if (inEstimationMode() && !details.shouldHalt)
@@ -1797,6 +1813,13 @@ void ExplorationCore::reportError(Event pos, const ErrorDetails &details)
 	 * under IMM), do not get into an infinite loop... */
 	if (scheduler.inErrorReplay() && !scheduler.isErrorReplayEvent(pos))
 		return;
+
+	/* The error is reported: its graph must be a prefix of an execution,
+	 * consistent with the events its threads must add next (I6) */
+	if (checksInvariants() && !misusesRcu && !scheduler.inErrorReplay())
+		invariants::checkErrorConsistency(
+			g, getConsChecker().isConsistentWithSectionsClosed(g),
+			invariantContext("reporting an error"));
 
 	/* Before printing an error, do an extra run to collect metadata;
 	 * when pruning, the graph cannot be replayed, so report directly */

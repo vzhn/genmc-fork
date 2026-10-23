@@ -98,8 +98,9 @@ auto findSrcuMisuse(const ExecutionGraph &g) -> std::optional<SrcuMisuse>;
 
 /** Evaluates the model on G. Unless FULL, only rb and plain-coherence are
  * decided (the other axioms may be wrong in the verdict): events that
- * cannot matter to them are left out */
-auto evaluate(const ExecutionGraph &g, bool full) -> Verdict;
+ * cannot matter to them are left out. With CLOSEOPEN, a critical section
+ * still open counts as closed at the end of its thread (see Model) */
+auto evaluate(const ExecutionGraph &g, bool full, bool closeOpen = false) -> Verdict;
 
 /** A data race of G (the cat's data-race flag), if any. G should be
  * consistent */

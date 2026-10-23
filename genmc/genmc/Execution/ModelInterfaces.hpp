@@ -98,6 +98,16 @@ public:
 	[[nodiscard]] virtual auto isConsistent(const EventLabel *lab) const -> bool = 0;
 	[[nodiscard]] virtual auto isConsistent(const ExecutionGraph & /*g*/) const -> bool = 0;
 
+	/** Whether G is consistent with each read-side critical section still
+	 * open closed at the end of its thread: whether an execution can still
+	 * complete it (LKMM; the other models have no sections, and a trailing
+	 * fence keeps a graph consistent: see openSectionsNeedCheck()) */
+	[[nodiscard]] virtual auto isConsistentWithSectionsClosed(const ExecutionGraph &g) const
+		-> bool
+	{
+		return isConsistent(g);
+	}
+
 	/** Whether RLAB, reading the co-maximal write, keeps its graph consistent
 	 * without a check: it does for a model whose po-based orderings are all
 	 * in ppo, as nothing then leaves the read in a cycle */

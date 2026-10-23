@@ -30,13 +30,14 @@ static auto needsModel(const ExecutionGraph &g) -> bool
 	return lkmm::hasGracePeriod(g) || lkmm::hasPreRace(g);
 }
 
-auto LKMMRcuChecker::withModel(const ExecutionGraph &g, bool generated) const -> bool
+auto LKMMRcuChecker::withModel(const ExecutionGraph &g, bool generated, bool closeOpen) const
+	-> bool
 {
 	const bool reference = getConf()->lkmmReference;
 	if (!reference && (!generated || !needsModel(g)))
 		return generated;
 
-	auto v = lkmm::evaluate(g, reference);
+	auto v = lkmm::evaluate(g, reference, closeOpen);
 	/* The generated checker decides hb and pb (coherence and atomicity hold
 	 * by construction); the graphs it is asked about were consistent before
 	 * their last event */
@@ -104,6 +105,18 @@ auto LKMMRcuChecker::isConsistent(const ExecutionGraph &g) const -> bool
 		return LKMMChecker::isConsistent(g);
 	}();
 	return withModel(g, generated);
+}
+
+auto LKMMRcuChecker::isConsistentWithSectionsClosed(const ExecutionGraph &g) const -> bool
+{
+	/* The regular part has no edge out of an unlock at the end of its
+	 * thread: closing the open sections changes rcu-order only, and what
+	 * follows from it (rb, the plain-access rules through rcu-fence) */
+	auto generated = [&] {
+		lkmm::PropIntCache cache;
+		return LKMMChecker::isConsistent(g);
+	}();
+	return withModel(g, generated, true);
 }
 
 auto LKMMRcuChecker::isCoMaxReadConsistent(const ReadLabel *rLab) const -> bool

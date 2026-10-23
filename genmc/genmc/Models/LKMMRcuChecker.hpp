@@ -36,6 +36,7 @@ public:
 
 	auto isConsistent(const EventLabel *lab) const -> bool override;
 	auto isConsistent(const ExecutionGraph &g) const -> bool override;
+	auto isConsistentWithSectionsClosed(const ExecutionGraph &g) const -> bool override;
 
 	/* rcu-link and rcu-fence order by po, not ppo: a read of the co-maximal
 	 * write that a revisit leaves before events of its thread (an
@@ -61,7 +62,8 @@ private:
 		-> std::optional<VerificationError>;
 
 	/* Combines the generated checker's answer on G with the model's */
-	auto withModel(const ExecutionGraph &g, bool generated) const -> bool;
+	auto withModel(const ExecutionGraph &g, bool generated, bool closeOpen = false) const
+		-> bool;
 };
 
 #endif /* GENMC_LKMM_RCU_CHECKER_HPP */
