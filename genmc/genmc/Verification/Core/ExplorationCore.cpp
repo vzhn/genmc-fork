@@ -153,7 +153,8 @@ auto ExplorationCore::invariantContext(std::string_view where) const -> invarian
 {
 	return {.where = where,
 		.dbgInfo = &errorReplay_->dbgInfo(),
-		.holesAllowed = getConf()->isDepTrackingModel};
+		.holesAllowed = getConf()->isDepTrackingModel,
+		.rmwPairsKept = !getConf()->isDepTrackingModel || getConf()->exhaustive};
 }
 
 void ExplorationCore::checkGraphInvariants(const ExecutionGraph &g, std::string_view where,
@@ -2387,6 +2388,17 @@ auto ExplorationCore::restrictAndRevisit(const WorkList::ItemT &item) -> bool
 		stamp = std::max(stamp, g.getEventLabel(wcf->getRev())->getStamp());
 	restrictExecution(stamp, "restricting the graph for a revisit");
 	repairDanglingReads(g);
+	if (checksInvariants()) {
+		using invariants::RevisitTarget;
+		const auto kind = genmc::isa<WriteForwardRevisit>(&*item) ? RevisitTarget::Write
+				  : genmc::isa<ReadForwardRevisit>(&*item) || br ||
+						  genmc::isa<WeakCasFailureRevisit>(&*item)
+					  ? RevisitTarget::Read
+					  : RevisitTarget::Any;
+		invariants::checkRevisitTarget(
+			g, item->getPos(), kind, br ? std::optional(br->getRev()) : std::nullopt,
+			invariantContext("restricting the graph for a revisit"));
+	}
 
 	resumePoints_.clearPending();
 	if (auto *fr = genmc::dyn_cast<ForwardRevisit>(&*item)) {

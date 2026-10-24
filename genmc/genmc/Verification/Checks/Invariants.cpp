@@ -281,6 +281,25 @@ void checkRelations(const ExecutionGraph &g, const Context &ctx)
 							   "elsewhere",
 							   oLab.getPos(), wLab->getPos()));
 			}
+			/* The write part of an RMW comes right after its read, which
+			 * was added before it (#223: a revisit kept the write part
+			 * without its read, and a later cut fell between them) */
+			if (wLab->isRMW() && ctx.rmwPairsKept) {
+				const auto *pLab = g.po_imm_pred(wLab);
+				const auto *rLab = genmc::dyn_cast_if_present<ReadLabel>(pLab);
+				if (!rLab || rLab->getAddr() != wLab->getAddr())
+					failI1(std::format("the RMW write {} does not follow its "
+							   "read ({} before it)",
+							   wLab->getPos(),
+							   pLab ? std::format("{}", pLab->getKind())
+								: std::string("nothing")));
+				else if (rLab->hasStamp() && wLab->hasStamp() &&
+					 !(rLab->getStamp() < wLab->getStamp()))
+					failI1(std::format("the RMW write {} was added before its "
+							   "read (stamps {} and {})",
+							   wLab->getPos(), wLab->getStamp().get(),
+							   rLab->getStamp().get()));
+			}
 		}
 	}
 
@@ -527,6 +546,31 @@ void checkCopyView(const ExecutionGraph &g, const VectorClock &v, const Context 
 					 t, v.getMax(t), t, t < n ? g.getThreadSize(t) : 0),
 			     &g, ctx);
 	}
+}
+
+void checkRevisitTarget(const ExecutionGraph &g, Event pos, RevisitTarget kind,
+			std::optional<Event> rev, const Context &ctx)
+{
+	auto describe = [](const EventLabel *lab) {
+		return lab ? std::format("a {} label", lab->getKind()) : std::string("missing");
+	};
+	const auto *lab = g.getEventLabelIfPresent(pos);
+	const auto ok = lab != nullptr && !genmc::isa<EmptyLabel>(lab) &&
+			(kind != RevisitTarget::Read || genmc::isa<ReadLabel>(lab)) &&
+			(kind != RevisitTarget::Write || genmc::isa<WriteLabel>(lab));
+	if (!ok)
+		fail(kI1,
+		     std::format("the event {} a revisit is for is {} after the restriction for it",
+				 pos, describe(lab)),
+		     &g, ctx);
+	if (!rev)
+		return;
+	const auto *wLab = g.getEventLabelIfPresent(*rev);
+	if (!genmc::isa_and_present<WriteLabel>(wLab))
+		fail(kI1,
+		     std::format("the write {} revisiting {} is {} after the restriction for it",
+				 *rev, pos, describe(wLab)),
+		     &g, ctx);
 }
 
 void checkGraph(const ExecutionGraph &g, const Context &ctx, const RestrictionPlan *plan)
