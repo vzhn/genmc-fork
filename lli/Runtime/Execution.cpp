@@ -1596,6 +1596,30 @@ void Interpreter::visitGetElementPtrInst(GetElementPtrInst &I)
 		 SF);
 }
 
+/* GenMC's values (SVal) are 64 bits wide. A wider access (an __int128, a
+ * long double, a 16-byte struct or vector) is modelled only if its value
+ * fits: an integer below 2^64 (zero-extended, as a load extends it). Other
+ * values used to be truncated (a wrong verdict): rejects them as unsupported.
+ * VALS are the values the access writes or compares with (none for a load) */
+static void checkAccessWidth(const Instruction &I, Type *typ, uint64_t size,
+			     std::initializer_list<const GenericValue *> vals = {})
+{
+	if (size <= sizeof(SVal::Value))
+		return;
+	if (typ->isIntegerTy() && std::ranges::all_of(vals, [](const GenericValue *v) {
+		    return v->IntVal.getActiveBits() <= 8 * sizeof(SVal::Value);
+	    }))
+		return;
+	std::string ty;
+	llvm::raw_string_ostream os(ty);
+	typ->print(os);
+	const auto &loc = I.getDebugLoc();
+	ERROR("Memory accesses wider than {} bytes are supported only for integers below 2^64: "
+	      "a {}-byte {} ({}){}\n",
+	      sizeof(SVal::Value), size, I.getOpcodeName(), os.str(),
+	      loc ? std::format(" at line {}", loc.getLine()) : std::string());
+}
+
 void Interpreter::visitLoadInst(LoadInst &I)
 {
 	Thread &thr = getCurThr();
@@ -1604,6 +1628,7 @@ void Interpreter::visitLoadInst(LoadInst &I)
 	Type *typ = I.getType();
 	auto size = getTypeSize(typ);
 	auto ord = toGenMCOrdering(I.getOrdering());
+	checkAccessWidth(I, typ, size);
 
 	/* First, set the dependencies for this instruction... */
 	auto deps = makeEventDeps(getDataDeps(thr.id, I.getPointerOperand()), nullptr,
@@ -1654,6 +1679,7 @@ void Interpreter::visitStoreInst(StoreInst &I)
 	auto *ptr = (GenericValue *)GVTOP(src);
 	auto asize = getTypeSize(typ);
 	auto ord = toGenMCOrdering(I.getOrdering());
+	checkAccessWidth(I, typ, asize, {&val});
 
 	/* First, record the dependencies for this instruction */
 	auto deps = makeEventDeps(getDataDeps(thr.id, I.getPointerOperand()),
@@ -1747,6 +1773,7 @@ void Interpreter::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I)
 	GenericValue src = getOperandValue(I.getPointerOperand(), SF);
 	auto *ptr = (GenericValue *)GVTOP(src);
 	auto size = getTypeSize(typ);
+	checkAccessWidth(I, typ, size, {&cmpVal, &newVal});
 	GenericValue result;
 
 	auto lDeps = makeEventDeps(getDataDeps(thr.id, I.getPointerOperand()),
@@ -1824,8 +1851,10 @@ void Interpreter::visitAtomicRMWInst(AtomicRMWInst &I)
 	GenericValue src = getOperandValue(I.getPointerOperand(), SF);
 	auto *ptr = (GenericValue *)GVTOP(src);
 	Type *typ = I.getType();
-	auto val = GV_TO_SVAL(getOperandValue(I.getValOperand(), SF), typ);
+	auto operand = getOperandValue(I.getValOperand(), SF);
+	auto val = GV_TO_SVAL(operand, typ);
 	auto size = getTypeSize(typ);
+	checkAccessWidth(I, typ, size, {&operand});
 
 	VERIFY(typ->isIntegerTy());
 
