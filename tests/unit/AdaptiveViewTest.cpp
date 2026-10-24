@@ -168,7 +168,9 @@ RC_GTEST_PROP(AdaptiveView, AnUpdateKeepsWhatItsViewDoesNotContain, ())
 		if (e.index >= 0 && !uView.contains(e))
 			RC_ASSERT(covers(acc.av, e));
 	for (auto e : acc.av) {
-		if (e.index < 0)
+		/* (A view lists the begin, index 0, of a thread it has no event
+		 * of but a later thread's: that is no event added) */
+		if (e.index <= 0)
 			continue;
 		RC_ASSERT(e == pos || std::ranges::find(before, e) != before.end());
 	}
