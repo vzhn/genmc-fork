@@ -20,12 +20,15 @@
 
 #include "AxiomaticOracle.hpp"
 #include "ScriptedProducer.hpp"
+#include "genmc/Verification/Checks/Invariants.hpp"
 
 #include <gtest/gtest.h>
 #include <rapidcheck.h>
 #include <rapidcheck/gtest.h>
 
+#include <format>
 #include <ostream>
+#include <string>
 
 namespace scripted {
 /* For rapidcheck's counterexamples */
@@ -276,12 +279,15 @@ auto genOp(bool relaxedOnly) -> rc::Gen<Op>
 		rc::gen::inRange(0U, 4U));
 }
 
-auto genProgram(bool relaxedOnly) -> rc::Gen<Program>
+/** Up to MAXTHREADS threads of up to MAXOPS accesses to two variables */
+auto genProgram(bool relaxedOnly, std::size_t maxThreads = 3, std::size_t maxOps = 3)
+	-> rc::Gen<Program>
 {
-	auto genThread = rc::gen::mapcat(rc::gen::inRange<std::size_t>(1, 4), [=](std::size_t n) {
-		return rc::gen::container<std::vector<Op>>(n, genOp(relaxedOnly));
-	});
-	auto genThreads = rc::gen::mapcat(rc::gen::inRange<std::size_t>(1, 4), [=](std::size_t n) {
+	auto genThread =
+		rc::gen::mapcat(rc::gen::inRange<std::size_t>(1, maxOps + 1), [=](std::size_t n) {
+			return rc::gen::container<std::vector<Op>>(n, genOp(relaxedOnly));
+		});
+	auto genThreads = rc::gen::mapcat(rc::gen::inRange<std::size_t>(1, maxThreads + 1), [=](std::size_t n) {
 		return rc::gen::container<std::vector<std::vector<Op>>>(n, genThread);
 	});
 	return rc::gen::map(genThreads, [](std::vector<std::vector<Op>> ts) {
@@ -496,6 +502,105 @@ RC_GTEST_PROP(ScriptedDriverExhaustive, RC11MatchesTheReference, ())
 }
 
 /*
+ * The configuration matrix: every model, the default exploration and the
+ * reference (-exhaustive), under -check-invariants (a violation fails the
+ * case, shrunk, instead of aborting), and with every scheduling policy.
+ * Under each: no invariant fails, every counted execution satisfies the
+ * model (I5), and the number of executions does not depend on the policy
+ * (it is the set of graphs, whatever order the threads run in).
+ * Under LKMM the default exploration may miss executions (#77) and explore
+ * some twice (#230), so its count is not compared. #223 (a crash under -lkmm, which explores
+ * as -exhaustive does) came from a combination of model and mode that no
+ * test ran; IMM's default exploration is left out until #227 is resolved.
+ */
+namespace {
+
+auto runChecked(const Program &p, ModelType model, Options opts) -> Exploration
+{
+	opts.checkInvariants = true;
+	invariants::ThrowOnViolation throwing;
+	try {
+		return explore(p, model, opts);
+	} catch (const invariants::Violation &v) {
+		RC_FAIL(std::format("{} (exhaustive: {}, policy {})", v.what(), opts.exhaustive,
+				    static_cast<int>(opts.schedulePolicy)));
+	}
+}
+
+auto checkMatrix(const Program &p, ModelType model, bool withDefault) -> void
+{
+	static constexpr SchedulePolicy kPolicies[] = {SchedulePolicy::WF, SchedulePolicy::LTR,
+						       SchedulePolicy::WFR,
+						       SchedulePolicy::Arbitrary};
+	for (auto exhaustive : {false, true}) {
+		if (!exhaustive && !withDefault)
+			continue;
+		std::optional<unsigned> count;
+		for (auto policy : kPolicies) {
+			auto r = runChecked(p, model,
+					    {.exhaustive = exhaustive,
+					     .schedulePolicy = policy,
+					     .scheduleSeed = 1});
+			RC_ASSERT(!r.error);
+			RC_ASSERT(r.inconsistent == 0U);
+			/* (The optimal exploration under LKMM depends on the
+			 * order of the revisits: #77) */
+			if (!exhaustive && model == ModelType::LKMM)
+				continue;
+			if (count)
+				RC_ASSERT(r.explored == *count);
+			count = r.explored;
+		}
+	}
+}
+
+} // namespace
+
+RC_GTEST_PROP(ScriptedDriverMatrix, SC, ())
+{
+	checkMatrix(*genProgram(false), ModelType::SC, true);
+}
+
+RC_GTEST_PROP(ScriptedDriverMatrix, TSO, ())
+{
+	checkMatrix(*genProgram(false), ModelType::TSO, true);
+}
+
+RC_GTEST_PROP(ScriptedDriverMatrix, RA, ())
+{
+	checkMatrix(*genProgram(false), ModelType::RA, true);
+}
+
+RC_GTEST_PROP(ScriptedDriverMatrix, RC11, ())
+{
+	checkMatrix(*genProgram(false), ModelType::RC11, true);
+}
+
+RC_GTEST_PROP(ScriptedDriverMatrix, IMMExhaustive, ())
+{
+	checkMatrix(*genProgram(false), ModelType::IMM, false);
+}
+
+RC_GTEST_PROP(ScriptedDriverMatrix, LKMM, ())
+{
+	checkMatrix(*genProgram(false), ModelType::LKMM, true);
+}
+
+/* Larger programs (four threads of four accesses): the number of executions
+ * under IMM and LKMM depends on the scheduling policy (#228, found by these;
+ * enable once it is fixed: --gtest_also_run_disabled_tests). About 7 minutes
+ * for 300 cases of each */
+RC_GTEST_PROP(ScriptedDriverMatrixLarge, DISABLED_IMMExhaustive, ())
+{
+	checkMatrix(*genProgram(false, 4, 4), ModelType::IMM, false);
+}
+
+RC_GTEST_PROP(ScriptedDriverMatrixLarge, DISABLED_LKMM, ())
+{
+	checkMatrix(*genProgram(false, 4, 4), ModelType::LKMM, true);
+}
+
+/*
  * The exploration checks each event as it adds it; those checks must imply
  * that every execution it counts satisfies the model's axioms as a whole
  * (the -check-invariants check I5).
@@ -546,3 +651,4 @@ TEST(ScriptedDriverConsistency, TSORMWWriteCannotCloseACycle)
 	EXPECT_EQ(tso.explored, explore(p, ModelType::TSO, {.exhaustive = true}).explored);
 	EXPECT_EQ(tso.outcomes, explore(p, ModelType::SC).outcomes);
 }
+
