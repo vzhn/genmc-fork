@@ -36,25 +36,30 @@ add_test(
     COMMAND bash -c "${SCRIPT_DIR}/randomize-driver.sh > ${SCRIPT_DIR}/randomize-driver.log"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-set_tests_properties(randomize-driver PROPERTIES LABELS "integration" TIMEOUT 600)
+# (each iteration runs the fast suite, ~90 s on 16 cores)
+set_tests_properties(randomize-driver PROPERTIES LABELS "integration" TIMEOUT 900
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc;iterations=5")
 
 add_test(NAME run-parallel
     COMMAND bash -c "${SCRIPT_DIR}/run-parallel.sh > ${SCRIPT_DIR}/run-parallel.log"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-set_tests_properties(run-parallel PROPERTIES LABELS "integration;concurrency" TIMEOUT 300)
+set_tests_properties(run-parallel PROPERTIES LABELS "integration;concurrency" TIMEOUT 300
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
 add_test(NAME run-relinche-impl
     COMMAND bash -c "${SCRIPT_DIR}/run-relinche-impl.sh > ${SCRIPT_DIR}/run-relinche-impl.log"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-set_tests_properties(run-relinche-impl PROPERTIES LABELS "integration;relinche" TIMEOUT 300)
+set_tests_properties(run-relinche-impl PROPERTIES LABELS "integration;relinche" TIMEOUT 300
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
 add_test(NAME run-relinche-spec
     COMMAND bash -c "${SCRIPT_DIR}/run-relinche-spec.sh > ${SCRIPT_DIR}/run-relinche-spec.log"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-set_tests_properties(run-relinche-spec PROPERTIES LABELS "integration;relinche" TIMEOUT 300)
+set_tests_properties(run-relinche-spec PROPERTIES LABELS "integration;relinche" TIMEOUT 300
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
 if(SANITIZE MATCHES "address")
   set(_asan_env "ASAN_OPTIONS=detect_leaks=0:halt_on_error=0")

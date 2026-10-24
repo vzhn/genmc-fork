@@ -12,9 +12,13 @@
 #     https://opensource.org/licenses/MIT
 
 # Runs the fast test suite with several exploration threads (ctest target
-# "run-parallel"). NTHREADS (default: 4) sets the number of threads.
+# "run-parallel"). NTHREADS (default: 4) sets the number of threads. The
+# tests run in parallel too (scripts/parallel-driver.sh), JOBS at a time
+# (default: one per NTHREADS cores).
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${DIR}/terminal.sh"
 
-GENMCFLAGS="${GENMCFLAGS:-} -nthreads=${NTHREADS:-4}" "${DIR}/driver.sh" --fast --debug
+NTHREADS="${NTHREADS:-4}"
+JOBS="${JOBS:-$(( ($(nproc) + NTHREADS - 1) / NTHREADS ))}" \
+	GENMCFLAGS="${GENMCFLAGS:-} -nthreads=${NTHREADS}" "${DIR}/parallel-driver.sh" --fast --debug
