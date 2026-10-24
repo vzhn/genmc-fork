@@ -14,11 +14,12 @@
 #ifndef GENMC_SCHEDULER_HPP
 #define GENMC_SCHEDULER_HPP
 
-#include "genmc/ADT/Trie.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Support/ActionEnums.hpp"
 
 #include <compare>
+#include <map>
+#include <memory>
 #include <optional>
 #include <random>
 #include <utility>
@@ -79,6 +80,11 @@ public:
 	/** Prioritizes thread of POS */
 	void prioritize(Event pos) { threadPrios_ = {pos}; }
 
+	/** Opt: Forgets where the cache is in each thread: to be called
+	 * whenever the graph is cut or replaced (the cache follows the labels
+	 * added to a graph, and the removal of a thread's last labels) */
+	void resetCacheCursors();
+
 	/** Adds LAB to the cache. Should be called before LAB is added to G. */
 	void cacheEventLabel(const ExecutionGraph &g, const EventLabel *lab);
 
@@ -126,19 +132,40 @@ protected:
 	[[nodiscard]] auto getConf() const -> const Config * { return conf_; }
 
 private:
-	using ValuePrefixT = std::unordered_map<
-		std::pair<unsigned int, unsigned int>, // fun_id, tid
-		Trie<std::vector<CacheKey>, std::vector<std::unique_ptr<EventLabel>>>,
-		PairHasher<unsigned int, unsigned int>>;
+	/** Opt: The labels cached after a value prefix, and the prefixes that
+	 * extend it by one value */
+	struct CacheNode {
+		std::vector<std::unique_ptr<EventLabel>> labs;
+		std::map<CacheKey, std::unique_ptr<CacheNode>> children;
+	};
 
-	/** Opt: Checks whether SEQ has been seen before for <FUN_ID, TID> and
-	 * if so returns its successors. Returns nullptr otherwise. */
-	auto retrieveCachedSuccessors(std::pair<unsigned int, unsigned int> key,
-				      const std::vector<CacheKey> &seq)
-		-> std::vector<std::unique_ptr<EventLabel>> *
-	{
-		return seenPrefixes[key].lookup(seq);
-	}
+	/** Opt: The cache of one <FUN_ID, TID>, and a cursor over the values the
+	 * thread has read so far, so that caching a label only looks at the
+	 * labels added since the previous call */
+	struct ThreadCache {
+		CacheNode root;
+		/** The values read before index SCANNED, and where they were read */
+		std::vector<CacheKey> vals;
+		std::vector<int> valIdx;
+		int scanned = 0;
+		/** PATH[k] is the node of VALS[0..k), as far as the cache has it */
+		std::vector<CacheNode *> path{&root};
+
+		void resetCursor()
+		{
+			vals.clear();
+			valIdx.clear();
+			scanned = 0;
+			path.assign(1, &root);
+		}
+	};
+
+	using ValuePrefixT = std::unordered_map<std::pair<unsigned int, unsigned int>, // fun_id, tid
+						ThreadCache, PairHasher<unsigned int, unsigned int>>;
+
+	/** Opt: Brings the cursor of TC to the values the thread of POS read
+	 * before POS */
+	void syncCursor(const ExecutionGraph &g, ThreadCache &tc, Event pos) const;
 
 	/** If there are more events to replay, schedules according to those */
 	auto scheduleReplay(const ExecutionGraph &g, std::span<Action> runnable)

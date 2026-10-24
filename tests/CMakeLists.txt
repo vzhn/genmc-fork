@@ -167,6 +167,13 @@ add_test(NAME wide-accesses
 set_tests_properties(wide-accesses PROPERTIES LABELS "integration;fast" TIMEOUT 120
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME cache-long-thread
+    COMMAND bash -c "${SCRIPT_DIR}/check-cache-long-thread.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(cache-long-thread PROPERTIES LABELS "integration;fast" TIMEOUT 120
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(NAME dot-graph
     COMMAND bash -c "${SCRIPT_DIR}/check-dot-graph.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
