@@ -85,6 +85,9 @@ correct infr/imm-parallel-copy imm -nthreads=2
 # section closed (issue #201)
 correct lkmm/rcu-assert-inside lkmm
 correct lkmm/srcu-assert-inside lkmm
+# I5: coherence; an RMW read filled into a hole before a kept read of its
+# location reads no write that read reads
+correct lkmm/fai-hole-kept-read lkmm
 for model in rc11 imm; do
 	# I2: the replay target stays in the schedule (PR #22)
 	wrong liveness/spin-na-stuck "${model}" "Liveness violation"

@@ -206,6 +206,10 @@ void checkResumeSchedule(const ExecutionGraph &g, const std::vector<Event> &sche
  * checks implying the whole-graph one */
 void checkConsistency(const ExecutionGraph &g, bool consistent, const Context &ctx);
 
+/** I5, coherence: along each thread, the accesses to a location do not go
+ * back in its coherence order (part of every model; see checkConsistency()) */
+void checkCoherence(const ExecutionGraph &g, const Context &ctx);
+
 /** I6: G, the graph of an error the exploration reports, is a prefix of an
  * execution: consistent with the events its threads must add next, the
  * unlocks of its open read-side critical sections (CONSISTENT: the model's

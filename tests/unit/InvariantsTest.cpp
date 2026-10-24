@@ -455,3 +455,67 @@ TEST(InvariantsI5, ACountedExecutionIsConsistent)
 	invariants::checkConsistency(t.g, true, kCtx);
 	EXPECT_DEATH(invariants::checkConsistency(t.g, false, kCtx), "I5 \\(consistency\\)");
 }
+
+TEST(InvariantsI5, ACoherentExecutionPasses)
+{
+	/* Thread 1 reads x twice, from the write of main and then from its own
+	 * later one, and the writes are in that order in coherence */
+	Graph t;
+	auto *w0 = t.write(0, t.x);
+	t.read(1, t.x, w0);
+	auto *w1 = t.write(1, t.x);
+	t.read(1, t.x, w1);
+	invariants::checkCoherence(t.g, kCtx);
+}
+
+TEST(InvariantsI5, AReadDoesNotReadBeforeItsThreadsWrite)
+{
+	/* CoWR: thread 1 writes x, then reads the write of main, co-before */
+	Graph t;
+	auto *w0 = t.write(0, t.x);
+	t.write(1, t.x);
+	t.read(1, t.x, w0);
+	EXPECT_DEATH(invariants::checkConsistency(t.g, true, kCtx), "violates coherence");
+}
+
+TEST(InvariantsI5, AReadDoesNotReadBeforeAnEarlierRead)
+{
+	/* CoRR: thread 1 reads the write of main, then the initializer */
+	Graph t;
+	auto *w0 = t.write(0, t.x);
+	t.read(1, t.x, w0);
+	t.read(1, t.x, t.g.getInitLabel());
+	EXPECT_DEATH(invariants::checkCoherence(t.g, kCtx), "violates coherence");
+}
+
+TEST(InvariantsI5, AWriteFollowsWhatItsThreadRead)
+{
+	/* CoRW: thread 1 reads the write of main, then writes x co-before it */
+	Graph t;
+	auto *w0 = t.write(0, t.x);
+	t.read(1, t.x, w0);
+	auto *w1 = t.write(1, t.x);
+	w1->moveCo(t.g.getInitLabel());
+	EXPECT_DEATH(invariants::checkCoherence(t.g, kCtx), "violates coherence");
+}
+
+TEST(InvariantsI5, AWriteFollowsItsThreadsWrite)
+{
+	/* CoWW: thread 1 writes x twice, the second co-before the first */
+	Graph t;
+	t.write(1, t.x);
+	auto *w2 = t.write(1, t.x);
+	w2->moveCo(t.g.getInitLabel());
+	EXPECT_DEATH(invariants::checkCoherence(t.g, kCtx), "violates coherence");
+}
+
+TEST(InvariantsI5, AccessesToOtherLocationsAreNotOrdered)
+{
+	/* Thread 1 reads y's initializer after reading x from main's write */
+	Graph t;
+	auto *w0 = t.write(0, t.x);
+	t.write(0, t.y);
+	t.read(1, t.x, w0);
+	t.read(1, t.y, t.g.getInitLabel());
+	invariants::checkCoherence(t.g, kCtx);
+}
