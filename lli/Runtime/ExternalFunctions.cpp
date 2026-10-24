@@ -365,13 +365,6 @@ static GenericValue lle_X_atexit(FunctionType *FT, const std::vector<GenericValu
 	return GV;
 }
 
-// void exit(int)
-static GenericValue lle_X_exit(FunctionType *FT, const std::vector<GenericValue> &Args)
-{
-	TheInterpreter->exitCalled(Args[0]);
-	return GenericValue();
-}
-
 // int sprintf(char *, const char *, ...) - a very rough implementation to make
 // output useful.
 static GenericValue lle_X_sprintf(FunctionType *FT, const std::vector<GenericValue> &Args)
@@ -575,7 +568,6 @@ void Interpreter::initializeExternalFunctions()
 {
 	sys::ScopedLock Writer(*FunctionsLock);
 	FuncNames["lle_X_atexit"] = lle_X_atexit;
-	FuncNames["lle_X_exit"] = lle_X_exit;
 
 	FuncNames["lle_X_printf"] = lle_X_printf;
 	FuncNames["lle_X_sprintf"] = lle_X_sprintf;

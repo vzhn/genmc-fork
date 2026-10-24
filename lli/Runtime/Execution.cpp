@@ -1283,20 +1283,6 @@ void Interpreter::freeAllocas(const AllocaHolder &allocas)
 			    StorageDuration::SD_Automatic, GET_DEPS(deps));
 }
 
-void Interpreter::exitCalled(GenericValue GV)
-{
-	// runAtExitHandlers() assumes there are no stack frames, but
-	// if exit() was called, then it had a stack frame. Blow away
-	// the stack before interpreting atexit handlers.
-	WARN_ONCE("exit-called", "Usage of exit() is not thread-safe!\n");
-	while (ECStack().size() > 0) {
-		freeAllocas(ECStack().back().Allocas);
-		ECStack().pop_back(); /* FIXME: Now assumes the user has properly used it */
-	}
-	runAtExitHandlers();
-	// exit(GV.IntVal.zextOrTrunc(32).getZExtValue());
-}
-
 /// Pop the last stack frame off of ECStack and then copy the result
 /// back into the result variable if we are not returning void. The
 /// result variable may be the ExitValue, or the Value of the calling
@@ -2754,65 +2740,24 @@ void Interpreter::visitShuffleVectorInst(ShuffleVectorInst &I)
 
 	GenericValue Src1 = getOperandValue(I.getOperand(0), SF);
 	GenericValue Src2 = getOperandValue(I.getOperand(1), SF);
-	GenericValue Src3 = getOperandValue(I.getOperand(2), SF);
 	GenericValue Dest;
 
-	// There is no need to check types of src1 and src2, because the compiled
-	// bytecode can't contain different types for src1 and src2 for a
-	// shufflevector instruction.
-
-	Type *TyContained = Ty->getContainedType(0);
-	unsigned src1Size = (unsigned)Src1.AggregateVal.size();
-	unsigned src2Size = (unsigned)Src2.AggregateVal.size();
-	unsigned src3Size = (unsigned)Src3.AggregateVal.size();
-
-	Dest.AggregateVal.resize(src3Size);
-
-	switch (TyContained->getTypeID()) {
-	default:
-		llvm_unreachable("Unhandled dest type for insertelement instruction");
-		break;
-	case Type::IntegerTyID:
-		for (unsigned i = 0; i < src3Size; i++) {
-			unsigned j = Src3.AggregateVal[i].IntVal.getZExtValue();
-			if (j < src1Size)
-				Dest.AggregateVal[i].IntVal = Src1.AggregateVal[j].IntVal;
-			else if (j < src1Size + src2Size)
-				Dest.AggregateVal[i].IntVal =
-					Src2.AggregateVal[j - src1Size].IntVal;
-			else
-				// The selector may not be greater than sum of lengths of first and
-				// second operands and llasm should not allow situation like
-				// %tmp = shufflevector <2 x i32> <i32 3, i32 4>, <2 x i32> undef,
-				//                      <2 x i32> < i32 0, i32 5 >,
-				// where i32 5 is invalid, but let it be additional check here:
-				llvm_unreachable("Invalid mask in shufflevector instruction");
-		}
-		break;
-	case Type::FloatTyID:
-		for (unsigned i = 0; i < src3Size; i++) {
-			unsigned j = Src3.AggregateVal[i].IntVal.getZExtValue();
-			if (j < src1Size)
-				Dest.AggregateVal[i].FloatVal = Src1.AggregateVal[j].FloatVal;
-			else if (j < src1Size + src2Size)
-				Dest.AggregateVal[i].FloatVal =
-					Src2.AggregateVal[j - src1Size].FloatVal;
-			else
-				llvm_unreachable("Invalid mask in shufflevector instruction");
-		}
-		break;
-	case Type::DoubleTyID:
-		for (unsigned i = 0; i < src3Size; i++) {
-			unsigned j = Src3.AggregateVal[i].IntVal.getZExtValue();
-			if (j < src1Size)
-				Dest.AggregateVal[i].DoubleVal = Src1.AggregateVal[j].DoubleVal;
-			else if (j < src1Size + src2Size)
-				Dest.AggregateVal[i].DoubleVal =
-					Src2.AggregateVal[j - src1Size].DoubleVal;
-			else
-				llvm_unreachable("Invalid mask in shufflevector instruction");
-		}
-		break;
+	/* The mask is not an operand (since LLVM 11): each element selects an
+	 * element of the concatenated sources, or is -1 (poison: any value) */
+	auto mask = I.getShuffleMask();
+	auto src1Size = Src1.AggregateVal.size();
+	auto src2Size = Src2.AggregateVal.size();
+	Dest.AggregateVal.resize(mask.size());
+	for (auto i = 0U; i < mask.size(); i++) {
+		if (mask[i] < 0)
+			continue;
+		auto j = static_cast<std::size_t>(mask[i]);
+		if (j < src1Size)
+			Dest.AggregateVal[i] = Src1.AggregateVal[j];
+		else if (j < src1Size + src2Size)
+			Dest.AggregateVal[i] = Src2.AggregateVal[j - src1Size];
+		else
+			llvm_unreachable("Invalid mask in shufflevector instruction");
 	}
 	SetValue(&I, Dest, SF);
 }
@@ -3670,6 +3615,24 @@ void Interpreter::callFunction(Function *F, const std::vector<GenericValue> &Arg
 	/* abort() ends the program with an error, not GenMC */
 	if (F->isDeclaration() && F->getName() == "abort") {
 		CALL_DRIVER(handleError, currDbgInfo(), currPos(), "Program aborted");
+		return;
+	}
+
+	/* exit() ends the calling thread, as returning its status from the
+	 * thread's function would (for main, after the atexit() handlers; the
+	 * other threads go on, as they do after main returns) */
+	if (F->isDeclaration() && F->getName() == "exit") {
+		WARN_ONCE("exit-called", "Usage of exit() is not thread-safe!\n");
+		DepInfo exitDeps;
+		if (const auto *d =
+			    getDataDeps(getCurThr().id, ECStack().back().Caller.arg_begin()[0]))
+			exitDeps = *d;
+		while (ECStack().size() > 1) {
+			freeAllocas(ECStack().back().Allocas);
+			ECStack().pop_back();
+		}
+		popStackAndReturnValueToCaller(F->getFunctionType()->getParamType(0), ArgVals[0],
+					       nullptr, exitDeps);
 		return;
 	}
 
