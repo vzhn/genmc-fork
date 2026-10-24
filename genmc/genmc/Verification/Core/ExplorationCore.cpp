@@ -141,7 +141,13 @@ void ExplorationCore::repairDanglingReads(ExecutionGraph &g)
 	}
 }
 
-void ExplorationCore::pushExecution(Execution &&e) { stack_->push(std::move(e)); }
+/* The cache follows the labels added to a graph (see Scheduler::resetCacheCursors()):
+ * each change of the graph other than an addition at a thread's end resets it */
+void ExplorationCore::pushExecution(Execution &&e)
+{
+	stack_->push(std::move(e));
+	getScheduler().resetCacheCursors();
+}
 
 auto ExplorationCore::invariantContext(std::string_view where) const -> invariants::Context
 {
@@ -168,6 +174,7 @@ void ExplorationCore::checkAllocationInvariants(std::string_view where) const
 
 void ExplorationCore::restrictExecution(Stamp stamp, std::string_view where)
 {
+	getScheduler().resetCacheCursors();
 	if (!checksInvariants()) {
 		stack_->restrict(stamp);
 		return;
@@ -177,7 +184,11 @@ void ExplorationCore::restrictExecution(Stamp stamp, std::string_view where)
 	checkGraphInvariants(getExec().getGraph(), where, &plan);
 }
 
-auto ExplorationCore::popExecution() -> bool { return stack_->pop(); }
+auto ExplorationCore::popExecution() -> bool
+{
+	getScheduler().resetCacheCursors();
+	return stack_->pop();
+}
 
 void ExplorationCore::initFromState(std::unique_ptr<Execution> exec)
 {
@@ -205,6 +216,7 @@ void ExplorationCore::initFromState(std::unique_ptr<Execution> exec)
 	resumePoints_.clearPending();
 
 	stack_->reset({std::move(exec->graph), LocalQueueT(), std::move(exec->choices)});
+	getScheduler().resetCacheCursors();
 }
 
 auto ExplorationCore::extractState() -> std::unique_ptr<ExplorationCore::Execution>
@@ -242,6 +254,7 @@ void ExplorationCore::restartExecution()
 {
 	resumePoints_.clearPending();
 	stack_->reset(stack_->emptyFrame());
+	getScheduler().resetCacheCursors();
 }
 
 auto ExplorationCore::done() -> bool

@@ -20,7 +20,8 @@
  * A violation is an internal failure whose message names the invariant, the
  * events involved and the graph, printed as error reports print it. Each
  * check costs O(graph) and runs once per restriction, execution start or
- * resume, which the operations it checks cost themselves.
+ * resume, which the operations it checks cost themselves (except I7, see
+ * there).
  *
  * I1 Restriction (checkGraph()). After every restriction of the graph
  *    (cutToStamp() for a forward revisit or a rerun, copyGraphUpTo() for a
@@ -84,6 +85,20 @@
  *    and the state's per-thread positions must not sit past a hole of the
  *    graph (a thread cannot have passed an event the graph lacks).
  *    (Issue #111: executions lost under IMM when resuming from older states.)
+ *
+ * I7 Instruction cache (Scheduler::syncCursor()). Under -cache-instructions,
+ *    the cursor through which the cache finds a thread's value prefix holds
+ *    exactly the values the graph's thread read before the label cached or
+ *    retrieved, at the same indices. The cursor is kept up to date
+ *    incrementally, on the assumption that between the cuts and the
+ *    replacements of the graph, which reset it, labels are only removed
+ *    from the end of a thread; the check re-reads the whole
+ *    prefix, so with it caching costs O(L^2) again for a thread of L events.
+ *    (Issue #218: caching re-read the prefix for every label.)
+ *    Validation: without the resets in ExplorationCore (only at the start
+ *    of an execution), tests/correct/classic/philosophers fails it: a
+ *    backward revisit adds labels to the copied graph before the next
+ *    execution starts.
  */
 
 #ifndef GENMC_INVARIANTS_HPP

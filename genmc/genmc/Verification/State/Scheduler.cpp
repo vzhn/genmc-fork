@@ -142,6 +142,7 @@ void Scheduler::resetExplorationOptions(const ExecutionGraph &g)
 {
 	setRescheduledRead(Event::getInit());
 	threadPrios_.clear();
+	resetCacheCursors();
 	/* Also for an execution resuming from a saved state: its threads have
 	 * passed most of the schedule (scheduleReplay() skips that), but a
 	 * thread with holes before kept events (a non-po-closed prefix a
@@ -250,22 +251,77 @@ auto Scheduler::schedule(const ExecutionGraph &g, std::span<Action> runnable)
 	return rescheduleReads(g);
 }
 
+static auto cacheKeyOf(const EventLabel *lab) -> CacheKey
+{
+	const auto *cLab = genmc::dyn_cast<CasReadLabel>(lab);
+	return {lab->getReturnValue(), cLab != nullptr && cLab->failsSpuriously()};
+}
+
 static auto extractValPrefix(const ExecutionGraph &g, Event pos)
-	-> std::pair<std::vector<CacheKey>, std::vector<Event>>
+	-> std::pair<std::vector<CacheKey>, std::vector<int>>
 {
 	std::vector<CacheKey> vals;
-	std::vector<Event> events;
+	std::vector<int> indices;
 
 	for (auto i = 0; i < pos.index; i++) {
 		const auto *lab = g.getEventLabel(Event(pos.thread, i));
 		if (lab->returnsValue()) {
-			const auto *cLab = genmc::dyn_cast<CasReadLabel>(lab);
-			vals.push_back({lab->getReturnValue(),
-					cLab != nullptr && cLab->failsSpuriously()});
-			events.push_back(lab->getPos());
+			vals.push_back(cacheKeyOf(lab));
+			indices.push_back(i);
 		}
 	}
-	return {vals, events};
+	return {vals, indices};
+}
+
+void Scheduler::resetCacheCursors()
+{
+	for (auto &[key, tc] : seenPrefixes)
+		tc.resetCursor();
+}
+
+void Scheduler::syncCursor(const ExecutionGraph &g, ThreadCache &tc, Event pos) const
+{
+	/* Between resets (see resetCacheCursors()), labels are removed only
+	 * from the end of a thread (blocking, unblocking): forget the ones at
+	 * or past POS */
+	while (!tc.valIdx.empty() && tc.valIdx.back() >= pos.index) {
+		tc.vals.pop_back();
+		tc.valIdx.pop_back();
+	}
+	tc.scanned = std::min(tc.scanned, pos.index);
+
+	/* A read added in place of a removed one may have read another value */
+	if (!tc.valIdx.empty()) {
+		const auto *lab = g.getEventLabel(Event(pos.thread, tc.valIdx.back()));
+		if (!lab->returnsValue() || cacheKeyOf(lab) != tc.vals.back())
+			tc.resetCursor();
+	}
+
+	for (; tc.scanned < pos.index; ++tc.scanned) {
+		const auto *lab = g.getEventLabel(Event(pos.thread, tc.scanned));
+		if (lab->returnsValue()) {
+			tc.vals.push_back(cacheKeyOf(lab));
+			tc.valIdx.push_back(tc.scanned);
+		}
+	}
+
+	tc.path.resize(std::min(tc.path.size(), tc.vals.size() + 1));
+	while (tc.path.size() <= tc.vals.size()) {
+		auto it = tc.path.back()->children.find(tc.vals[tc.path.size() - 1]);
+		if (it == tc.path.back()->children.end())
+			break;
+		tc.path.push_back(&*it->second);
+	}
+
+	if (getConf()->checkInvariants) {
+		auto [vals, indices] = extractValPrefix(g, pos);
+		if (vals != tc.vals || indices != tc.valIdx)
+			invariants::fail("I7 (instruction cache)",
+					 std::format("the cache's cursor for thread {} holds the "
+						     "values read at {} before {}, the graph at {}",
+						     pos.thread, tc.valIdx, pos, indices),
+					 &g, {.where = "caching a label"});
+	}
 }
 
 void Scheduler::cacheEventLabel(const ExecutionGraph &g, const EventLabel *lab)
@@ -275,6 +331,7 @@ void Scheduler::cacheEventLabel(const ExecutionGraph &g, const EventLabel *lab)
 				       ? genmc::dyn_cast<ThreadStartLabel>(lab)
 				       : g.getFirstThreadLabel(lab->getThread());
 	auto cacheKey = std::make_pair(firstLab->getThreadInfo().funId, (unsigned)lab->getThread());
+	auto &tc = seenPrefixes[cacheKey];
 
 	/* Helper that copies and resets the prefix of LAB starting from index FROM. */
 	auto copyPrefix = [&](auto from, auto &lab) {
@@ -289,12 +346,10 @@ void Scheduler::cacheEventLabel(const ExecutionGraph &g, const EventLabel *lab)
 		return labs;
 	};
 
-	/* Extract value prefix and find how much of it has already been cached */
-	auto [vals, indices] = extractValPrefix(g, lab->getPos());
-	auto commonPrefixLen = seenPrefixes[cacheKey].findLongestCommonPrefix(vals);
-	std::vector<CacheKey> seenVals(vals.begin(), vals.begin() + commonPrefixLen);
-	auto *data = retrieveCachedSuccessors(cacheKey, seenVals);
-	VERIFY(data);
+	/* Find how much of the value prefix has already been cached */
+	syncCursor(g, tc, lab->getPos());
+	auto commonPrefixLen = tc.path.size() - 1;
+	auto *data = &tc.path.back()->labs;
 
 	/*
 	 * Fastpath: if there are no new data to cache, return.
@@ -308,7 +363,7 @@ void Scheduler::cacheEventLabel(const ExecutionGraph &g, const EventLabel *lab)
 	 * Fetch the labels to cache. We try to copy as little as possible,
 	 * by inspecting what's already cached.
 	 */
-	auto fromIdx = commonPrefixLen == 0 ? 0 : indices[commonPrefixLen - 1].index + 1;
+	auto fromIdx = commonPrefixLen == 0 ? 0 : tc.valIdx[commonPrefixLen - 1] + 1;
 	if (!data->empty())
 		fromIdx = std::max(data->back()->getIndex() + 1, fromIdx);
 	auto labs = copyPrefix(fromIdx, lab);
@@ -320,10 +375,11 @@ void Scheduler::cacheEventLabel(const ExecutionGraph &g, const EventLabel *lab)
 		/* If the last cached label returns a value, then we need
 		 * to cache to a different bucket */
 		if (!data->empty() && data->back()->returnsValue()) {
-			seenVals.push_back(vals[seenVals.size()]);
-			auto res = seenPrefixes[cacheKey].addSeq(seenVals, {});
-			VERIFY(res);
-			data = retrieveCachedSuccessors(cacheKey, seenVals);
+			auto &child = tc.path.back()->children[tc.vals[tc.path.size() - 1]];
+			VERIFY(!child);
+			child = std::make_unique<CacheNode>();
+			tc.path.push_back(&*child);
+			data = &child->labs;
 		}
 		data->push_back(std::move(labs[i]));
 	}
@@ -343,11 +399,14 @@ auto Scheduler::retrieveFromCache(const ExecutionGraph &g, int thread)
 {
 	auto key = std::make_pair(g.getFirstThreadLabel(thread)->getThreadInfo().funId,
 				  (unsigned)thread);
+	auto &tc = seenPrefixes[key];
 
 	auto next = findNextLabelToAdd(g, thread);
-	auto [vals, last] = extractValPrefix(g, next);
-	auto *res = retrieveCachedSuccessors(key, vals);
-	if (res == nullptr || res->empty() || res->back()->getIndex() < next.index)
+	syncCursor(g, tc, next);
+	if (tc.path.size() != tc.vals.size() + 1)
+		return nullptr;
+	auto *res = &tc.path.back()->labs;
+	if (res->empty() || res->back()->getIndex() < next.index)
 		return nullptr;
 	return res;
 }
