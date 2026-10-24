@@ -160,6 +160,13 @@ add_test(NAME variadic
 set_tests_properties(variadic PROPERTIES LABELS "integration;fast" TIMEOUT 120
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME wide-accesses
+    COMMAND bash -c "${SCRIPT_DIR}/check-wide-accesses.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(wide-accesses PROPERTIES LABELS "integration;fast" TIMEOUT 120
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(NAME helping-cas-annotation
     COMMAND bash -c "${SCRIPT_DIR}/check-helping-cas-annotation.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
