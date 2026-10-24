@@ -750,6 +750,25 @@ auto ExplorationCore::checkInitializedMem(const WriteLabel *wLab) -> std::option
 	return reportIfViolated(error_rules::invalidUnlock(wLab));
 }
 
+auto ExplorationCore::isErrorGraphConsistent(const ExecutionGraph &g) const -> bool
+{
+	/* An error found as a read is added (see handleLoad()) comes before the
+	 * read has an rf: the error is on the prefix before the read, and the
+	 * read, taken as reading the initializer, can make the graph
+	 * inconsistent (#221). Such a read is checked as not yet added */
+	auto pending = std::views::filter(g.thr_ids(), [&](auto t) {
+		const auto *rLab = genmc::dyn_cast<ReadLabel>(g.getLastThreadLabel(t));
+		return rLab && !rLab->getRf();
+	});
+	if (std::ranges::empty(pending))
+		return getConsChecker().isConsistentWithSectionsClosed(g);
+
+	auto v = g.getViewFromStamp(g.getMaxStamp());
+	for (auto t : pending)
+		v->setMax(g.getLastThreadLabel(t)->getPos().prev());
+	return getConsChecker().isConsistentWithSectionsClosed(*g.getCopyUpTo(*v));
+}
+
 auto ExplorationCore::reportIfViolated(const std::optional<ErrorDetails> &violation)
 	-> std::optional<VerificationError>
 {
@@ -1814,7 +1833,7 @@ void ExplorationCore::reportError(Event pos, const ErrorDetails &details)
 	 * is: the model has nothing to say about such a graph */
 	const auto misusesRcu = details.type == VerificationError::VE_InvalidRcu;
 	if (openSectionsNeedCheck(getConf()->model) && !misusesRcu && !scheduler.inErrorReplay() &&
-	    !getConsChecker().isConsistentWithSectionsClosed(g)) {
+	    !isErrorGraphConsistent(g)) {
 		moot();
 		return;
 	}
@@ -1832,9 +1851,8 @@ void ExplorationCore::reportError(Event pos, const ErrorDetails &details)
 	/* The error is reported: its graph must be a prefix of an execution,
 	 * consistent with the events its threads must add next (I6) */
 	if (checksInvariants() && !misusesRcu && !scheduler.inErrorReplay())
-		invariants::checkErrorConsistency(
-			g, getConsChecker().isConsistentWithSectionsClosed(g),
-			invariantContext("reporting an error"));
+		invariants::checkErrorConsistency(g, isErrorGraphConsistent(g),
+						  invariantContext("reporting an error"));
 
 	/* Before printing an error, do an extra run to collect metadata;
 	 * when pruning, the graph cannot be replayed, so report directly */

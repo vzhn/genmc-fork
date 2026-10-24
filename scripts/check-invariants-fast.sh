@@ -85,6 +85,11 @@ correct infr/imm-parallel-copy imm -nthreads=2
 # section closed (issue #201)
 correct lkmm/rcu-assert-inside lkmm
 correct lkmm/srcu-assert-inside lkmm
+# I6: an error found as a read is added is checked without the read, which
+# has no rf yet (issue #221)
+for model in sc rc11 imm; do
+	correct infr/ipr-error-pending-read "${model}"
+done
 for model in rc11 imm; do
 	# I2: the replay target stays in the schedule (PR #22)
 	wrong liveness/spin-na-stuck "${model}" "Liveness violation"

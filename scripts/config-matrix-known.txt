@@ -2,4 +2,3 @@
 #   <model flag> [-exhaustive] <test under tests/correct> <issue>
 # A run listed here must fail, and a run not listed must pass: fix the
 # issue, then delete its lines.
--rc11 -exhaustive lkmm/urcu-mb/variants/urcu-mb.c #221
