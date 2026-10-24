@@ -22,6 +22,7 @@
  * operations and finishes. Variables are 4-byte globals, zero-initialized.
  */
 
+#include "genmc/Execution/EventKey.hpp"
 #include "genmc/Verification/Core/EventProducer.hpp"
 #include "genmc/Verification/Core/Explorer.hpp"
 #include "genmc/Verification/Core/GenMCDriver.hpp"
@@ -99,7 +100,23 @@ struct Options {
 	bool blindRMWReduction = false;
 	/** -exhaustive: the reference exploration (every revisit, no maximality) */
 	bool exhaustive = false;
+	/** -check-invariants (a violation throws: see invariants::ThrowOnViolation) */
+	bool checkInvariants = false;
+	/** -schedule-policy and -schedule-seed */
+	SchedulePolicy schedulePolicy = SchedulePolicy::WF;
+	unsigned long long scheduleSeed = 0;
 };
+
+/** The failure ordering a C compare-exchange of success ordering ORD
+ * gets (C forbids a release failure): the interpreter receives it */
+inline auto failureOrdering(MemOrdering ord) -> MemOrdering
+{
+	if (ord == MemOrdering::Release)
+		return MemOrdering::Relaxed;
+	if (ord == MemOrdering::AcquireRelease)
+		return MemOrdering::Acquire;
+	return ord;
+}
 
 class Producer : public EventProducer {
 public:
@@ -202,7 +219,24 @@ private:
 		return val;
 	}
 
+	/* As the interpreter does with replay keys (CALL_DRIVER()): each
+	 * operation is an instruction instance, keyed by its thread and index,
+	 * and its events follow the thread's position (sub-keys 1, 2, ...).
+	 * Kept events are aligned by these keys (see alignKeptEvents()) */
 	void step(int tid)
+	{
+		if (!driver_.checksReplayKeys()) {
+			stepOp(tid);
+			return;
+		}
+		auto key = std::make_shared<const EventKey>(std::vector<EventKey::Step>{
+			{static_cast<std::uint32_t>(tid), static_cast<std::uint32_t>(pc_[tid])}});
+		driver_.setEventKey(std::move(key), acts_[tid].event);
+		stepOp(tid);
+		driver_.clearEventKey();
+	}
+
+	void stepOp(int tid)
 	{
 		const auto pos = acts_[tid].event;
 		if (tid == 0) {
@@ -247,7 +281,8 @@ private:
 		case OpKind::CompareSwap: {
 			/* As the interpreter issues a strong cmpxchg: the CAS read, and
 			 * the CAS write only if the read succeeds */
-			auto r = driver_.handleCasRead(nullptr, pos, op.ord, op.ord, addrs_[op.var],
+			auto r = driver_.handleCasRead(nullptr, pos, op.ord, failureOrdering(op.ord),
+						       addrs_[op.var],
 						       ASize(kSize), SVal(op.expected), SVal(op.val),
 						       WriteAttr::None, false, nullptr, std::nullopt,
 						       EventDeps());
@@ -312,12 +347,17 @@ inline auto explore(const Program &prog, ModelType model, Options opts = {}) -> 
 	auto conf = std::make_shared<Config>();
 	conf->model = model;
 	conf->isDepTrackingModel = (model == ModelType::IMM || model == ModelType::LKMM);
-	conf->schedulePolicy = SchedulePolicy::WF;
-	conf->randomScheduleSeed = 0;
+	conf->schedulePolicy = opts.schedulePolicy;
+	conf->randomScheduleSeed = opts.scheduleSeed;
 	conf->warnOnGraphSize = 1024;
 	conf->symmetryReduction = opts.symmetryReduction;
 	conf->blindRMWReduction = opts.blindRMWReduction;
 	conf->exhaustive = opts.exhaustive;
+	conf->checkInvariants = opts.checkInvariants;
+	/* As the command line sets it: kept events are relocated under LKMM,
+	 * and under IMM with -exhaustive (see relocatesKeptEvents()) */
+	conf->checkReplayKeys = model == ModelType::LKMM ||
+				(opts.exhaustive && model == ModelType::IMM);
 	if (opts.exhaustive) {
 		std::vector<std::string> warnings;
 		VERIFY(std::holds_alternative<std::monostate>(conf->validate(warnings)));

@@ -46,6 +46,14 @@
  *      shifted thread ids);
  *    - holes (EMPTY labels) only under dependency-tracking models, never at
  *      index 0;
+ *    - the write part of an RMW comes right after its read (same address),
+ *      which has a smaller stamp (except in the optimal exploration under
+ *      dependency tracking, which may keep a write part alone and complete
+ *      it when its read is executed again); after the restriction for a revisit, the
+ *      event it is for is in the graph (a read, for a revisit of a read)
+ *      and the revisiting write too (checkRevisitTarget()). (#223: a revisit kept an RMW's write part
+ *      without its read, a later cut fell between them, and a forward
+ *      revisit was for the hole left; the exploration crashed);
  *    - a cut keeps exactly the planned labels (RestrictionPlan, computed
  *      before the cut): nothing with a stamp above the cut survives, nothing
  *      at or below it is lost, except the begins of erased trailing threads,
@@ -109,6 +117,7 @@
 #include "genmc/Verification/Report/DebugInfo.hpp"
 #include "genmc/Verification/Checks/GraphFingerprint.hpp"
 
+#include <cstdint>
 #include <optional>
 #include <source_location>
 #include <stdexcept>
@@ -130,6 +139,11 @@ struct Context {
 	const GraphDbgInfo *dbgInfo = nullptr;
 	/** Whether the graph may have holes (dependency-tracking models) */
 	bool holesAllowed = false;
+	/** Whether a revisit keeps an RMW's read with its write part. Not so in
+	 * the optimal exploration under dependency tracking: the write part may
+	 * be kept alone, and is completed when its read is executed again
+	 * (ExplorationCore::updateKeptRMWWrite()) */
+	bool rmwPairsKept = true;
 };
 
 /** The labels a restriction must keep, computed before it (see I1) */
@@ -155,6 +169,15 @@ void checkGraph(const ExecutionGraph &g, const Context &ctx, const RestrictionPl
  * of G. A view built from a stale prefix view reaches beyond a thread, and
  * the copy dereferences the missing labels before any check of its result */
 void checkCopyView(const ExecutionGraph &g, const VectorClock &v, const Context &ctx);
+
+/** What a revisit is for: a read, a write (its coherence placing), or any event */
+enum class RevisitTarget : std::uint8_t { Read, Write, Any };
+
+/** I1: after the restriction for a revisit of POS (by REV, for a backward
+ * revisit), POS is an event of the graph of kind KIND, not a hole, and REV
+ * a write */
+void checkRevisitTarget(const ExecutionGraph &g, Event pos, RevisitTarget kind,
+			std::optional<Event> rev, const Context &ctx);
 
 /** I3: the allocation map of STATE agrees with the lifecycle labels of G */
 void checkAllocations(const ExecutionGraph &g, const ExecutionState &state, const Context &ctx);

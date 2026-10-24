@@ -24,6 +24,7 @@
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
 #include "genmc/Execution/ExecutionState.hpp"
+#include "genmc/Support/RMWOps.hpp"
 #include "genmc/Support/ThreadInfo.hpp"
 #include "genmc/Verification/Checks/Invariants.hpp"
 
@@ -247,6 +248,52 @@ TEST(InvariantsI1, ACopyKeepsTheLabelsOfItsView)
 	all.setMax(Event(1, 1));
 	auto whole = invariants::planCopyUpTo(t.g, all);
 	EXPECT_DEATH(invariants::checkGraph(*og, kCtx, &whole), "was to be kept by the copy");
+}
+
+/* The write part of an RMW comes right after its read (#223: a revisit
+ * kept the write part without its read; the exploration crashed later, on
+ * a revisit of the hole left) */
+TEST(InvariantsI1, AnRMWWriteFollowsItsRead)
+{
+	Graph t;
+	auto *rLab = t.add(FaiReadLabel::create(t.next(1), MemOrdering::Relaxed, t.x, ASize(4),
+						RMWBinOp::Add, SVal(1)));
+	rLab->setRf(t.g.getInitLabel());
+	auto *wLab = t.add(FaiWriteLabel::create(t.next(1), MemOrdering::Relaxed, t.x, ASize(4),
+						 SVal(1)));
+	wLab->addCo(t.g.co_max(t.x));
+	invariants::checkGraph(t.g, kCtx);
+}
+
+TEST(InvariantsI1, AnRMWWriteWithoutItsRead)
+{
+	Graph t;
+	t.fence(1);
+	auto *wLab = t.add(FaiWriteLabel::create(t.next(1), MemOrdering::Relaxed, t.x, ASize(4),
+						 SVal(1)));
+	wLab->addCo(t.g.co_max(t.x));
+	EXPECT_DEATH(invariants::checkGraph(t.g, kCtx),
+		     "the RMW write \\(1, 2\\) does not follow its read");
+}
+
+/* After the restriction for a revisit, the event it is for is there */
+TEST(InvariantsI1, ARevisitIsForAnEventOfTheGraph)
+{
+	Graph t;
+	auto *r = t.read(1, t.x, t.g.getInitLabel());
+	auto *w = t.write(0, t.x);
+	using invariants::RevisitTarget;
+	invariants::checkRevisitTarget(t.g, r->getPos(), RevisitTarget::Read, w->getPos(), kCtx);
+	invariants::checkRevisitTarget(t.g, w->getPos(), RevisitTarget::Write, std::nullopt, kCtx);
+	EXPECT_DEATH(invariants::checkRevisitTarget(t.g, w->getPos(), RevisitTarget::Read,
+						    std::nullopt, kCtx),
+		     "the event \\(0, 2\\) a revisit is for is a W label");
+	EXPECT_DEATH(invariants::checkRevisitTarget(t.g, Event(1, 5), RevisitTarget::Any,
+						    std::nullopt, kCtx),
+		     "the event \\(1, 5\\) a revisit is for is missing");
+	EXPECT_DEATH(invariants::checkRevisitTarget(t.g, r->getPos(), RevisitTarget::Read,
+						    Event(0, 1), kCtx),
+		     "the write \\(0, 1\\) revisiting \\(1, 1\\) is a THREAD_CREATE label");
 }
 
 /*******************************************************************************
