@@ -134,6 +134,7 @@ public:
 		acts_.clear();
 		funOf_.assign(1, 0);
 		pc_.assign(1, 0);
+		ctrl_.assign(1, DepInfo());
 		acts_.emplace_back(ActionKind::NonLoad, Event(0, 0));
 		for (const auto &ti : tis)
 			addThread(ti.id, static_cast<unsigned>(ti.arg.get()));
@@ -189,6 +190,7 @@ private:
 			acts_.emplace_back(ActionKind::NonLoad, Event(static_cast<int>(acts_.size()), 0));
 			funOf_.push_back(0);
 			pc_.push_back(0);
+			ctrl_.emplace_back();
 		}
 		funOf_[tid] = funId;
 		updateKind(tid);
@@ -268,15 +270,15 @@ private:
 		switch (op.kind) {
 		case OpKind::Load:
 			advance(tid, driver_.handleRead(nullptr, pos, op.ord, addrs_[op.var],
-							ASize(kSize), nullptr, std::nullopt, EventDeps()));
+							ASize(kSize), nullptr, std::nullopt, deps(tid)));
 			break;
 		case OpKind::Store:
 			advance(tid, driver_.handleWrite(nullptr, pos, op.ord, addrs_[op.var],
 							 ASize(kSize), SVal(op.val), WriteAttr::None,
-							 EventDeps()));
+							 deps(tid)));
 			break;
 		case OpKind::Fence:
-			advance(tid, driver_.handleFence(nullptr, pos, op.ord, EventDeps()));
+			advance(tid, driver_.handleFence(nullptr, pos, op.ord, deps(tid)));
 			break;
 		case OpKind::CompareSwap: {
 			/* As the interpreter issues a strong cmpxchg: the CAS read, and
@@ -285,19 +287,21 @@ private:
 						       addrs_[op.var],
 						       ASize(kSize), SVal(op.expected), SVal(op.val),
 						       WriteAttr::None, false, nullptr, std::nullopt,
-						       EventDeps());
+						       deps(tid));
 			acts_[tid].event.index += static_cast<int>(r.count);
 			const auto *res = std::get_if<GenMCDriver::CasReadResult>(&r.result);
 			if (!res)
 				break;
 			if (!res->success) {
+				orderAfterExclusiveRead(tid, pos.next());
 				++pc_[tid];
 				updateKind(tid);
 				break;
 			}
 			advance(tid, driver_.handleCasWrite(nullptr, acts_[tid].event, op.ord,
 							    addrs_[op.var], ASize(kSize), SVal(op.val),
-							    WriteAttr::None, EventDeps()));
+							    WriteAttr::None, deps(tid)));
+			orderAfterExclusiveRead(tid, pos.next());
 			break;
 		}
 		case OpKind::FetchAdd: {
@@ -307,7 +311,7 @@ private:
 			auto wattr = op.blind ? WriteAttr::Blind : WriteAttr::None;
 			auto r = driver_.handleFaiRead(nullptr, pos, op.ord, addrs_[op.var],
 						       ASize(kSize), RMWBinOp::Add, SVal(op.val), wattr,
-						       nullptr, std::nullopt, EventDeps());
+						       nullptr, std::nullopt, deps(tid));
 			acts_[tid].event.index += static_cast<int>(r.count);
 			const auto *old = std::get_if<SVal>(&r.result);
 			if (!old)
@@ -315,7 +319,8 @@ private:
 			auto sum = static_cast<std::uint32_t>(old->get() + op.val);
 			advance(tid, driver_.handleFaiWrite(nullptr, acts_[tid].event, op.ord,
 							    addrs_[op.var], ASize(kSize), SVal(sum), wattr,
-							    EventDeps()));
+							    deps(tid)));
+			orderAfterExclusiveRead(tid, pos.next());
 			break;
 		}
 		}
@@ -326,10 +331,31 @@ private:
 	std::vector<std::uint32_t> init_;
 	std::vector<SAddr> addrs_;
 
+	/* The dependencies of a thread's next event */
+	auto deps(int tid) const -> EventDeps
+	{
+		EventDeps d;
+		d.ctrl = ctrl_[tid];
+		return d;
+	}
+
+	/* As the interpreter does outside LKMM (visitAtomicCmpXchgInst(),
+	 * visitAtomicRMWInst()): IMM orders an exclusive read before all later
+	 * events of its thread, as a control dependency. Without it, a revisit
+	 * kept the events after a CAS without the CAS, which then failed and
+	 * left its write part as a hole (#227) */
+	void orderAfterExclusiveRead(int tid, Event read)
+	{
+		if (!driver_.scopesCtrlDeps())
+			ctrl_[tid].update(DepInfo(read));
+	}
+
 	/* Per run: each thread's position, function and next operation */
 	std::vector<Action> acts_;
 	std::vector<unsigned> funOf_;
 	std::vector<size_t> pc_;
+	/* and the control dependencies of its next events */
+	std::vector<DepInfo> ctrl_;
 };
 
 /** The result of exploring PROG under MODEL */

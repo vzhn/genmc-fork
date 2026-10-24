@@ -254,6 +254,21 @@ TEST(ScriptedDriver, CasAfterAnIncrement)
 	expectMatchesOracle(p, ModelType::SC);
 }
 
+TEST(ScriptedDriver, IMMKeepsACasBeforeAKeptIncrement)
+{
+	/* #227: the revisit of t0's increment by t1's keeps t1's CAS, which IMM
+	 * orders before it (an exclusive read). Without that order, the CAS
+	 * was deleted, failed when executed anew, and left its write part as a
+	 * hole before the kept increment (a crash). 4 executions, as the
+	 * interpreter gives */
+	Program p{.numVars = 2, .threads = {{fai(X, 1)}, {cas(Y, 0, 1), fai(X, 3)}, {fai(Y, 2)}}};
+	for (auto exhaustive : {false, true}) {
+		auto r = explore(p, ModelType::IMM, {.exhaustive = exhaustive, .checkInvariants = true});
+		EXPECT_FALSE(r.error);
+		EXPECT_EQ(r.explored, 4U);
+	}
+}
+
 /*
  * Random programs: up to three threads of up to three accesses to two
  * variables. The driver explores exactly the graphs the axioms allow and
@@ -501,6 +516,11 @@ RC_GTEST_PROP(ScriptedDriverExhaustive, RC11MatchesTheReference, ())
 	checkAgainstExhaustive(*genProgram(false), ModelType::RC11);
 }
 
+RC_GTEST_PROP(ScriptedDriverExhaustive, IMMMatchesTheReference, ())
+{
+	checkAgainstExhaustive(*genProgram(false), ModelType::IMM);
+}
+
 /*
  * The configuration matrix: every model, the default exploration and the
  * reference (-exhaustive), under -check-invariants (a violation fails the
@@ -511,7 +531,9 @@ RC_GTEST_PROP(ScriptedDriverExhaustive, RC11MatchesTheReference, ())
  * Under LKMM the default exploration may miss executions (#77) and explore
  * some twice (#230), so its count is not compared. #223 (a crash under -lkmm, which explores
  * as -exhaustive does) came from a combination of model and mode that no
- * test ran; IMM's default exploration is left out until #227 is resolved.
+ * test ran. IMM's default exploration was left out until #227, a crash of
+ * the scripted programs only (they lacked the interpreter's order after an
+ * exclusive read).
  */
 namespace {
 
@@ -576,9 +598,9 @@ RC_GTEST_PROP(ScriptedDriverMatrix, RC11, ())
 	checkMatrix(*genProgram(false), ModelType::RC11, true);
 }
 
-RC_GTEST_PROP(ScriptedDriverMatrix, IMMExhaustive, ())
+RC_GTEST_PROP(ScriptedDriverMatrix, IMM, ())
 {
-	checkMatrix(*genProgram(false), ModelType::IMM, false);
+	checkMatrix(*genProgram(false), ModelType::IMM, true);
 }
 
 RC_GTEST_PROP(ScriptedDriverMatrix, LKMM, ())
