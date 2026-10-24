@@ -1147,6 +1147,7 @@ auto ExplorationCore::getBackwardRevisits() const -> BackwardRevisits
 		{.depTracking = getConf()->isDepTrackingModel,
 		 .disableBAM = getConf()->disableBAM,
 		 .scopesCtrlDeps = scopesCtrlDeps(),
+		 .exhaustive = getConf()->exhaustive,
 		 .exhaustiveIMM = getConf()->exhaustive && getConf()->model == ModelType::IMM}};
 }
 
@@ -2323,8 +2324,9 @@ auto ExplorationCore::backwardRevisit(const BackwardRevisit &br) -> bool
 
 	/* Recalculate the view because some B labels might have been
 	 * removed */
+	auto keptRMWReads = false;
 	auto v = getBackwardRevisits().revisitView(g.getReadLabel(br.getPos()),
-						   g.getWriteLabel(br.getRev()));
+						   g.getWriteLabel(br.getRev()), &keptRMWReads);
 	if (!v) {
 		VERIFY(getConf()->exhaustive);
 		return false;
@@ -2334,7 +2336,9 @@ auto ExplorationCore::backwardRevisit(const BackwardRevisit &br) -> bool
 	auto cmap = ChoiceMap(getExec().getChoiceMap());
 	cmap.cut(*v);
 
+	keptRMWReads |= getExec().keptRMWReads;
 	pushExecution({std::move(og), LocalQueueT(), std::move(cmap)});
+	getExec().keptRMWReads = keptRMWReads;
 
 	repairDanglingReads(getExec().getGraph());
 

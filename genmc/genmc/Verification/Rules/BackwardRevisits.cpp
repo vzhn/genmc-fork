@@ -68,7 +68,8 @@ static void updatePredsWithPrefixView(const ExecutionGraph &g, VectorClock &pred
 	}
 }
 
-auto BackwardRevisits::revisitView(const ReadLabel *rLab, const WriteLabel *sLab) const
+auto BackwardRevisits::revisitView(const ReadLabel *rLab, const WriteLabel *sLab,
+				   bool *keptRMWReads) const
 	-> std::unique_ptr<VectorClock>
 {
 	const auto &g = g_;
@@ -80,7 +81,7 @@ auto BackwardRevisits::revisitView(const ReadLabel *rLab, const WriteLabel *sLab
 	const auto &prefix = getPrefixView(sLab);
 	if (prefix.contains(rLab->getPos())) {
 		updatePredsWithPrefixView(g, *preds, *getRevisitPrefixView(sLab));
-		return preds;
+		return keepRMWReads(rLab, std::move(preds), keptRMWReads);
 	}
 	updatePredsWithPrefixView(g, *preds, prefix);
 	if (opts_.exhaustiveIMM) {
@@ -90,7 +91,66 @@ auto BackwardRevisits::revisitView(const ReadLabel *rLab, const WriteLabel *sLab
 		if (!keepValueDependencies(rLab->getPos(), *preds))
 			return nullptr;
 	}
-	return preds;
+	return keepRMWReads(rLab, std::move(preds), keptRMWReads);
+}
+
+/* -exhaustive, without keepValueDependencies() (-lkmm). A kept read that
+ * reads from a write of its own thread keeps that write (see
+ * updatePredsWithPrefixView()), but not what the write depends on: for the
+ * write part of an RMW, its read, whose value gives the write's. The read
+ * may also have been revisited before, and so come after its write part in
+ * the insertion order. A graph that keeps the write without its read is not
+ * an execution of the program, and once it is cut between the two, the
+ * revisits pushed for the read point at a hole (#223: a forward revisit of
+ * the hole crashed in revisitRead()). The revisit keeps the read too, and,
+ * transitively, the write it reads from (and, for an RMW's write, its
+ * read), and the creation of their threads. The write part of the revisited
+ * read itself is executed anew: it is not kept, and the revisit is not
+ * taken if a kept read reads from it */
+auto BackwardRevisits::keepRMWReads(const ReadLabel *rLab, std::unique_ptr<VectorClock> v,
+				    bool *kept) const -> std::unique_ptr<VectorClock>
+{
+	if (!opts_.exhaustive || opts_.exhaustiveIMM || !opts_.depTracking)
+		return v;
+
+	const auto &g = g_;
+	auto &dv = *genmc::cast<DepView>(&*v);
+	auto isRMWWrite = [](const EventLabel *lab) {
+		const auto *wLab = genmc::dyn_cast_if_present<WriteLabel>(lab);
+		return wLab && wLab->isRMW();
+	};
+	if (const auto *own = g.po_imm_succ(rLab); isRMWWrite(own) && dv.contains(own->getPos())) {
+		if (std::ranges::any_of(genmc::cast<WriteLabel>(own)->readers(), [&](auto &oLab) {
+			    return dv.contains(oLab.getPos());
+		    }))
+			return nullptr;
+		dv.addHole(own->getPos());
+	}
+
+	std::vector<Event> work;
+	for (const auto &lab : g.labels())
+		if (isRMWWrite(&lab) && dv.contains(lab.getPos()))
+			work.push_back(lab.getPos().prev());
+	while (!work.empty()) {
+		auto e = work.back();
+		work.pop_back();
+		if (e.isInitializer() || dv.contains(e))
+			continue;
+		if (e == rLab->getPos())
+			return nullptr;
+		dv.updateIdx(e);
+		if (kept)
+			*kept = true;
+		const auto *lab = g.getEventLabel(e);
+		if (const auto *eRLab = genmc::dyn_cast<ReadLabel>(lab))
+			work.push_back(eRLab->getRf()->getPos());
+		if (isRMWWrite(lab))
+			work.push_back(e.prev());
+		const auto *bLab = genmc::cast<ThreadStartLabel>(g.getFirstThreadLabel(e.thread));
+		if (!bLab->getCreateId().isInitializer())
+			work.push_back(bLab->getCreateId());
+	}
+	return v;
 }
 
 /* -exhaustive under IMM. A revisit keeps the events added before the read and

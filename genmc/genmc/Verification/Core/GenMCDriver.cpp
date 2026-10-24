@@ -324,6 +324,15 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		++result.exploredInconsistent;
 		return {};
 	}
+	/* -exhaustive under the other dependency-tracking models (-lkmm): the
+	 * events a revisit kept with an RMW's read (see
+	 * BackwardRevisits::keepRMWReads()) were not checked as they would be
+	 * when added; the complete execution is counted only if it satisfies
+	 * the model's axioms as a whole (#223) */
+	if (getExec().keptRMWReads && !getConsChecker().isConsistent(g)) {
+		++result.exploredInconsistent;
+		return {};
+	}
 	if (const auto err = checkExhaustiveRace())
 		return err;
 
