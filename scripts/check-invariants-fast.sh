@@ -81,6 +81,10 @@ correct infr/imm-resume-holes imm
 correct infr/imm-resume-holes rc11
 # I1 on graphs handed to other workers
 correct infr/imm-parallel-copy imm -nthreads=2
+# I6: an error inside an open read-side critical section is checked with the
+# section closed (issue #201)
+correct lkmm/rcu-assert-inside lkmm
+correct lkmm/srcu-assert-inside lkmm
 for model in rc11 imm; do
 	# I2: the replay target stays in the schedule (PR #22)
 	wrong liveness/spin-na-stuck "${model}" "Liveness violation"

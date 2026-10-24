@@ -167,6 +167,13 @@ void checkResumeSchedule(const ExecutionGraph &g, const std::vector<Event> &sche
  * checks implying the whole-graph one */
 void checkConsistency(const ExecutionGraph &g, bool consistent, const Context &ctx);
 
+/** I6: G, the graph of an error the exploration reports, is a prefix of an
+ * execution: consistent with the events its threads must add next, the
+ * unlocks of its open read-side critical sections (CONSISTENT: the model's
+ * isConsistentWithSectionsClosed()). An error on another graph is on no
+ * execution (see openSectionsNeedCheck()) */
+void checkErrorConsistency(const ExecutionGraph &g, bool consistent, const Context &ctx);
+
 /** Reports a violation of INVARIANT (WHAT describes it) and aborts; G is printed if given */
 [[noreturn]] void fail(std::string_view invariant, const std::string &what, const ExecutionGraph *g,
 		       const Context &ctx,
