@@ -484,36 +484,6 @@ static GenericValue lle_X_printf(FunctionType *FT, const std::vector<GenericValu
 	return GV;
 }
 
-// int sscanf(const char *format, ...);
-static GenericValue lle_X_sscanf(FunctionType *FT, const std::vector<GenericValue> &args)
-{
-	assert(args.size() < 10 && "Only handle up to 10 args to sscanf right now!");
-
-	char *Args[10];
-	for (unsigned i = 0; i < args.size(); ++i)
-		Args[i] = (char *)GVTOP(args[i]);
-
-	GenericValue GV;
-	GV.IntVal = APInt(32, sscanf(Args[0], Args[1], Args[2], Args[3], Args[4], Args[5], Args[6],
-				     Args[7], Args[8], Args[9]));
-	return GV;
-}
-
-// int scanf(const char *format, ...);
-static GenericValue lle_X_scanf(FunctionType *FT, const std::vector<GenericValue> &args)
-{
-	assert(args.size() < 10 && "Only handle up to 10 args to scanf right now!");
-
-	char *Args[10];
-	for (unsigned i = 0; i < args.size(); ++i)
-		Args[i] = (char *)GVTOP(args[i]);
-
-	GenericValue GV;
-	GV.IntVal = APInt(32, scanf(Args[0], Args[1], Args[2], Args[3], Args[4], Args[5], Args[6],
-				    Args[7], Args[8], Args[9]));
-	return GV;
-}
-
 // int fprintf(FILE *, const char *, ...) - a very rough implementation to make
 // output useful.
 static GenericValue lle_X_fprintf(FunctionType *FT, const std::vector<GenericValue> &Args)
@@ -570,9 +540,9 @@ void Interpreter::initializeExternalFunctions()
 	FuncNames["lle_X_atexit"] = lle_X_atexit;
 
 	FuncNames["lle_X_printf"] = lle_X_printf;
-	FuncNames["lle_X_sprintf"] = lle_X_sprintf;
-	FuncNames["lle_X_sscanf"] = lle_X_sscanf;
-	FuncNames["lle_X_scanf"] = lle_X_scanf;
+	/* (Not sprintf(), sscanf() or scanf(): they would write to the program's
+	 * memory behind the interpreter's back. printf() formats into a buffer
+	 * of its own) */
 	FuncNames["lle_X_fprintf"] = lle_X_fprintf;
 	FuncNames["lle_X_memset"] = lle_X_memset;
 	FuncNames["lle_X_memcpy"] = lle_X_memcpy;
