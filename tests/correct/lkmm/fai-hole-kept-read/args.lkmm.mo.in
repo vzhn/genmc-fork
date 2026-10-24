@@ -1,1 +1,3 @@
  |
+-disable-lkmm-exhaustive |
+-disable-lkmm-exhaustive -schedule-policy=arbitrary -schedule-seed=1 |

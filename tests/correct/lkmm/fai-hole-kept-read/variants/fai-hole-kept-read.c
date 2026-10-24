@@ -10,6 +10,13 @@
  * counted that incoherent graph: 7 executions, herd7 allows 6 (the
  * litmus version, with atomic_fetch_add_relaxed() and
  * atomic_read_acquire()).
+ *
+ * The optimal exploration (-disable-lkmm-exhaustive) found 4: it took
+ * t1's store, read by the kept read, as an alternative for the
+ * fetch-and-add deleted by the revisit (which rejected the revisit as
+ * non-maximal), and it did not let t1's store revisit the fetch-and-add
+ * once executed anew, its own kept write and the read of it being after
+ * it in its thread.
  */
 
 atomic_int v0, v1;
