@@ -250,9 +250,10 @@ auto ExecutionGraph::removeLast(int thread) -> std::unique_ptr<EventLabel>
 	poLists[lab->getThread()].remove(*lab);
 	lab->setParent(nullptr);
 
-	/* Adjust max graph stamp if necessary; remove stamp from label (might be re-added) */
-	if (lab->getStamp() == getMaxStamp())
-		resetStamp(lab->getStamp());
+	/* The max graph stamp follows the newest label left (LAB need not be
+	 * the newest one: another thread may have added labels since);
+	 * remove stamp from label (might be re-added) */
+	resetStamp(Stamp(insertionOrder.back().getStamp().get() + 1));
 	lab->setStamp(std::nullopt);
 
 	/* Extract ownership and return */

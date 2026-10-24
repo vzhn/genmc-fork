@@ -7,6 +7,7 @@
 #include "genmc/ADT/View.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
+#include "genmc/Support/ThreadInfo.hpp"
 #include "genmc/Verification/Checks/Invariants.hpp"
 
 /* Moving a thread's events (ExecutionGraph::relocateThread()): positions,
@@ -228,4 +229,26 @@ TEST(RelocateTest, ACopyDropsPrefixViewsBeyondIt)
 	EXPECT_TRUE(og->getEventLabel(Event(0, 1))->hasPrefixView());
 	EXPECT_FALSE(og->getEventLabel(Event(0, 2))->hasPrefixView());
 	invariants::checkGraph(*og, {.where = "a unit test"});
+}
+
+/* Removing a thread's last label that is not the newest one, then the
+ * newest: the maximum stamp follows the newest label left (found by
+ * GraphPropertyTest; it used to drop by one only, leaving it at the stamp
+ * of the label removed first) */
+TEST(RelocateTest, RemovingLabelsKeepsTheMaximumStamp)
+{
+	TestGraph g;
+	auto info = ThreadInfo{1, 0, 0, SVal(0), "t"};
+	auto *tc = genmc::cast<ThreadCreateLabel>(
+		g.graph.add(ThreadCreateLabel::create(Event(0, 1), info)));
+	g.graph.addNewThread();
+	g.graph.add(ThreadStartLabel::create(Event(1, 0), tc->getPos(), tc, info));
+	g.graph.add(FenceLabel::create(Event(1, 1), MemOrdering::SequentiallyConsistent));
+	g.addFence(); /* (0, 2), the newest */
+
+	g.graph.removeLast(1); /* not the newest */
+	g.graph.removeLast(0);
+
+	EXPECT_EQ(g.graph.getMaxStamp(), g.graph.getEventLabel(Event(1, 0))->getStamp());
+	invariants::checkGraph(g.graph, {.where = "a unit test"});
 }
