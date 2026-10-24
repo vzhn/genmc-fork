@@ -1932,17 +1932,15 @@ void Interpreter::visitCallInstWrapper(CallInstWrapper CS)
 		switch (F->getIntrinsicID()) {
 		case Intrinsic::not_intrinsic:
 			break;
-		case Intrinsic::vastart: { // va_start
-			GenericValue ArgIndex;
-			ArgIndex.UIntPairVal.first = ECStack().size() - 1;
-			ArgIndex.UIntPairVal.second = 0;
-			SetValue(&CS, ArgIndex, SF);
-			return;
-		}
-		case Intrinsic::vaend: // va_end is a noop for the interpreter
-			return;
-		case Intrinsic::vacopy: // va_copy: dest = src
-			SetValue(&CS, getOperandValue(*CS.arg_begin(), SF), SF);
+		/* Variadic functions are not supported: clang lowers va_arg() to
+		 * loads from the target's va_list (on x86-64, its offsets and save
+		 * areas), which the interpreter does not lay out */
+		case Intrinsic::vastart:
+		case Intrinsic::vacopy:
+			ERROR("Variadic functions are not supported: {}() calls va_start() or "
+			      "va_copy()\n",
+			      SF.CurFunction->getName().str());
+		case Intrinsic::vaend:
 			return;
 		default:
 			WARN_ONCE("unknown-intrinsic", "Unknown intrinstic function"

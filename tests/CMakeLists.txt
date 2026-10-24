@@ -153,6 +153,13 @@ add_test(NAME external-stdio
 set_tests_properties(external-stdio PROPERTIES LABELS "integration;fast" TIMEOUT 120
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME variadic
+    COMMAND bash -c "${SCRIPT_DIR}/check-variadic.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(variadic PROPERTIES LABELS "integration;fast" TIMEOUT 120
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(NAME helping-cas-annotation
     COMMAND bash -c "${SCRIPT_DIR}/check-helping-cas-annotation.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
