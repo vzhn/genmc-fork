@@ -3941,10 +3941,15 @@ void Interpreter::applyCtrlShadows(Thread &thr, DepInfo &ctrl)
 
 void Interpreter::updateCasCtrlDeps(AtomicCmpXchgInst &I)
 {
-	/* What a CAS orders after it depends on whether it succeeds (an
-	 * acquire on success only, as cmpxchg_acquire()): so does the prefix of
-	 * every later event, unless they all depend on the CAS */
-	if (scopesCtrlDeps() && I.getSuccessOrdering() != I.getFailureOrdering())
+	/* What a CAS orders after it depends on whether it succeeds: the model
+	 * orders nothing after a failed CAS, whatever its failure ordering (a
+	 * failed cmpxchg_acquire() is a plain read, a failed cmpxchg() loses
+	 * its Mb attribute). So does the prefix of every later event, unless
+	 * they all depend on the CAS. Without that, a revisit kept a write
+	 * after a failed CAS without the CAS, which then succeeded when
+	 * executed anew: the graph was also reached from its success (#230) */
+	if (scopesCtrlDeps() && (I.getSuccessOrdering() != AtomicOrdering::Monotonic ||
+				 !!(getWriteAttr(I) & WriteAttr::LkmmMb)))
 		updateCtrlDeps(getCurThr().id, currPos());
 }
 
