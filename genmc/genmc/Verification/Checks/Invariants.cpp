@@ -36,10 +36,19 @@
 
 namespace invariants {
 
+namespace {
+thread_local int throwOnViolation = 0;
+} // namespace
+
+ThrowOnViolation::ThrowOnViolation() { ++throwOnViolation; }
+ThrowOnViolation::~ThrowOnViolation() { --throwOnViolation; }
+
 void fail(std::string_view invariant, const std::string &what, const ExecutionGraph *g,
 	  const Context &ctx, std::source_location loc)
 {
 	auto header = std::format("Invariant {} violated after {}: {}", invariant, ctx.where, what);
+	if (throwOnViolation > 0)
+		throw Violation(header);
 	/* Say what failed before touching the graph: printing a corrupted graph
 	 * may itself crash */
 	std::cerr << "\n" << header << "\n" << std::flush;

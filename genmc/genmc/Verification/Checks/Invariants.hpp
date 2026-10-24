@@ -111,6 +111,7 @@
 
 #include <optional>
 #include <source_location>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -188,6 +189,24 @@ void checkConsistency(const ExecutionGraph &g, bool consistent, const Context &c
  * isConsistentWithSectionsClosed()). An error on another graph is on no
  * execution (see openSectionsNeedCheck()) */
 void checkErrorConsistency(const ExecutionGraph &g, bool consistent, const Context &ctx);
+
+/** A violation, thrown instead of aborting while a ThrowOnViolation lives */
+struct Violation : std::runtime_error {
+	using std::runtime_error::runtime_error;
+};
+
+/** While alive, fail() throws a Violation (naming the invariant and what
+ * failed) instead of reporting it and aborting: for property tests, which
+ * must survive a failing case to shrink it. Per thread */
+class ThrowOnViolation {
+public:
+	ThrowOnViolation();
+	~ThrowOnViolation();
+	ThrowOnViolation(const ThrowOnViolation &) = delete;
+	auto operator=(const ThrowOnViolation &) -> ThrowOnViolation & = delete;
+	ThrowOnViolation(ThrowOnViolation &&) = delete;
+	auto operator=(ThrowOnViolation &&) -> ThrowOnViolation & = delete;
+};
 
 /** Reports a violation of INVARIANT (WHAT describes it) and aborts; G is printed if given */
 [[noreturn]] void fail(std::string_view invariant, const std::string &what, const ExecutionGraph *g,
