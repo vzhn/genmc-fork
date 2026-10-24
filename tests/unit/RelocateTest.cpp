@@ -7,6 +7,7 @@
 #include "genmc/ADT/View.hpp"
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Execution/ExecutionGraph.hpp"
+#include "genmc/Verification/Checks/Invariants.hpp"
 
 /* Moving a thread's events (ExecutionGraph::relocateThread()): positions,
  * the dependencies and views that name them, and the holes opened or closed */
@@ -186,4 +187,45 @@ TEST(RelocateTest, ALabelFillsAHoleInTheLastSlot)
 	EXPECT_EQ(added->getPos(), Event(0, 2));
 	EXPECT_EQ(g.graph.getLastThreadLabel(0), added);
 	EXPECT_EQ(g.graph.po_imm_pred(added)->getPos(), Event(0, 1));
+}
+
+/* Closing slots removes holes, which may be the newest labels: the
+ * graph's maximum stamp follows its newest label (#222, I1 failed on
+ * data-structures/boost-queue under -lkmm -check-invariants) */
+TEST(RelocateTest, ClosingSlotsKeepsTheMaximumStamp)
+{
+	TestGraph g;
+	g.addFence(); /* (0, 1) */
+	g.addFence(); /* (0, 2) */
+	g.graph.relocateThread(0, 2, 2); /* the holes get the newest stamps */
+	g.graph.relocateThread(0, 4, -2);
+
+	EXPECT_EQ(g.graph.getMaxStamp(), g.graph.getLastThreadLabel(0)->getStamp());
+	invariants::checkGraph(g.graph, {.where = "a unit test"});
+}
+
+/* A copy keeps a cached prefix view only if the copy has all of its
+ * events: a label may be kept without its whole prefix (a write a
+ * same-thread read reads from, see updatePredsWithPrefixView()), and its
+ * view would name events the copy lacks (#222, I1 failed on
+ * gobench/grpc3017 under -lkmm -check-invariants) */
+TEST(RelocateTest, ACopyDropsPrefixViewsBeyondIt)
+{
+	TestGraph g;
+	auto *f1 = g.addFence(); /* (0, 1) */
+	auto *f2 = g.addFence(); /* (0, 2) */
+	g.addFence();		 /* (0, 3) */
+	View within;
+	within.setMax(Event(0, 1));
+	f1->setPrefixView(std::make_unique<View>(within));
+	View beyond;
+	beyond.setMax(Event(0, 3));
+	f2->setPrefixView(std::make_unique<View>(beyond));
+
+	View v;
+	v.setMax(Event(0, 2));
+	auto og = g.graph.getCopyUpTo(v);
+	EXPECT_TRUE(og->getEventLabel(Event(0, 1))->hasPrefixView());
+	EXPECT_FALSE(og->getEventLabel(Event(0, 2))->hasPrefixView());
+	invariants::checkGraph(*og, {.where = "a unit test"});
 }

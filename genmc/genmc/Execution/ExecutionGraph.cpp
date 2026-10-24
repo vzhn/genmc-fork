@@ -538,6 +538,8 @@ void ExecutionGraph::relocateThread(int thread, int from, int delta)
 			insertionOrder.remove(lab);
 		}
 		thr.erase(thr.begin() + from + delta, thr.begin() + from);
+		/* The holes removed may have been the newest labels (#222) */
+		resetStamp(Stamp(insertionOrder.back().getStamp().get() + 1));
 	}
 	for (auto j = from + std::min(delta, 0); std::cmp_less(j, thr.size()); j++)
 		thr[j]->setPos(Event(thread, j));
@@ -560,6 +562,20 @@ void ExecutionGraph::relocateThread(int thread, int from, int delta)
 			tsLab->setCreateId(remap(tsLab->getCreateId()));
 	}
 	getInitLabel()->relocateLocViews(thread, from, delta);
+}
+
+/* Whether every event of PV is in V (element-wise: either may have holes) */
+static auto viewWithin(const VectorClock &pv, const VectorClock &v) -> bool
+{
+	for (auto i = 0; i < pv.size(); i++) {
+		if (pv.getMax(i) <= v.getMax(i) && !genmc::isa<DepView>(&pv) &&
+		    !genmc::isa<DepView>(&v))
+			continue;
+		for (auto j = 1; j <= pv.getMax(i); j++)
+			if (pv.contains(Event(i, j)) && !v.contains(Event(i, j)))
+				return false;
+	}
+	return true;
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -587,6 +603,13 @@ void ExecutionGraph::copyGraphUpTo(ExecutionGraph &other, const VectorClock &v) 
 				continue;
 			}
 			auto *nLab = other.addLabelToGraph(getEventLabel(Event(i, j))->clone());
+			/* A label can be kept without all of its prefix (e.g., a
+			 * write kept for a same-thread read, see
+			 * updatePredsWithPrefixView()): its cached view would name
+			 * events the copy does not have, and is computed anew in
+			 * the copy when needed (#222) */
+			if (nLab->hasPrefixView() && !viewWithin(nLab->getPrefixView(), v))
+				nLab->setPrefixView(nullptr);
 			if (auto *wLab = genmc::dyn_cast<WriteLabel>(nLab)) {
 				const_cast<WriteLabel *>(wLab)->removeReader([&v](ReadLabel &rLab) {
 					return !v.contains(rLab.getPos());

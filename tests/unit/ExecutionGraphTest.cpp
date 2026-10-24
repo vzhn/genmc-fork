@@ -371,7 +371,18 @@ template <typename ViewT>
 static auto copyPrefixView(TestGraph &g, const ViewT &prefix, std::unique_ptr<ExecutionGraph> &og)
 	-> const ViewT &
 {
-	g.addFence();
+	/* The threads the view names: a copy keeps a prefix view only if it
+	 * has the view's events */
+	for (auto t = 1; t <= 2; t++) {
+		auto info = ThreadInfo{t, 0, 0, SVal(0), "t"};
+		auto *tc = genmc::cast<ThreadCreateLabel>(g.graph.add(
+			ThreadCreateLabel::create(Event(0, g.graph.getThreadSize(0)), info)));
+		g.graph.addNewThread();
+		g.graph.add(ThreadStartLabel::create(Event(t, 0), tc->getPos(), tc, info));
+		for (auto i = 1; i <= 3; i++)
+			g.graph.add(FenceLabel::create(Event(t, i),
+						       MemOrdering::SequentiallyConsistent));
+	}
 	auto *lab = g.addFence();
 	lab->setPrefixView(std::make_unique<ViewT>(prefix));
 
