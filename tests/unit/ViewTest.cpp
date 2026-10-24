@@ -196,6 +196,30 @@ TEST(ViewUnitTest, TrailingZerosDoNotInflateSizeCheck)
 	EXPECT_TRUE(vRealData.contains(vEmptyButLarge));
 }
 
+/* A view made of a shared base and a diff contains an equal view that holds
+ * everything in its base: the comparison of the bases alone missed the diff */
+TEST(ViewUnitTest, ContainsAnEqualViewWithAnotherBase)
+{
+	View a;
+	a.updateIdx({0, 1});
+	a.updateIdx({1, 1});
+	View shared = a; /* a's base is shared from now on */
+	a.updateIdx({2, 1}); /* ... so this goes to a's diff */
+
+	View b;
+	b.updateIdx({0, 1});
+	b.updateIdx({1, 1});
+	b.updateIdx({2, 1});
+
+	EXPECT_EQ(a, b);
+	EXPECT_TRUE(a.contains(b));
+	EXPECT_TRUE(b.contains(a));
+	EXPECT_TRUE(a.contains(shared));
+	EXPECT_FALSE(shared.contains(a));
+	b.updateIdx({1, 2});
+	EXPECT_FALSE(a.contains(b));
+}
+
 /*
  * Property: Conformance wrt oracle
  */
@@ -257,6 +281,39 @@ RC_GTEST_PROP(ViewPropertyTest, UpdateCommutativity,
 	join2.update(v1);
 
 	RC_ASSERT(join1 == join2);
+}
+
+/*
+ * Property: contains() agrees with the element-wise order, for views made of
+ * shared bases and diffs in any combination (copies, updates, joins)
+ */
+RC_GTEST_PROP(ViewPropertyTest, ContainsIsTheElementWiseOrder,
+	      (const std::vector<std::pair<int, Event>> &ops))
+{
+	std::vector<View> views(3);
+	for (const auto &[which, e] : ops) {
+		auto i = static_cast<std::size_t>(std::abs(which) % 3);
+		auto j = (i + 1) % 3;
+		switch (std::abs(which / 3) % 3) {
+		case 0:
+			views[i].updateIdx({std::abs(e.thread) % 6, std::abs(e.index) % 5});
+			break;
+		case 1:
+			views[i] = views[j]; /* share a base */
+			break;
+		default:
+			views[i].update(views[j]);
+			break;
+		}
+	}
+	for (const auto &x : views) {
+		for (const auto &y : views) {
+			auto le = true;
+			for (auto t = 0; t < 6; t++)
+				le = le && y.getMax(t) <= x.getMax(t);
+			RC_ASSERT(x.contains(y) == le);
+		}
+	}
 }
 
 /*
