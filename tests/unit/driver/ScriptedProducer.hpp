@@ -215,6 +215,7 @@ private:
 						   std::ranges::find(prog_.threads, prog_.threads[prog - 1])));
 				ThreadInfo info(-1, 0, fun, SVal(prog), "t" + std::to_string(prog));
 				info.argUsed = false;
+				info.selfUsed = false;
 				if (const auto *child = advance(0, driver_.handleThreadCreate(
 									   nullptr, pos, info, EventDeps())))
 					addThread(*child, prog);

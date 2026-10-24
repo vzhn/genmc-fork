@@ -66,6 +66,12 @@ static auto isSymmetric(const ExecutionGraph &g, int candidate, Event parent, co
 		return false;
 	}
 
+	/* A thread that reads its own id (pthread_self(), or GenMC's rwlock,
+	 * which takes a mutex per thread id) behaves differently from its
+	 * twin: renaming them does not map one execution to another */
+	if (info.selfUsed)
+		return false;
+
 	/* Then make sure that there is no memory access in between the spawn
 	 * events, other than to memory only the parent can access (e.g.,
 	 * storing the first thread's handle into a local array) */

@@ -91,6 +91,7 @@
 #define MAX_THREADS 16
 #endif
 
+#include <genmc.h>
 #include <pthread.h>
 #include <assert.h>
 
@@ -184,9 +185,29 @@ SYNC_ITER_3ARGS(DECL_SYNC_VAR, _PLACEHOLDER, _PLACEHOLDER)
 		}
 	ITER(DECLARE_THREAD, 6)
 
-	#define M_CREATE_THREAD(KIND_IX, COPY_IX)                          \
-		if (COPY_IX <= THREAD_NUM_ ## KIND_IX)                           \
-			pthread_create(&t##KIND_IX##COPY_IX, NULL, thread ## KIND_IX, NULL);
+	/* The copies of a kind are symmetric up to the values they use
+	 * (get_thread_num() tells them apart), which a specification does not
+	 * distinguish: they are declared symmetric (each to the one before), as
+	 * GenMC does not deem threads that read their id symmetric on its own */
+	#define PREV_COPY_1 1
+	#define PREV_COPY_2 1
+	#define PREV_COPY_3 2
+	#define PREV_COPY_4 3
+	#define PREV_COPY_5 4
+	#define PREV_COPY_6 5
+	#define PREV_COPY_7 6
+	#define PREV_COPY_8 7
+	#define PREV_COPY_9 8
+	#define PREV_COPY_10 9
+	#define PREV_THREAD_(KIND_IX, PREV) t##KIND_IX##PREV
+	#define PREV_THREAD(KIND_IX, PREV) PREV_THREAD_(KIND_IX, PREV)
+	#define M_CREATE_THREAD(KIND_IX, COPY_IX)                                          \
+		if (COPY_IX == 1 && COPY_IX <= THREAD_NUM_ ## KIND_IX)                         \
+			pthread_create(&t##KIND_IX##COPY_IX, NULL, thread ## KIND_IX, NULL);       \
+		else if (COPY_IX <= THREAD_NUM_ ## KIND_IX)                                    \
+			t##KIND_IX##COPY_IX = __VERIFIER_spawn_symmetric(                             \
+				thread ## KIND_IX, NULL,                                               \
+				PREV_THREAD(KIND_IX, PREV_COPY_ ## COPY_IX));
 
 #endif // GENERATE_SYNC
 
