@@ -11,7 +11,7 @@
 # MIT License:
 #     https://opensource.org/licenses/MIT
 
-# Each test of tests/correct runs under -rc11, -sc, -imm and -lkmm, with the
+# Each test of tests/correct runs under -rc11, -sc, -tso, -ra, -imm and -lkmm, with the
 # default exploration and with -exhaustive, under -check-invariants, for at
 # most MATRIX_TIMEOUT seconds (default 5). A run fails the check only if it
 # crashes, reports an internal failure or violates an invariant: the counts
@@ -19,7 +19,9 @@
 # or may be rejected under a model it was not written for.
 #
 # #223 crashed -lkmm (which explores as -exhaustive does) on a test that ran
-# only under -imm: no test ran that combination of model and mode. ctest
+# only under -imm: no test ran that combination of model and mode. -tso and
+# -ra were left out until a non-atomic write outside coherence crashed the
+# TSO checker under -check-invariants. ctest
 # target "config-matrix" (label "matrix", not part of "fast"). The runs
 # known to fail, each with its issue, are listed in config-matrix-known.txt;
 # a new failure, or a listed one that passes, fails the check.
@@ -56,7 +58,7 @@ export GenMC TIMEOUT ROOT
 if [[ $# -gt 0 ]]; then mapfile -t dirs < <(realpath "$@"); else dirs=("$ROOT"/*); fi
 tests=$(find "${dirs[@]}" -path '*/variants/*.c' | sort)
 n=$(echo "$tests" | wc -l)
-out=$(for model in rc11 sc imm lkmm; do
+out=$(for model in rc11 sc tso ra imm lkmm; do
 	for mode in "" "-exhaustive"; do
 		echo "$tests" | sed "s|\$| $model $mode|"
 	done
@@ -78,5 +80,5 @@ if [[ -n "$fixed" ]]; then
 	echo "$fixed" | sed 's/^/  /'
 	status=1
 fi
-[[ $status -eq 0 ]] && echo "config-matrix: ok ($n tests x 8 configurations, $(echo "$known" | sed '/^$/d' | wc -l) known failures)"
+[[ $status -eq 0 ]] && echo "config-matrix: ok ($n tests x 12 configurations, $(echo "$known" | sed '/^$/d' | wc -l) known failures)"
 exit $status
