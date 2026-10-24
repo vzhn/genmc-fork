@@ -55,6 +55,10 @@ struct ExecutionFrame {
 	std::unique_ptr<ExecutionGraph> graph;
 	WorkList workqueue;
 	ChoiceMap choices;
+	/** A revisit that led to this graph kept an RMW's read with its write
+	 * part (see BackwardRevisits::keepRMWReads()): complete executions are
+	 * checked as a whole before they are counted */
+	bool keptRMWReads = false;
 };
 
 #endif /* GENMC_EXECUTION_FRAME_HPP */

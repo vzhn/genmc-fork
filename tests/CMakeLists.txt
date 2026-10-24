@@ -174,6 +174,13 @@ add_test(NAME cache-long-thread
 set_tests_properties(cache-long-thread PROPERTIES LABELS "integration;fast" TIMEOUT 120
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME lkmm-exhaustive-rmw
+    COMMAND bash -c "${SCRIPT_DIR}/check-lkmm-exhaustive-rmw.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(lkmm-exhaustive-rmw PROPERTIES LABELS "integration;fast" TIMEOUT 300
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(NAME dot-graph
     COMMAND bash -c "${SCRIPT_DIR}/check-dot-graph.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}

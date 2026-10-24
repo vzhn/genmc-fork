@@ -54,6 +54,9 @@ public:
 		bool disableBAM = false;
 		/** See revisitPrefixView() */
 		bool scopesCtrlDeps = false;
+		/** -exhaustive (the default under -lkmm): a revisit view may be
+		 * refused (see revisitView()) */
+		bool exhaustive = false;
 		/** -exhaustive under IMM: a revisit keeps the value dependencies
 		 * of what it keeps (see keepValueDependencies()) */
 		bool exhaustiveIMM = false;
@@ -69,8 +72,9 @@ public:
 
 	/** What the revisit of RLAB by SLAB keeps: the events before RLAB and
 	 * SLAB's prefix; null if no graph keeps it (-exhaustive under IMM, see
-	 * keepValueDependencies()) */
-	[[nodiscard]] auto revisitView(const ReadLabel *rLab, const WriteLabel *sLab) const
+	 * keepValueDependencies(); -exhaustive otherwise, see keepRMWReads()) */
+	[[nodiscard]] auto revisitView(const ReadLabel *rLab, const WriteLabel *sLab,
+				       bool *keptRMWReads = nullptr) const
 		-> std::unique_ptr<VectorClock>;
 
 	/** Whether R, a backward revisit of the graph, is the one revisit that
@@ -110,6 +114,14 @@ private:
 	 * depend on for their values; false if that needs the read at R or an
 	 * event the graph does not have */
 	auto keepValueDependencies(Event r, VectorClock &v) const -> bool;
+
+	/** -exhaustive, without keepValueDependencies() (-lkmm): V extended
+	 * so that every RMW write it keeps has its read (and what that reads
+	 * from), without the write part of RLAB; null if that needs RLAB or a
+	 * kept read reads RLAB's write part. KEPT (if given) tells whether
+	 * a read was added */
+	auto keepRMWReads(const ReadLabel *rLab, std::unique_ptr<VectorClock> v,
+			  bool *kept) const -> std::unique_ptr<VectorClock>;
 
 	auto getPrefixView(const EventLabel *lab) const -> const VectorClock &
 	{
