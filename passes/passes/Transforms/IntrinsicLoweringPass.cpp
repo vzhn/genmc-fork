@@ -32,6 +32,8 @@
 #include <llvm/IR/Type.h>
 #include <llvm/Support/Casting.h>
 
+#include <cstdint>
+#include <iterator>
 #include <memory>
 
 using namespace llvm;
@@ -98,6 +100,98 @@ static auto replaceExtractValUsers(WithOverflowInst *oi, Value *replace, Value *
 	return result;
 }
 
+/*
+ * The floating-point intrinsics that IntrinsicLowering leaves to the code
+ * generator (it reports a fatal error for them), as integer and select
+ * instructions on scalar floats and doubles
+ */
+
+/* The bits of a float or double V, and its layout */
+struct FPBits {
+	Value *bits;
+	unsigned width;
+	unsigned mantissa; /* the mantissa's width */
+
+	FPBits(IRBuilder<> &builder, Value *v)
+		: width(v->getType()->getPrimitiveSizeInBits()),
+		  mantissa(v->getType()->isFloatTy() ? 23 : 52)
+	{
+		bits = builder.CreateBitCast(v, builder.getIntNTy(width));
+	}
+
+	auto mask(IRBuilder<> &builder, uint64_t m) const -> Value *
+	{
+		return builder.getIntN(width, m);
+	}
+	auto signMask() const -> uint64_t { return 1ULL << (width - 1); }
+	auto expMask() const -> uint64_t { return ~signMask() & ~mantMask(); }
+	auto mantMask() const -> uint64_t { return (1ULL << mantissa) - 1; }
+	auto quietMask() const -> uint64_t { return 1ULL << (mantissa - 1); }
+};
+
+static auto isLowerableFPType(const llvm::Type *type) -> bool
+{
+	return type->isFloatTy() || type->isDoubleTy();
+}
+
+/* fabs: clears the sign bit */
+static auto lowerFAbs(IRBuilder<> &builder, Value *v) -> Value *
+{
+	FPBits fp(builder, v);
+	auto *abs = builder.CreateAnd(fp.bits, fp.mask(builder, ~fp.signMask()));
+	return builder.CreateBitCast(abs, v->getType());
+}
+
+/* is.fpclass: whether V is in one of the classes of MASK (see the LangRef) */
+static auto lowerIsFPClass(IRBuilder<> &builder, Value *v, uint64_t classes) -> Value *
+{
+	FPBits fp(builder, v);
+	auto *exp = builder.CreateAnd(fp.bits, fp.mask(builder, fp.expMask()));
+	auto *mant = builder.CreateAnd(fp.bits, fp.mask(builder, fp.mantMask()));
+	auto *quiet = builder.CreateAnd(fp.bits, fp.mask(builder, fp.quietMask()));
+	auto *neg = builder.CreateICmpNE(
+		builder.CreateAnd(fp.bits, fp.mask(builder, fp.signMask())), fp.mask(builder, 0));
+	auto *pos = builder.CreateNot(neg);
+	auto *expMax = builder.CreateICmpEQ(exp, fp.mask(builder, fp.expMask()));
+	auto *expZero = builder.CreateICmpEQ(exp, fp.mask(builder, 0));
+	auto *mantZero = builder.CreateICmpEQ(mant, fp.mask(builder, 0));
+	auto *quietSet = builder.CreateICmpNE(quiet, fp.mask(builder, 0));
+
+	auto *nan = builder.CreateAnd(expMax, builder.CreateNot(mantZero));
+	auto *inf = builder.CreateAnd(expMax, mantZero);
+	auto *zero = builder.CreateAnd(expZero, mantZero);
+	auto *sub = builder.CreateAnd(expZero, builder.CreateNot(mantZero));
+	auto *normal = builder.CreateNot(builder.CreateOr(expMax, expZero));
+	Value *const cls[] = {
+		builder.CreateAnd(nan, builder.CreateNot(quietSet)), /* signaling NaN */
+		builder.CreateAnd(nan, quietSet),		     /* quiet NaN */
+		builder.CreateAnd(inf, neg),
+		builder.CreateAnd(normal, neg),
+		builder.CreateAnd(sub, neg),
+		builder.CreateAnd(zero, neg),
+		builder.CreateAnd(zero, pos),
+		builder.CreateAnd(sub, pos),
+		builder.CreateAnd(normal, pos),
+		builder.CreateAnd(inf, pos),
+	};
+	Value *result = builder.getFalse();
+	for (auto i = 0U; i < std::size(cls); i++)
+		if (classes & (1U << i))
+			result = builder.CreateOr(result, cls[i]);
+	return result;
+}
+
+/* minnum/maxnum: the smaller/larger operand; a NaN loses (if both are NaNs,
+ * one is the result). Either zero for -0 and +0 */
+static auto lowerMinMaxNum(IRBuilder<> &builder, Value *x, Value *y, bool isMin) -> Value *
+{
+	auto *xNaN = builder.CreateFCmpUNO(x, x);
+	auto *yNaN = builder.CreateFCmpUNO(y, y);
+	auto *pick = isMin ? builder.CreateFCmpOLT(x, y) : builder.CreateFCmpOGT(x, y);
+	auto *ordered = builder.CreateSelect(pick, x, y);
+	return builder.CreateSelect(xNaN, y, builder.CreateSelect(yNaN, x, ordered));
+}
+
 static auto runOnBasicBlock(BasicBlock &bb, IntrinsicLowering *IL) -> bool
 {
 	auto &M = *bb.getParent()->getParent();
@@ -151,6 +245,52 @@ static auto runOnBasicBlock(BasicBlock &bb, IntrinsicLowering *IL) -> bool
 								  I->getModule()->getDataLayout(),
 								  nullptr, /* must succeed */ true);
 			I->replaceAllUsesWith(objSize);
+			I->eraseFromParent();
+			modified = true;
+			break;
+		}
+		case llvm::Intrinsic::fmuladd: {
+			/* clang contracts x * y + z into it (-ffp-contract=on). It may
+			 * be fused or not
+			 * (https://llvm.org/docs/LangRef.html#llvm-fmuladd-intrinsic): a
+			 * multiplication and an addition */
+			IRBuilder<> builder(I);
+			builder.setFastMathFlags(I->getFastMathFlags());
+			auto *mul = builder.CreateFMul(I->getArgOperand(0), I->getArgOperand(1));
+			I->replaceAllUsesWith(builder.CreateFAdd(mul, I->getArgOperand(2)));
+			I->eraseFromParent();
+			modified = true;
+			break;
+		}
+		/* fabs(), isnan() and the like, fmin(), fmax() */
+		case llvm::Intrinsic::fabs:
+		case llvm::Intrinsic::is_fpclass:
+		case llvm::Intrinsic::minnum:
+		case llvm::Intrinsic::maxnum: {
+			if (!isLowerableFPType(I->getArgOperand(0)->getType())) {
+				IL->LowerIntrinsicCall(I);
+				modified = true;
+				break;
+			}
+			IRBuilder<> builder(I);
+			auto *x = I->getArgOperand(0);
+			Value *result = nullptr;
+			switch (I->getIntrinsicID()) {
+			case llvm::Intrinsic::fabs:
+				result = lowerFAbs(builder, x);
+				break;
+			case llvm::Intrinsic::is_fpclass:
+				result = lowerIsFPClass(
+					builder, x,
+					cast<ConstantInt>(I->getArgOperand(1))->getZExtValue());
+				break;
+			default:
+				result = lowerMinMaxNum(builder, x, I->getArgOperand(1),
+							I->getIntrinsicID() ==
+								llvm::Intrinsic::minnum);
+				break;
+			}
+			I->replaceAllUsesWith(result);
 			I->eraseFromParent();
 			modified = true;
 			break;

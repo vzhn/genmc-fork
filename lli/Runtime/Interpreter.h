@@ -725,6 +725,7 @@ public:
 	void visitIndirectBrInst(IndirectBrInst &I);
 
 	void visitBinaryOperator(BinaryOperator &I);
+	void visitUnaryOperator(UnaryOperator &I);
 	void visitICmpInst(ICmpInst &I);
 	void visitFCmpInst(FCmpInst &I);
 	void visitAllocaInst(AllocaInst &I);
