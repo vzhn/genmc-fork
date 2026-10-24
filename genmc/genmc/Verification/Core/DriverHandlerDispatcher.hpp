@@ -161,6 +161,12 @@ public:
 			genmc::cast<MethodEndLabel>(lab.clone().release())));
 	}
 
+	void visitOutputLabel(const OutputLabel &lab)
+	{
+		driver->handleDummy(std::unique_ptr<OutputLabel>(
+			genmc::cast<OutputLabel>(lab.clone().release())));
+	}
+
 	/* Start,Init etc should never be handled here */
 
 	void visitEventLabel(const EventLabel & /*lab*/) { UNREACHABLE(); }
