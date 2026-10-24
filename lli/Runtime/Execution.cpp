@@ -3242,6 +3242,7 @@ void Interpreter::callThreadCreate(Function *F, const std::vector<GenericValue> 
 			       SVal((uintptr_t)ArgVals[2].PointerVal), calledFun->getName().str(),
 			       symm);
 	info.argUsed = !calledFun->arg_empty() && !calledFun->arg_begin()->use_empty();
+	info.selfUsed = mayReadThreadId(calledFun);
 	auto ret = CALL_DRIVER(handleThreadCreate, currDbgInfo(), currPos(), info, GET_DEPS(deps));
 	auto tid = std::get_if<int>(&ret);
 	if (!tid)

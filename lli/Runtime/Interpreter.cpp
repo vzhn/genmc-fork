@@ -403,6 +403,40 @@ std::unique_ptr<EventDeps> Interpreter::updateFunArgDeps(unsigned int tid, Funct
 	return nullptr;
 }
 
+bool Interpreter::mayReadThreadId(const llvm::Function *F)
+{
+	if (auto it = readsThreadId_.find(F); it != readsThreadId_.end())
+		return it->second;
+
+	/* (A recursive call does not add anything: assume no while visiting F) */
+	readsThreadId_[F] = false;
+	auto reads = false;
+	for (const auto &I : llvm::instructions(*F)) {
+		const auto *CB = llvm::dyn_cast<llvm::CallBase>(&I);
+		if (!CB || CB->isInlineAsm())
+			continue;
+		const auto *callee = CB->getCalledFunction();
+		if (callee == nullptr) {
+			reads = true; /* an indirect call */
+			break;
+		}
+		auto it = internalFunCache_.find(callee);
+		if (it != internalFunCache_.end()) {
+			if (it->second == InternalFunctions::ThreadSelf) {
+				reads = true;
+				break;
+			}
+			continue;
+		}
+		if (!callee->isDeclaration() && mayReadThreadId(callee)) {
+			reads = true;
+			break;
+		}
+	}
+	readsThreadId_[F] = reads;
+	return reads;
+}
+
 void Interpreter::updateInternalFunRetDeps(unsigned int tid, Function *F, Instruction *CS)
 {
 	auto it = internalFunCache_.find(F);

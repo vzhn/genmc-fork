@@ -25,6 +25,7 @@ struct ThreadInfo {
 	std::string name;     /**< Thread name */
 	int symmId = -1;      /**< ID of previous symmetric thread if any, -1 otherwise */
 	bool argUsed = true;  /**< Whether the thread body reads its argument at all */
+	bool selfUsed = true; /**< Whether the thread body may read its own thread id */
 
 	ThreadInfo() = default;
 	ThreadInfo(int id, int parentId, unsigned funId, SVal arg, std::string name, int symm = -1)

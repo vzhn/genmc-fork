@@ -437,6 +437,10 @@ protected:
 	 * lazily by getCurrentAnnotConcretized() */
 	std::unordered_map<AnnotID, std::vector<std::pair<AnnotID, const Value *>>> annotRegs_;
 
+	/* Whether a function may read its thread's id (see mayReadThreadId()),
+	 * per function */
+	llvm::DenseMap<const llvm::Function *, bool> readsThreadId_;
+
 	/* Maps internal functions to their code. Derived once from internalFunNames */
 	llvm::DenseMap<const llvm::Function *, InternalFunctions> internalFunCache_;
 
@@ -917,6 +921,11 @@ private: // Helper functions
 	/* Whether the address of AI's memory never leaves AI's function, so only
 	 * the thread running the function can access the memory */
 	bool isThreadPrivateAlloca(const AllocaInst *AI);
+
+	/** Whether F may read its thread's id (__VERIFIER_thread_self(), as
+	 * pthread_self() and the rwlocks do), through the calls it makes; an
+	 * indirect call may */
+	bool mayReadThreadId(const llvm::Function *F);
 
 	/* The join of the branch ending BB (nullptr: the function's exit) */
 	const BasicBlock *getBranchJoin(BasicBlock *BB);
