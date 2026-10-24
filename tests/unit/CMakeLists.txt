@@ -23,7 +23,7 @@ FetchContent_Declare(
 set(RC_ENABLE_GTEST ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(rapidcheck)
 
-add_executable(unit_tests IntervalMapTest.cpp IntervalSetTest.cpp ViewTest.cpp ErrorTest.cpp CastTest.cpp CacheCounterTest.cpp ExecutionGraphTest.cpp RelocateTest.cpp RMWOpsTest.cpp SExprEvaluatorTest.cpp GraphHashTest.cpp RaceTest.cpp AdaptiveViewTest.cpp InvariantsTest.cpp TrieTest.cpp BitVectorTest.cpp VSetTest.cpp)
+add_executable(unit_tests IntervalMapTest.cpp IntervalSetTest.cpp ViewTest.cpp ErrorTest.cpp CastTest.cpp CacheCounterTest.cpp ExecutionGraphTest.cpp RelocateTest.cpp RMWOpsTest.cpp SExprEvaluatorTest.cpp GraphHashTest.cpp RaceTest.cpp AdaptiveViewTest.cpp InvariantsTest.cpp TrieTest.cpp BitVectorTest.cpp VSetTest.cpp GraphPropertyTest.cpp)
 # LLVM: the reference semantics of RMWOpsTest and SExprEvaluatorTest (llvm::APInt)
 target_link_libraries(unit_tests PRIVATE GTest::gtest_main rapidcheck_gtest genmc_config_includes genmc_lib LLVM)
 target_include_directories(unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/genmc)
@@ -41,3 +41,23 @@ target_include_directories(driver_tests PRIVATE ${CMAKE_SOURCE_DIR}/genmc ${CMAK
 include(GoogleTest)
 gtest_discover_tests(unit_tests)
 gtest_discover_tests(driver_tests)
+
+# Validation as part of the build: whenever the test binaries are relinked
+# (a change to the library relinks them), `ninja` (target "all") runs the
+# unit and driver tests, the graph properties with more cases than by
+# default, and fails the build if one fails. A property failure prints the
+# shrunk case and RC_PARAMS to reproduce it. -DGENMC_VALIDATE_ON_BUILD=OFF
+# leaves the tests to ctest.
+option(GENMC_VALIDATE_ON_BUILD "Run the unit and driver tests as part of the build" ON)
+if(GENMC_VALIDATE_ON_BUILD)
+  set(_validate_stamp ${CMAKE_CURRENT_BINARY_DIR}/validate.stamp)
+  add_custom_command(OUTPUT ${_validate_stamp}
+    COMMAND ${CMAKE_COMMAND} -E env RC_PARAMS=max_success=1000
+            $<TARGET_FILE:unit_tests> --gtest_brief=1
+    COMMAND $<TARGET_FILE:driver_tests> --gtest_brief=1
+    COMMAND ${CMAKE_COMMAND} -E touch ${_validate_stamp}
+    DEPENDS unit_tests driver_tests
+    COMMENT "Validating: unit and driver tests (graph properties: 1000 cases)"
+    VERBATIM)
+  add_custom_target(validate ALL DEPENDS ${_validate_stamp})
+endif()
