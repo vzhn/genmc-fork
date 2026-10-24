@@ -237,7 +237,7 @@ public:
 				switch (r) {
 				case Node::QueryResult::Same:
 					tNode = nNode;
-					++result;
+					result += nNode->label().size();
 					break;
 				case Node::QueryResult::StringIsPrefix:
 					return result + std::distance(sBeg, sEnd);

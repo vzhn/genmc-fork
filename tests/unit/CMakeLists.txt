@@ -23,7 +23,7 @@ FetchContent_Declare(
 set(RC_ENABLE_GTEST ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(rapidcheck)
 
-add_executable(unit_tests IntervalMapTest.cpp IntervalSetTest.cpp ViewTest.cpp ErrorTest.cpp CastTest.cpp CacheCounterTest.cpp ExecutionGraphTest.cpp RelocateTest.cpp RMWOpsTest.cpp SExprEvaluatorTest.cpp GraphHashTest.cpp RaceTest.cpp AdaptiveViewTest.cpp)
+add_executable(unit_tests IntervalMapTest.cpp IntervalSetTest.cpp ViewTest.cpp ErrorTest.cpp CastTest.cpp CacheCounterTest.cpp ExecutionGraphTest.cpp RelocateTest.cpp RMWOpsTest.cpp SExprEvaluatorTest.cpp GraphHashTest.cpp RaceTest.cpp AdaptiveViewTest.cpp InvariantsTest.cpp TrieTest.cpp BitVectorTest.cpp VSetTest.cpp)
 # LLVM: the reference semantics of RMWOpsTest and SExprEvaluatorTest (llvm::APInt)
 target_link_libraries(unit_tests PRIVATE GTest::gtest_main rapidcheck_gtest genmc_config_includes genmc_lib LLVM)
 target_include_directories(unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/genmc)
@@ -33,7 +33,7 @@ target_compile_definitions(unit_tests PRIVATE ENABLE_GENMC_DEBUG) # to access va
 # The exploration without LLVM: a scripted event producer drives the core
 # library alone (no ENABLE_GENMC_DEBUG: the library is built without it, and
 # Config must have the same layout on both sides)
-add_executable(driver_tests driver/DriverTest.cpp driver/ErrorRulesTest.cpp driver/ExplorationStackTest.cpp driver/ResumePointStoreTest.cpp driver/KeptEventRunsTest.cpp driver/KeptEventAlignmentTest.cpp driver/SpinloopRulesTest.cpp driver/RevisitOptimizationsTest.cpp)
+add_executable(driver_tests driver/DriverTest.cpp driver/ErrorRulesTest.cpp driver/ExplorationStackTest.cpp driver/ResumePointStoreTest.cpp driver/KeptEventRunsTest.cpp driver/KeptEventAlignmentTest.cpp driver/SpinloopRulesTest.cpp driver/RevisitOptimizationsTest.cpp driver/RevisitTest.cpp driver/ConfigTest.cpp)
 target_link_libraries(driver_tests PRIVATE GTest::gtest_main rapidcheck_gtest genmc_config_includes genmc_lib)
 target_include_directories(driver_tests PRIVATE ${CMAKE_SOURCE_DIR}/genmc ${CMAKE_CURRENT_SOURCE_DIR}/driver)
 
