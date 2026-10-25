@@ -371,7 +371,7 @@ auto ExplorationCore::checkPendingKept(const ExecutionGraph &g) -> bool
 {
 	if (!keptRuns_.takeDeferredCheck())
 		return true;
-	if (getConsChecker().isConsistent(g))
+	if (isExecutionConsistent(g))
 		return true;
 	keptRuns_.repeatEagerly();
 	moot();
@@ -402,6 +402,18 @@ auto ExplorationCore::isRevisitValid(const Revisit &revisit) -> bool
 	if (!isExecutionValid(mLab))
 		return false;
 
+	/* The events kept after the read in its thread (-lkmm) are ordered
+	 * differently now that it reads from the write, and the read's own
+	 * check takes it as the last event of its thread: a cycle through
+	 * them is found in the whole graph. (Checked now, not when the run
+	 * ends: the run may be dropped before, with the revisits it queued
+	 * from the inconsistent graph left to explore) */
+	if (relocatesKeptEvents() && !genmc::isa<BackwardRevisit>(&revisit) &&
+	    g.hasEventsAfter(pos.thread, pos.index)) {
+		if (!isExecutionConsistent(g, true))
+			return false;
+	}
+
 	/* If an extra event is added, re-check consistency */
 	auto *rLab = genmc::dyn_cast<ReadLabel>(mLab);
 	auto *nLab = g.po_imm_succ(mLab);
@@ -430,18 +442,13 @@ auto ExplorationCore::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 	using Kind = kept_events::Alignment::Kind;
 
 	auto sub = curr.index - currKeyBase.index;
-	/* No such run: it is dropped, and the event being aligned is not added
-	 * (handleLoad(), handleStore() and handleThreadFinish() reset their
-	 * instruction; the other kinds go into the hole, harmlessly). Before,
-	 * the run went on with the event: a second event of the instance,
-	 * placed in coherence against the kept ones and so contradicting it,
-	 * and the revisits and warnings computed from that graph */
-	auto dropRun = [&] {
-		++result.relocationsLost;
-		keptRuns_.dropRun();
-		moot();
-	};
-
+	/* The thread's path skips a kept event: it stops (see deadEndThread()),
+	 * and the event being aligned is not added (handleLoad(), handleStore()
+	 * and handleThreadFinish() reset their instruction; the other kinds go
+	 * into the hole, harmlessly). Before, the run went on with the event: a
+	 * second event of the instance, placed in coherence against the kept
+	 * ones and so contradicting it, and the revisits and warnings computed
+	 * from that graph */
 	auto alignment = kept_events::align(getExec().getGraph(), curr, *currKey, sub);
 	switch (alignment.kind) {
 	case Kind::Own:
@@ -451,7 +458,7 @@ auto ExplorationCore::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 		return false;
 	case Kind::ShiftAndDrop:
 		relocateExecution(curr.thread, curr.index, 1);
-		dropRun();
+		deadEndThread(curr);
 		return false;
 	case Kind::OpenGap:
 		/* (Doubling on repeats; the surplus is closed later) */
@@ -461,7 +468,7 @@ auto ExplorationCore::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 	case Kind::FillHole:
 		return false;
 	case Kind::Drop:
-		dropRun();
+		deadEndThread(curr);
 		return false;
 	case Kind::FillBeforeKept:
 		keptRuns_.addedBeforeKept();
@@ -472,6 +479,30 @@ auto ExplorationCore::alignKeptEvents(Event curr, const EventLabel *lab) -> bool
 	}
 	UNREACHABLE();
 	return false;
+}
+
+/* The thread's path cannot go on at POS (a hole) before the events a revisit
+ * kept after it: they are unreachable on it (a kept event skipped, the
+ * thread's end), or the event there has no consistent option against them
+ * (a read with no write to read, a store with no place in coherence). The
+ * thread stops there, with a block after the kept events (see blockThread()),
+ * and the run goes on for the other threads: a write they add may revisit a
+ * read this run added before the dead end, a graph no other run holds (the
+ * read was added before the write, and only its revisit gives it the
+ * write). The run is not counted (hasThreadBlockedBeforeKept()). Before, the
+ * run was dropped, and such executions were lost (#77) */
+void ExplorationCore::deadEndThread(Event pos)
+{
+	auto &g = getExec().getGraph();
+	VERIFY(g.hasEventsAfter(pos.thread, pos.index));
+	blockThread(g, DeadPathBlockLabel::create(pos));
+}
+
+auto ExplorationCore::threadDeadEnded(int tid) const -> bool
+{
+	const auto *bLab = genmc::dyn_cast_if_present<BlockLabel>(
+		getExec().getGraph().getLastThreadLabel(tid));
+	return bLab != nullptr && bLab->isAfterKept();
 }
 
 void ExplorationCore::relocateExecution(int thread, int from, int delta)
@@ -587,9 +618,10 @@ auto ExplorationCore::checkForRaces(const EventLabel *lab) -> std::optional<Veri
 			return err;
 	}
 
-	/* -exhaustive under IMM: what the views leave unordered is checked
+	/* -exhaustive under IMM, and -lkmm: the views of the events a revisit
+	 * kept after a hole are stale; what they leave unordered is checked
 	 * again with the views computed anew (see checkWithViewsAnew()) */
-	const auto checksAnew = getConf()->exhaustive && getConf()->model == ModelType::IMM;
+	const auto checksAnew = relocatesKeptEvents();
 	auto inGraph = [&g](const EventLabel *oLab) {
 		return oLab ? g.getEventLabel(oLab->getPos()) : nullptr;
 	};
@@ -737,6 +769,29 @@ auto ExplorationCore::checkAccessValidity(Event pos, const AAccess &access)
 							   pos, access));
 }
 
+/* Whether RLAB accesses allocated and initialized memory. The views of the
+ * events a revisit kept after a hole RLAB fills are stale (-lkmm, as
+ * -exhaustive under IMM, see checkForRaces()): a violation they show is
+ * checked again with the views computed anew, and reported only if it
+ * stands */
+auto ExplorationCore::checkReadMemAccess(const ReadLabel *rLab) -> std::optional<VerificationError>
+{
+	auto violation = [&](const ReadLabel *mLab) {
+		auto v = error_rules::invalidAccess(getExec().getGraph().getState(),
+						    !getConf()->disableStaticValidityChecks,
+						    mLab->getPos(), mLab->getAccess());
+		if (!v && !getConf()->disableInitializationChecks)
+			v = error_rules::uninitializedRead(getConsChecker(), mLab);
+		return v;
+	};
+	auto v = violation(rLab);
+	if (v && relocatesKeptEvents())
+		checkWithViewsAnew([&](const ExecutionGraph &cg) {
+			v = violation(genmc::cast<ReadLabel>(cg.getEventLabel(rLab->getPos())));
+		});
+	return reportIfViolated(v);
+}
+
 auto ExplorationCore::checkInitializedMem(const ReadLabel *rLab) -> std::optional<VerificationError>
 {
 	/* Allow frontends to skip uninit/msa checks */
@@ -759,25 +814,34 @@ auto ExplorationCore::getErrorPrefix(const ExecutionGraph &g) const
 	 * inconsistent (#221). Such a read is checked as not yet added. So is a
 	 * store checked before it is placed in coherence (an access to
 	 * non-allocated memory): the model has no coherence position for it */
-	auto pending = std::views::filter(g.thr_ids(), [&](auto t) {
-		const auto *lab = g.getLastThreadLabel(t);
+	auto isPending = [](const EventLabel *lab) {
 		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab))
 			return !rLab->getRf();
 		const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
 		return wLab && !wLab->isInCo();
-	});
+	};
+	/* (Before events a revisit kept after it (-lkmm), such an access is a
+	 * hole in the copy, not the end of its thread) */
+	auto pending = std::views::filter(g.labels(), [&](auto &lab) { return isPending(&lab); });
 	if (std::ranges::empty(pending))
 		return nullptr;
 
 	auto v = g.getViewFromStamp(g.getMaxStamp());
-	for (auto t : pending)
-		v->setMax(g.getLastThreadLabel(t)->getPos().prev());
+	for (auto &lab : pending) {
+		if (g.getLastThreadLabel(lab.getThread()) == &lab)
+			v->setMax(lab.getPos().prev());
+		else
+			genmc::cast<DepView>(&*v)->addHole(lab.getPos());
+	}
 	return g.getCopyUpTo(*v);
 }
 
 auto ExplorationCore::isErrorGraphConsistent(const ExecutionGraph &g) const -> bool
 {
 	auto prefix = getErrorPrefix(g);
+	for (const auto &lab : (prefix ? *prefix : g).labels())
+		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(&lab); rLab && !rLab->getRf())
+			fprintf(stderr, "DBG dangling read %s in:\n%s\n", std::format("{}", rLab->getPos()).c_str(), std::format("{}", prefix ? *prefix : g).c_str());
 	return getConsChecker().isConsistentWithSectionsClosed(prefix ? *prefix : g);
 }
 
@@ -1101,23 +1165,20 @@ auto ExplorationCore::handleThreadFinish(std::unique_ptr<ThreadFinishLabel> eLab
 {
 	auto &g = getExec().getGraph();
 
-	/* The run was dropped while aligning this event (alignKeptEvents()) */
-	if (keptRuns_.runDropped())
+	/* The thread stopped while aligning this event (alignKeptEvents()) */
+	if (threadDeadEnded(eLab->getThread()))
 		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = addLabelToGraph(std::move(eLab));
 
-	/* Kept events after the end (see alignKeptEvents()) are never reached */
-	if (relocatesKeptEvents() &&
-	    std::ranges::any_of(std::views::iota(lab->getIndex() + 1,
-						 g.getThreadSize(lab->getThread())),
-				[&](int i) {
-					return !genmc::isa<EmptyLabel>(
-						g.getEventLabel(Event(lab->getThread(), i)));
-				})) {
-		++result.relocationsLost;
-		moot();
-		return {.result = std::monostate(), .count = 1U};
+	/* Kept events after the end (see alignKeptEvents()) are never reached:
+	 * the thread stops before its end (see deadEndThread()) */
+	if (relocatesKeptEvents() && g.hasEventsAfter(lab->getThread(), lab->getIndex())) {
+		auto pos = lab->getPos();
+		g.replaceWithHole(pos);
+		deadEndThread(pos);
+		/* (No reset: the thread's last frame is popped already) */
+		return {.result = std::monostate(), .count = 0U};
 	}
 	if (getRcuNesting(g, lab->getPos()) > 0) {
 		reportError(lab->getPos(),
@@ -1164,7 +1225,7 @@ void ExplorationCore::checkReconsiderFaiSpinloop(const MemAccessLabel *lab)
 
 auto ExplorationCore::getPrefixView(const EventLabel *lab) const -> const VectorClock &
 {
-	return prefixView(getConsChecker(), lab);
+	return prefixView(getConsChecker(), lab, keepsDependencies());
 }
 
 auto ExplorationCore::getRevisitPrefixView(const EventLabel *lab) const
@@ -1180,7 +1241,8 @@ auto ExplorationCore::getBackwardRevisits() const -> BackwardRevisits
 		 .disableBAM = getConf()->disableBAM,
 		 .scopesCtrlDeps = scopesCtrlDeps(),
 		 .exhaustive = getConf()->exhaustive,
-		 .exhaustiveIMM = getConf()->exhaustive && getConf()->model == ModelType::IMM}};
+		 .exhaustiveIMM = getConf()->exhaustive && getConf()->model == ModelType::IMM,
+		 .keepsDependencies = keepsDependencies()}};
 }
 
 auto ExplorationCore::getRfReductions() const -> RfReductions
@@ -1198,7 +1260,8 @@ auto ExplorationCore::getChoiceCandidates() -> ChoiceCandidates
 		{.depTracking = getConf()->isDepTrackingModel,
 		 .scopesCtrlDeps = scopesCtrlDeps(),
 		 .exhaustive = getConf()->exhaustive,
-		 .exhaustiveIMM = getConf()->exhaustive && getConf()->model == ModelType::IMM}};
+		 .exhaustiveIMM = getConf()->exhaustive && getConf()->model == ModelType::IMM,
+		 .keepsDependencies = keepsDependencies()}};
 }
 
 auto ExplorationCore::getRfsApproximation(ReadLabel *lab) -> std::vector<EventLabel *>
@@ -1240,13 +1303,12 @@ auto ExplorationCore::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<
 	auto &g = getExec().getGraph();
 	auto &frontier = g.getState();
 
-	/* The run was dropped while aligning this event (alignKeptEvents()) */
-	if (keptRuns_.runDropped())
+	/* The thread stopped while aligning this event (alignKeptEvents()) */
+	if (threadDeadEnded(rLab->getThread()))
 		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = genmc::dyn_cast<ReadLabel>(addLabelToGraph(std::move(rLab)));
-	auto err = checkAccessValidity(lab->getPos(), lab->getAccess())
-			   .or_else([&] { return checkInitializedMem(lab); })
+	auto err = checkReadMemAccess(lab)
 			   .or_else([&] { return checkForMixedSize(lab); })
 			   .or_else([&] { return checkIPRValidity(lab); })
 			   .or_else([&] { return checkForRaces(lab); });
@@ -1281,9 +1343,17 @@ auto ExplorationCore::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<
 	 * it no coherent write (-exhaustive under IMM, see getCoherentStores()),
 	 * or none an RMW can read: the write a kept later RMW reads, or a kept
 	 * later read of its thread (see ChoiceCandidates::rfs()). No completion
-	 * of the graph is consistent. The read reads from the last write, for
-	 * the graph to stay well formed until the run is dropped */
+	 * of the graph is consistent. With kept events after the read, the
+	 * thread stops before them (see deadEndThread()); otherwise the read
+	 * reads from the last write, for the graph to stay well formed until
+	 * the run is dropped */
 	if (stores.empty() && getConf()->isDepTrackingModel) {
+		if (relocatesKeptEvents() && g.hasEventsAfter(lab->getThread(), lab->getIndex())) {
+			auto pos = lab->getPos();
+			g.replaceWithHole(pos);
+				deadEndThread(pos);
+			return {.result = Reset{}, .count = 0U};
+		}
 		repairRead(g, lab);
 		moot();
 		return {.result = Invalid{}, .count = 1U};
@@ -1369,9 +1439,7 @@ auto ExplorationCore::handleNALoad(Event pos, SAddr loc, ASize size, const Event
 	/* Update views */
 	updateLabelViews(lab);
 
-	auto err = checkAccessValidity(lab->getPos(), lab->getAccess())
-			   .or_else([&] { return checkInitializedMem(lab); })
-			   .or_else([&] { return checkForRaces(lab); });
+	auto err = checkReadMemAccess(lab).or_else([&] { return checkForRaces(lab); });
 	if (err) {
 		guard.commit();
 		return {*err};
@@ -1504,8 +1572,8 @@ auto ExplorationCore::handleStore(std::unique_ptr<WriteLabel> wLab, std::optiona
 {
 	auto &g = getExec().getGraph();
 
-	/* The run was dropped while aligning this event (alignKeptEvents()) */
-	if (keptRuns_.runDropped())
+	/* The thread stopped while aligning this event (alignKeptEvents()) */
+	if (threadDeadEnded(wLab->getThread()))
 		return {.result = Reset{}, .count = 0U};
 
 	auto *lab = genmc::dyn_cast<WriteLabel>(addLabelToGraph(std::move(wLab)));
@@ -1536,9 +1604,17 @@ auto ExplorationCore::handleStore(std::unique_ptr<WriteLabel> wLab, std::optiona
 	 * and, under a dependency-tracking model, a store that a later access
 	 * of its thread bounds by an RMW's write with nothing but RMWs before it
 	 * in its range (no placing comes between an RMW's write and the write
-	 * its read reads). The store still goes in coherence (last), for the
-	 * graph to stay well formed until the run is dropped */
+	 * its read reads). With kept events after the store, the thread stops
+	 * before them (see deadEndThread()); otherwise the store still goes in
+	 * coherence (last), for the graph to stay well formed until the run is
+	 * dropped */
 	if (cos.empty()) {
+		if (relocatesKeptEvents() && g.hasEventsAfter(lab->getThread(), lab->getIndex())) {
+			auto pos = lab->getPos();
+			g.replaceWithHole(pos);
+				deadEndThread(pos);
+			return {.result = Reset{}, .count = 0U};
+		}
 		lab->addCo(g.co_max(lab->getAddr()));
 		moot();
 		return {.result = Invalid{}, .count = 1U};
@@ -1824,6 +1900,23 @@ void ExplorationCore::reportError(Event pos, const ErrorDetails &details)
 			moot();
 			return;
 		}
+		/* A thread has events kept after a hole it has not filled: they,
+		 * and what reads them, are not justified yet (its path may not
+		 * reach them, or may order them differently: a kept write read
+		 * through a lock the thread has not taken again). An error found
+		 * now may be theirs: the run is dropped, and a real error is found
+		 * again in a run that reaches the access with them in place */
+		auto unreachedKept = [&g](int t) {
+			for (auto i = 1; i < g.getThreadSize(t); i++)
+				if (genmc::isa<EmptyLabel>(g.getEventLabel(Event(t, i))))
+					return g.hasEventsAfter(t, i);
+			return false;
+		};
+		if (std::ranges::any_of(g.thr_ids(), unreachedKept)) {
+			++result.relocationsLost;
+			moot();
+			return;
+		}
 		/* (Without the events still pending, see getErrorPrefix()) */
 		auto prefix = getErrorPrefix(g);
 		const auto &eg = prefix ? *prefix : g;
@@ -1833,7 +1926,7 @@ void ExplorationCore::reportError(Event pos, const ErrorDetails &details)
 				return;
 			}
 		} else if (keptRuns_.takeAddedBeforeKept()) {
-			if (!getConsChecker().isConsistent(eg)) {
+			if (!isExecutionConsistent(eg)) {
 				moot();
 				return;
 			}
@@ -2102,7 +2195,9 @@ void ExplorationCore::revisitInPlace(const BackwardRevisit &br)
 
 auto ExplorationCore::getExhaustiveConsistency() -> ExhaustiveConsistency
 {
-	return ExhaustiveConsistency(getConsChecker(), [this](EventLabel *lab) { updateLabelViews(lab); });
+	return ExhaustiveConsistency(
+		getConsChecker(), [this](EventLabel *lab) { updateLabelViews(lab); },
+		getConf()->model == ModelType::IMM);
 }
 
 auto ExplorationCore::recomputeViews(ExecutionGraph &g) -> bool
@@ -2110,14 +2205,28 @@ auto ExplorationCore::recomputeViews(ExecutionGraph &g) -> bool
 	return getExhaustiveConsistency().recomputeViews(g);
 }
 
-auto ExplorationCore::isGraphConsistent(const ExecutionGraph &g) -> bool
+auto ExplorationCore::isGraphConsistent(const ExecutionGraph &g, bool intermediate) -> bool
 {
-	return getExhaustiveConsistency().isGraphConsistent(g);
+	return getExhaustiveConsistency().isGraphConsistent(g, intermediate);
 }
 
-auto ExplorationCore::isExecutionConsistent(const ExecutionGraph &g) -> bool
+auto ExplorationCore::isExecutionConsistent(const ExecutionGraph &g, bool intermediate,
+					    bool atomicity) -> bool
 {
-	return getExhaustiveConsistency().isExecutionConsistent(g);
+	return getExhaustiveConsistency().isExecutionConsistent(g, intermediate, atomicity);
+}
+
+auto ExplorationCore::checkEndedRun(const ExecutionGraph &g, bool moot) -> bool
+{
+	const auto pending = keptRuns_.takeDeferredCheck();
+	if (moot && !pending)
+		return true;
+	if (isExecutionConsistent(g, moot, !moot))
+		return true;
+	if (pending)
+		keptRuns_.repeatEagerly();
+	moot ? void() : this->moot();
+	return false;
 }
 
 void ExplorationCore::checkWithViewsAnew(const std::function<void(const ExecutionGraph &)> &check)
@@ -2143,7 +2252,7 @@ auto ExplorationCore::copyGraph(const BackwardRevisit *br, VectorClock *v) const
 	 * prefix views that name events the copy does not have.
 	 * backwardRevisit() computes the views anew, which drops them; they go
 	 * now, so that no check or rule sees them in between (#181) */
-	if (getConf()->exhaustive && getConf()->model == ModelType::IMM)
+	if (relocatesKeptEvents())
 		ExhaustiveConsistency::dropPrefixViews(*og);
 	checkGraphInvariants(*og, "copying the graph for a backward revisit",
 			     plan ? &*plan : nullptr);
@@ -2394,11 +2503,19 @@ auto ExplorationCore::backwardRevisit(const BackwardRevisit &br) -> bool
 	 * kept events, and the revisit is not taken if the graph is not
 	 * consistent. (A revisit that pushed work of its own: it is dropped, so
 	 * that the execution is popped) */
-	const auto checksGraph = getConf()->exhaustive && getConf()->model == ModelType::IMM;
+	const auto checksGraph = relocatesKeptEvents();
 	auto succeeded = !checksGraph || recomputeViews(getExec().getGraph());
 	succeeded = succeeded && revisitRead(br);
+	/* (-exhaustive: a graph produced before is skipped (see
+	 * visitRevisitedGraph()); its hash costs less than the checks below, so
+	 * it goes first) */
+	if (succeeded && getConf()->exhaustive &&
+	    visitedGraphs_.contains(canonicalGraphHash(getExec().getGraph()))) {
+		getExec().getWorkqueue().truncate(0);
+		return false;
+	}
 	if (checksGraph && (!succeeded || !recomputeViews(getExec().getGraph()) ||
-			    !isGraphConsistent(getExec().getGraph()))) {
+			    !isGraphConsistent(getExec().getGraph(), true))) {
 		getExec().getWorkqueue().truncate(0);
 		return false;
 	}

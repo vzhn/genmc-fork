@@ -1,6 +1,7 @@
 # Classified disagreements of lkmm-diff.py --model lkmm (classify.py --allowlist)
 # <test> <result> <cause>
-manual/absperf/C-SB+l-o-o-u+l-o-o-u+l-o-o-u-CE.litmus count same states, other execution count (failed cmpxchg reads); not a disagreement without --strict-counts
+manual/absperf/C-SB+l-o-o-u+l-o-o-u+l-o-o-u+l-o-o-u-C.litmus genmc-timeout four threads branching on shared state inside critical sections: the exhaustive exploration explores many more graphs than before (#261); 24 executions as herd7 given time
+manual/absperf/C-SB+l-o-o-u+l-o-o-u+l-o-o-u+l-o-o-u-X.litmus genmc-timeout four threads branching on shared state inside critical sections: the exhaustive exploration explores many more graphs than before (#261); 24 executions as herd7 given time
 manual/atomic/C-unlock-wait-00.litmus herd-error herd7 rejects the test (unknown macro or annotation)
 manual/memb/C-Goldblatt-memb-1.litmus herd-error herd7 rejects the test (unknown macro or annotation)
 manual/memb/C-Goldblatt-memb-2.litmus herd-error herd7 rejects the test (unknown macro or annotation)
@@ -8,7 +9,6 @@ manual/memb/C-Goldblatt-memb-3.litmus herd-error herd7 rejects the test (unknown
 manual/memb/C-memb-RCU-0.litmus herd-error herd7 rejects the test (unknown macro or annotation)
 manual/memb/C-memb-RCU-1.litmus herd-error herd7 rejects the test (unknown macro or annotation)
 manual/kernel/C-ManfredSpraul-L1G1locknr.litmus missing locks released and retaken in a branch: GenMC has 6 of herd7's 12 executions, with or without control dependencies scoped to the if (cause not yet known)
-manual/kernel/C-ManfredSpraul-L1G1xchgnr.litmus missing locks released and retaken in a branch: GenMC has 305 of herd7's 323 executions, with or without control dependencies scoped to the if (cause not yet known)
 manual/kernel/crypto-control-data.litmus missing a thin-air value through a register a branch sets: the value written after the if depends on the read (GenMC builds values from writes, and a value a branch chooses depends on its condition)
 manual/oota/C-AS-OOTA-1.litmus missing a cycle of ctrl and rfe through plain writes in branches: LKMM allows it (a plain write is in no hb), GenMC's prefix orders it (ctrl ; [W]) and GenMC cannot build a cycle of its prefix
 manual/oota/C-JO-OOTA-3.litmus missing a cycle of ctrl and rfe through plain accesses in branches: LKMM allows it (a plain access is in no hb), GenMC's prefix orders it and GenMC cannot build a cycle of its prefix

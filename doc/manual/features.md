@@ -195,10 +195,11 @@ exceptions:
   taken (`p = r ? &a : &b`, or a variable set in a branch) depends on the
   condition; so do the events of a function called through a pointer the
   read chose; a branch that leaves its function (an early `return`)
-  orders the rest of the function; and so do, for the exploration, a
-  marked write after the `if` to a location a marked write in the branch
-  writes, and the events after a later fence, release or lock operation
-  when the branch has a marked write or a fence. GenMC can also miss an
+  orders the rest of the function; and so do, for the optimal
+  exploration (`-disable-lkmm-exhaustive`), a marked write after the `if`
+  to a location a marked write in the branch writes, and the events
+  after a later fence, release or lock operation when the branch has a
+  marked write or a fence. GenMC can also miss an
   execution with a cycle of control dependencies and reads from plain
   writes in branches, which the model allows (a plain write is in no
   happens-before) but GenMC's exploration cannot build.
@@ -217,12 +218,24 @@ second the code after a branch into its arms.)
 Under `-lkmm`, GenMC explores exhaustively by default (see [Reference
 Exploration](#reference-exploration)). Under the kernel model, the
 events that order an event after a branch can depend on the path the
-branch took (a write in it to the same location, a fence in it), and
-the maximality check of the optimal exploration assumes they do not: it
-misses the executions in which a revisit changes such a path. The
-exhaustive exploration takes every consistent revisit, at the cost of
-about a third more work on the kernel's litmus tests and of running
-single-threaded. `-disable-lkmm-exhaustive` goes back to the optimal
+branch took (a write in it to the same location, a fence or a release
+in it), and the maximality check of the optimal exploration assumes
+they do not: it misses the executions in which a revisit changes such
+a path. The exhaustive exploration takes every consistent revisit, and
+a revisit keeps the model's prefix of the revisiting write without the
+events that exist because of what the revisited read read (those inside
+a branch it controls, and what depends on them): a read may be revisited
+by every write that does not depend on it and that the model orders
+after it only through those. The orderings of a path are checked again,
+on the whole graph,
+when a thread's path changes or an event is added before events a
+revisit kept, and a thread whose new path contradicts the events kept
+after it stops there (the run is not counted, but the other threads go
+on, as their writes may still revisit the reads of the run). This costs
+about a third more work on the kernel's litmus tests, much more on
+programs whose threads branch on shared state inside critical sections
+(the reads such a branch controls are executed anew; issue #261), and
+the exploration runs single-threaded. `-disable-lkmm-exhaustive` goes back to the optimal
 exploration, which is faster and can run in parallel (`-nthreads`), but
 can miss such executions; so does `-disable-spin-assume`, as the
 exhaustive exploration of a spin loop that is not turned into an

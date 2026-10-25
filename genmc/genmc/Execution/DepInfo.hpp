@@ -104,10 +104,16 @@ struct EventDeps {
 	/* -lkmm: what a branch's events can order after its join, whichever path
 	 * runs (see Interpreter::applyCtrlShadows()): in the prefix, not in ctrl */
 	DepInfo pctrl;
+	/* -lkmm: the part of ctrl that decides whether the event exists: the
+	 * conditions of the branches the event is inside (those with a join,
+	 * see Interpreter::updateBranchCtrlDeps()) and of the early exits of
+	 * its frames. A revisit of one of these reads deletes the event (see
+	 * BackwardRevisits::keptPrefixView()) */
+	DepInfo sctrl;
 
 	template <typename F> void remap(F f)
 	{
-		for (auto *d : {&addr, &data, &ctrl, &addrPo, &cas, &pctrl})
+		for (auto *d : {&addr, &data, &ctrl, &addrPo, &cas, &pctrl, &sctrl})
 			d->remap(f);
 	}
 };

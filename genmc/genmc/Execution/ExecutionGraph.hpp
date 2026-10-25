@@ -964,6 +964,11 @@ public:
 	 * If it is a read, updates the rf-lists.
 	 * If it is a write, makes all readers read BOT. */
 	auto removeLast(int thread) -> std::unique_ptr<EventLabel>;
+	void unlinkLabel(EventLabel *lab);
+
+	/* Removes the label at POS, which becomes a hole (or the thread's end,
+	 * when it is the last label) */
+	void replaceWithHole(Event pos);
 
 	/* Event getter methods */
 

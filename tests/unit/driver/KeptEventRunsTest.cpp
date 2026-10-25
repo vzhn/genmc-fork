@@ -93,13 +93,3 @@ TEST(KeptEventRuns, HaltingRepeatsNothing)
 	EXPECT_EQ(k.endRun(true), Repeat::None);
 	EXPECT_EQ(k.relocationsInRun(), 0U);
 }
-
-TEST(KeptEventRuns, ADroppedRunStaysDroppedUntilTheNextStarts)
-{
-	KeptEventRuns k;
-	k.startRun(Stamp(0), 0);
-	k.dropRun();
-	EXPECT_TRUE(k.runDropped());
-	k.startRun(Stamp(0), 0);
-	EXPECT_FALSE(k.runDropped());
-}

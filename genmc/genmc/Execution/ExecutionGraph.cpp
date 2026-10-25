@@ -201,9 +201,10 @@ void ExecutionGraph::trackCoherenceAtLoc(SAddr addr)
  ** Graph modification methods
  ***********************************************************/
 
-auto ExecutionGraph::removeLast(int thread) -> std::unique_ptr<EventLabel>
+/* Unlinks LAB from what it points to and what points to it (readers,
+ * rf, a thread's create or join), before it leaves the graph */
+void ExecutionGraph::unlinkLabel(EventLabel *lab)
 {
-	auto *lab = getLastThreadLabel(thread);
 	ASSERT(getMemModel());
 	getMemModel()->maybeDecreaseCacheCounters(lab);
 
@@ -244,6 +245,12 @@ auto ExecutionGraph::removeLast(int thread) -> std::unique_ptr<EventLabel>
 			eLab->setParentJoin(nullptr);
 	}
 	/* Nothing to do for start/finish: childId remains the same */
+}
+
+auto ExecutionGraph::removeLast(int thread) -> std::unique_ptr<EventLabel>
+{
+	auto *lab = getLastThreadLabel(thread);
+	unlinkLabel(lab);
 
 	/* Remove from lists */
 	insertionOrder.remove(*lab);
@@ -261,6 +268,28 @@ auto ExecutionGraph::removeLast(int thread) -> std::unique_ptr<EventLabel>
 	auto popped = std::move(threadEvents.back());
 	threadEvents.pop_back();
 	return popped;
+}
+
+void ExecutionGraph::replaceWithHole(Event pos)
+{
+	auto *lab = getEventLabel(pos);
+	VERIFY(!genmc::isa<EmptyLabel>(lab));
+	if (lab == getLastThreadLabel(pos.thread)) {
+		removeLast(pos.thread);
+		return;
+	}
+	unlinkLabel(lab);
+
+	/* The hole takes the label's place in every list, and its stamp */
+	auto hole = createHoleLabel(pos);
+	hole->setParent(this);
+	hole->setStamp(lab->getStamp());
+	insertionOrder.insert(label_iterator(*lab), *hole);
+	poLists[pos.thread].insert(po_iterator(*lab), *hole);
+	insertionOrder.remove(*lab);
+	poLists[pos.thread].remove(*lab);
+	lab->setParent(nullptr);
+	events[pos.thread][pos.index] = std::move(hole);
 }
 
 void ExecutionGraph::removeAfter(const VectorClock &preds)

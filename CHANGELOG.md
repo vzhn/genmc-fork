@@ -11,6 +11,58 @@ released.
 
 ### Fixed
 
+- `-lkmm` missed executions that LKMM allows when the events a revisit
+  kept depended on the path a branch took (#77). The prefix of a write
+  (what its revisits keep) had every fence before every later event
+  (`[F] ; po`) and, through a same-location write, a release or a fence in
+  a branch, the read the branch tests: a write after the join then could
+  not revisit that read, or the revisit kept the branch's events, which the
+  new path never reached, and the run was dropped. Under `-lkmm`
+  (exhaustive) a revisit now keeps the model's prefix of the write without
+  the events that exist because of what the revisited read read (those
+  inside a branch it controls, `EventDeps::sctrl`, with their readers and
+  what depends on them: `keptPrefixView()`), a read is revisitable by
+  every write that does not depend on it and that the prefix orders after
+  it only through those, the kat's prefix no
+  longer has `[F] ; po` (vzhn/kater-fork, the checker regenerated), and a
+  successful acquire CAS no longer makes every later event of its thread
+  depend on its read there (the exhaustive exploration deduplicates the
+  graphs #230 was about). What this opened is closed: a thread whose new
+  path contradicts the events kept after it (a kept event skipped, a store
+  with no place in coherence before a kept read, the thread's end) stops
+  there with a block instead of dropping the run, so that the other
+  threads' writes can still revisit the run's reads; the whole graph is
+  checked with its views computed anew, as under `-exhaustive -imm`
+  (coherence per location, not by the hb view), at a revisit that keeps
+  events after the read, when an event goes before kept ones (the views
+  are recomputed in place then), and when a run ends, mooted or not (a
+  mooted run's queued revisits came from an unchecked graph; its own
+  atomicity violation is left out); the checks between the events of a run
+  leave LKMM's plain-access rules to the complete execution; an error
+  found while a thread has events kept after a hole it has not filled is
+  not reported from that run (a kept write may be read through a lock the
+  thread has not taken again), a real one being found again with them in
+  place; and a graph produced before is recognized before it is checked.
+  On the 800 fuzz seeds of `scripts/lkmm/fuzz-ctrl.py` every seed herd7
+  finishes now agrees (782, was 776), with `-check-invariants`; the corpus
+  is unchanged; the optimal exploration (`-disable-lkmm-exhaustive`) gains
+  on 6 seeds and loses none. Programs whose threads branch on shared
+  state inside critical sections explore many more graphs (#261):
+  `tests/correct/lkmm/kept-free-access` takes about 20 times longer, and
+  two 4-lock tests of the corpus (`manual/absperf/C-SB+l-o-o-u+...`) no
+  longer finish within the comparison's limit (allowlisted). Master also
+  counted executions violating coherence after a
+  forward revisit of a read before a kept read of its location (I5;
+  `tests/correct/lkmm/kept-read-bounds-store-anew`). Tests:
+  `tests/correct/lkmm/{fence-in-branch-prefix,
+  kept-write-after-revisited-read, branch-release-moi-prefix,
+  branch-write-moi-rmb-prefix, branch-write-moi-cas-prefix,
+  dead-path-thread-stops, kept-read-bounds-store-anew(-2),
+  mooted-run-pending-check}`; `cas-path-lb` documents the gap left: a
+  cycle through the path a `cmpxchg()` takes, which no revisit builds.
+- The debug build (`-DGENMC_DEBUG=ON`) did not compile
+  (`GenMCDriver::trackExecutionBound()` used a private member).
+
 - `-exhaustive` reported errors under `-imm` that IMM rules out. A
   revisit keeps the events the kept ones compute from, such as a store
   that a CAS's expected value reads, without the events they are merely

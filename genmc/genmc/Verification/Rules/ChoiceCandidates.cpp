@@ -145,7 +145,7 @@ auto ChoiceCandidates::rfs(ReadLabel *lab) const -> std::vector<EventLabel *>
 		return rfs;
 
 	/* Remove atomicity violations */
-	const auto &before = prefixView(model_, lab);
+	const auto &before = prefixView(model_, lab, opts_.keepsDependencies);
 	auto isSettledRMWInView = [&before](auto &rLab) {
 		return rLab.isRMW() && (!rLab.isRevisitable() || before.contains(rLab.getPos()));
 	};
@@ -219,10 +219,18 @@ auto ChoiceCandidates::revisitableReads(WriteLabel *sLab) const -> std::vector<R
 	if (opts_.depTracking && !hasReads(g_, sLab->getAddr()))
 		return {};
 
-	/* (Computed for the other models' checkers, see above) */
-	prefixView(model_, sLab);
-	auto prefix = revisitPrefixView(model_, opts_.scopesCtrlDeps, sLab);
+	/* (Computed for the other models' checkers, see above; under
+	 * -exhaustive -lkmm the write's dependencies, which its revisits keep,
+	 * and which filterCoherentRevisits() then takes as what stays) */
+	const auto &before = prefixView(model_, sLab, opts_.keepsDependencies);
+	auto prefix = opts_.keepsDependencies
+			      ? before.clone()
+			      : revisitPrefixView(model_, opts_.scopesCtrlDeps, sLab);
 	auto loads = getRevisitable(sLab, *prefix, opts_.exhaustive, opts_.depTracking);
+	/* (-exhaustive under -lkmm: a read the model's prefix orders before
+	 * SLAB other than through what depends on the read is no candidate
+	 * either: its revisit's view, computed when the revisit is constructed,
+	 * is then null, see keptPrefixView()) */
 	model_.filterCoherentRevisits(sLab, loads);
 	if (opts_.exhaustiveIMM)
 		addRevisitableCases(sLab, *prefix, loads);

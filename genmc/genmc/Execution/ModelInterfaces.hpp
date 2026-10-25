@@ -98,6 +98,12 @@ public:
 	[[nodiscard]] virtual auto isConsistent(const EventLabel *lab) const -> bool = 0;
 	[[nodiscard]] virtual auto isConsistent(const ExecutionGraph & /*g*/) const -> bool = 0;
 
+	/** Whole-graph checks between the events of a run (-lkmm, see
+	 * ExplorationCore::checkPendingKept()) may leave out what a complete
+	 * execution's check decides (LKMM's plain-access rules): ON selects
+	 * that mode for the checks that follow */
+	virtual void setIntermediateChecks([[maybe_unused]] bool on) {}
+
 	/** Whether G is consistent with each read-side critical section still
 	 * open closed at the end of its thread: whether an execution can still
 	 * complete it (LKMM; the other models have no sections, and a trailing

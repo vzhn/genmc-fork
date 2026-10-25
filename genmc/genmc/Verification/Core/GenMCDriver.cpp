@@ -204,7 +204,7 @@ void GenMCDriver::checkHelpingCasAnnotation()
 #ifdef ENABLE_GENMC_DEBUG
 void GenMCDriver::trackExecutionBound()
 {
-	auto bound = bounder->calculate(getExec().getGraph());
+	auto bound = getBounder().calculate(getExec().getGraph());
 	result.exploredBounds.grow(bound);
 	result.exploredBounds[bound]++;
 }
@@ -261,7 +261,17 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		return details.shouldHalt ? std::optional(details.type) : std::nullopt;
 	}
 
-	if (isMoot() || !checkPendingKept(getExec().getGraph())) {
+	/* (A run mooted for another reason may have queued revisits from a
+	 * graph not checked since an event went before kept ones: the check
+	 * runs regardless, and when it fails the run is repeated with eager
+	 * checks, which cuts that work; see checkEndedRun()) */
+	if (relocatesKeptEvents()) {
+		const auto moot = isMoot();
+		if (!checkEndedRun(g, moot) || moot) {
+			GENMC_DEBUG(++result.exploredMoot;);
+			return {};
+		}
+	} else if (isMoot() || !checkPendingKept(g)) {
 		GENMC_DEBUG(++result.exploredMoot;);
 		return {};
 	}
@@ -348,9 +358,13 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 	GENMC_DEBUG(if (getConf()->boundsHistogram && inVerificationMode()) trackExecutionBound(););
 
 	/* The checks made as events are added must imply that the execution
-	 * satisfies the model's axioms as a whole (I5) */
+	 * satisfies the model's axioms as a whole (I5). With events kept after
+	 * holes (-lkmm), the checks between the events are intermediate ones
+	 * (see GraphModel::setIntermediateChecks()): the execution is checked
+	 * as a whole, with its views computed anew, and is not counted if it
+	 * fails */
 	if (checksInvariants() || executionHook_) {
-		const auto consistent = getConsChecker().isConsistent(g);
+		const auto consistent = relocatesKeptEvents() || getConsChecker().isConsistent(g);
 		if (executionHook_)
 			executionHook_(g, consistent);
 		if (checksInvariants())
@@ -390,9 +404,13 @@ auto GenMCDriver::scheduleNext(std::span<Action> runnable) -> ScheduleResult
 	auto &g = getExec().getGraph();
 	if (keptRuns_.hasAddedBeforeKept() && !isMoot()) {
 		keptRuns_.takeAddedBeforeKept();
+		/* The views of the events kept after the one just added are
+		 * stale: computed anew, so that the choices made next (a store's
+		 * places in coherence, a read's writes) see the event */
+		recomputeViews(g);
 		if (!keptRuns_.eagerChecks())
 			keptRuns_.deferCheck();
-		else if (!getConsChecker().isConsistent(g))
+		else if (!isExecutionConsistent(g, true))
 			moot();
 	}
 	if (g.keptEventsUnreachable()) {

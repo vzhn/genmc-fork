@@ -62,6 +62,10 @@ public:
 		return DELEGATE_LABEL(BlockLabel);
 	}
 	void visitAwaitBlockLabel(const AwaitBlockLabel &lab) { return DELEGATE_LABEL(BlockLabel); }
+	void visitDeadPathBlockLabel(const DeadPathBlockLabel &lab)
+	{
+		return DELEGATE_LABEL(BlockLabel);
+	}
 	void visitFaiZNEBlockLabel(const FaiZNEBlockLabel &lab)
 	{
 		return DELEGATE_LABEL(BlockLabel);

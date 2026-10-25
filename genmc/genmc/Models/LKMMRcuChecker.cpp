@@ -25,23 +25,34 @@
 
 /* Whether G has what the generated checker cannot decide: a grace period
  * (rb) or a potential race (plain-coherence) */
-static auto needsModel(const ExecutionGraph &g) -> bool
+static auto needsModel(const ExecutionGraph &g, bool intermediate) -> bool
 {
-	return lkmm::hasGracePeriod(g) || lkmm::hasPreRace(g);
+	return lkmm::hasGracePeriod(g) || (!intermediate && lkmm::hasPreRace(g));
 }
 
 auto LKMMRcuChecker::withModel(const ExecutionGraph &g, bool generated, bool closeOpen) const
 	-> bool
 {
-	const bool reference = getConf()->lkmmReference;
-	if (!reference && (!generated || !needsModel(g)))
+	/* (An intermediate check leaves the plain-access rules, costly to
+	 * evaluate, to the check of the complete execution) */
+	const bool reference = getConf()->lkmmReference && !intermediate_;
+	if (!reference && (!generated || !needsModel(g, intermediate_)))
 		return generated;
 
 	auto v = lkmm::evaluate(g, reference, closeOpen);
 	/* The generated checker decides hb and pb (coherence and atomicity hold
 	 * by construction); the graphs it is asked about were consistent before
-	 * their last event */
-	if (reference && (generated != (v.hb && v.pb) || !v.coherence || !v.atomicity))
+	 * their last event. Not so with a hole in a thread: the events a
+	 * revisit kept after it have the views of another graph, the check of
+	 * an event before them takes it as its thread's last, and the whole
+	 * graph is checked again once the holes are filled (see
+	 * ExplorationCore::checkPendingKept()) */
+	const auto kept = std::ranges::any_of(g.labels(), [&g](const auto &lab) {
+		const auto *pLab = g.po_imm_pred(&lab);
+		return pLab && pLab->getStamp() > lab.getStamp();
+	});
+	if (reference && !kept &&
+	    (generated != (v.hb && v.pb) || !v.coherence || !v.atomicity))
 		ERROR("The LKMM checker and the model disagree (checker: {}, model: "
 		      "coherence {}, atomicity {}, hb {}, pb {}) on:\n{}\n",
 		      generated ? "consistent" : "inconsistent", v.coherence, v.atomicity,
@@ -143,7 +154,7 @@ auto LKMMRcuChecker::isCoMaxReadConsistent(const ReadLabel *rLab) const -> bool
 {
 	const auto &g = *rLab->getParent();
 	return !getConf()->lkmmReference &&
-	       (g.getLastThreadLabel(rLab->getThread()) == rLab || !needsModel(g));
+	       (g.getLastThreadLabel(rLab->getThread()) == rLab || !needsModel(g, intermediate_));
 }
 
 auto LKMMRcuChecker::checkAccessFreed(const EventLabel *lab, const EventLabel *&race) const

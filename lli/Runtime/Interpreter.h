@@ -300,6 +300,7 @@ public:
 
 	/* The thread's control dependencies, with those of the open branches */
 	DepInfo ctrlScratch;
+	DepInfo sctrlScratch;
 
 	/* The prefix-only ones of the current event (shadows, see EventDeps) */
 	DepInfo pctrlScratch;
@@ -911,6 +912,7 @@ private: // Helper functions
 
 	/* Whether control dependencies end at the join of their branch */
 	bool scopesCtrlDeps() const { return driver->scopesCtrlDeps(); }
+	bool keepsDependencies() const { return driver->keepsDependencies(); }
 
 	/* A conditional branch (or switch) at the end of BB on COND */
 	void updateBranchCtrlDeps(BasicBlock *BB, Value *Cond);

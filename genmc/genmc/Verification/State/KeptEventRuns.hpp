@@ -49,7 +49,6 @@ public:
 	{
 		addedBeforeKept_ = false;
 		checkPending_ = false;
-		dropped_ = false;
 		startStamp_ = maxStamp;
 		startWork_ = work;
 	}
@@ -78,9 +77,6 @@ public:
 	/** How many times the current run was repeated after a relocation */
 	[[nodiscard]] auto relocationsInRun() const -> unsigned { return relocations_; }
 
-	/** The run is dropped (no event is added until it ends) */
-	void dropRun() { dropped_ = true; }
-	[[nodiscard]] auto runDropped() const -> bool { return dropped_; }
 
 	/** The run ends: which repeat it needs. Without one (or when HALTING,
 	 * which repeats nothing), the next run is a new one: no relocation
@@ -111,7 +107,6 @@ private:
 	bool repeatEagerly_ = false;
 	bool repeatAfterRelocation_ = false;
 	unsigned relocations_{};
-	bool dropped_ = false;
 };
 
 #endif /* GENMC_KEPT_EVENT_RUNS_HPP */

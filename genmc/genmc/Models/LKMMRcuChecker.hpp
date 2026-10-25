@@ -37,6 +37,7 @@ public:
 	auto isConsistent(const EventLabel *lab) const -> bool override;
 	auto isConsistent(const ExecutionGraph &g) const -> bool override;
 	auto isConsistentWithSectionsClosed(const ExecutionGraph &g) const -> bool override;
+	void setIntermediateChecks(bool on) override { intermediate_ = on; }
 
 	/* rcu-link and rcu-fence order by po, not ppo: a read of the co-maximal
 	 * write that a revisit leaves before events of its thread (an
@@ -64,6 +65,11 @@ private:
 	/* Combines the generated checker's answer on G with the model's */
 	auto withModel(const ExecutionGraph &g, bool generated, bool closeOpen = false) const
 		-> bool;
+
+private:
+	/* See setIntermediateChecks(): the plain-access rules wait for the
+	 * complete execution */
+	bool intermediate_ = false;
 };
 
 #endif /* GENMC_LKMM_RCU_CHECKER_HPP */

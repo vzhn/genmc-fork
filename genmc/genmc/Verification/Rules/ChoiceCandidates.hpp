@@ -42,6 +42,9 @@ public:
 		bool exhaustive = false;
 		/** -exhaustive under IMM */
 		bool exhaustiveIMM = false;
+		/** -exhaustive under -lkmm: a write may revisit every read it
+		 * does not depend on (see dependencyPrefixView()) */
+		bool keepsDependencies = false;
 	};
 
 	ChoiceCandidates(const ExecutionGraph &g, ConsistencyChecker &model, Options opts)
