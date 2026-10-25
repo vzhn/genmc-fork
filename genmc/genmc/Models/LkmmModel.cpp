@@ -22,6 +22,8 @@
  * RCU events included, as in herd7. GenMC's additions are those of
  * kat/lkmm-genmc.kat in the Kater fork: dependencies reach the write of an
  * RMW (rmw?), and thread creation and join order (thread-po, tc, tj).
+ * herd7's data dependency of a fetch-and-op's write on its read, which
+ * GenMC does not record, is the kat's rmw-data.
  *
  * RCU, as the cat file has it:
  *
@@ -770,7 +772,13 @@ Relations::Relations(const Model &mod, bool full)
 	in = m.sameThread();
 	ext = m.otherThread();
 	auto addr = m.deps(&EventDeps::addr);
-	auto data = m.deps(&EventDeps::data);
+	/* herd7's data has an RMW's own iico_data too, from the read of a
+	 * fetch-and-op (not xchg(), nor cmpxchg()) to its write */
+	auto fopR = m.set([](auto *l) {
+		const auto *fLab = genmc::dyn_cast<FaiReadLabel>(l);
+		return fLab && fLab->getOp() != RMWBinOp::Xchg;
+	});
+	auto data = m.deps(&EventDeps::data) | rmw.dom(fopR);
 	auto ctrl = m.deps(&EventDeps::ctrl);
 	rfe = rf & ext;
 	auto rfi = rf & in;

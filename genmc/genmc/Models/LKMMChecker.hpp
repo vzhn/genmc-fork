@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater v0.4.0-vzhn.2 (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater v0.4.0-vzhn.3 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_LKMM_CHECKER_HPP
@@ -219,27 +219,27 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	void maybeDecreaseCacheCounters(const EventLabel *lab) const override;
 	void maybeIncreaseCacheCounters(const EventLabel *lab) const override;
 
-	mutable NodeStatusVector<uint32_t> visitedCalc125_0;
-	mutable NodeStatusVector<uint32_t> visitedCalc125_1;
-	mutable NodeStatusVector<uint32_t> visitedCalc125_2;
+	mutable NodeStatusVector<uint32_t> visitedCalc128_0;
+	mutable NodeStatusVector<uint32_t> visitedCalc128_1;
+	mutable NodeStatusVector<uint32_t> visitedCalc128_2;
 
-	bool visitCalc125Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
+	bool visitCalc128Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
-	View visitCalc125(const EventLabel *lab) const;
+	View visitCalc128(const EventLabel *lab) const;
 	auto getCohView(const EventLabel *lab) const -> const View & { return lab->view(0); }
 	auto getCohViewIndex() const -> unsigned { return 0; }
 
-	auto checkCalc125(const EventLabel *lab) const;
-	mutable NodeStatusVector<uint32_t> visitedCalc126_0;
-	mutable NodeStatusVector<uint32_t> visitedCalc126_1;
-	mutable NodeStatusVector<uint32_t> visitedCalc126_2;
+	auto checkCalc128(const EventLabel *lab) const;
+	mutable NodeStatusVector<uint32_t> visitedCalc129_0;
+	mutable NodeStatusVector<uint32_t> visitedCalc129_1;
+	mutable NodeStatusVector<uint32_t> visitedCalc129_2;
 
-	bool visitCalc126Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
+	bool visitCalc129Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
-	View visitCalc126(const EventLabel *lab) const;
+	View visitCalc129(const EventLabel *lab) const;
 	auto getHbViewIndex() const -> unsigned { return 1; }
 
-	auto checkCalc126(const EventLabel *lab) const;
+	auto checkCalc129(const EventLabel *lab) const;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_0;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_1;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_2;

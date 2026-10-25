@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater v0.4.0-vzhn.2 (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater v0.4.0-vzhn.3 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -28,7 +28,7 @@
 
 bool LKMMChecker::isDepTracking() const { return 1; }
 
-bool LKMMChecker::visitCalc125Iterative(std::vector<DFSWorklistEntry> &worklist,
+bool LKMMChecker::visitCalc128Iterative(std::vector<DFSWorklistEntry> &worklist,
 					View &calcRes) const
 {
 	while (!worklist.empty()) {
@@ -103,7 +103,7 @@ bool LKMMChecker::visitCalc125Iterative(std::vector<DFSWorklistEntry> &worklist,
 	return true;
 }
 
-View LKMMChecker::visitCalc125(const EventLabel *lab) const
+View LKMMChecker::visitCalc128(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
@@ -115,18 +115,18 @@ View LKMMChecker::visitCalc125(const EventLabel *lab) const
 		{2, lab},
 	};
 
-	visitCalc125Iterative(startStates, calcRes);
+	visitCalc128Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto LKMMChecker::checkCalc125(const EventLabel *lab) const
+auto LKMMChecker::checkCalc128(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc125(lab);
+	return visitCalc128(lab);
 }
 
-bool LKMMChecker::visitCalc126Iterative(std::vector<DFSWorklistEntry> &worklist,
+bool LKMMChecker::visitCalc129Iterative(std::vector<DFSWorklistEntry> &worklist,
 					View &calcRes) const
 {
 	while (!worklist.empty()) {
@@ -217,7 +217,7 @@ bool LKMMChecker::visitCalc126Iterative(std::vector<DFSWorklistEntry> &worklist,
 	return true;
 }
 
-View LKMMChecker::visitCalc126(const EventLabel *lab) const
+View LKMMChecker::visitCalc129(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
@@ -229,15 +229,15 @@ View LKMMChecker::visitCalc126(const EventLabel *lab) const
 		{2, lab},
 	};
 
-	visitCalc126Iterative(startStates, calcRes);
+	visitCalc129Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto LKMMChecker::checkCalc126(const EventLabel *lab) const
+auto LKMMChecker::checkCalc129(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc126(lab);
+	return visitCalc129(lab);
 }
 
 void LKMMChecker::calculateSaved([[maybe_unused]] EventLabel *lab) {}
@@ -248,12 +248,12 @@ void LKMMChecker::calculateViews(EventLabel *lab)
 
 	{
 		lab->addView({});
-		lab->setView(std::move(checkCalc125(lab)), 0);
+		lab->setView(std::move(checkCalc128(lab)), 0);
 	}
 
 	{
 		lab->addView({});
-		lab->setView(std::move(checkCalc126(lab)), 1);
+		lab->setView(std::move(checkCalc129(lab)), 1);
 	}
 }
 
@@ -845,6 +845,48 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic1_2.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(2, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_2,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic1_24.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(24, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_24,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
 
 			break;
 		}
@@ -977,6 +1019,27 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic1_2.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(2, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_2,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    ((genmc::isa<ReadLabel>(pLab) &&
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -990,6 +1053,27 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						   visitedConsAcyclic1Search.reach(
 							   visitedConsAcyclic1_3,
 							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic1_24.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(24, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_24,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2540,6 +2624,32 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic1_2.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(2, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_2,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true) {
@@ -4075,6 +4185,32 @@ bool LKMMChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic1_24.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(24, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_24,
+								   pLab->getStamp().get(), true)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						auto status = visitedConsAcyclic1_24.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -16233,6 +16369,70 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) && pLab->isLkmmMb() &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_20.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(20, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_20,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_21.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(21, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_21,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_22.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(22, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_22,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    ((genmc::isa<ReadLabel>(pLab) &&
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -16245,6 +16445,134 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
 							   visitedConsAcyclic2_29,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_31.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(31, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_31,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_32.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(32, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_32,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_35.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(35, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_35,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<WriteLabel>(pLab) && pLab->isAtLeastRelease() &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_40.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(40, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_40,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_41,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn() &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_43.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(43, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_43,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -16769,6 +17097,112 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) && pLab->isLkmmMb() &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_20.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(20, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_20,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_21.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(21, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_21,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_22.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(22, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_22,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_31.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(31, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_31,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_32.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(32, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_32,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    ((genmc::isa<ReadLabel>(pLab) &&
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -16781,6 +17215,92 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
 							   visitedConsAcyclic2_33,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_35.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(35, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_35,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<WriteLabel>(pLab) && pLab->isAtLeastRelease() &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_40.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(40, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_40,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_41,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn() &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_43.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(43, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_43,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -18288,6 +18808,133 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) && pLab->isLkmmMb() &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_20.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(20, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_20,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_21.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(21, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_21,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_22.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(22, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_22,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_31.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(31, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_31,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_32.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(32, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_32,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_35.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(35, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_35,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<ReadLabel>(pLab) &&
 				    ((genmc::isa<ReadLabel>(pLab) &&
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -18300,6 +18947,71 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
 							   visitedConsAcyclic2_36,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<WriteLabel>(pLab) && pLab->isAtLeastRelease() &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_40.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(40, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_40,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_41.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(41, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_41,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FaiReadLabel>(pLab) &&
+				    static_cast<const FaiReadLabel *>(
+					    static_cast<const EventLabel *>(pLab))
+						    ->getOp() != RMWBinOp::Xchg &&
+				    genmc::isa<ReadLabel>(pLab) && !pLab->isLkmmNoreturn() &&
+				    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_43.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(43, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_43,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -21694,6 +22406,33 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 			     (genmc::isa<WriteLabel>(lab) &&
 			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    genmc::isa<ReadLabel>(pLab) && pLab->isLkmmMb() &&
+					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_20.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(20, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_20,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<LkmmFenceLabel>(pLab) &&
 					    static_cast<const LkmmFenceLabel *>(
 						    static_cast<const EventLabel *>(pLab))
@@ -22830,6 +23569,32 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
 					    genmc::isa<WriteLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_21.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(21, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_21,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						auto status = visitedConsAcyclic2_21.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -24569,6 +25334,32 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 						return false; /* cycle detected */
 					}
 				}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_22.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(22, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_22,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true)
@@ -25866,6 +26657,32 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_31.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(31, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_31,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true) {
@@ -26025,6 +26842,32 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isLkmmMb() && !(pLab->isNotAtomic()) &&
 					    genmc::isa<ReadLabel>(pLab)) {
+						auto status = visitedConsAcyclic2_32.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(32, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_32,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						auto status = visitedConsAcyclic2_32.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -26333,6 +27176,32 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && genmc::isa<WriteLabel>(pLab) &&
 					    pLab->isLkmmMb() && !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_35.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(35, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_35,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						auto status = visitedConsAcyclic2_35.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -27832,6 +28701,34 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    genmc::isa<WriteLabel>(pLab) &&
+					    pLab->isAtLeastRelease() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_40.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(40, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_40,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true)
@@ -28508,6 +29405,32 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 							return false; /* cycle detected */
 						}
 					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    !(pLab->isNotAtomic()) && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic2_41.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(41, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_41,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
 			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab))
 				for (auto &tmp : g.addr_preds(lab))
 					if (auto *pLab = &tmp; true)
@@ -28980,6 +29903,34 @@ bool LKMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &work
 					    !pLab->isLkmmNoreturn() &&
 					    genmc::isa<WriteLabel>(pLab) && pLab->isLkmmMb() &&
 					    !(pLab->isNotAtomic())) {
+						auto status = visitedConsAcyclic2_43.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(43, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_43,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && !(lab->isNotAtomic()) && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<FaiReadLabel>(pLab) &&
+					    static_cast<const FaiReadLabel *>(
+						    static_cast<const EventLabel *>(pLab))
+							    ->getOp() != RMWBinOp::Xchg &&
+					    genmc::isa<ReadLabel>(pLab) &&
+					    !pLab->isLkmmNoreturn() && !(pLab->isNotAtomic()) &&
+					    genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 						auto status = visitedConsAcyclic2_43.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
@@ -30398,6 +31349,22 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
 	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<FaiReadLabel>(pLab) &&
+			    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+					    ->getOp() != RMWBinOp::Xchg &&
+			    genmc::isa<ReadLabel>(pLab) &&
+			    ((genmc::isa<ReadLabel>(pLab) &&
+			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(pLab) &&
+			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+				auto status = visitedPPoRf1[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf1(pLab, pporf);
+			}
+	if (true && genmc::isa<WriteLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<ReadLabel>(pLab) &&
 			    ((genmc::isa<ReadLabel>(pLab) &&
 			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -30624,6 +31591,23 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 					if (status == NodeStatus::unseen)
 						visitPPoRf7(pLab, pporf);
 				}
+	if (true && genmc::isa<WriteLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<FaiReadLabel>(pLab) &&
+			    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+					    ->getOp() != RMWBinOp::Xchg &&
+			    genmc::isa<ReadLabel>(pLab) &&
+			    ((genmc::isa<ReadLabel>(pLab) &&
+			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(pLab) &&
+			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedPPoRf7[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitPPoRf7(pLab, pporf);
+				}
 	if (true && genmc::isa<ReadLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
@@ -30686,6 +31670,22 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.data_preds(lab))
 			if (auto *pLab = &tmp; true) {
+				auto status = visitedPPoRf10[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf10(pLab, pporf);
+			}
+	if (true && genmc::isa<WriteLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<FaiReadLabel>(pLab) &&
+			    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+					    ->getOp() != RMWBinOp::Xchg &&
+			    genmc::isa<ReadLabel>(pLab) &&
+			    ((genmc::isa<ReadLabel>(pLab) &&
+			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(pLab) &&
+			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 				auto status = visitedPPoRf10[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf10(pLab, pporf);
@@ -31503,6 +32503,22 @@ void LKMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
 	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<FaiReadLabel>(pLab) &&
+			    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+					    ->getOp() != RMWBinOp::Xchg &&
+			    genmc::isa<ReadLabel>(pLab) &&
+			    ((genmc::isa<ReadLabel>(pLab) &&
+			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(pLab) &&
+			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+				auto status = visitedPPoRf24[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf24(pLab, pporf);
+			}
+	if (true && genmc::isa<WriteLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<ReadLabel>(pLab) &&
 			    ((genmc::isa<ReadLabel>(pLab) &&
 			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -31655,6 +32671,30 @@ void LKMMChecker::visitPPoRf4(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf4[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf2[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf2(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
@@ -31662,6 +32702,18 @@ void LKMMChecker::visitPPoRf4(const EventLabel *lab, DepView &pporf) const
 			auto status = visitedPPoRf3[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf3(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf24[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf24(pLab, pporf);
 		}
 	visitedPPoRf4[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -31718,6 +32770,30 @@ void LKMMChecker::visitPPoRf6(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf6[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf2[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf2(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
@@ -31725,6 +32801,18 @@ void LKMMChecker::visitPPoRf6(const EventLabel *lab, DepView &pporf) const
 			auto status = visitedPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf5(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf24[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf24(pLab, pporf);
 		}
 	visitedPPoRf6[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -31777,6 +32865,30 @@ void LKMMChecker::visitPPoRf9(const EventLabel *lab, DepView &pporf) const
 
 	visitedPPoRf9[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
@@ -31784,6 +32896,30 @@ void LKMMChecker::visitPPoRf9(const EventLabel *lab, DepView &pporf) const
 			auto status = visitedPPoRf8[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf8(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf10[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf10(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedPPoRf24[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf24(pLab, pporf);
 		}
 	visitedPPoRf9[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -33325,6 +34461,22 @@ void LKMMChecker::visitRPPoRf1(const EventLabel *lab, DepView &pporf) const
 	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
 	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<FaiReadLabel>(pLab) &&
+			    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+					    ->getOp() != RMWBinOp::Xchg &&
+			    genmc::isa<ReadLabel>(pLab) &&
+			    ((genmc::isa<ReadLabel>(pLab) &&
+			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(pLab) &&
+			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+				auto status = visitedRPPoRf1[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitRPPoRf1(pLab, pporf);
+			}
+	if (true && genmc::isa<WriteLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<ReadLabel>(pLab) &&
 			    ((genmc::isa<ReadLabel>(pLab) &&
 			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -33543,6 +34695,23 @@ void LKMMChecker::visitRPPoRf1(const EventLabel *lab, DepView &pporf) const
 					if (status == NodeStatus::unseen)
 						visitRPPoRf7(pLab, pporf);
 				}
+	if (true && genmc::isa<WriteLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<FaiReadLabel>(pLab) &&
+			    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+					    ->getOp() != RMWBinOp::Xchg &&
+			    genmc::isa<ReadLabel>(pLab) &&
+			    ((genmc::isa<ReadLabel>(pLab) &&
+			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(pLab) &&
+			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedRPPoRf7[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitRPPoRf7(pLab, pporf);
+				}
 	if (true && genmc::isa<ReadLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && !(genmc::isa<MemAccessLabel>(pLab) && pLab->isNotAtomic()) &&
@@ -33605,6 +34774,22 @@ void LKMMChecker::visitRPPoRf1(const EventLabel *lab, DepView &pporf) const
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.data_preds(lab))
 			if (auto *pLab = &tmp; true) {
+				auto status = visitedRPPoRf10[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitRPPoRf10(pLab, pporf);
+			}
+	if (true && genmc::isa<WriteLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<FaiReadLabel>(pLab) &&
+			    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+					    ->getOp() != RMWBinOp::Xchg &&
+			    genmc::isa<ReadLabel>(pLab) &&
+			    ((genmc::isa<ReadLabel>(pLab) &&
+			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(pLab) &&
+			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
 				auto status = visitedRPPoRf10[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitRPPoRf10(pLab, pporf);
@@ -34415,6 +35600,22 @@ void LKMMChecker::visitRPPoRf1(const EventLabel *lab, DepView &pporf) const
 	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
 	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (true && genmc::isa<FaiReadLabel>(pLab) &&
+			    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+					    ->getOp() != RMWBinOp::Xchg &&
+			    genmc::isa<ReadLabel>(pLab) &&
+			    ((genmc::isa<ReadLabel>(pLab) &&
+			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(pLab) &&
+			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+				auto status = visitedRPPoRf24[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitRPPoRf24(pLab, pporf);
+			}
+	if (true && genmc::isa<WriteLabel>(lab) &&
+	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (true && genmc::isa<ReadLabel>(pLab) &&
 			    ((genmc::isa<ReadLabel>(pLab) &&
 			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -34567,6 +35768,30 @@ void LKMMChecker::visitRPPoRf4(const EventLabel *lab, DepView &pporf) const
 
 	visitedRPPoRf4[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedRPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitRPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedRPPoRf2[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitRPPoRf2(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
@@ -34574,6 +35799,18 @@ void LKMMChecker::visitRPPoRf4(const EventLabel *lab, DepView &pporf) const
 			auto status = visitedRPPoRf3[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitRPPoRf3(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedRPPoRf24[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitRPPoRf24(pLab, pporf);
 		}
 	visitedRPPoRf4[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -34630,6 +35867,30 @@ void LKMMChecker::visitRPPoRf6(const EventLabel *lab, DepView &pporf) const
 
 	visitedRPPoRf6[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedRPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitRPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedRPPoRf2[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitRPPoRf2(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
@@ -34637,6 +35898,18 @@ void LKMMChecker::visitRPPoRf6(const EventLabel *lab, DepView &pporf) const
 			auto status = visitedRPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitRPPoRf5(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedRPPoRf24[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitRPPoRf24(pLab, pporf);
 		}
 	visitedRPPoRf6[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -34689,6 +35962,30 @@ void LKMMChecker::visitRPPoRf9(const EventLabel *lab, DepView &pporf) const
 
 	visitedRPPoRf9[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedRPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitRPPoRf1(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) && genmc::dyn_cast<WriteLabel>(pLab)->isRMW())))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedRPPoRf7[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitRPPoRf7(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
@@ -34696,6 +35993,30 @@ void LKMMChecker::visitRPPoRf9(const EventLabel *lab, DepView &pporf) const
 			auto status = visitedRPPoRf8[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitRPPoRf8(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedRPPoRf10[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitRPPoRf10(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<FaiReadLabel>(pLab) &&
+		    static_cast<const FaiReadLabel *>(static_cast<const EventLabel *>(pLab))
+				    ->getOp() != RMWBinOp::Xchg &&
+		    genmc::isa<ReadLabel>(pLab) &&
+		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+		     (genmc::isa<WriteLabel>(pLab) &&
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+			auto status = visitedRPPoRf24[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitRPPoRf24(pLab, pporf);
 		}
 	visitedRPPoRf9[lab->getStamp().get()] = NodeStatus::left;
 }
