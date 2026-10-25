@@ -508,8 +508,10 @@ RC_GTEST_PROP(ScriptedDriverExhaustive, RC11MatchesTheReference, ())
  * Under each: no invariant fails, every counted execution satisfies the
  * model (I5), and the number of executions does not depend on the policy
  * (it is the set of graphs, whatever order the threads run in).
- * Under LKMM the default exploration may miss executions (#77) and explore
- * some twice (#230), so its count is not compared. #223 (a crash under -lkmm, which explores
+ * Under LKMM the default exploration may miss executions (#77) and, here,
+ * explore some twice: the scripted programs give a CAS no control
+ * dependency to the events after it, which the interpreter adds (#230). Its
+ * count is not compared. #223 (a crash under -lkmm, which explores
  * as -exhaustive does) came from a combination of model and mode that no
  * test ran; IMM's default exploration is left out until #227 is resolved.
  */
