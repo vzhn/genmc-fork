@@ -85,9 +85,6 @@ correct infr/imm-parallel-copy imm -nthreads=2
 # section closed (issue #201)
 correct lkmm/rcu-assert-inside lkmm
 correct lkmm/srcu-assert-inside lkmm
-# I5 under TSO: the checker's whole-graph check walks plain writes, which
-# are not in coherence
-correct infr/tso-plain-write-check tso
 # I6: an error found as a read is added is checked without the read, which
 # has no rf yet (issue #221)
 for model in sc rc11 imm; do
@@ -100,4 +97,7 @@ for model in rc11 imm; do
 	# I2: no stale replay across the tasks of a worker (PR #19)
 	wrong safety/parallel-error-report "${model}" "Safety violation" -nthreads=4
 done
+# I5 under TSO: the checker's whole-graph check walks plain writes, which
+# are not in coherence
+correct infr/tso-plain-write-check tso
 exit ${status}
