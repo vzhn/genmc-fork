@@ -530,6 +530,13 @@ public:
 		return std::ranges::subrange(++co_iterator(lab), coherence[lab->getAddr()].end());
 	}
 
+	/* Whether LAB is a non-atomic write that is not in coherence */
+	static auto isOutsideCo(const EventLabel *lab) -> bool
+	{
+		const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
+		return wLab && wLab->isNotAtomic() && !wLab->isInCo();
+	}
+
 	auto co_succs(const EventLabel *lab) const
 	{
 		using RangeType = decltype(co_succs(static_cast<const WriteLabel *>(nullptr)));
@@ -545,8 +552,14 @@ public:
 		return wLab ? co_succs(wLab) : RangeType{};
 	}
 
+	/* A non-atomic write that is not in coherence (plain writes are placed in
+	 * it only when GenMC explores plain accesses, see handleNAStore()) has no
+	 * neighbours in it. The generated checkers' whole-graph checks walk every
+	 * write: -tso -check-invariants crashed on such a write */
 	auto co_imm_succ(const EventLabel *lab) const -> const WriteLabel *
 	{
+		if (isOutsideCo(lab))
+			return nullptr;
 		auto succs = co_succs(lab);
 		return succs.begin() == succs.end() ? nullptr : &*succs.begin();
 	}
@@ -579,6 +592,8 @@ public:
 
 	auto co_imm_pred(const EventLabel *lab) const -> const WriteLabel *
 	{
+		if (isOutsideCo(lab))
+			return nullptr;
 		auto preds = co_preds(lab);
 		return preds.begin() == preds.end() ? nullptr : &*preds.begin();
 	}
