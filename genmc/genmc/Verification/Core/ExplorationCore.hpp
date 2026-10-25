@@ -373,7 +373,7 @@ protected:
 	/* Checks the whole graph if an event went before kept ones during the
 	 * run; if it is inconsistent, moots the run and has it repeated with
 	 * eager checks. Returns whether the run stands */
-	bool checkPendingKept();
+	bool checkPendingKept(const ExecutionGraph &g);
 
 	auto executionExceedsBound(BoundCalculationStrategy strategy) const -> bool;
 
@@ -414,6 +414,11 @@ private:
 
 	/** If LAB accesses improperly initialized memory, reports an error */
 	auto checkInitializedMem(const WriteLabel *lab) -> std::optional<VerificationError>;
+
+	/** The graph of an error without the events still pending when it was
+	 * found (a read with no rf, a store not in coherence), or nullptr if no
+	 * event is pending */
+	auto getErrorPrefix(const ExecutionGraph &g) const -> std::unique_ptr<ExecutionGraph>;
 
 	/** Whether the graph of an error is consistent once its open read-side
 	 * critical sections are closed (see reportError()) */
