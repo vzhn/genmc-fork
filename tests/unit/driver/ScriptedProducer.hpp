@@ -292,6 +292,7 @@ private:
 			const auto *res = std::get_if<GenMCDriver::CasReadResult>(&r.result);
 			if (!res)
 				break;
+			orderAfterOrderedCas(tid, pos.next(), op.ord);
 			if (!res->success) {
 				orderAfterExclusiveRead(tid, pos.next());
 				++pc_[tid];
@@ -347,6 +348,16 @@ private:
 	void orderAfterExclusiveRead(int tid, Event read)
 	{
 		if (!driver_.scopesCtrlDeps())
+			ctrl_[tid].update(DepInfo(read));
+	}
+
+	/* As the interpreter does under LKMM (updateCasCtrlDeps()): a failed CAS
+	 * orders nothing, a successful one with an ordering other than relaxed
+	 * orders the events after it, which then depend on whether it
+	 * succeeds (#230, #234) */
+	void orderAfterOrderedCas(int tid, Event read, MemOrdering ord)
+	{
+		if (driver_.scopesCtrlDeps() && ord != MemOrdering::Relaxed)
 			ctrl_[tid].update(DepInfo(read));
 	}
 
