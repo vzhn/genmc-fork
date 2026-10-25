@@ -25,7 +25,8 @@
  * reads added after an RMW that conflicts with SLAB. With ALL (-exhaustive),
  * every such read is a candidate, and BackwardRevisits::keepsConflictingRMW()
  * drops the revisits whose graph would violate atomicity */
-static auto getRevisitable(WriteLabel *sLab, const VectorClock &before, bool all)
+static auto getRevisitable(WriteLabel *sLab, const VectorClock &before, bool all,
+			   bool depTracking)
 	-> std::vector<ReadLabel *>
 {
 	auto &g = *sLab->getParent();
@@ -41,8 +42,17 @@ static auto getRevisitable(WriteLabel *sLab, const VectorClock &before, bool all
 		std::erase_if(loads,
 			      [&](auto &eLab) { return eLab->getStamp() > confLab->getStamp(); });
 	};
-	auto candidate = [all, &before](const ReadLabel &rLab) {
-		return (all || !rLab.isStable()) && !before.contains(rLab.getPos());
+	/* A read that was not added maximally is no candidate (TruSt: the graph
+	 * where it read the maximal write revisits it), except under the
+	 * dependency-tracking models. There a revisit keeps the write's prefix,
+	 * which may keep later accesses of the read's thread: they bound the
+	 * writes the read can read, and the read may read the maximal one of
+	 * those although it did not read the maximal one when it was added.
+	 * isMaximalExtension() judges it against that bound
+	 * (isPlacedMaximallyInRevisit()) */
+	auto candidate = [all, depTracking, &before](const ReadLabel &rLab) {
+		auto stable = depTracking ? !rLab.isRevisitable() : rLab.isStable();
+		return (all || !stable) && !before.contains(rLab.getPos());
 	};
 
 	/* Fastpath: previous co-max is ppo-before SLAB */
@@ -189,7 +199,7 @@ auto ChoiceCandidates::revisitableReads(WriteLabel *sLab) const -> std::vector<R
 	/* (Computed for the other models' checkers, see above) */
 	prefixView(model_, sLab);
 	auto prefix = revisitPrefixView(model_, opts_.scopesCtrlDeps, sLab);
-	auto loads = getRevisitable(sLab, *prefix, opts_.exhaustive);
+	auto loads = getRevisitable(sLab, *prefix, opts_.exhaustive, opts_.depTracking);
 	model_.filterCoherentRevisits(sLab, loads);
 	if (opts_.exhaustiveIMM)
 		addRevisitableCases(sLab, *prefix, loads);

@@ -1,0 +1,4 @@
+ |
+-schedule-policy=arbitrary -schedule-seed=2 |
+-schedule-policy=arbitrary -schedule-seed=3 |
+-schedule-policy=wfr -schedule-seed=1 |
