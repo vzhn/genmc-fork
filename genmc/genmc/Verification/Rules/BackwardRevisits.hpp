@@ -122,11 +122,13 @@ private:
 
 	/** -exhaustive, without keepValueDependencies() (-lkmm): V extended
 	 * so that every RMW write it keeps has its read (and what that reads
-	 * from), without the write part of RLAB; null if that needs RLAB or a
-	 * kept read reads RLAB's write part. KEPT (if given) tells whether
-	 * a read was added */
-	auto keepRMWReads(const ReadLabel *rLab, std::unique_ptr<VectorClock> v,
-			  bool *kept) const -> std::unique_ptr<VectorClock>;
+	 * from), without the write part of RLAB unless a kept read reads it
+	 * and reading SLAB leaves its value as it is; null if that needs RLAB,
+	 * or if a kept read reads a write part of RLAB that reading SLAB
+	 * changes. KEPT (if given) tells whether a read was added */
+	auto keepRMWReads(const ReadLabel *rLab, const WriteLabel *sLab,
+			  std::unique_ptr<VectorClock> v, bool *kept) const
+		-> std::unique_ptr<VectorClock>;
 
 	auto getPrefixView(const EventLabel *lab) const -> const VectorClock &
 	{
