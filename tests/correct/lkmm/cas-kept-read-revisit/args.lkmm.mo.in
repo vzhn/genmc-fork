@@ -1,0 +1,6 @@
+ |
+-schedule-policy=ltr |
+-schedule-policy=wfr -schedule-seed=3 |
+-schedule-policy=wfr -schedule-seed=4 |
+-schedule-policy=arbitrary -schedule-seed=4 |
+-lkmm-reference -schedule-policy=wfr -schedule-seed=6 |
