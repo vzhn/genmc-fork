@@ -1,0 +1,4 @@
+ |
+-schedule-policy=wfr |
+-exhaustive |
+-exhaustive -schedule-policy=ltr |

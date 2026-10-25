@@ -1,0 +1,6 @@
+ |
+-schedule-policy=ltr |
+-schedule-policy=wfr |
+-schedule-policy=arbitrary -schedule-seed=2 |
+-exhaustive |
+-exhaustive -schedule-policy=arbitrary -schedule-seed=2 |

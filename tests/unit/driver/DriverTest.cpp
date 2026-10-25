@@ -589,9 +589,10 @@ RC_GTEST_PROP(ScriptedDriverMatrix, LKMM, ())
 }
 
 /* Larger programs (four threads of four accesses): the number of executions
- * under IMM and LKMM depends on the scheduling policy (#228, found by these;
- * enable once it is fixed: --gtest_also_run_disabled_tests). About 7 minutes
- * for 300 cases of each */
+ * under IMM and LKMM depended on the scheduling policy (#228, found by these).
+ * IMM's case is fixed (tests/correct/infr/imm-co-revisit-hole-read), LKMM's
+ * is not; run with --gtest_also_run_disabled_tests. About 2 minutes for 600
+ * cases of IMM */
 RC_GTEST_PROP(ScriptedDriverMatrixLarge, DISABLED_IMMExhaustive, ())
 {
 	checkMatrix(*genProgram(false, 4, 4), ModelType::IMM, false);

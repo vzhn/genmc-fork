@@ -45,10 +45,16 @@ static auto getRevisitable(WriteLabel *sLab, const VectorClock &before, bool all
 		return (all || !rLab.isStable()) && !before.contains(rLab.getPos());
 	};
 
-	/* Fastpath: previous co-max is ppo-before SLAB */
+	/* Fastpath: SLAB is co-maximal and the previous co-max is ppo-before
+	 * it. Not for a write placed before others in coherence (a coherence
+	 * revisit, see revisitWrite()): the readers of the writes co-before it
+	 * can read from it too (#228: under IMM, a read filled into a hole
+	 * before a kept write of its thread, which only SLAB placed co-before
+	 * that write can revisit) */
 	auto prevCoMaxIt = std::ranges::find_if(
 		g.rco(sLab->getAddr()), [&](auto &lab) { return lab.getPos() != sLab->getPos(); });
-	if (prevCoMaxIt != std::ranges::end(g.rco(sLab->getAddr())) &&
+	if (g.co_max(sLab->getAddr()) == sLab &&
+	    prevCoMaxIt != std::ranges::end(g.rco(sLab->getAddr())) &&
 	    before.contains(prevCoMaxIt->getPos())) {
 		for (auto &rLab : prevCoMaxIt->readers()) {
 			if (candidate(rLab))
