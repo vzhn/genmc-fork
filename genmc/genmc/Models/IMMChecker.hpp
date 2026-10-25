@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/imm-genmc.kat, Kater 914a4ed (scripts/lkmm/kater-export.sh).
+ * From kat/imm-genmc.kat, Kater v0.4.0-vzhn.1 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_IMM_CHECKER_HPP
@@ -21,6 +21,7 @@
 
 #include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Models/ConsistencyChecker.hpp"
+#include <algorithm>
 #include <concepts>
 #include <cstdint>
 #include <vector>
@@ -75,83 +76,119 @@ private:
 		T baseStatus{};
 	};
 
-	class NodeVisitStatusVector {
-	private:
-		struct NodeVisitStatus {
-			NodeVisitStatus() = default;
-			NodeVisitStatus(uint32_t count, uint32_t status)
-				: count(count), status(status)
-			{}
-			uint32_t count{};
-			uint32_t status{};
-		};
-
+	/* Tarjan's algorithm, for the acyclicity checks: each node keeps its
+	 * index, the least index it reaches (its lowlink), the number of
+	 * starting nodes on the stack up to it, and the node it was reached
+	 * from. A node is `entered` while it is on the stack, and `left` once
+	 * its component is complete */
+	class NodeSCCVector {
 	public:
-		NodeVisitStatusVector() = default;
-		NodeVisitStatusVector(size_t size)
-			: visited(size), baseStatus(0), baseCount(0), currIterationMaxCount(0)
-		{}
+		struct Node {
+			uint32_t status{};
+			uint32_t index{};
+			uint32_t lowlink{};
+			uint32_t starting{};
+			Node *parent{};
+
+			/* left is entered + 1 */
+			void leave() { ++status; }
+		};
 
 		[[nodiscard]] auto getStatus(size_t i) const -> NodeStatus
 		{
-			auto status = visited[i].status;
+			auto status = nodes[i].status;
 			if (status < baseStatus)
 				return NodeStatus::unseen;
 			return static_cast<NodeStatus>(status - baseStatus);
 		}
 
-		void setStatus(size_t i, NodeStatus s)
-		{
-			visited[i].status = baseStatus + static_cast<uint32_t>(s);
-		}
+		[[nodiscard]] auto get(size_t i) const -> const Node & { return nodes[i]; }
 
-		[[nodiscard]] auto getCount(size_t i) const -> uint32_t
+		auto enter(size_t i, uint32_t index, uint32_t starting, Node *parent) -> Node *
 		{
-			auto count = visited[i].count;
-			if (count < baseCount)
-				return 0;
-			return count - baseCount;
-		}
-
-		auto setCountIncr(size_t i, uint32_t count)
-		{
-			const uint32_t newCount = baseCount + count;
-			visited[i].count = newCount;
-			currIterationMaxCount = std::max(currIterationMaxCount, newCount);
-		}
-
-		void setIncr(size_t i, uint32_t count, NodeStatus status)
-		{
-			setCountIncr(i, count);
-			setStatus(i, status);
-		}
-
-		void set(size_t i, uint32_t count, NodeStatus status)
-		{
-			visited[i].count = baseCount + count;
-			setStatus(i, status);
+			nodes[i] = {baseStatus + static_cast<uint32_t>(NodeStatus::entered), index,
+				    index, starting, parent};
+			return &nodes[i];
 		}
 
 		void maybeClearResize(size_t newSize)
 		{
-			if (baseStatus >= UINT32_MAX - 6 ||
-			    currIterationMaxCount > UINT32_MAX / 2) {
-				visited.clear();
+			if (baseStatus >= UINT32_MAX - 6) {
+				nodes.clear();
 				baseStatus = 0;
-				baseCount = 0;
 			} else {
 				baseStatus += 3;
-				baseCount = currIterationMaxCount;
 			}
-			currIterationMaxCount = 0;
-			visited.resize(newSize);
+			nodes.resize(newSize);
 		}
 
 	private:
-		mutable std::vector<NodeVisitStatus> visited;
+		std::vector<Node> nodes;
 		uint32_t baseStatus{};
-		uint32_t baseCount{};
-		uint32_t currIterationMaxCount{};
+	};
+
+	/* The search for a cycle through a starting node. The nodes on the stack
+	 * from any node an edge leads back to are all in the edge's component, so
+	 * the edge closes such a cycle iff a starting node is among them. The
+	 * stack is kept as the nodes being explored, innermost first through
+	 * their parents, and apart, the explored ones that are not the root of
+	 * their component */
+	class SCCSearch {
+	public:
+		void reset()
+		{
+			explored = nullptr;
+			pending.clear();
+			index = 0;
+			starting = 0;
+		}
+
+		/* Puts node I of NODES on the stack, to explore it */
+		[[gnu::always_inline]] void enter(NodeSCCVector &nodes, size_t i, bool isStarting)
+		{
+			starting += static_cast<uint32_t>(isStarting);
+			explored = nodes.enter(i, index++, starting, explored);
+		}
+
+		/* The node explored has an edge to node I of NODES, which is on the
+		 * stack: returns whether the edge closes a cycle through a starting node */
+		[[gnu::always_inline]] auto reach(const NodeSCCVector &nodes, size_t i,
+						  bool isStarting) -> bool
+		{
+			const auto &n = nodes.get(i);
+			if (starting > n.starting || isStarting)
+				return true;
+			explored->lowlink = std::min(explored->lowlink, n.index);
+			return false;
+		}
+
+		/* Done exploring the innermost node explored: if it reaches nothing
+		 * below it on the stack, its component, it and the nodes above it,
+		 * is complete. Its only starting node can be itself, alone: the
+		 * search stops at any cycle through one */
+		[[gnu::always_inline]] void finish(bool isStarting)
+		{
+			auto *n = explored;
+			explored = n->parent;
+			if (n->lowlink < n->index) {
+				explored->lowlink = std::min(explored->lowlink, n->lowlink);
+				pending.push_back(n);
+				return;
+			}
+			starting -= static_cast<uint32_t>(isStarting);
+			n->leave();
+			while (!pending.empty() && pending.back()->index > n->index) {
+				pending.back()->leave();
+				pending.pop_back();
+			}
+		}
+
+	private:
+		NodeSCCVector::Node *explored{}; /* the innermost node being explored */
+		std::vector<NodeSCCVector::Node *>
+			pending; /* explored, in a component not complete */
+		uint32_t index{};
+		uint32_t starting{}; /* the starting nodes on the stack */
 	};
 
 public:
@@ -241,27 +278,27 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 
 	bool visitCoherenceRelinche(const ExecutionGraph &g) const;
 
-	mutable NodeVisitStatusVector visitedConsAcyclic1_0;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_1;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_2;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_3;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_4;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_5;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_6;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_7;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_8;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_9;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_10;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_11;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_12;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_13;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_14;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_15;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_16;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_17;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_18;
-	mutable NodeVisitStatusVector visitedConsAcyclic1_19;
-	mutable uint32_t visitedConsAcyclic1Accepting;
+	mutable NodeSCCVector visitedConsAcyclic1_0;
+	mutable NodeSCCVector visitedConsAcyclic1_1;
+	mutable NodeSCCVector visitedConsAcyclic1_2;
+	mutable NodeSCCVector visitedConsAcyclic1_3;
+	mutable NodeSCCVector visitedConsAcyclic1_4;
+	mutable NodeSCCVector visitedConsAcyclic1_5;
+	mutable NodeSCCVector visitedConsAcyclic1_6;
+	mutable NodeSCCVector visitedConsAcyclic1_7;
+	mutable NodeSCCVector visitedConsAcyclic1_8;
+	mutable NodeSCCVector visitedConsAcyclic1_9;
+	mutable NodeSCCVector visitedConsAcyclic1_10;
+	mutable NodeSCCVector visitedConsAcyclic1_11;
+	mutable NodeSCCVector visitedConsAcyclic1_12;
+	mutable NodeSCCVector visitedConsAcyclic1_13;
+	mutable NodeSCCVector visitedConsAcyclic1_14;
+	mutable NodeSCCVector visitedConsAcyclic1_15;
+	mutable NodeSCCVector visitedConsAcyclic1_16;
+	mutable NodeSCCVector visitedConsAcyclic1_17;
+	mutable NodeSCCVector visitedConsAcyclic1_18;
+	mutable NodeSCCVector visitedConsAcyclic1_19;
+	mutable SCCSearch visitedConsAcyclic1Search;
 
 	bool visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 
@@ -274,25 +311,25 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	bool visitUnlessConsAcyclic1(const EventLabel *lab) const;
 	bool checkConsAcyclic1(const EventLabel *lab) const;
 	bool checkConsAcyclic1(const ExecutionGraph &g) const;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_0;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_1;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_2;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_3;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_4;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_5;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_6;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_7;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_8;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_9;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_10;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_11;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_12;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_13;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_14;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_15;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_16;
-	mutable NodeVisitStatusVector visitedConsAcyclic2_17;
-	mutable uint32_t visitedConsAcyclic2Accepting;
+	mutable NodeSCCVector visitedConsAcyclic2_0;
+	mutable NodeSCCVector visitedConsAcyclic2_1;
+	mutable NodeSCCVector visitedConsAcyclic2_2;
+	mutable NodeSCCVector visitedConsAcyclic2_3;
+	mutable NodeSCCVector visitedConsAcyclic2_4;
+	mutable NodeSCCVector visitedConsAcyclic2_5;
+	mutable NodeSCCVector visitedConsAcyclic2_6;
+	mutable NodeSCCVector visitedConsAcyclic2_7;
+	mutable NodeSCCVector visitedConsAcyclic2_8;
+	mutable NodeSCCVector visitedConsAcyclic2_9;
+	mutable NodeSCCVector visitedConsAcyclic2_10;
+	mutable NodeSCCVector visitedConsAcyclic2_11;
+	mutable NodeSCCVector visitedConsAcyclic2_12;
+	mutable NodeSCCVector visitedConsAcyclic2_13;
+	mutable NodeSCCVector visitedConsAcyclic2_14;
+	mutable NodeSCCVector visitedConsAcyclic2_15;
+	mutable NodeSCCVector visitedConsAcyclic2_16;
+	mutable NodeSCCVector visitedConsAcyclic2_17;
+	mutable SCCSearch visitedConsAcyclic2Search;
 
 	bool visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 

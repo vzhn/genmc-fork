@@ -1,7 +1,7 @@
-# sha256 of the Kater models proofs/alloy/open-section.als transcribes (Kater 914a4ed)
+# sha256 of the Kater models proofs/alloy/open-section.als transcribes (Kater v0.4.0-vzhn.1)
 # scripts/check-alloy-proofs.sh compares them when KATER_SRC points to a Kater checkout
 f997dd87aadfb62c37cfba17908202f8e0c7065e16f12d55f119ac810441aea2  kat/sc-genmc.kat
 e7c7a33a3a9f3ee29f5478f2cad25a92f7db78048f25fd3129730a88be935c0b  kat/tso-genmc.kat
 c2a3b1fccaac5da1d1067c263b2b370a9b3e191cf478360e2dba3478363d87a0  kat/ra-genmc.kat
 3b6442859ee9f32c7b2ce015f8db404c3dc2c4802bc4ef54e47fba9c557c9057  kat/rc11-genmc.kat
-0da976e9a7dac557e0f13230f998a54a388a5b4bf67413d8621d07051db80f7c  kat/lkmm-genmc.kat
+7cde6f6212b1a4431abf6221d9ba779ce3be1d291ce1b77442dee2d2f86d0c82  kat/lkmm-genmc.kat

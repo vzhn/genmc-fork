@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/sc-genmc.kat, Kater 914a4ed (scripts/lkmm/kater-export.sh).
+ * From kat/sc-genmc.kat, Kater v0.4.0-vzhn.1 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -1094,27 +1094,21 @@ bool SCChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &workli
 		switch (stateId) {
 		case 0: {
 			if (isFinishing) {
-				--visitedConsAcyclic1Accepting;
-				visitedConsAcyclic1_0.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
+				visitedConsAcyclic1Search.finish(true);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_0.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				++visitedConsAcyclic1Accepting;
-				visitedConsAcyclic1_0.setIncr(lab->getStamp().get(),
-							      visitedConsAcyclic1Accepting,
-							      NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_0,
+								lab->getStamp().get(), true);
 				worklist.emplace_back(0, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_0.getCount(lab->getStamp().get()) ||
-				    1)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_0,
+								   lab->getStamp().get(), true)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -1125,10 +1119,9 @@ bool SCChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &workli
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(0, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_0.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_0,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -1139,10 +1132,9 @@ bool SCChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &workli
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(0, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_0.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_0,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -1152,10 +1144,9 @@ bool SCChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &workli
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(0, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_0.getCount(
-							    pLab->getStamp().get()) ||
-					    1)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_0,
+									   pLab->getStamp().get(),
+									   true)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -1165,10 +1156,9 @@ bool SCChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &workli
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(0, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_0.getCount(
-							    pLab->getStamp().get()) ||
-					    1)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_0,
+									   pLab->getStamp().get(),
+									   true)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -1178,10 +1168,9 @@ bool SCChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &workli
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(0, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_0.getCount(
-							    pLab->getStamp().get()) ||
-					    1)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_0,
+									   pLab->getStamp().get(),
+									   true)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -1191,10 +1180,9 @@ bool SCChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &workli
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(0, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_0.getCount(
-							    pLab->getStamp().get()) ||
-					    1)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_0,
+									   pLab->getStamp().get(),
+									   true)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -1204,10 +1192,9 @@ bool SCChecker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &workli
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(0, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_0.getCount(
-							    pLab->getStamp().get()) ||
-					    1)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_0,
+									   pLab->getStamp().get(),
+									   true)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -1225,7 +1212,7 @@ bool SCChecker::visitConsAcyclic1(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedConsAcyclic1Accepting = 0;
+	visitedConsAcyclic1Search.reset();
 	visitedConsAcyclic1_0.maybeClearResize(g.getMaxStamp().get() + 1);
 
 	/* States we need to explore from using DFS */
@@ -1238,7 +1225,7 @@ bool SCChecker::visitConsAcyclic1(const EventLabel *lab) const
 
 bool SCChecker::visitConsAcyclic1Full(const ExecutionGraph &g) const
 {
-	visitedConsAcyclic1Accepting = 0;
+	visitedConsAcyclic1Search.reset();
 	visitedConsAcyclic1_0.maybeClearResize(g.getMaxStamp().get() + 1);
 
 	auto exploreLab = [&](auto &lab) {
