@@ -141,6 +141,11 @@ static llvm::cl::opt<bool> clDisableFinalWrite("disable-final-write", llvm::cl::
 static llvm::cl::opt<bool> clPrintErrorTrace("print-error-trace", llvm::cl::cat(clGeneral),
 					     llvm::cl::desc("Print error trace"));
 
+static llvm::cl::opt<bool> clPrintAddresses(
+	"print-addresses", llvm::cl::cat(clGeneral),
+	llvm::cl::desc("Print the address of each access, and the block of each allocation "
+		       "and free, in the printed graphs"));
+
 static llvm::cl::opt<std::string>
 	clDotGraphFile("dump-error-graph", llvm::cl::init(""), llvm::cl::value_desc("file"),
 		       llvm::cl::cat(clGeneral),
@@ -505,6 +510,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.confirmation = clConfirmation;
 	conf.finalWrite = !clDisableFinalWrite;
 	conf.printErrorTrace = clPrintErrorTrace;
+	conf.printAddresses = clPrintAddresses;
 	conf.checkLiveness = clCheckLiveness;
 	conf.lkmmReference = clLkmmReference;
 	/* Under LKMM, the prefix of an event can depend on the path of a branch

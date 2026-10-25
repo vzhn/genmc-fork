@@ -48,6 +48,7 @@ struct Config {
 	bool lkmmReference{};
 	bool checkReplayKeys{};
 	bool printErrorTrace{};
+	bool printAddresses{};
 	std::string dotFile;
 	bool instructionCaching{};
 	bool disableRaceDetection{};

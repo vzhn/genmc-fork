@@ -295,7 +295,8 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		    }))
 			++result.spinBlocked;
 		if (getConf()->printBlockedExecs)
-			printGraph(g, errorReplay_->dbgInfo());
+			printGraph(g, errorReplay_->dbgInfo(), std::cerr,
+				   getConf()->printAddresses);
 		if (const auto err = checkExhaustiveRace())
 			return err;
 		if (getConf()->checkLiveness)
@@ -342,7 +343,7 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		return {};
 	}
 	if (getConf()->printExecGraphs)
-		printGraph(g, errorReplay_->dbgInfo());
+		printGraph(g, errorReplay_->dbgInfo(), std::cerr, getConf()->printAddresses);
 
 	GENMC_DEBUG(if (getConf()->boundsHistogram && inVerificationMode()) trackExecutionBound(););
 

@@ -26,19 +26,22 @@ class EventLabel;
 class ExecutionGraph;
 class VectorClock;
 
-/** Pretty-prints an execution graph according to the available debugging info */
-void printGraph(const ExecutionGraph &g, const GraphDbgInfo &dbgInfo,
-		std::ostream &s = std::cerr);
+/** Pretty-prints an execution graph according to the available debugging info
+ * (with PRINTADDRS, each access with its address, and each allocation and free
+ * with the block it allocates or frees) */
+void printGraph(const ExecutionGraph &g, const GraphDbgInfo &dbgInfo, std::ostream &s = std::cerr,
+		bool printAddrs = false);
 
 /** Uses available debugging information to print the trace of source-code
  * instructions up to LAB */
 void printTraceBefore(const GraphDbgInfo &dbgInfo, const EventLabel *lab,
 		      std::ostream &s = std::cerr);
 
-/** The report of the error DETAILS on G: its kind, where it is, the graph,
- * the source trace up to it (with PRINTTRACE) and its message */
-auto errorReport(const ExecutionGraph &g, const ErrorDetails &details,
-		 const GraphDbgInfo &dbgInfo, bool printTrace) -> std::string;
+/** The report of the error DETAILS on G: its kind, where it is, the graph
+ * (with addresses if PRINTADDRS), the source trace up to it (with PRINTTRACE)
+ * and its message */
+auto errorReport(const ExecutionGraph &g, const ErrorDetails &details, const GraphDbgInfo &dbgInfo,
+		 bool printTrace, bool printAddrs = false) -> std::string;
 
 /** Outputs the current graph into a file (DOT format),
  * and visually marks events e and c (conflicting).
@@ -46,6 +49,6 @@ auto errorReport(const ExecutionGraph &g, const ErrorDetails &details,
 void dotPrintToFile(const std::string &filename, EventLabel *errLab,
 		    std::unique_ptr<VectorClock> errView, const EventLabel *confLab,
 		    std::unique_ptr<VectorClock> confView, const ConsistencyChecker *checker,
-		    const GraphDbgInfo &dbgInfo, bool printObservation);
+		    const GraphDbgInfo &dbgInfo, bool printObservation, bool printAddrs = false);
 
 #endif /* GENMC_GRAPH_PRINTING_HPP */

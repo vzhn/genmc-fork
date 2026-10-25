@@ -273,6 +273,14 @@ released.
 
 ### Added
 
+- `-print-addresses`: the printed graphs (the error graph,
+  `-dump-error-graph`, `-print-exec-graphs`) show the address of each
+  access, as in `Wna (@H#(0, 52), 0)`, and the block each allocation and
+  free spans, as in `MALLOC  @H#(0, 48) size=8` and `FREE @H#(0, 48) size=8`.
+  A heap access was printed with an empty name, or one guessed from the
+  allocation site, so a tool reading the graph could not tell which block
+  an access or a free touches. Off by default: the graphs are unchanged
+  without it (`scripts/check-print-addresses.sh`, ctest `print-addresses`).
 - The other integer `__VERIFIER_nondet_X()` of SV-COMP (#48): `bool`,
   `char`, `uchar`, `short`, `ushort`, `uint`, `unsigned`, `long`, `ulong`,
   `longlong`, `ulonglong`, `size_t`, `int128` and `uint128`, declared in
