@@ -39,6 +39,7 @@ KATER_SRC="${KATER_SRC}" KATER="${KATER}" \
 	{ cat "${out}/export.log"; exit 1; }
 
 status=0
+rev="$(git -C "${KATER_SRC}" describe --always --dirty 2>/dev/null || echo unknown)"
 for m in "${MODELS[@]}"; do
 	for f in "${m^^}Checker.hpp" "${m^^}Checker.cpp"; do
 		checked="${ROOT}/genmc/genmc/Models/${f}"
@@ -46,7 +47,7 @@ for m in "${MODELS[@]}"; do
 		     <(grep -v '^ \* From kat/' "${out}/${f}") > /dev/null; then
 			echo "ok   ${f}"
 		else
-			echo "FAIL ${f} differs from Kater's output (checked in: $(grep -m1 '^ \* From kat/' \
+			echo "FAIL ${f} differs from the output of Kater ${rev} at ${KATER_SRC} (checked in: $(grep -m1 '^ \* From kat/' \
 				"${ROOT}/genmc/genmc/Models/${m^^}Checker.hpp" | sed 's/^ \* //'))"
 			diff <(grep -v '^ \* From kat/' "${checked}") <(grep -v '^ \* From kat/' "${out}/${f}") |
 				head -10
@@ -54,4 +55,7 @@ for m in "${MODELS[@]}"; do
 		fi
 	done
 done
+# (a checkout older than the release the banners name drifts too)
+test ${status} -eq 0 ||
+	echo "(the checked-in files name the Kater they came from; KATER_SRC=<that release's checkout> checks them against it)"
 exit ${status}
