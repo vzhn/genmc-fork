@@ -323,7 +323,11 @@ auto BackwardRevisits::isPlacedMaximallyInRevisit(const BackwardRevisit &r,
 			if (!qLab->getRf() || qLab->getRf() == ownLab)
 				continue;
 			bound = qLab->getRf();
-			mayReadBound = true;
+			/* (An RMW read that reading BOUND makes succeed may not:
+			 * its write would go right after BOUND in coherence, which
+			 * QLAB would read before. See ChoiceCandidates::rfs()) */
+			mayReadBound = !rLab || !rLab->valueMakesRMWSucceed(bound->getAccessValue(
+							rLab->getAccess()));
 		} else {
 			bound = mLab;
 		}

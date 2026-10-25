@@ -163,6 +163,23 @@ auto ChoiceCandidates::rfs(ReadLabel *lab) const -> std::vector<EventLabel *>
 			std::ranges::any_of(iLab->rfs(addr), isSettledRMWInView);
 	};
 	std::erase_if(rfs, atomicityViolationInView);
+
+	/* A read of LAB's thread kept after it (LAB fills a hole before kept
+	 * events) bounds LAB further than a plain read: reading a write that
+	 * read reads, LAB's write part would go right after it in coherence,
+	 * and the kept read would read a write co-before one its thread wrote
+	 * before it (CoWR; -lkmm built such graphs and counted them) */
+	auto readByKeptLaterRead = [lab](auto *sLab) {
+		if (!lab->valueMakesRMWSucceed(sLab->getAccessValue(lab->getAccess())))
+			return false;
+		auto isLater = [lab](auto &rLab) {
+			return rLab.getThread() == lab->getThread() && rLab.getIndex() > lab->getIndex();
+		};
+		if (auto *wLab = genmc::dyn_cast<WriteLabel>(sLab))
+			return std::ranges::any_of(wLab->readers(), isLater);
+		return std::ranges::any_of(genmc::cast<InitLabel>(sLab)->rfs(lab->getAddr()), isLater);
+	};
+	std::erase_if(rfs, readByKeptLaterRead);
 	return rfs;
 }
 

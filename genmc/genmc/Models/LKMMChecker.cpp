@@ -453,7 +453,11 @@ void LKMMChecker::filterCoherentRevisits(WriteLabel *sLab, std::vector<ReadLabel
 				[&](auto &eLab) { return sLab->view(0).contains(eLab->getPos()); }),
 		 ls.end());
 
-	/* ...and also exclude (mo^-1; rf?; (hb^-1)?; sb^-1)-after reads in the *resulting* graph */
+	/* ...and also exclude (mo^-1; rf?; (hb^-1)?; sb^-1)-after reads in the *resulting* graph.
+	 * An RMW read's own write part, and the reads of it, are no such events:
+	 * revisited, the read reads SLAB, and its write moves right after SLAB
+	 * in coherence (a write part kept while its read was deleted and
+	 * executed anew, see updateKeptRMWWrite()) */
 	auto &before = sLab->getPrefixView();
 	auto moInvOptRfs = getMOInvOptRfAfter(sLab);
 	ls.erase(std::remove_if(
@@ -461,9 +465,15 @@ void LKMMChecker::filterCoherentRevisits(WriteLabel *sLab, std::vector<ReadLabel
 			 [&](auto &eLab) {
 				 auto v = g.getViewFromStamp(eLab->getStamp());
 				 v->update(before);
+				 const auto *own = eLab->isRMW() ? g.po_imm_succ(eLab) : nullptr;
+				 auto isOwn = [&](const EventLabel *evLab) {
+					 const auto *rLab = genmc::dyn_cast<ReadLabel>(evLab);
+					 return own && (evLab == own || (rLab && rLab->getRf() == own));
+				 };
 				 return std::any_of(
 					 moInvOptRfs.begin(), moInvOptRfs.end(), [&](auto &evLab) {
-						 return v->contains(evLab->getPos()) && // stays in
+						 return !isOwn(evLab) &&
+							v->contains(evLab->getPos()) && // stays in
 											// graph?
 							g.po_imm_pred(evLab)->view(0).contains(
 								eLab->getPos()); // po-pred to check

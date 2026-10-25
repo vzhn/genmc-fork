@@ -85,6 +85,9 @@ correct infr/imm-parallel-copy imm -nthreads=2
 # section closed (issue #201)
 correct lkmm/rcu-assert-inside lkmm
 correct lkmm/srcu-assert-inside lkmm
+# I5: coherence; an RMW read filled into a hole before a kept read of its
+# location reads no write that read reads
+correct lkmm/fai-hole-kept-read lkmm
 # I6: an error found as a read is added is checked without the read, which
 # has no rf yet (issue #221)
 for model in sc rc11 imm; do

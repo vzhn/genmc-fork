@@ -785,6 +785,59 @@ void checkConsistency(const ExecutionGraph &g, bool consistent, const Context &c
 	if (!consistent)
 		fail(kI5, "the execution violates the memory model's axioms (whole-graph check)", &g,
 		     ctx);
+	checkCoherence(g, ctx);
+}
+
+/* Coherence (SC per location: po-loc, rf, co and fr acyclic) holds under every
+ * model, and the models' whole-graph checks take it for granted (coherence is
+ * enforced as the events are added). Along each thread, the accesses to a
+ * location do not go back in its coherence order: a write follows every
+ * write a po-earlier access of the location wrote or read (CoWW, CoRW), and
+ * a read reads that write or a later one (CoWR, CoRR) */
+void checkCoherence(const ExecutionGraph &g, const Context &ctx)
+{
+	std::unordered_map<const EventLabel *, unsigned> coIdx;
+	for (auto lIt = g.loc_begin(); lIt != g.loc_end(); ++lIt) {
+		auto i = 0U;
+		for (const auto &wLab : g.co(lIt->first))
+			coIdx[&wLab] = ++i;
+	}
+	auto idx = [&](const EventLabel *wLab) -> std::optional<unsigned> {
+		if (genmc::isa<InitLabel>(wLab))
+			return 0U;
+		auto it = coIdx.find(wLab);
+		return it != coIdx.end() ? std::optional(it->second) : std::nullopt;
+	};
+
+	for (auto t = 0; t < g.getNumThreads(); t++) {
+		/* For each location, the latest write in coherence that a po-earlier
+		 * access wrote or read, and that access */
+		std::unordered_map<SAddr, std::pair<unsigned, Event>> bound;
+		for (auto j = 1; j < g.getThreadSize(t); j++) {
+			const auto *lab = g.getEventLabel(Event(t, j));
+			const auto *rLab = genmc::dyn_cast<ReadLabel>(lab);
+			const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
+			if (!rLab && !wLab)
+				continue;
+			const auto *mLab = genmc::cast<MemAccessLabel>(lab);
+			auto i = rLab ? (rLab->getRf() ? idx(rLab->getRf()) : std::nullopt) : idx(wLab);
+			if (!i)
+				continue;
+			auto it = bound.find(mLab->getAddr());
+			if (it != bound.end() &&
+			    (wLab ? *i <= it->second.first : *i < it->second.first))
+				fail(kI5,
+				     std::format("the execution violates coherence: {} {} a write "
+						 "co-before one that {}, po-before it, {}",
+						 lab->getPos(), wLab ? "is placed after" : "reads",
+						 it->second.second,
+						 genmc::isa<WriteLabel>(g.getEventLabel(it->second.second))
+							 ? "wrote"
+							 : "read"),
+				     &g, ctx);
+			bound[mLab->getAddr()] = {*i, lab->getPos()};
+		}
+	}
 }
 
 void checkErrorConsistency(const ExecutionGraph &g, bool consistent, const Context &ctx)
