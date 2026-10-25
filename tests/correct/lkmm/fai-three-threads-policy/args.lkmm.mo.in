@@ -1,0 +1,4 @@
+ |
+-schedule-policy=ltr |
+-schedule-policy=wfr -schedule-seed=4 |
+-check-invariants -schedule-policy=arbitrary -schedule-seed=1 |
