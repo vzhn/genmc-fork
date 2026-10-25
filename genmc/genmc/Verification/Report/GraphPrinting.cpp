@@ -26,6 +26,7 @@
 
 #include <format>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <ranges>
@@ -108,6 +109,36 @@ static auto printVarName(const MemAccessLabel &lab, const GraphDbgInfo &dbgInfo)
 	return dbgInfo.contains(lab.getPos()) ? dbgInfo.at(lab.getPos()).accessedVarName : "";
 }
 
+/* The name of LAB's variable followed by its address, as "name @H#(0, 8)" */
+static auto printVarNameAddr(const MemAccessLabel &lab, const GraphDbgInfo &dbgInfo) -> std::string
+{
+	auto name = printVarName(lab, dbgInfo);
+	auto addr = std::format("@{}", lab.getAddr());
+	return name.empty() ? addr : std::format("{} {}", name, addr);
+}
+
+/* How the printers name the variable of an access (followed by its address
+ * with PRINTADDRS) */
+static auto varNameFmter(const GraphDbgInfo &dbgInfo, bool printAddrs)
+	-> std::function<std::string(const MemAccessLabel &)>
+{
+	if (printAddrs)
+		return [&dbgInfo](const MemAccessLabel &lab) {
+			return printVarNameAddr(lab, dbgInfo);
+		};
+	return [&dbgInfo](const MemAccessLabel &lab) { return printVarName(lab, dbgInfo); };
+}
+
+/* The block an allocation or a free of LAB spans, as " @H#(0, 8) size=16"
+ * (empty for the other labels) */
+static auto printBlock(const EventLabel &lab) -> std::string
+{
+	const auto *mLab = genmc::dyn_cast<MemLifecycleLabel>(&lab);
+	if (!mLab)
+		return "";
+	return std::format(" @{} size={}", mLab->getAddr(), mLab->getSize());
+}
+
 /* Returns "<parent, id>", followed by the thread's name (if any) */
 static auto printThreadName(const ThreadInfo &info) -> std::string
 {
@@ -117,15 +148,12 @@ static auto printThreadName(const ThreadInfo &info) -> std::string
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void printGraph(const ExecutionGraph &g,
-		const GraphDbgInfo
-			&dbgInfo, // NOLINT(readability-function-cognitive-complexity)
-		std::ostream &s /* = std::cerr */)
+		const GraphDbgInfo &dbgInfo, // NOLINT(readability-function-cognitive-complexity)
+		std::ostream &s /* = std::cerr */, bool printAddrs /* = false */)
 {
-	LabelPrinter printer(
-		[&dbgInfo](const MemAccessLabel &lab) { return printVarName(lab, dbgInfo); },
-		[](const ReadLabel &lab) {
-			return lab.getRf() ? lab.getAccessValue(lab.getAccess()) : SVal();
-		});
+	LabelPrinter printer(varNameFmter(dbgInfo, printAddrs), [](const ReadLabel &lab) {
+		return lab.getRf() ? lab.getAccessValue(lab.getAccess()) : SVal();
+	});
 
 	/* Print the graph */
 	for (auto i = 0; i < g.getNumThreads(); i++) {
@@ -141,6 +169,8 @@ void printGraph(const ExecutionGraph &g,
 			if (genmc::isa<ThreadStartLabel>(&lab))
 				continue;
 			s << "\t" << printer.toString(lab);
+			if (printAddrs)
+				s << printBlock(lab);
 			if (dbgInfo.contains(lab.getPos()) && shouldPrintLOC(&lab))
 				executeMDPrint(&lab, dbgInfo.at(lab.getPos()), s);
 			s << "\n";
@@ -157,7 +187,9 @@ void printGraph(const ExecutionGraph &g,
 				header = true;
 			}
 			const auto *wLab = &*std::ranges::begin(g.co(locIt->first));
-			s << printVarName(*wLab, dbgInfo) << ": [ ";
+			s << (printAddrs ? printVarNameAddr(*wLab, dbgInfo)
+					 : printVarName(*wLab, dbgInfo))
+			  << ": [ ";
 			for (const auto &w : g.co(locIt->first))
 				s << std::format("{} ", w);
 			s << "]\n";
@@ -171,7 +203,8 @@ void dotPrintToFile(const std::string &filename,
 		    EventLabel *errLab, // NOLINT(readability-function-cognitive-complexity)
 		    std::unique_ptr<VectorClock> errView, const EventLabel *confLab,
 		    std::unique_ptr<VectorClock> confView, const ConsistencyChecker *checker,
-		    const GraphDbgInfo &dbgInfo, bool printObservation)
+		    const GraphDbgInfo &dbgInfo, bool printObservation,
+		    bool printAddrs /* = false */)
 {
 	auto &g = *errLab->getParent();
 
@@ -180,11 +213,9 @@ void dotPrintToFile(const std::string &filename,
 		const std::error_code ec = std::make_error_code(std::io_errc::stream);
 		handleFSError(ec, "Failed to open dot file " + filename);
 	}
-	DotPrinter printer(
-		[&dbgInfo](const MemAccessLabel &lab) { return printVarName(lab, dbgInfo); },
-		[](const ReadLabel &lab) {
-			return lab.getRf() ? lab.getAccessValue(lab.getAccess()) : SVal();
-		});
+	DotPrinter printer(varNameFmter(dbgInfo, printAddrs), [](const ReadLabel &lab) {
+		return lab.getRf() ? lab.getAccessValue(lab.getAccess()) : SVal();
+	});
 
 	std::unique_ptr<VectorClock> before;
 	if (errView)
@@ -225,6 +256,8 @@ void dotPrintToFile(const std::string &filename,
 
 			/* First, print the graph label for this node */
 			ss << printer.toString(*lab);
+			if (printAddrs)
+				ss << printBlock(*lab);
 
 			/* And then, print the corresponding line number */
 			if (dbgInfo.contains(lab->getPos()) && shouldPrintLOC(lab)) {
@@ -311,8 +344,8 @@ void dotPrintToFile(const std::string &filename,
 	ss << "}\n";
 }
 
-auto errorReport(const ExecutionGraph &g, const ErrorDetails &details,
-		 const GraphDbgInfo &dbgInfo, bool printTrace) -> std::string
+auto errorReport(const ExecutionGraph &g, const ErrorDetails &details, const GraphDbgInfo &dbgInfo,
+		 bool printTrace, bool printAddrs /* = false */) -> std::string
 {
 	const auto *errLab = details.pos ? g.getEventLabel(*details.pos) : nullptr;
 
@@ -325,7 +358,7 @@ auto errorReport(const ExecutionGraph &g, const ErrorDetails &details,
 	if (details.racyLab != nullptr)
 		out << std::format("conflicts with event {} ", details.racyLab->getPos());
 	out << "in graph:\n";
-	printGraph(g, dbgInfo, out);
+	printGraph(g, dbgInfo, out, printAddrs);
 
 	/* Print an error trace (if desired), and the specific error message */
 	if (printTrace && errLab) {

@@ -20,6 +20,7 @@ A full list of the available command-line options can by viewed by issuing `genm
 - **`-unroll=<N>`**: All loops will be executed at most `N` times.
 - **`-dump-error-graph=<file>`**: Outputs an erroneous graph to file `<file>`.
 - **`-print-error-trace`**: Outputs a sequence of source-code instructions that lead to an error.
+- **`-print-addresses`**: Prints the address of each access in the printed graphs (the error graph, `-dump-error-graph`, `-print-exec-graphs`), e.g. `Wna (@H#(1, 0), 1)` or `Rna (x @G#(0, 3), 0)`, and the block each allocation and free spans, e.g. `MALLOC  @H#(0, 0) size=4`. An address is `G#` (static), `S#` (stack) or `H#` (heap) followed by `(thread, offset)`: the thread that allocated it and its byte offset in that thread's memory of that kind, so an access at `H#(0, 52)` lies in the block `H#(0, 48) size=8`; an `I` after the letter marks GenMC's internal memory.
 - **`-disable-race-detection`**: Disables race detection; racy executions are then explored too (see [Race Detection and Memory Errors](features.md#race-detection-and-memory-errors)).
 - **`-program-entry-function=<fun_name>`**: Uses function `<fun_name>` as the program's entry point, instead of `main()`.
 - **`-disable-spin-assume`**: Disables the transformation of spin loops to `assume()` statements.

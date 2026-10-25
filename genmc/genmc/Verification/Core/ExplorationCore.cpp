@@ -1891,7 +1891,8 @@ void ExplorationCore::reportError(Event pos, const ErrorDetails &details)
 	if (const auto *bLab = genmc::dyn_cast_if_present<BlockLabel>(errLab))
 		inheritDbgInfo(bLab->getPos().prev(), bLab);
 
-	result.message += errorReport(g, details, errorReplay_->dbgInfo(), getConf()->printErrorTrace);
+	result.message += errorReport(g, details, errorReplay_->dbgInfo(),
+				      getConf()->printErrorTrace, getConf()->printAddresses);
 
 	/* Dump the graph into a file (DOT format) */
 	if (!getConf()->dotFile.empty())
@@ -1899,7 +1900,7 @@ void ExplorationCore::reportError(Event pos, const ErrorDetails &details)
 			       errLab ? getPrefixView(errLab).clone() : nullptr, details.racyLab,
 			       details.racyLab ? getPrefixView(details.racyLab).clone() : nullptr,
 			       &getConsChecker(), errorReplay_->dbgInfo(),
-			       getConf()->dotPrintOnlyClientEvents);
+			       getConf()->dotPrintOnlyClientEvents, getConf()->printAddresses);
 
 	/* Stop the error-collecting execution */
 	haltErrorReplay();
