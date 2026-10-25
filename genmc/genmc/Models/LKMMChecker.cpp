@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater v0.4.0-vzhn.1 (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater v0.4.0-vzhn.2 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -468,7 +468,8 @@ void LKMMChecker::filterCoherentRevisits(WriteLabel *sLab, std::vector<ReadLabel
 				 const auto *own = eLab->isRMW() ? g.po_imm_succ(eLab) : nullptr;
 				 auto isOwn = [&](const EventLabel *evLab) {
 					 const auto *rLab = genmc::dyn_cast<ReadLabel>(evLab);
-					 return own && (evLab == own || (rLab && rLab->getRf() == own));
+					 return own &&
+						(evLab == own || (rLab && rLab->getRf() == own));
 				 };
 				 return std::any_of(
 					 moInvOptRfs.begin(), moInvOptRfs.end(), [&](auto &evLab) {
