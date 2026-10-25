@@ -2,10 +2,12 @@
 #include <stdatomic.h>
 
 /*
- * MPU+rel+acq under TSO with -check-invariants: the plain writes to x are in
- * the graph but not in coherence, and the TSO checker's whole-graph check
- * (I5) asked for a coherence successor of one, which failed an internal
- * check. TSO and RA were not in the configuration matrix.
+ * MPU+rel+acq under TSO, race-free: TSO's hb (po | [REL];rf;[ACQ]) has no
+ * release sequences, so the FAI is acq_rel to carry thread_1's release to
+ * thread_3 (with a relaxed FAI, the writes to x race under -tso). Under
+ * -tso -check-invariants, the TSO checker's whole-graph check (I5) walks the
+ * plain writes to x; wrong/racy/MPU+rel+rlx covers the racing plain write,
+ * which is not in coherence.
  */
 
 int x;
@@ -20,7 +22,7 @@ void *thread_1(void *unused)
 
 void *thread_2(void *unused)
 {
-	atomic_fetch_add_explicit(&y, 1, memory_order_relaxed);
+	atomic_fetch_add_explicit(&y, 1, memory_order_acq_rel);
 	return NULL;
 }
 
