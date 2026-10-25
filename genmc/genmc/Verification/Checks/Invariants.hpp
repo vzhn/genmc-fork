@@ -210,6 +210,10 @@ void checkConsistency(const ExecutionGraph &g, bool consistent, const Context &c
  * back in its coherence order (part of every model; see checkConsistency()) */
 void checkCoherence(const ExecutionGraph &g, const Context &ctx);
 
+/** I5, atomicity: the write of an RMW is right after the write its read
+ * reads in coherence (part of every model; see checkConsistency()) */
+void checkAtomicity(const ExecutionGraph &g, const Context &ctx);
+
 /** I6: G, the graph of an error the exploration reports, is a prefix of an
  * execution: consistent with the events its threads must add next, the
  * unlocks of its open read-side critical sections (CONSISTENT: the model's

@@ -1532,10 +1532,13 @@ auto ExplorationCore::handleStore(std::unique_ptr<WriteLabel> wLab, std::optiona
 	 * they do not (the checker rejects the placings that break its axioms),
 	 * and the kat's own warning rule decides (see checkForRaces()) */
 	auto cos = getConsChecker().getCoherentPlacings(lab);
-	/* -exhaustive under IMM: as for a read (see handleLoad()); the store
-	 * still goes in coherence (last), for the graph to stay well formed
-	 * until the run is dropped */
-	if (cos.empty() && getConf()->exhaustive && getConf()->model == ModelType::IMM) {
+	/* No placing: -exhaustive under IMM, as for a read (see handleLoad()),
+	 * and, under a dependency-tracking model, a store that a later access
+	 * of its thread bounds by an RMW's write with nothing but RMWs before it
+	 * in its range (no placing comes between an RMW's write and the write
+	 * its read reads). The store still goes in coherence (last), for the
+	 * graph to stay well formed until the run is dropped */
+	if (cos.empty()) {
 		lab->addCo(g.co_max(lab->getAddr()));
 		moot();
 		return {.result = Invalid{}, .count = 1U};

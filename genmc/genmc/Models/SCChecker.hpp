@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/sc-genmc.kat, Kater v0.4.0-vzhn.3 (scripts/lkmm/kater-export.sh).
+ * From kat/sc-genmc.kat, Kater v0.4.0-vzhn.3-2-g2967209 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_SC_CHECKER_HPP

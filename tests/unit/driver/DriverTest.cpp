@@ -299,6 +299,31 @@ TEST(ScriptedDriver, LKMMExhaustiveKeepsTheWriteARevisitedCasReads)
 	}
 }
 
+TEST(ScriptedDriver, LKMMPlacesNoStoreInsideAnRMW)
+{
+	/* #237: t2's store to X revisits t0's read and keeps t2's acquire read
+	 * of t1's increment; t2's first store, executed anew, must go before
+	 * the increment's write, and was placed right before it, after the
+	 * store of t3 the increment reads (atomicity): 25 executions under
+	 * ltr, 24 (herd7's count) under wf */
+	Program p{.numVars = 2,
+		  .threads = {{ld(X)},
+			      {fai(Y, 1)},
+			      {st(Y, 1), ld(X), ld(Y, MemOrdering::Acquire), st(X, 1)},
+			      {st(Y, 1)}}};
+	for (auto policy : {SchedulePolicy::WF, SchedulePolicy::LTR, SchedulePolicy::WFR,
+			    SchedulePolicy::Arbitrary}) {
+		auto r = explore(p, ModelType::LKMM,
+				 {.exhaustive = true,
+				  .checkInvariants = true,
+				  .schedulePolicy = policy,
+				  .scheduleSeed = 1});
+		EXPECT_FALSE(r.error);
+		EXPECT_EQ(r.inconsistent, 0U);
+		EXPECT_EQ(r.explored, 24U);
+	}
+}
+
 TEST(ScriptedDriver, IMMKeepsACasBeforeAKeptIncrement)
 {
 	/* #227: the revisit of t0's increment by t1's keeps t1's CAS, which IMM

@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/ra-genmc.kat, Kater v0.4.0-vzhn.3 (scripts/lkmm/kater-export.sh).
+ * From kat/ra-genmc.kat, Kater v0.4.0-vzhn.3-2-g2967209 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -1232,11 +1232,16 @@ auto RAChecker::getCoherentPlacings(WriteLabel *wLab) -> std::vector<EventLabel 
 			   return pLab ? (EventLabel *)pLab : (EventLabel *)g.getInitLabel();
 		   });
 	std::ranges::copy(cos, std::back_inserter(result));
-	result.push_back(rangeEnd == std::ranges::end(g.co(wLab->getAddr()))
-				 ? g.co_max(wLab->getAddr())
-				 : (!g.co_imm_pred(&*rangeEnd)
-					    ? (EventLabel *)g.getInitLabel()
-					    : (EventLabel *)g.co_imm_pred(&*rangeEnd)));
+	/* The range's end bounds it from above (dependency-tracking models: the
+	 * first write a later access of the thread wrote or read). If it is an
+	 * RMW's write, the placing right before it comes between that write and
+	 * the write its read reads, as the ones the filter drops do */
+	if (rangeEnd == std::ranges::end(g.co(wLab->getAddr())))
+		result.push_back(g.co_max(wLab->getAddr()));
+	else if (!rangeEnd->isRMW())
+		result.push_back(!g.co_imm_pred(&*rangeEnd)
+					 ? (EventLabel *)g.getInitLabel()
+					 : (EventLabel *)g.co_imm_pred(&*rangeEnd));
 	return result;
 }
 bool RAChecker::visitCoherenceIterative(std::vector<DFSWorklistEntry> &worklist,
