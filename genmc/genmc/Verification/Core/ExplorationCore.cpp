@@ -1265,11 +1265,13 @@ auto ExplorationCore::handleLoad(std::unique_ptr<ReadLabel> rLab, std::optional<
 
 	/* Get an approximation of the stores we can read from */
 	auto stores = getRfsApproximation(lab);
-	/* -exhaustive under IMM: the read fills a hole, and the events a revisit
-	 * kept after it leave it no coherent write (see getCoherentStores()).
-	 * It reads from the last write, for the graph to stay well formed until
-	 * the run is dropped */
-	if (stores.empty() && getConf()->exhaustive && getConf()->model == ModelType::IMM) {
+	/* The read fills a hole, and the events a revisit kept after it leave
+	 * it no coherent write (-exhaustive under IMM, see getCoherentStores()),
+	 * or none an RMW can read: the write a kept later RMW reads, or a kept
+	 * later read of its thread (see ChoiceCandidates::rfs()). No completion
+	 * of the graph is consistent. The read reads from the last write, for
+	 * the graph to stay well formed until the run is dropped */
+	if (stores.empty() && getConf()->isDepTrackingModel) {
 		repairRead(g, lab);
 		moot();
 		return {.result = Invalid{}, .count = 1U};
