@@ -81,7 +81,7 @@ auto BackwardRevisits::revisitView(const ReadLabel *rLab, const WriteLabel *sLab
 	const auto &prefix = getPrefixView(sLab);
 	if (prefix.contains(rLab->getPos())) {
 		updatePredsWithPrefixView(g, *preds, *getRevisitPrefixView(sLab));
-		return keepRMWReads(rLab, std::move(preds), keptRMWReads);
+		return keepRMWReads(rLab, sLab, std::move(preds), keptRMWReads);
 	}
 	updatePredsWithPrefixView(g, *preds, prefix);
 	if (opts_.exhaustiveIMM) {
@@ -91,7 +91,16 @@ auto BackwardRevisits::revisitView(const ReadLabel *rLab, const WriteLabel *sLab
 		if (!keepValueDependencies(rLab->getPos(), *preds))
 			return nullptr;
 	}
-	return keepRMWReads(rLab, std::move(preds), keptRMWReads);
+	return keepRMWReads(rLab, sLab, std::move(preds), keptRMWReads);
+}
+
+/* Whether the write part of the RMW RLAB is the same when RLAB reads from
+ * SLAB: an xchg() writes its argument, a CAS its new value if it succeeds */
+static auto writeIgnoresRead(const ReadLabel *rLab, const WriteLabel *sLab) -> bool
+{
+	if (const auto *fLab = genmc::dyn_cast<FaiReadLabel>(rLab))
+		return fLab->getOp() == RMWBinOp::Xchg;
+	return genmc::isa<CasReadLabel>(rLab) && !failsReading(rLab, sLab);
 }
 
 /* -exhaustive, without keepValueDependencies() (-lkmm). A kept read that
@@ -105,10 +114,16 @@ auto BackwardRevisits::revisitView(const ReadLabel *rLab, const WriteLabel *sLab
  * the hole crashed in revisitRead()). The revisit keeps the read too, and,
  * transitively, the write it reads from (and, for an RMW's write, its
  * read), and the creation of their threads. The write part of the revisited
- * read itself is executed anew: it is not kept, and the revisit is not
- * taken if a kept read reads from it */
-auto BackwardRevisits::keepRMWReads(const ReadLabel *rLab, std::unique_ptr<VectorClock> v,
-				    bool *kept) const -> std::unique_ptr<VectorClock>
+ * read itself is executed anew. If a kept read reads from it, it stays when
+ * reading SLAB leaves its value as it is (an xchg(), a CAS that still
+ * succeeds): it then moves right after SLAB in coherence, as a write part
+ * kept while its read is executed anew (updateKeptRMWWrite()). Otherwise
+ * it is not kept, and the revisit is not taken if a kept read reads from it
+ * (#237: under -lkmm, xchg()'s write is ordered after its read only by
+ * rmw, so the kept read can be in SLAB's prefix while the xchg() is not) */
+auto BackwardRevisits::keepRMWReads(const ReadLabel *rLab, const WriteLabel *sLab,
+				    std::unique_ptr<VectorClock> v, bool *kept) const
+	-> std::unique_ptr<VectorClock>
 {
 	if (!opts_.exhaustive || opts_.exhaustiveIMM || !opts_.depTracking)
 		return v;
@@ -119,17 +134,23 @@ auto BackwardRevisits::keepRMWReads(const ReadLabel *rLab, std::unique_ptr<Vecto
 		const auto *wLab = genmc::dyn_cast_if_present<WriteLabel>(lab);
 		return wLab && wLab->isRMW();
 	};
-	if (const auto *own = g.po_imm_succ(rLab); isRMWWrite(own) && dv.contains(own->getPos())) {
+	const auto *own = g.po_imm_succ(rLab);
+	auto keptOwn = false;
+	if (isRMWWrite(own) && dv.contains(own->getPos())) {
 		if (std::ranges::any_of(genmc::cast<WriteLabel>(own)->readers(), [&](auto &oLab) {
 			    return dv.contains(oLab.getPos());
-		    }))
-			return nullptr;
-		dv.addHole(own->getPos());
+		    })) {
+			if (!writeIgnoresRead(rLab, sLab))
+				return nullptr;
+			keptOwn = true;
+		} else {
+			dv.addHole(own->getPos());
+		}
 	}
 
 	std::vector<Event> work;
 	for (const auto &lab : g.labels())
-		if (isRMWWrite(&lab) && dv.contains(lab.getPos()))
+		if (isRMWWrite(&lab) && dv.contains(lab.getPos()) && !(keptOwn && &lab == own))
 			work.push_back(lab.getPos().prev());
 	while (!work.empty()) {
 		auto e = work.back();
