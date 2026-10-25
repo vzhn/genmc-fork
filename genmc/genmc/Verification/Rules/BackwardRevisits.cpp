@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <memory>
 #include <ranges>
+#include <utility>
 
 auto prefixView(const GraphModel &model, const EventLabel *lab) -> const VectorClock &
 {
@@ -114,10 +115,15 @@ static auto writeIgnoresRead(const ReadLabel *rLab, const WriteLabel *sLab) -> b
  * the hole crashed in revisitRead()). The revisit keeps the read too, and,
  * transitively, the write it reads from (and, for an RMW's write, its
  * read), and the creation of their threads. The write part of the revisited
- * read itself is executed anew. If a kept read reads from it, it stays when
- * reading SLAB leaves its value as it is (an xchg(), a CAS that still
- * succeeds): it then moves right after SLAB in coherence, as a write part
- * kept while its read is executed anew (updateKeptRMWWrite()). Otherwise
+ * read itself is executed anew. The closure follows a kept read's write
+ * even when the read is kept anyway, as one added before RLAB: it may since
+ * have been revisited by a write added after RLAB (#237: the revisit was
+ * otherwise refused as not closed, and whether a graph was reached
+ * depended on the order the threads ran in). If a kept read reads from
+ * the write part of RLAB, it stays when reading SLAB leaves its value as
+ * it is (an xchg(), a CAS that still succeeds): it then moves right after
+ * SLAB in coherence, as a write part kept while its read is executed anew
+ * (updateKeptRMWWrite()). Otherwise
  * it is not kept, and the revisit is not taken if a kept read reads from it
  * (#237: under -lkmm, xchg()'s write is ordered after its read only by
  * rmw, so the kept read can be in SLAB's prefix while the xchg() is not) */
@@ -152,17 +158,28 @@ auto BackwardRevisits::keepRMWReads(const ReadLabel *rLab, const WriteLabel *sLa
 	for (const auto &lab : g.labels())
 		if (isRMWWrite(&lab) && dv.contains(lab.getPos()) && !(keptOwn && &lab == own))
 			work.push_back(lab.getPos().prev());
+	/* (The events it needs are followed even when the view has them: a
+	 * read added before RLAB may since have been revisited by a write added
+	 * after it, which it then also needs) */
+	std::vector<char> seen(g.getMaxStamp().get() + 1, 0);
 	while (!work.empty()) {
 		auto e = work.back();
 		work.pop_back();
-		if (e.isInitializer() || dv.contains(e))
+		if (e.isInitializer())
 			continue;
-		if (e == rLab->getPos())
-			return nullptr;
-		dv.updateIdx(e);
-		if (kept)
-			*kept = true;
 		const auto *lab = g.getEventLabel(e);
+		if (std::exchange(seen[lab->getStamp().get()], 1))
+			continue;
+		if (dv.contains(e)) {
+			if (e == rLab->getPos())
+				continue;
+		} else {
+			if (e == rLab->getPos())
+				return nullptr;
+			dv.updateIdx(e);
+			if (kept)
+				*kept = true;
+		}
 		if (const auto *eRLab = genmc::dyn_cast<ReadLabel>(lab))
 			work.push_back(eRLab->getRf()->getPos());
 		if (isRMWWrite(lab))

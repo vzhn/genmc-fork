@@ -276,6 +276,29 @@ TEST(ScriptedDriver, LKMMOrdersAfterASeqCstCasOnlyOnSuccess)
 	}
 }
 
+TEST(ScriptedDriver, LKMMExhaustiveKeepsTheWriteARevisitedCasReads)
+{
+	/* #237: t1's store to X revisits t0's first read and keeps t1's CAS,
+	 * whose write part the acquire read reads. When the CAS was added
+	 * before that read and then revisited by t0's release store, the revisit
+	 * kept the CAS without the store it reads and was refused: 5 executions
+	 * under some policies instead of 7 (herd7's count) */
+	Program p{.numVars = 2,
+		  .threads = {{ld(X), ld(X), st(Y, 2, MemOrdering::Release)},
+			      {cas(Y, 2, 3), ld(Y, MemOrdering::Acquire), st(X, 1)}}};
+	for (auto policy : {SchedulePolicy::WF, SchedulePolicy::LTR, SchedulePolicy::WFR,
+			    SchedulePolicy::Arbitrary}) {
+		auto r = explore(p, ModelType::LKMM,
+				 {.exhaustive = true,
+				  .checkInvariants = true,
+				  .schedulePolicy = policy,
+				  .scheduleSeed = 1});
+		EXPECT_FALSE(r.error);
+		EXPECT_EQ(r.inconsistent, 0U);
+		EXPECT_EQ(r.explored, 7U);
+	}
+}
+
 TEST(ScriptedDriver, IMMKeepsACasBeforeAKeptIncrement)
 {
 	/* #227: the revisit of t0's increment by t1's keeps t1's CAS, which IMM
