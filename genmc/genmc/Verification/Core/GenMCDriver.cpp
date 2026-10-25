@@ -261,7 +261,7 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 		return details.shouldHalt ? std::optional(details.type) : std::nullopt;
 	}
 
-	if (isMoot() || !checkPendingKept()) {
+	if (isMoot() || !checkPendingKept(getExec().getGraph())) {
 		GENMC_DEBUG(++result.exploredMoot;);
 		return {};
 	}

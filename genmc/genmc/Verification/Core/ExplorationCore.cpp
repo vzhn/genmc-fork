@@ -367,11 +367,11 @@ void ExplorationCore::blockThreadTryMoot(std::unique_ptr<BlockLabel> bLab)
 	mootExecutionIfFullyBlocked(lab);
 }
 
-auto ExplorationCore::checkPendingKept() -> bool
+auto ExplorationCore::checkPendingKept(const ExecutionGraph &g) -> bool
 {
 	if (!keptRuns_.takeDeferredCheck())
 		return true;
-	if (getConsChecker().isConsistent(getExec().getGraph()))
+	if (getConsChecker().isConsistent(g))
 		return true;
 	keptRuns_.repeatEagerly();
 	moot();
@@ -750,23 +750,35 @@ auto ExplorationCore::checkInitializedMem(const WriteLabel *wLab) -> std::option
 	return reportIfViolated(error_rules::invalidUnlock(wLab));
 }
 
-auto ExplorationCore::isErrorGraphConsistent(const ExecutionGraph &g) const -> bool
+auto ExplorationCore::getErrorPrefix(const ExecutionGraph &g) const
+	-> std::unique_ptr<ExecutionGraph>
 {
 	/* An error found as a read is added (see handleLoad()) comes before the
 	 * read has an rf: the error is on the prefix before the read, and the
 	 * read, taken as reading the initializer, can make the graph
-	 * inconsistent (#221). Such a read is checked as not yet added */
+	 * inconsistent (#221). Such a read is checked as not yet added. So is a
+	 * store checked before it is placed in coherence (an access to
+	 * non-allocated memory): the model has no coherence position for it */
 	auto pending = std::views::filter(g.thr_ids(), [&](auto t) {
-		const auto *rLab = genmc::dyn_cast<ReadLabel>(g.getLastThreadLabel(t));
-		return rLab && !rLab->getRf();
+		const auto *lab = g.getLastThreadLabel(t);
+		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab))
+			return !rLab->getRf();
+		const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
+		return wLab && !wLab->isInCo();
 	});
 	if (std::ranges::empty(pending))
-		return getConsChecker().isConsistentWithSectionsClosed(g);
+		return nullptr;
 
 	auto v = g.getViewFromStamp(g.getMaxStamp());
 	for (auto t : pending)
 		v->setMax(g.getLastThreadLabel(t)->getPos().prev());
-	return getConsChecker().isConsistentWithSectionsClosed(*g.getCopyUpTo(*v));
+	return g.getCopyUpTo(*v);
+}
+
+auto ExplorationCore::isErrorGraphConsistent(const ExecutionGraph &g) const -> bool
+{
+	auto prefix = getErrorPrefix(g);
+	return getConsChecker().isConsistentWithSectionsClosed(prefix ? *prefix : g);
 }
 
 auto ExplorationCore::reportIfViolated(const std::optional<ErrorDetails> &violation)
@@ -1807,18 +1819,21 @@ void ExplorationCore::reportError(Event pos, const ErrorDetails &details)
 			moot();
 			return;
 		}
+		/* (Without the events still pending, see getErrorPrefix()) */
+		auto prefix = getErrorPrefix(g);
+		const auto &eg = prefix ? *prefix : g;
 		if (getConf()->exhaustive && getConf()->model == ModelType::IMM) {
 			if (!isExecutionConsistent(g)) {
 				moot();
 				return;
 			}
 		} else if (keptRuns_.takeAddedBeforeKept()) {
-			if (!getConsChecker().isConsistent(g)) {
+			if (!getConsChecker().isConsistent(eg)) {
 				moot();
 				return;
 			}
 		}
-		if (!checkPendingKept())
+		if (!checkPendingKept(eg))
 			return;
 	}
 
