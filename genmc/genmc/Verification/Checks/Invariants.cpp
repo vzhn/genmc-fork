@@ -786,6 +786,7 @@ void checkConsistency(const ExecutionGraph &g, bool consistent, const Context &c
 		fail(kI5, "the execution violates the memory model's axioms (whole-graph check)", &g,
 		     ctx);
 	checkCoherence(g, ctx);
+	checkAtomicity(g, ctx);
 }
 
 /* Coherence (SC per location: po-loc, rf, co and fr acyclic) holds under every
@@ -837,6 +838,32 @@ void checkCoherence(const ExecutionGraph &g, const Context &ctx)
 				     &g, ctx);
 			bound[mLab->getAddr()] = {*i, lab->getPos()};
 		}
+	}
+}
+
+/* Atomicity (rmw & (fre ; coe) empty) holds under every model as well, and
+ * the exploration ensures it as it places each RMW's write: the write is
+ * right after the write its read reads in coherence */
+void checkAtomicity(const ExecutionGraph &g, const Context &ctx)
+{
+	for (const auto &lab : g.labels()) {
+		const auto *wLab = genmc::dyn_cast<WriteLabel>(&lab);
+		if (!wLab || !wLab->isRMW())
+			continue;
+		const auto *rLab = genmc::dyn_cast_if_present<ReadLabel>(g.po_imm_pred(wLab));
+		if (!rLab || !rLab->getRf())
+			continue;
+		const auto *pLab = g.co_imm_pred(wLab);
+		const auto *rf = rLab->getRf();
+		if (pLab ? pLab == rf : genmc::isa<InitLabel>(rf))
+			continue;
+		fail(kI5,
+		     std::format("the execution violates atomicity: {} reads {}, but {} is "
+				 "right before its write {} in coherence",
+				 rLab->getPos(), rf->getPos(),
+				 pLab ? std::format("{}", pLab->getPos()) : std::string("the initializer"),
+				 wLab->getPos()),
+		     &g, ctx);
 	}
 }
 

@@ -1,0 +1,5 @@
+ |
+-schedule-policy=ltr |
+-schedule-policy=arbitrary -schedule-seed=1 |
+-lkmm-reference -schedule-policy=ltr |
+-check-invariants -schedule-policy=ltr |
