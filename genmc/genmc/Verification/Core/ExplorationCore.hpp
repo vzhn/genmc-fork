@@ -415,6 +415,10 @@ private:
 	/** If LAB accesses improperly initialized memory, reports an error */
 	auto checkInitializedMem(const WriteLabel *lab) -> std::optional<VerificationError>;
 
+	/** Whether the graph of an error is consistent once its open read-side
+	 * critical sections are closed (see reportError()) */
+	auto isErrorGraphConsistent(const ExecutionGraph &g) const -> bool;
+
 	/** Reports VIOLATION, if any (see ErrorRules.hpp), and returns its type */
 	auto reportIfViolated(const std::optional<ErrorDetails> &violation)
 		-> std::optional<VerificationError>;
