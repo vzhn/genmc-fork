@@ -155,6 +155,14 @@ public:
 		return getConf()->checkReplayKeys && getConf()->model == ModelType::LKMM;
 	}
 
+	/** -exhaustive under -lkmm: a revisit keeps the model's prefix of the
+	 * write without what depends on the revisited read, and every read the
+	 * write does not depend on may be revisited (see keptPrefixView()) */
+	auto keepsDependencies() const -> bool
+	{
+		return getConf()->exhaustive && getConf()->model == ModelType::LKMM;
+	}
+
 	/** Whether there are more executions to be explored */
 	auto done() -> bool;
 
@@ -192,6 +200,7 @@ protected:
 
 	/** Returns a reference to the set consistency checker */
 	auto getConsChecker() -> ConsistencyChecker & { return *consChecker; }
+	auto getBounder() -> BoundDecider & { return *bounder; }
 	auto getConsChecker() const -> const ConsistencyChecker & { return *consChecker; }
 
 	/** Returns a reference to the symmetry checker */
@@ -363,17 +372,35 @@ protected:
 	/** -exhaustive under IMM: whether G (a complete execution, or the
 	 * graph of an error) is consistent, checked on a copy whose views are
 	 * computed anew */
-	auto isExecutionConsistent(const ExecutionGraph &g) -> bool;
+	auto isExecutionConsistent(const ExecutionGraph &g, bool intermediate = false,
+				   bool atomicity = true) -> bool;
+
+	/** -exhaustive under IMM: computes the views of G's labels anew, in G,
+	 * and drops their cached prefix views. Returns false if they do not
+	 * settle (an hb cycle) */
+	auto recomputeViews(ExecutionGraph &g) -> bool;
 
 	/** -exhaustive under IMM: runs CHECK on a copy of the current graph
 	 * whose views are computed anew (positions name the same events in
 	 * both) */
 	void checkWithViewsAnew(const std::function<void(const ExecutionGraph &)> &check);
 
+	/** -lkmm: the thread's path cannot go on at POS (a hole) before the
+	 * events a revisit kept after it: it stops there (see deadEndThread()) */
+	void deadEndThread(Event pos);
+	[[nodiscard]] auto threadDeadEnded(int tid) const -> bool;
+
 	/* Checks the whole graph if an event went before kept ones during the
 	 * run; if it is inconsistent, moots the run and has it repeated with
 	 * eager checks. Returns whether the run stands */
 	bool checkPendingKept(const ExecutionGraph &g);
+
+	/* The checks of a run that ends (-lkmm, see checkPendingKept()): a
+	 * complete execution is checked as a whole; a mooted run's graph is
+	 * checked for what went before the moot (not atomicity, the cause of a
+	 * moot by an RMW) when an event went before kept ones. Returns whether
+	 * the run stands; a failed check has the run repeated with eager checks */
+	bool checkEndedRun(const ExecutionGraph &g, bool moot);
 
 	auto executionExceedsBound(BoundCalculationStrategy strategy) const -> bool;
 
@@ -411,6 +438,8 @@ private:
 
 	/** If LAB accesses an uninitialized location, reports an error */
 	auto checkInitializedMem(const ReadLabel *lab) -> std::optional<VerificationError>;
+	/** Returns an error if LAB accesses non-allocated or uninitialized memory */
+	auto checkReadMemAccess(const ReadLabel *lab) -> std::optional<VerificationError>;
 
 	/** If LAB accesses improperly initialized memory, reports an error */
 	auto checkInitializedMem(const WriteLabel *lab) -> std::optional<VerificationError>;
@@ -507,14 +536,10 @@ private:
 	 * LOADS, and returns whether we can skip revisiting altogether */
 	auto tryOptimizeRevisits(WriteLabel *lab, std::vector<ReadLabel *> &loads) -> bool;
 
-	/** -exhaustive under IMM: computes the views of G's labels anew, in G,
-	 * and drops their cached prefix views. Returns false if they do not
-	 * settle (an hb cycle) */
-	auto recomputeViews(ExecutionGraph &g) -> bool;
 
 	/** -exhaustive under IMM: whether G, with the views its labels have, is
 	 * consistent: coherence, the atomicity of its RMWs, the other axioms */
-	auto isGraphConsistent(const ExecutionGraph &g) -> bool;
+	auto isGraphConsistent(const ExecutionGraph &g, bool intermediate = false) -> bool;
 
 	/** The checks of -exhaustive under IMM (see ExhaustiveConsistency) */
 	auto getExhaustiveConsistency() -> ExhaustiveConsistency;

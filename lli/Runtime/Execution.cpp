@@ -3760,13 +3760,17 @@ const DepInfo *Interpreter::getCtrlDeps(unsigned int tid)
 	auto open = [](const ExecutionContext &SF) {
 		return !SF.CtrlScopes.empty() || !SF.FrameCtrl.empty();
 	};
+	thr.sctrlScratch.clear();
 	if (std::ranges::none_of(thr.ECStack, open))
 		return ctrl;
 	thr.ctrlScratch = *ctrl;
 	for (const auto &SF : thr.ECStack) {
 		thr.ctrlScratch.update(SF.FrameCtrl);
-		for (const auto &scope : SF.CtrlScopes)
+		thr.sctrlScratch.update(SF.FrameCtrl);
+		for (const auto &scope : SF.CtrlScopes) {
 			thr.ctrlScratch.update(scope.shadow.deps);
+			thr.sctrlScratch.update(scope.shadow.deps);
+		}
 	}
 	return &thr.ctrlScratch;
 }
@@ -3947,9 +3951,13 @@ void Interpreter::updateCasCtrlDeps(AtomicCmpXchgInst &I)
 	 * its Mb attribute). So does the prefix of every later event, unless
 	 * they all depend on the CAS. Without that, a revisit kept a write
 	 * after a failed CAS without the CAS, which then succeeded when
-	 * executed anew: the graph was also reached from its success (#230) */
-	if (scopesCtrlDeps() && (I.getSuccessOrdering() != AtomicOrdering::Monotonic ||
-				 !!(getWriteAttr(I) & WriteAttr::LkmmMb)))
+	 * executed anew: the graph was also reached from its success (#230).
+	 * Not under the exhaustive exploration, which deduplicates its graphs:
+	 * there the dependency would make every event after a lock depend on
+	 * its read, and a revisit of that read would keep none of them */
+	if (scopesCtrlDeps() && !keepsDependencies() &&
+	    (I.getSuccessOrdering() != AtomicOrdering::Monotonic ||
+	     !!(getWriteAttr(I) & WriteAttr::LkmmMb)))
 		updateCtrlDeps(getCurThr().id, currPos());
 }
 

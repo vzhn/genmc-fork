@@ -38,12 +38,52 @@ class ReadLabel;
 class WriteLabel;
 
 /** The prefix view of LAB under MODEL (computed once, cached on the label) */
-auto prefixView(const GraphModel &model, const EventLabel *lab) -> const VectorClock &;
+auto prefixView(const GraphModel &model, const EventLabel *lab, bool dependenciesOnly = false)
+	-> const VectorClock &;
 
 /** The part of LAB's prefix a revisit by LAB keeps: the prefix, unless
  * SCOPESCTRLDEPS (LKMM with event keys), where the model narrows it */
 auto revisitPrefixView(const GraphModel &model, bool scopesCtrlDeps, const EventLabel *lab)
 	-> std::unique_ptr<VectorClock>;
+
+/** -exhaustive under -lkmm: the events LAB depends on, which a revisit by
+ * LAB keeps. The closure of LAB under its dependencies (address, data,
+ * control, the expected value of a CAS), rf, an RMW's read before its
+ * write, and thread creation (a thread's start, its create, and the thread
+ * of a join): what decides that LAB exists with its value, and nothing
+ * ordered before it otherwise (fences, releases, same-location writes),
+ * which the kat's ppo has. Those orderings depend on the path a branch
+ * took: in the prefix, they could put the read a branch tests before a
+ * write after its join, so that the write could not revisit it (or kept
+ * the branch's events, which the new path did not reach); the exhaustive
+ * exploration rechecks the whole graph when an event is added before kept
+ * ones (see ExplorationCore::checkPendingKept()), so they need not be
+ * kept (issue #77) */
+auto dependencyPrefixView(const ExecutionGraph &g, const EventLabel *lab)
+	-> std::unique_ptr<VectorClock>;
+
+/** The events that depend on RLAB, by stamp: the closure under the
+ * dependents of an event (address, data, control, a CAS's expected value),
+ * the readers of a write, an RMW's write after its read, and the threads
+ * a create starts, of RLAB, or with SCOPED of the events that exist
+ * because of what RLAB read (those inside a branch it controls, see
+ * EventDeps::sctrl). A revisit of RLAB deletes them, and keeps nothing
+ * because of them */
+auto dependentsOf(const ExecutionGraph &g, const ReadLabel *rLab, bool scoped = false)
+	-> std::vector<char>;
+
+/** -exhaustive under -lkmm: what a revisit of RLAB by SLAB keeps of SLAB's
+ * prefix: the model's prefix (its revisit prefix, rppo and rf: a kept event
+ * with its locks, fences and the same-location writes before it) computed
+ * without the events that exist because of what RLAB read (the scoped
+ * dependents, see dependentsOf()): those are made anew on RLAB's new path,
+ * and what they ordered before SLAB is not ordered by them any more (the
+ * path-dependent part of the prefix, issue #77). What was in the prefix
+ * only through them is left out. Null if SLAB depends on RLAB in any way,
+ * or the prefix without them still has RLAB: then RLAB is before SLAB
+ * whatever its value, and no revisit */
+auto keptPrefixView(const ExecutionGraph &g, const GraphModel &model, const ReadLabel *rLab,
+		    const WriteLabel *sLab) -> std::unique_ptr<VectorClock>;
 
 class BackwardRevisits {
 public:
@@ -60,6 +100,9 @@ public:
 		/** -exhaustive under IMM: a revisit keeps the value dependencies
 		 * of what it keeps (see keepValueDependencies()) */
 		bool exhaustiveIMM = false;
+		/** -exhaustive under -lkmm: a revisit keeps what the write depends
+		 * on (see dependencyPrefixView()) */
+		bool keepsDependencies = false;
 	};
 
 	BackwardRevisits(const ExecutionGraph &g, const GraphModel &model, Options opts)
@@ -132,7 +175,7 @@ private:
 
 	auto getPrefixView(const EventLabel *lab) const -> const VectorClock &
 	{
-		return prefixView(model_, lab);
+		return prefixView(model_, lab, opts_.keepsDependencies);
 	}
 	auto getRevisitPrefixView(const EventLabel *lab) const -> std::unique_ptr<VectorClock>
 	{

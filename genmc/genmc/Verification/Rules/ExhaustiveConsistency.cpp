@@ -17,6 +17,8 @@
 #include "genmc/Support/Error.hpp"
 
 #include <algorithm>
+#include <optional>
+#include <unordered_map>
 #include <ranges>
 
 auto ExhaustiveConsistency::recomputeViews(ExecutionGraph &g) -> bool
@@ -54,24 +56,91 @@ void ExhaustiveConsistency::dropPrefixViews(ExecutionGraph &g)
 			lab.setPrefixView(nullptr);
 }
 
-auto ExhaustiveConsistency::isGraphConsistent(const ExecutionGraph &g) const -> bool
+/* WLAB's index in its location's coherence order (-1 for the initial
+ * write), or none when it is not placed yet (a store an error stopped) */
+static auto coIndexIfPlaced(const ExecutionGraph &g, const EventLabel *wLab)
+	-> std::optional<int>
+{
+	if (genmc::isa<InitLabel>(wLab))
+		return -1;
+	auto i = 0;
+	for (const auto &oLab : g.co(genmc::cast<WriteLabel>(wLab)->getAddr())) {
+		if (&oLab == wLab)
+			return i;
+		++i;
+	}
+	return std::nullopt;
+}
+
+static auto coIndexOf(const ExecutionGraph &g, const EventLabel *wLab) -> int
+{
+	auto idx = coIndexIfPlaced(g, wLab);
+	VERIFY(idx.has_value());
+	return *idx;
+}
+
+/* Along each thread, the accesses to a location do not go back in its
+ * coherence order: a write follows every write a po-earlier access of the
+ * location wrote or read (CoWW, CoRW), and a read reads that write or a
+ * later one (CoWR, CoRR). With coherence a total order per location, this
+ * is acyclic (po-loc | rf | co | fr) */
+auto ExhaustiveConsistency::isCoherentPerLocation(const ExecutionGraph &g) -> bool
+{
+	for (auto t : g.thr_ids()) {
+		std::unordered_map<SAddr, int> last;
+		for (const auto &lab : g.po(t)) {
+			const auto *mLab = genmc::dyn_cast<MemAccessLabel>(&lab);
+			if (!mLab)
+				continue;
+			auto it = last.find(mLab->getAddr());
+			auto seen = it == last.end() ? -1 : it->second;
+			if (const auto *wLab = genmc::dyn_cast<WriteLabel>(mLab)) {
+				auto idx = coIndexIfPlaced(g, wLab);
+				if (!idx) /* not placed yet: an error stopped the run */
+					continue;
+				if (seen != -1 && *idx <= seen)
+					return false;
+				last[mLab->getAddr()] = *idx;
+			} else if (const auto *rLab = genmc::dyn_cast<ReadLabel>(mLab);
+				   rLab && rLab->getRf()) {
+				auto idx = coIndexIfPlaced(g, rLab->getRf());
+				if (!idx)
+					continue;
+				if (*idx < seen)
+					return false;
+				last[mLab->getAddr()] = std::max(seen, *idx);
+			}
+		}
+	}
+	return true;
+}
+
+/* INTERMEDIATE: a check between the events of a run, which may leave out
+ * what the complete execution's check decides (see
+ * GraphModel::setIntermediateChecks()) */
+auto ExhaustiveConsistency::isGraphConsistent(const ExecutionGraph &g, bool intermediate,
+					       bool atomicity) const -> bool
+{
+	model_.setIntermediateChecks(intermediate);
+	const auto consistent = isGraphConsistentImpl(g, atomicity);
+	model_.setIntermediateChecks(false);
+	return consistent;
+}
+
+/* ATOMICITY: whether the RMWs are checked (not for a run mooted by a new
+ * RMW reading a write another RMW reads, which a queued revisit resolves) */
+auto ExhaustiveConsistency::isGraphConsistentImpl(const ExecutionGraph &g, bool atomicity) const
+	-> bool
 {
 	const auto &cc = model_;
-	auto coIndex = [&g](const EventLabel *wLab) -> int {
-		if (genmc::isa<InitLabel>(wLab))
-			return -1;
-		auto i = 0;
-		for (const auto &oLab : g.co(genmc::cast<WriteLabel>(wLab)->getAddr())) {
-			if (&oLab == wLab)
-				return i;
-			++i;
-		}
-		VERIFY(false);
-		return -1;
-	};
+	auto coIndex = [&g](const EventLabel *wLab) { return coIndexOf(g, wLab); };
+	if (!hbCoherence_ && !isCoherentPerLocation(g))
+		return false;
 
 	/* Coherence: no cycle in hb;eco, as CoWR, CoRW, CoRR and CoWW */
 	for (const auto &lab : g.labels()) {
+		if (!hbCoherence_)
+			break;
 		const auto *rLab = genmc::dyn_cast<ReadLabel>(&lab);
 		if (!rLab || !rLab->getRf())
 			continue;
@@ -93,7 +162,7 @@ auto ExhaustiveConsistency::isGraphConsistent(const ExecutionGraph &g) const -> 
 				return false;
 		}
 	}
-	for (auto locIt = g.loc_begin(); locIt != g.loc_end(); ++locIt) {
+	for (auto locIt = g.loc_begin(); locIt != g.loc_end() && hbCoherence_; ++locIt) {
 		auto i = 0;
 		for (const auto &wLab : g.co(locIt->first)) {
 			auto j = 0;
@@ -110,7 +179,7 @@ auto ExhaustiveConsistency::isGraphConsistent(const ExecutionGraph &g) const -> 
 	/* Atomicity: an RMW's write follows the write its read reads from */
 	for (const auto &lab : g.labels()) {
 		const auto *wLab = genmc::dyn_cast<WriteLabel>(&lab);
-		if (!wLab || !wLab->isRMW())
+		if (!atomicity || !wLab || !wLab->isRMW())
 			continue;
 		const auto *rLab = genmc::dyn_cast<ReadLabel>(g.po_imm_pred(wLab));
 		const EventLabel *pLab = g.co_imm_pred(wLab);
@@ -120,11 +189,13 @@ auto ExhaustiveConsistency::isGraphConsistent(const ExecutionGraph &g) const -> 
 	return cc.isConsistent(g);
 }
 
-auto ExhaustiveConsistency::isExecutionConsistent(const ExecutionGraph &g) -> bool
+auto ExhaustiveConsistency::isExecutionConsistent(const ExecutionGraph &g, bool intermediate,
+						   bool atomicity) -> bool
 {
 	auto copy = g.clone();
 	model_.recomputeCacheCounters(*copy);
-	const auto consistent = recomputeViews(*copy) && isGraphConsistent(*copy);
+	const auto consistent =
+		recomputeViews(*copy) && isGraphConsistent(*copy, intermediate, atomicity);
 	model_.recomputeCacheCounters(g);
 	return consistent;
 }

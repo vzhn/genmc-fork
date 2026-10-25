@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/lkmm-genmc.kat, Kater v0.4.0-vzhn.3-2-g2967209 (scripts/lkmm/kater-export.sh).
+ * From kat/lkmm-genmc.kat, Kater v0.4.0-vzhn.3-4-ge1c0182 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -33947,12 +33947,6 @@ void LKMMChecker::visitPPoRf24(const EventLabel *lab, DepView &pporf) const
 				visitPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<FenceLabel>(pLab)) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
@@ -33970,13 +33964,6 @@ void LKMMChecker::visitPPoRf24(const EventLabel *lab, DepView &pporf) const
 		    (!genmc::isa<CasReadLabel>(pLab) ||
 		     static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
 			     ->isRMW()))
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf7[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf7(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<FenceLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
@@ -34007,12 +33994,6 @@ void LKMMChecker::visitPPoRf24(const EventLabel *lab, DepView &pporf) const
 		    (!genmc::isa<CasReadLabel>(pLab) ||
 		     static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
 			     ->isRMW())) {
-			auto status = visitedPPoRf24[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf24(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<FenceLabel>(pLab)) {
 			auto status = visitedPPoRf24[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitPPoRf24(pLab, pporf);
@@ -37044,12 +37025,6 @@ void LKMMChecker::visitRPPoRf24(const EventLabel *lab, DepView &pporf) const
 				visitRPPoRf1(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<FenceLabel>(pLab)) {
-			auto status = visitedRPPoRf1[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitRPPoRf1(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
 			auto status = visitedRPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
@@ -37067,13 +37042,6 @@ void LKMMChecker::visitRPPoRf24(const EventLabel *lab, DepView &pporf) const
 		    (!genmc::isa<CasReadLabel>(pLab) ||
 		     static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
 			     ->isRMW()))
-			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedRPPoRf7[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitRPPoRf7(pLab, pporf);
-			}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<FenceLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedRPPoRf7[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
@@ -37104,12 +37072,6 @@ void LKMMChecker::visitRPPoRf24(const EventLabel *lab, DepView &pporf) const
 		    (!genmc::isa<CasReadLabel>(pLab) ||
 		     static_cast<const ReadLabel *>(static_cast<const EventLabel *>(pLab))
 			     ->isRMW())) {
-			auto status = visitedRPPoRf24[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitRPPoRf24(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<FenceLabel>(pLab)) {
 			auto status = visitedRPPoRf24[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
 				visitRPPoRf24(pLab, pporf);

@@ -249,10 +249,18 @@ auto describeLabel(const ExecutionGraph &g, const EventLabel &lab, const ThreadN
 	if (const auto *mLab = genmc::dyn_cast<MemLabel>(&lab))
 		s += std::format(":a{}:s{}", names.addr(mLab->getAddr()), mLab->getSize().get());
 	if (const auto *rLab = genmc::dyn_cast<ReadLabel>(&lab)) {
-		if (rLab->getRf()) {
-			s += std::format(
-				":rf{}:v{}", names.event(rLab->getRf()->getPos()),
-				names.value(rLab->getRf()->getAccessValue(rLab->getAccess())));
+		/* (A read of the initializer of dynamic memory not initialized
+		 * yet has no value: a run that found it an error was dropped, as
+		 * a thread had events kept after a hole, see reportError()) */
+		const auto *rf = rLab->getRf();
+		const auto uninit = rf && rf->getPos().isInitializer() &&
+				    rLab->getAddr().isDynamic() &&
+				    !g.getState().isInitialized(rLab->getAccess());
+		if (rf && uninit) {
+			s += std::format(":rf{}:v?", names.event(rf->getPos()));
+		} else if (rf) {
+			s += std::format(":rf{}:v{}", names.event(rf->getPos()),
+					 names.value(rf->getAccessValue(rLab->getAccess())));
 		} else {
 			s += ":rf-";
 		}

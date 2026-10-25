@@ -579,6 +579,9 @@ BLOCK_PURE_SUBCLASS(ErrorBlock);
 BLOCK_PURE_SUBCLASS(UserBlock);
 /* A thread blocked in __VERIFIER_await() */
 BLOCK_PURE_SUBCLASS(AwaitBlock);
+/** -lkmm: the thread's path cannot go on before the events a revisit kept
+ * after it (see ExplorationCore::deadEndThread()) */
+BLOCK_PURE_SUBCLASS(DeadPathBlock);
 
 /**
  * Represents that a thread cannot be scheduled until a child
@@ -2254,6 +2257,9 @@ template <> struct std::formatter<EventLabel::EventLabelKind> {
 			break;
 		case EventLabel::AwaitBlock:
 			str = "BLOCK[await]";
+			break;
+		case EventLabel::DeadPathBlock:
+			str = "BLOCK[dead-path]";
 			break;
 		case EventLabel::FaiZNEBlock:
 			str = "BLOCK[Fai-zne]";

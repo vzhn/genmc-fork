@@ -37,8 +37,12 @@ class ExhaustiveConsistency {
 public:
 	using UpdateViews = std::function<void(EventLabel *)>;
 
-	ExhaustiveConsistency(ConsistencyChecker &model, UpdateViews updateViews)
-		: model_(model), updateViews_(std::move(updateViews))
+	/** HBCOHERENCE: coherence is judged by the hb view (IMM: no cycle in
+	 * hb ; eco); otherwise along each thread (LKMM: SC per location, the
+	 * accesses of a thread to a location do not go back in its coherence
+	 * order) */
+	ExhaustiveConsistency(ConsistencyChecker &model, UpdateViews updateViews, bool hbCoherence)
+		: model_(model), updateViews_(std::move(updateViews)), hbCoherence_(hbCoherence)
 	{}
 
 	/** Computes the views of G's labels anew, in G, and drops their cached
@@ -51,11 +55,13 @@ public:
 
 	/** Whether G, whose views are up to date, is consistent: coherence,
 	 * the atomicity of its RMWs, the other axioms */
-	auto isGraphConsistent(const ExecutionGraph &g) const -> bool;
+	auto isGraphConsistent(const ExecutionGraph &g, bool intermediate = false,
+			       bool atomicity = true) const -> bool;
 
 	/** Whether G (a complete execution, or the graph of an error) is
 	 * consistent, checked on a copy whose views are computed anew */
-	auto isExecutionConsistent(const ExecutionGraph &g) -> bool;
+	auto isExecutionConsistent(const ExecutionGraph &g, bool intermediate = false,
+				   bool atomicity = true) -> bool;
 
 	/** Runs CHECK on a copy of G whose views are computed anew (positions
 	 * name the same events in both) */
@@ -63,8 +69,13 @@ public:
 				const std::function<void(const ExecutionGraph &)> &check);
 
 private:
+	/** Whether G's accesses respect coherence along each thread */
+	static auto isCoherentPerLocation(const ExecutionGraph &g) -> bool;
+	auto isGraphConsistentImpl(const ExecutionGraph &g, bool atomicity) const -> bool;
+
 	ConsistencyChecker &model_;
 	UpdateViews updateViews_;
+	bool hbCoherence_;
 };
 
 #endif /* GENMC_EXHAUSTIVE_CONSISTENCY_HPP */
