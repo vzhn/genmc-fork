@@ -431,6 +431,42 @@ auto BackwardRevisits::isKeptByKeptRevisit(const BackwardRevisit &r, const Event
 	});
 }
 
+/* A read revisited although it did not read the maximal write when it was
+ * added (see getRevisitable()) may be bounded by an access of its thread
+ * after it that the revisit keeps: the revisiting write must not be co-after
+ * the write that access reads, or co-after or equal to the write it is (an
+ * RMW read's own write part moves with it, and is no bound) */
+auto BackwardRevisits::breaksCoherenceOfKeptLater(const BackwardRevisit &r) const -> bool
+{
+	const auto &g = g_;
+	const auto &v = r.getViewNoRel();
+	const auto *rLab = g.getReadLabel(r.getPos());
+	const auto *sLab = g.getWriteLabel(r.getRev());
+	const auto *ownLab = rLab->isRMW() ? g.getWriteLabel(rLab->getPos().next()) : nullptr;
+	auto coBefore = [&](const EventLabel *a, const EventLabel *b) {
+		if (a == b || genmc::isa<InitLabel>(b))
+			return false;
+		if (genmc::isa<InitLabel>(a))
+			return true;
+		return std::ranges::any_of(g.co_succs(genmc::cast<WriteLabel>(a)),
+					   [&](auto &wLab) { return &wLab == b; });
+	};
+	for (auto j = rLab->getIndex() + 1; j < g.getThreadSize(rLab->getThread()); j++) {
+		const auto *mLab = genmc::dyn_cast<MemAccessLabel>(
+			g.getEventLabel(Event(rLab->getThread(), j)));
+		if (!mLab || mLab == ownLab || mLab->getAddr() != rLab->getAddr() ||
+		    !v->contains(mLab->getPos()))
+			continue;
+		if (const auto *qLab = genmc::dyn_cast<ReadLabel>(mLab)) {
+			if (!qLab->getRf() || qLab->getRf() == ownLab)
+				continue;
+			return coBefore(qLab->getRf(), sLab);
+		}
+		return !coBefore(sLab, mLab);
+	}
+	return false;
+}
+
 auto BackwardRevisits::isMaximalExtension(const BackwardRevisit &r) const -> bool
 {
 	/* Only revisit when the write's direct successor (if any) remains in the graph;

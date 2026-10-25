@@ -81,6 +81,11 @@ public:
 	 * reaches its graph: the events it deletes were added maximally */
 	[[nodiscard]] auto isMaximalExtension(const BackwardRevisit &r) const -> bool;
 
+	/** Whether the read R revisits, reading the revisiting write, would go
+	 * back in coherence against the first access to its location that R
+	 * keeps after it in its thread */
+	[[nodiscard]] auto breaksCoherenceOfKeptLater(const BackwardRevisit &r) const -> bool;
+
 	/** Whether every read R keeps keeps its write (-exhaustive) */
 	[[nodiscard]] auto isRevisitViewClosed(const BackwardRevisit &r) const -> bool;
 

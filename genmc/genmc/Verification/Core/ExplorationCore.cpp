@@ -2174,6 +2174,8 @@ void ExplorationCore::calcRevisits(WriteLabel *sLab)
 				getExec().getWorkqueue().add(std::move(br));
 			continue;
 		}
+		if (revisits.breaksCoherenceOfKeptLater(*br))
+			continue;
 		if (!revisits.isMaximalExtension(*br))
 			break;
 
