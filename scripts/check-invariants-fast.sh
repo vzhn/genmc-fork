@@ -100,4 +100,7 @@ for model in rc11 imm; do
 	# I2: no stale replay across the tasks of a worker (PR #19)
 	wrong safety/parallel-error-report "${model}" "Safety violation" -nthreads=4
 done
+# I5 under TSO: the checker's whole-graph check walks plain writes, which
+# are not in coherence
+correct infr/tso-plain-write-check tso
 exit ${status}
