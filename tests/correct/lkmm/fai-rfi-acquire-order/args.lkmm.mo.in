@@ -1,0 +1,5 @@
+ |
+-schedule-policy=wfr -schedule-seed=4 |
+-schedule-policy=arbitrary -schedule-seed=1 |
+-disable-lkmm-exhaustive |
+-lkmm-reference |
