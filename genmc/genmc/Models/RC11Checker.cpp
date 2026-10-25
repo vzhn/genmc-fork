@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/rc11-genmc.kat, Kater 914a4ed (scripts/lkmm/kater-export.sh).
+ * From kat/rc11-genmc.kat, Kater v0.4.0-vzhn.1 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -1930,10 +1930,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(1, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_1.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_1,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -1943,10 +1942,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(1, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_1.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_1,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -1956,10 +1954,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(1, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_1.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_1,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -1969,10 +1966,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(1, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_1.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_1,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -1983,10 +1979,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_2.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_2,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -1997,10 +1992,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_2.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_2,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2012,11 +2006,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(3, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_3.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_3,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2025,25 +2017,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 1: {
 			if (isFinishing) {
-				visitedConsAcyclic1_1.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_1.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_1.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_1,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(1, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_1.getCount(lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_1,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -2054,10 +2042,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(1, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_1.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_1,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2067,10 +2054,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(1, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_1.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_1,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2080,10 +2066,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(1, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_1.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_1,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2093,10 +2078,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(1, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_1.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_1,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2107,10 +2091,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_2.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_2,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2121,10 +2104,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_2.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_2,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2136,11 +2118,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(3, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_3.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_3,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2151,10 +2131,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2163,25 +2142,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 2: {
 			if (isFinishing) {
-				visitedConsAcyclic1_2.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_2.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_2.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_2,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(2, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_2.getCount(lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_2,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -2191,10 +2166,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(2, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_2.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_2,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2205,10 +2179,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(3, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_3.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_3,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2217,25 +2190,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 3: {
 			if (isFinishing) {
-				visitedConsAcyclic1_3.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_3.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_3.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_3,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(3, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_3.getCount(lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_3,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -2247,11 +2216,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(1, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_1.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_1,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2262,10 +2229,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(1, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_1.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_1,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2277,10 +2243,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_2.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_2,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2292,11 +2257,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(3, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_3.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_3,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2314,10 +2277,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(5, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_5.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_5,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2329,11 +2291,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2358,11 +2318,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(3, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_3.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_3,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2371,25 +2329,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 5: {
 			if (isFinishing) {
-				visitedConsAcyclic1_5.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_5.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_5.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_5,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(5, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_5.getCount(lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_5,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -2400,10 +2354,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(1, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_1.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_1,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2414,10 +2367,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(1, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_1.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_1,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2429,10 +2381,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_2.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_2,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2442,10 +2393,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(5, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_5.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_5,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2457,11 +2407,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2473,11 +2421,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2486,25 +2432,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 6: {
 			if (isFinishing) {
-				visitedConsAcyclic1_6.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_6.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_6.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_6,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(6, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_6.getCount(lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_6,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -2515,10 +2457,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(6, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_6,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2528,10 +2469,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(6, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_6.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_6,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2541,10 +2481,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(6, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_6.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_6,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2554,10 +2493,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(6, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_6.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_6,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2568,10 +2506,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(7, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_7.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_7,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2582,10 +2519,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(7, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_7.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_7,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2597,11 +2533,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(8, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_8.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_8,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2611,10 +2545,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(12, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_12.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_12,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2624,10 +2557,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(13, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_13.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_13,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2637,10 +2569,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(13, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_13.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_13,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2651,10 +2582,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(18, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_18.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_18,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2664,10 +2594,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(18, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_18.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_18,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2677,10 +2606,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(18, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_18.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_18,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2692,11 +2620,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2707,10 +2633,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2721,10 +2646,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2735,10 +2659,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2747,25 +2670,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 7: {
 			if (isFinishing) {
-				visitedConsAcyclic1_7.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_7.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_7.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_7,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(7, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_7.getCount(lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_7,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -2775,10 +2694,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(7, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_7.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_7,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2789,10 +2707,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(8, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_8.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_8,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2801,25 +2718,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 8: {
 			if (isFinishing) {
-				visitedConsAcyclic1_8.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_8.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_8.set(lab->getStamp().get(),
-							  visitedConsAcyclic1Accepting,
-							  NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_8,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(8, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting >
-					    visitedConsAcyclic1_8.getCount(lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_8,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -2831,11 +2744,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(6, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_6.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_6,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2846,10 +2757,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(6, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_6,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2861,10 +2771,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(7, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_7.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_7,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2876,11 +2785,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(8, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_8.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_8,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2898,10 +2805,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(10, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_10.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_10,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -2912,10 +2818,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(12, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_12.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_12,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2926,10 +2831,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(13, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_13.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_13,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2940,10 +2844,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(13, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_13.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_13,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2955,11 +2858,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(18, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_18.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_18,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -2970,10 +2871,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(18, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_18.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_18,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -2984,10 +2884,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(18, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_18.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_18,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3000,13 +2899,11 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
 								worklist.emplace_back(19, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic1Accepting >
-									 visitedConsAcyclic1_19.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 1)) {
+							} else if (status == NodeStatus::entered &&
+								   visitedConsAcyclic1Search.reach(
+									   visitedConsAcyclic1_19,
+									   pLab->getStamp().get(),
+									   true)) {
 								return false; /* cycle detected */
 							}
 						}
@@ -3018,11 +2915,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3034,11 +2929,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3050,11 +2943,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3079,11 +2970,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(8, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_8.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_8,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3092,25 +2981,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 10: {
 			if (isFinishing) {
-				visitedConsAcyclic1_10.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_10.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_10.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_10,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(10, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_10.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_10,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -3121,10 +3006,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(6, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_6,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3135,10 +3019,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(6, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_6,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3150,10 +3033,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(7, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_7.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_7,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3163,10 +3045,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(10, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_10.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_10,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3177,10 +3058,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(12, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_12.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_12,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3191,10 +3071,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(12, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_12.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_12,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3206,11 +3085,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3222,11 +3099,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3235,25 +3110,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 11: {
 			if (isFinishing) {
-				visitedConsAcyclic1_11.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_11.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_11.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_11,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(11, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_11.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -3264,10 +3135,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_11.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_11,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3277,10 +3147,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3290,10 +3159,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3303,10 +3171,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3317,10 +3184,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3331,10 +3197,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3346,11 +3211,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(15, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_15.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_15,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3361,10 +3224,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3373,25 +3235,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 12: {
 			if (isFinishing) {
-				visitedConsAcyclic1_12.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_12.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_12.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_12,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(12, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_12.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_12,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -3402,10 +3260,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_11.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_11,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3415,10 +3272,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3428,10 +3284,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3441,10 +3296,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(12, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_12.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_12,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3455,10 +3309,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3469,10 +3322,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3484,11 +3336,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(15, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_15.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_15,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3499,10 +3349,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3513,10 +3362,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3525,25 +3373,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 13: {
 			if (isFinishing) {
-				visitedConsAcyclic1_13.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_13.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_13.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_13,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(13, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_13.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_13,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -3554,10 +3398,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_11.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_11,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3567,10 +3410,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3580,10 +3422,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3593,10 +3434,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3606,10 +3446,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(13, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_13.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_13,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3620,10 +3459,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3634,10 +3472,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3649,11 +3486,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(15, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_15.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_15,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3664,10 +3499,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3678,10 +3512,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3690,25 +3523,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 14: {
 			if (isFinishing) {
-				visitedConsAcyclic1_14.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_14.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_14.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_14,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(14, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_14.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_14,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -3718,10 +3547,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(14, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_14.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_14,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3732,10 +3560,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(15, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_15.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_15,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3744,25 +3571,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 15: {
 			if (isFinishing) {
-				visitedConsAcyclic1_15.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_15.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_15.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_15,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(15, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_15.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_15,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -3774,11 +3597,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(11, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_11.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_11,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3789,10 +3610,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_11.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_11,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3804,10 +3624,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3819,11 +3638,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(15, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_15.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_15,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3841,10 +3658,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(17, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_17.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_17,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3856,10 +3672,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3871,11 +3686,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3900,11 +3713,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(15, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_15.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_15,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -3913,25 +3724,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 17: {
 			if (isFinishing) {
-				visitedConsAcyclic1_17.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_17.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_17.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_17,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(17, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_17.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_17,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -3942,10 +3749,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_11.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_11,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3956,10 +3762,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_11.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_11,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3971,10 +3776,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -3984,10 +3788,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(17, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_17.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_17,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -3999,10 +3802,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4014,11 +3816,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -4030,11 +3830,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -4043,25 +3841,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 18: {
 			if (isFinishing) {
-				visitedConsAcyclic1_18.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::left);
+				visitedConsAcyclic1Search.finish(false);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_18.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic1_18.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_18,
+								lab->getStamp().get(), false);
 				worklist.emplace_back(18, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_18.getCount(
-									   lab->getStamp().get()) ||
-				    0)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_18,
+								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -4072,10 +3866,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_11.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_11,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4085,10 +3878,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -4098,10 +3890,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -4111,10 +3902,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(11, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_11.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_11,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -4125,10 +3915,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4139,10 +3928,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4154,11 +3942,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(15, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_15.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_15,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -4169,10 +3955,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(18, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_18.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_18,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4182,10 +3967,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(18, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_18.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_18,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -4195,10 +3979,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(18, pLab);
 				} else if (status == NodeStatus::entered &&
-					   (visitedConsAcyclic1Accepting >
-						    visitedConsAcyclic1_18.getCount(
-							    pLab->getStamp().get()) ||
-					    0)) {
+					   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_18,
+									   pLab->getStamp().get(),
+									   false)) {
 					return false; /* cycle detected */
 				}
 			}
@@ -4209,10 +3992,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(19, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_19.getCount(
-								    pLab->getStamp().get()) ||
-						    1)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_19,
+							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4221,27 +4003,21 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 		}
 		case 19: {
 			if (isFinishing) {
-				--visitedConsAcyclic1Accepting;
-				visitedConsAcyclic1_19.set(lab->getStamp().get(),
-							   visitedConsAcyclic1Accepting,
-							   NodeStatus::left);
+				visitedConsAcyclic1Search.finish(true);
 				break;
 			}
 
 			auto status = visitedConsAcyclic1_19.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				++visitedConsAcyclic1Accepting;
-				visitedConsAcyclic1_19.setIncr(lab->getStamp().get(),
-							       visitedConsAcyclic1Accepting,
-							       NodeStatus::entered);
+				visitedConsAcyclic1Search.enter(visitedConsAcyclic1_19,
+								lab->getStamp().get(), true);
 				worklist.emplace_back(19, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   (visitedConsAcyclic1Accepting > visitedConsAcyclic1_19.getCount(
-									   lab->getStamp().get()) ||
-				    1)) {
+				   visitedConsAcyclic1Search.reach(visitedConsAcyclic1_19,
+								   lab->getStamp().get(), true)) {
 				return false; /* cycle detected */
-			} else if (status == NodeStatus::left) {
-				break; /* already explored*/
+			} else {
+				break; /* already explored */
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
@@ -4256,10 +4032,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(6, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_6.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_6,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4271,10 +4046,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(7, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_7.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_7,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4285,10 +4059,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(11, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_11.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_11,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4300,11 +4073,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(11, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_11.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    0)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_11,
+								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -4315,10 +4086,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(12, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_12.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_12,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4329,10 +4099,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(13, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_13.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_13,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4343,10 +4112,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(13, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_13.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_13,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4358,10 +4126,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 					if (status == NodeStatus::unseen) {
 						worklist.emplace_back(14, pLab);
 					} else if (status == NodeStatus::entered &&
-						   (visitedConsAcyclic1Accepting >
-							    visitedConsAcyclic1_14.getCount(
-								    pLab->getStamp().get()) ||
-						    0)) {
+						   visitedConsAcyclic1Search.reach(
+							   visitedConsAcyclic1_14,
+							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
@@ -4373,11 +4140,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -4390,13 +4155,11 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
 								worklist.emplace_back(19, pLab);
-							} else if (
-								status == NodeStatus::entered &&
-								(visitedConsAcyclic1Accepting >
-									 visitedConsAcyclic1_19.getCount(
-										 pLab->getStamp()
-											 .get()) ||
-								 1)) {
+							} else if (status == NodeStatus::entered &&
+								   visitedConsAcyclic1Search.reach(
+									   visitedConsAcyclic1_19,
+									   pLab->getStamp().get(),
+									   true)) {
 								return false; /* cycle detected */
 							}
 						}
@@ -4408,11 +4171,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -4424,11 +4185,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -4440,11 +4199,9 @@ bool RC11Checker::visitConsAcyclic1Iterative(std::vector<DFSWorklistEntry> &work
 						if (status == NodeStatus::unseen) {
 							worklist.emplace_back(19, pLab);
 						} else if (status == NodeStatus::entered &&
-							   (visitedConsAcyclic1Accepting >
-								    visitedConsAcyclic1_19.getCount(
-									    pLab->getStamp()
-										    .get()) ||
-							    1)) {
+							   visitedConsAcyclic1Search.reach(
+								   visitedConsAcyclic1_19,
+								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
@@ -4462,7 +4219,7 @@ bool RC11Checker::visitConsAcyclic1(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedConsAcyclic1Accepting = 0;
+	visitedConsAcyclic1Search.reset();
 	visitedConsAcyclic1_1.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_2.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_3.maybeClearResize(g.getMaxStamp().get() + 1);
@@ -4491,7 +4248,7 @@ bool RC11Checker::visitConsAcyclic1(const EventLabel *lab) const
 
 bool RC11Checker::visitConsAcyclic1Full(const ExecutionGraph &g) const
 {
-	visitedConsAcyclic1Accepting = 0;
+	visitedConsAcyclic1Search.reset();
 	visitedConsAcyclic1_1.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_2.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic1_3.maybeClearResize(g.getMaxStamp().get() + 1);

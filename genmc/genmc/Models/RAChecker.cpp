@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/ra-genmc.kat, Kater 914a4ed (scripts/lkmm/kater-export.sh).
+ * From kat/ra-genmc.kat, Kater v0.4.0-vzhn.1 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN

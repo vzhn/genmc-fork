@@ -60,7 +60,8 @@ tests=$(find "${dirs[@]}" -path '*/variants/*.c' | sort)
 n=$(echo "$tests" | wc -l)
 out=$(for model in rc11 sc tso ra imm lkmm; do
 	for mode in "" "-exhaustive"; do
-		echo "$tests" | sed "s|\$| $model $mode|"
+		# no trailing blank: xargs -L 1 would join the line with the next
+		echo "$tests" | sed "s|\$| $model${mode:+ $mode}|"
 	done
 done | xargs -P "$JOBS" -L 1 bash -c 'one "$0" "$1" "$2"')
 KNOWN="${MATRIX_KNOWN:-$DIR/config-matrix-known.txt}"
