@@ -254,6 +254,28 @@ TEST(ScriptedDriver, CasAfterAnIncrement)
 	expectMatchesOracle(p, ModelType::SC);
 }
 
+TEST(ScriptedDriver, LKMMOrdersAfterASeqCstCasOnlyOnSuccess)
+{
+	/* #235: under LKMM a seq_cst CAS orders the events after it only when it
+	 * succeeds, and the events after it then depend on it (as the
+	 * interpreter makes them since #234). Without that dependency, the
+	 * optimal exploration counted an execution where the CAS, succeeding,
+	 * is ordered before the store t2 reads, whose thread then writes what
+	 * the CAS read: a cycle (I5, under the arbitrary policy) */
+	Program p{.numVars = 2,
+		  .threads = {{cas(X, 2, 3, MemOrdering::SequentiallyConsistent), st(Y, 1)},
+			      {ld(X)},
+			      {ld(X), ld(Y), st(X, 2, MemOrdering::Release)}}};
+	for (auto seed : {1ULL, 18ULL, 21ULL}) {
+		auto r = explore(p, ModelType::LKMM,
+				 {.checkInvariants = true,
+				  .schedulePolicy = SchedulePolicy::Arbitrary,
+				  .scheduleSeed = seed});
+		EXPECT_FALSE(r.error);
+		EXPECT_EQ(r.inconsistent, 0U);
+	}
+}
+
 TEST(ScriptedDriver, IMMKeepsACasBeforeAKeptIncrement)
 {
 	/* #227: the revisit of t0's increment by t1's keeps t1's CAS, which IMM
