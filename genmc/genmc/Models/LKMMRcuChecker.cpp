@@ -71,6 +71,17 @@ static auto mayBreakModel(const EventLabel *lab) -> bool
 	return false;
 }
 
+/* The write part of LAB, an RMW read, when the graph has it already */
+static auto rmwWritePart(const EventLabel *lab) -> const WriteLabel *
+{
+	const auto *rLab = genmc::dyn_cast<ReadLabel>(lab);
+	if (!rLab || !rLab->isRMW())
+		return nullptr;
+	const auto *wLab = genmc::dyn_cast_if_present<WriteLabel>(
+		rLab->getParent()->po_imm_succ(rLab));
+	return wLab && wLab->isRMW() ? wLab : nullptr;
+}
+
 auto LKMMRcuChecker::isConsistent(const EventLabel *lab) const -> bool
 {
 	const auto &g = *lab->getParent();
@@ -91,7 +102,16 @@ auto LKMMRcuChecker::isConsistent(const EventLabel *lab) const -> bool
 			  g.getLastThreadLabel(lab->getThread()) == lab) ||
 			 [&] {
 				 lkmm::PropIntCache cache;
-				 return LKMMChecker::isConsistent(lab);
+				 if (!LKMMChecker::isConsistent(lab))
+					 return false;
+				 /* A revisit of an RMW read adds its write part too,
+				  * which isRevisitValid() checks next. The generated
+				  * checker looks for cycles through the event it is
+				  * given; the model, which the reference asks now,
+				  * judges the whole graph (#250) */
+				 const auto *wLab = rmwWritePart(lab);
+				 return !getConf()->lkmmReference || !wLab ||
+					LKMMChecker::isConsistent(wLab);
 			 }();
 	if (!getConf()->lkmmReference && !mayBreakModel(lab))
 		return generated;
