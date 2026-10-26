@@ -90,9 +90,22 @@ so a clean result holds only up to those bounds:
 - **`pthread_create`** stores the new thread's ID after creating the
   thread; glibc stores it before the thread runs. A thread that reads the ID
   once the new thread has signalled it races with the store only in GenMC,
-  so a race on that store is labelled `CREATE-RACE`, with no verdict.
+  so a race on that store is labelled `CREATE-RACE`, with no verdict. The
+  prelude's `pthread_create` stores the ID atomically, so that the runner
+  can tell that store from one of the task's own.
 - **`abort()`** and **`malloc(0)`** discard the execution. SV-COMP uses
   `abort()` to cut off paths, and GenMC itself would die on it (#44, #47).
+- **`malloc` and `calloc` may fail**, as in SV-COMP, for tasks that check
+  `valid-memsafety`: in each execution, at most one allocation returns NULL.
+- **Library functions** that GenMC lacks: `sleep` and `usleep` return at
+  once, `strcpy`, `ffs` and POSIX semaphores (`sem_init`, `sem_wait`,
+  `sem_trywait`, `sem_post`, ...) are defined in the generated tail of a
+  preprocessed task, and `scanf(fmt, p)` stores a nondet value through `p`.
+  `time` is not modelled (a clock that a task loops on until a deadline
+  cannot be bounded soundly), nor is `mmap` (its task forks).
+- **gcc's leniency:** SV-COMP's tasks are written for gcc, which only warns
+  about passing a pointer as an int (`assume_abort_if_not(p)`); the runner
+  makes clang warn too.
 
 ## Results
 
@@ -102,32 +115,33 @@ every folder of `Concurrency.set` (sv-benchmarks of 2026-10-26: 1154 tasks,
 
 | Verdict | Tasks |
 |---|---|
-| AGREE | 475 |
+| AGREE | 491 |
 | MISSED | 8 |
 | FALSE-ALARM | 0 |
-| BOUNDED | 190 |
+| BOUNDED | 212 |
 | UNCHECKED, ATOMIC-RACE, CREATE-RACE | 6, 40, 5 |
-| TIMEOUT | 368 |
-| COMPILE-ERROR | 26 |
-| UNSUPPORTED-CALL | 17 |
+| TIMEOUT | 369 |
+| COMPILE-ERROR | 0 |
+| UNSUPPORTED-CALL | 4 |
 | UNKNOWN, OTHER-ERROR | 3, 5 |
 
 Most timeouts are in `pthread-wmm` (201): its tasks simulate weak memory
 with many small atomic sections, and the one lock that implements them
 makes GenMC explore every order of the sections.
 
-Almost every `BOUNDED` task (184 of 190, 159 of them in `weaver`) has no
-complete execution at all: each execution asks for more nondet values than
-`--max-choices` allows, or wants a value beyond the range. 21 of them are
-bugs that a clean result would have missed; 168 were "true" only by luck,
-and one timed out. A larger `--max-choices` completes few of them (with 8,
-9 more AGREE; with 16, 11, and many more timeouts).
+Almost every `BOUNDED` task has no complete execution at all: each
+execution asks for more nondet values than `--max-choices` allows, or wants
+a value beyond the range. Before the check, 21 of them were bugs reported
+"true", 168 were "true" only by luck, and one timed out; a larger
+`--max-choices` completes few of them (with 8, 9 more AGREE; with 16, 11,
+and many more timeouts). The other 22 are `pthread-driver-races`, whose
+harnesses ask for some fifty nondet values.
 
 The missed bugs need a value beyond the small `nondet` range that no
 `assume` asks for (an index that reaches a neighbouring object, as in
 the `goblint-regression` ones), or a race hidden by the atomic-section
 lock; GenMC also does not check memory leaks.
 
-The `UNSUPPORTED-CALL` tasks call library functions that neither GenMC nor
-the prelude provides (`sleep`, `time`, `ffs`, `sem_init`, `strcpy`, `mmap`)
-or, in one case, a function the task declares but never defines.
+The `UNSUPPORTED-CALL` tasks call `time` or `mmap`, which the prelude does
+not model, or, in one case, a function the task declares but never
+defines.

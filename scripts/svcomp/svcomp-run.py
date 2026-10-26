@@ -25,7 +25,9 @@ A race where one side lies inside an atomic section is labelled ATOMIC-RACE
 and gets no verdict: SV-COMP counts accesses in atomic sections as atomic,
 while the shim implements atomic sections with a lock. A race on the store of
 a new thread's ID is labelled CREATE-RACE and gets no verdict: glibc's
-pthread_create stores the ID before the thread runs, GenMC's after.
+pthread_create stores the ID before the thread runs, GenMC's after. The
+shim's pthread_create stores it atomically, which tells that store from
+the task's own.
 
 GenMC runs with -svcomp where it has the option, so that a read of
 uninitialized memory, which SV-COMP does not count as a memory-safety
@@ -55,9 +57,10 @@ SHIM_PP = os.path.join(HERE, "svcomp-shim-pp.h")
 # Definitions for preprocessed tasks, in terms of GenMC's primitives. Each is
 # emitted only if the task mentions the function, so the types it uses exist.
 TAIL = {
+    # an atomic store, so that create_race() can tell it from the task's own
     "pthread_create": """int pthread_create(pthread_t *t, const pthread_attr_t *a,
 		   void *(*f)(void *), void *arg)
-{ *t = __VERIFIER_thread_create(0, f, arg); return 0; }""",
+{ __atomic_store_n(t, __VERIFIER_thread_create(0, f, arg), __ATOMIC_RELAXED); return 0; }""",
     "pthread_join": """int pthread_join(pthread_t t, void **r)
 { void *v = __VERIFIER_thread_join(t); if (r) *r = v; return 0; }""",
     "pthread_exit": "void pthread_exit(void *r) { __VERIFIER_thread_exit(r); }",
@@ -138,13 +141,45 @@ TAIL = {
 { return __svc_setspecific(k, p); }""",
     # GenMC's allocator rejects size 0 (its stdlib.h asserts); malloc(0) is
     # legal C, so drop those executions instead of reporting an error
-    "malloc": "void *malloc(size_t n) { __VERIFIER_assume(n > 0); return __VERIFIER_malloc(n); }",
+    # and it may fail (svcomp-shim-core.h)
+    "malloc": """void *malloc(size_t n)
+{ __VERIFIER_assume(n > 0); return __svc_malloc_fails() ? 0 : __VERIFIER_malloc(n); }""",
     "calloc": """void *calloc(size_t n, size_t sz)
-{ __VERIFIER_assume(n > 0 && sz > 0); return __VERIFIER_calloc(n, sz); }""",
+{
+	__VERIFIER_assume(n > 0 && sz > 0);
+	return __svc_malloc_fails() ? 0 : __VERIFIER_calloc(n, sz);
+}""",
     "free": "void free(void *p) { __VERIFIER_free(p); }",
     # SV-COMP's abort() cuts off a path; GenMC's real abort() would kill GenMC
     "abort": "void abort(void) { __svc_abort_path(); }",
     "pthread_detach": "int pthread_detach(pthread_t t) { return 0; }",
+    # sleeping only delays a thread, and GenMC explores every interleaving
+    "sleep": "unsigned int sleep(unsigned int s) { return 0; }",
+    "usleep": "int usleep(unsigned int us) { return 0; }",
+    "strcpy": """char *strcpy(char *d, const char *s)
+{ char *r = d; while ((*d++ = *s++) != 0) ; return r; }""",
+    "ffs": """int ffs(int i)
+{
+	unsigned int u = i;
+	int n = 1;
+
+	if (!u)
+		return 0;
+	while (!(u & 1)) {
+		u >>= 1;
+		n++;
+	}
+	return n;
+}""",
+    "sem_init": """int sem_init(sem_t *s, int pshared, unsigned int v)
+{ __atomic_store_n((int *) s, (int) v, __ATOMIC_RELAXED); return 0; }""",
+    "sem_destroy": "int sem_destroy(sem_t *s) { return 0; }",
+    "sem_wait": "int sem_wait(sem_t *s) { return __svc_sem_wait((int *) s); }",
+    "sem_trywait": "int sem_trywait(sem_t *s) { return __svc_sem_trywait((int *) s); }",
+    "sem_post": """int sem_post(sem_t *s)
+{ __atomic_fetch_add((int *) s, 1, __ATOMIC_RELEASE); return 0; }""",
+    "sem_getvalue": """int sem_getvalue(sem_t *s, int *v)
+{ *v = __atomic_load_n((int *) s, __ATOMIC_RELAXED); return 0; }""",
     "__assert_fail": """void __assert_fail(const char *e, const char *file, unsigned int line,
 		   const char *fn)
 { __VERIFIER_assert_fail(e, file, line); }""",
@@ -242,12 +277,14 @@ def atomic_race(out):
 
 def create_race(out):
     """A race on the store of a new thread's ID: pthread_create's store right
-    after the THREAD_CREATE of that thread, with no source location (GenMC's
-    pthread.h) or that of the THREAD_CREATE (the generated tail): a store of
-    the task's own on the next line may store the same value. glibc
-    stores the ID before the thread runs, so a read ordered after the
-    thread's start does not race with it there; GenMC creates the thread
-    first."""
+    after the THREAD_CREATE of that thread. The shim and the generated tail
+    store the ID atomically, at a line of svcomp-shim.h or at the line of
+    the THREAD_CREATE (the tail's pthread_create), so that the store is
+    told from a store of the task's own, which may store the same value
+    right after pthread_create and is printed without a location when it
+    is the racing event. glibc stores the ID before the thread runs, so a
+    read ordered after the thread's start does not race with it there;
+    GenMC creates the thread first."""
     m = re.search(r"Event \((\d+), (\d+)\) conflicts with event \((\d+), (\d+)\)", out)
     if not m:
         return False
@@ -257,9 +294,10 @@ def create_race(out):
     def is_id_store(tid, idx):
         create = re.fullmatch(r"THREAD_CREATE \[thread (\d+)\]\s*(\S*)",
                               events.get((tid, idx - 1), ""))
-        store = re.fullmatch(r"W\w* \(.*, (\d+)\)\s*(\S*)", events.get((tid, idx), ""))
+        store = re.fullmatch(r"W(?!na\b)\w* \(.*, (\d+)\)\s*(\S+)", events.get((tid, idx), ""))
         return bool(create and store and create.group(1) == store.group(1)
-                    and store.group(2) in ("", create.group(2)))
+                    and (store.group(2) == create.group(2)
+                         or store.group(2).startswith("svcomp-shim.h:")))
 
     a, b, c, d = map(int, m.groups())
     return is_id_store(a, b) or is_id_store(c, d)
@@ -299,8 +337,9 @@ def run_task(args, d, yml):
     # SV-COMP runs functions named __VERIFIER_atomic_* atomically
     code = re.sub(r"(\b__VERIFIER_atomic_(?!begin\b|end\b)\w+\s*\([^;{)]*\)\s*\{)",
                   r"\1 SVC_ATOMIC_FUNCTION_GUARD;", code)
-    # preprocessed tasks declare pthread_t themselves
-    if not re.search(r"typedef\s+unsigned\s+long(\s+int)?\s+pthread_t\s*;", code):
+    # preprocessed tasks declare pthread_t themselves (unsigned long, or int
+    # in pthread-driver-races)
+    if not re.search(r"\btypedef\s+[^;{}]+\bpthread_t\s*;", code):
         shim, mode = SHIM, "A"
         src = os.path.join(od, name + ".c")
         with open(src, "w") as f:
@@ -314,6 +353,8 @@ def run_task(args, d, yml):
             f.write(code + "\n\n/* ---- svcomp-run tail ---- */\n" + "\n\n".join(tail) + "\n")
     main_argc = 1 if re.search(r"\bmain\s*\(\s*int\b", with_local_includes(code, d)) else 0
     recursive = 1 if mentions_recursive(code) else 0
+    # SV-COMP's malloc may fail; only memory safety is about that
+    malloc_fail = 1 if "valid-memsafety" in expected else 0
 
     def genmc(check_bounds, timeout):
         p = subprocess.run([args.genmc, f"-{args.model}", "-disable-estimation",
@@ -324,6 +365,11 @@ def run_task(args, d, yml):
                             f"-DSVC_MAX_CHOICES={args.max_choices}",
                             f"-DSVC_MAX_SPURIOUS={args.max_spurious}",
                             f"-DSVC_CHECK_BOUNDS={check_bounds}",
+                            f"-DSVC_MALLOC_FAIL={malloc_fail}",
+                            # gcc, which SV-COMP's tasks are written for,
+                            # only warns about these
+                            "-Wno-error=int-conversion",
+                            "-Wno-error=incompatible-pointer-types",
                             "-include", shim, src],
                            capture_output=True, text=True, timeout=timeout)
         return p.stdout + p.stderr

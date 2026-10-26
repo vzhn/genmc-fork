@@ -22,12 +22,14 @@
  *   with that type keeps an owner and a count around GenMC's mutex.
  * - malloc/calloc: GenMC's stdlib.h asserts that the size is not zero, which
  *   reports legal malloc(0) calls as safety violations. Here an execution
- *   that allocates zero bytes is discarded instead.
+ *   that allocates zero bytes is discarded instead. They may fail (see
+ *   svcomp-shim-core.h).
  * - abort(): SV-COMP uses it to cut off paths it is not interested in
  *   (assume_abort_if_not()). GenMC's interpreter calls the real abort(), which
  *   kills GenMC; here it discards the execution instead.
  * - pthread_detach, pthread_mutexattr_*, PTHREAD_RWLOCK_INITIALIZER: missing
  *   from GenMC's pthread.h; trivial versions here.
+ * - scanf(fmt, p): missing from GenMC's stdio.h; stores a nondet value.
  */
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -40,13 +42,13 @@
 static void *__svc_malloc(size_t n)
 {
 	__VERIFIER_assume(n > 0);
-	return __VERIFIER_malloc(n);
+	return __svc_malloc_fails() ? NULL : __VERIFIER_malloc(n);
 }
 
 static void *__svc_calloc(size_t n, size_t sz)
 {
 	__VERIFIER_assume(n > 0 && sz > 0);
-	return __VERIFIER_calloc(n, sz);
+	return __svc_malloc_fails() ? NULL : __VERIFIER_calloc(n, sz);
 }
 
 static void __svc_abort(void)
@@ -141,6 +143,20 @@ static int __svc_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
 	return 0;
 }
 #define pthread_cond_wait(c, m) __svc_cond_wait(c, m)
+
+/* scanf(fmt, p): GenMC's stdio.h has none; a task reads one number with it,
+ * which is a nondet value here */
+#define scanf(fmt, p) (*(p) = __svc_nondet_val(), 1)
+
+/* GenMC's pthread_create, with an atomic store of the ID, which
+ * svcomp-run.py tells from the task's own stores (see create_race()) */
+static int __svc_pthread_create(pthread_t *t, const pthread_attr_t *a,
+				void *(*fn)(void *), void *arg)
+{
+	__atomic_store_n(t, __VERIFIER_thread_create(a, fn, arg), __ATOMIC_RELAXED);
+	return 0;
+}
+#define pthread_create __svc_pthread_create
 
 #define malloc __svc_malloc
 #define abort __svc_abort

@@ -376,8 +376,11 @@ released.
   also labels a race on the store of a new thread's ID `CREATE-RACE`, with
   no verdict: glibc's `pthread_create()` stores the ID before the thread
   runs, GenMC's after it creates the thread, so a read that the new thread
-  orders after its start races with that store only in GenMC
-  (`scripts/svcomp/selftest/create-order`, `uninit-read`).
+  orders after its start races with that store only in GenMC. The
+  prelude's `pthread_create` stores the ID atomically, so that the runner
+  tells that store from the task's own, which GenMC may print without a
+  location (`scripts/svcomp/selftest/create-order`, `create-then-write`,
+  `uninit-read`).
 - `scripts/svcomp/svcomp-run.py` reported a task clean even when the
   prelude's bounds had discarded every execution that could reach its error
   (more nondet values than `--max-choices`, a value beyond `--nondet-max`):
@@ -387,6 +390,18 @@ released.
   execution that asks for one value too many or aborts after reading the
   range's largest value; the task is then labelled `BOUNDED`, with no
   verdict (`scripts/svcomp/selftest/bounded-*`, `blocked-not-bounded`).
+- `scripts/svcomp/svcomp-run.py` could not run 43 tasks of
+  `Concurrency.set`. The 22 of `pthread-driver-races` declare `pthread_t`
+  as `int`, so the runner took them for tasks that include `<pthread.h>`
+  and they clashed with GenMC's; others called `sleep`, `strcpy`, `ffs`,
+  POSIX semaphores or `scanf`, which GenMC lacks, or passed a pointer as an
+  int, which clang rejects and gcc only warns about. The prelude now
+  defines those functions (`time` and `mmap` stay unsupported) and clang
+  only warns. With `strcpy`, a task whose error is a NULL dereference after
+  a failed `malloc` became a wrong "true": as in SV-COMP, `malloc` and
+  `calloc` now may fail, at most once per execution, in tasks that check
+  `valid-memsafety` (`scripts/svcomp/selftest/pp-libc`, `pp-sem-race`,
+  `scanf`, `pp-int-pthread-t`, `malloc-fail*`).
 
 
 ## [0.19.0-vzhn.14] - 2026.10.22
