@@ -126,6 +126,11 @@ public:
 	/** Opt: Sets E as an event to be re-executed */
 	void setErrorReplayEvent(std::optional<Event> e) { eventToReexecute_ = e; }
 
+	/** Opt: Sets E as an event the error replay also re-executes, before
+	 * the one it runs up to: the other access of a race, which is not in
+	 * that one's prefix, and whose source information the report needs */
+	void setErrorReplayPartner(std::optional<Event> e) { errorReplayPartner_ = e; }
+
 protected:
 	Scheduler(const Config *config) : conf_(config) {}
 
@@ -190,6 +195,9 @@ private:
 
 	/** Opt: Whether we need to re-execute up to a given event (error reporting) */
 	std::optional<Event> eventToReexecute_;
+
+	/** Opt: An event the error replay re-executes too (see setErrorReplayPartner()) */
+	std::optional<Event> errorReplayPartner_;
 
 	/** Opt: Whether a particular read needs to be repaired during rescheduling */
 	Event readToReschedule_ = Event::getInit();

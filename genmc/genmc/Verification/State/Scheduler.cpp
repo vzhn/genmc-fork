@@ -80,7 +80,8 @@ static auto isSchedulable(const ExecutionGraph &g, int thread) -> bool
 }
 
 static auto calculateReplaySchedule(const ExecutionGraph &g, const Config *conf,
-				    std::optional<Event> errorEvent) -> std::vector<Event>
+				    std::optional<Event> errorEvent,
+				    std::optional<Event> errorPartner) -> std::vector<Event>
 {
 	/* Calculate preliminary replay schedule (reversed order) */
 	View view;
@@ -115,10 +116,13 @@ static auto calculateReplaySchedule(const ExecutionGraph &g, const Config *conf,
 	}
 
 	/* Erase NAs as they cannot affect the schedule (unless RD is disabled),
-	 * but keep the error event: a replay must reach it */
+	 * but keep the error event: a replay must reach it. Keep the other
+	 * access of a race too: it is not in the error event's prefix, and its
+	 * thread would not run up to it (it stays before the error event) */
 	if (!conf->disableRaceDetection) {
-		std::erase_if(result, [&g, &errorEvent](const auto &pos) {
-			return pos != errorEvent && g.getEventLabel(pos)->isNotAtomic();
+		std::erase_if(result, [&](const auto &pos) {
+			return pos != errorEvent && pos != errorPartner &&
+			       g.getEventLabel(pos)->isNotAtomic();
 		});
 	}
 
@@ -149,7 +153,8 @@ void Scheduler::resetExplorationOptions(const ExecutionGraph &g)
 	 * backward revisit copied) must fill them before the policy lets the
 	 * others run, as it would in a replay; otherwise the events the others
 	 * add first make the kept events' revisits non-maximal (issue #111) */
-	replaySchedule_ = calculateReplaySchedule(g, getConf(), eventToReexecute_);
+	replaySchedule_ = calculateReplaySchedule(g, getConf(), eventToReexecute_,
+						  eventToReexecute_ ? errorReplayPartner_ : std::nullopt);
 
 	/* Check whether the event that led to this execs needs thread prioritization */
 	for (auto tid : g.thr_ids()) {

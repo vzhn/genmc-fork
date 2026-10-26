@@ -11,6 +11,12 @@ released.
 
 ### Fixed
 
+- The error graph of a race printed the access that the race was found
+  with, if it came later than the reported one, without its variable's name
+  or its source location: `Wna (, 5)`. The error replay, which collects the
+  source information, ran up to the reported access only, and the other one
+  is not in its prefix (the two race). The replay now runs the other access
+  too (`tests/wrong/racy/race-partner-location`).
 - `-lkmm` missed executions that LKMM allows when the events a revisit
   kept depended on the path a branch took (#77). The prefix of a write
   (what its revisits keep) had every fence before every later event
