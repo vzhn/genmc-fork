@@ -90,7 +90,9 @@ so a clean result holds only up to those bounds:
 - **`pthread_create`** stores the new thread's ID after creating the
   thread; glibc stores it before the thread runs. A thread that reads the ID
   once the new thread has signalled it races with the store only in GenMC,
-  so a race on that store is labelled `CREATE-RACE`, with no verdict.
+  so a race on that store is labelled `CREATE-RACE`, with no verdict. The
+  prelude's `pthread_create` stores the ID atomically, so that the runner
+  can tell that store from one of the task's own.
 - **`abort()`** and **`malloc(0)`** discard the execution. SV-COMP uses
   `abort()` to cut off paths, and GenMC itself would die on it (#44, #47).
 

@@ -25,7 +25,9 @@ A race where one side lies inside an atomic section is labelled ATOMIC-RACE
 and gets no verdict: SV-COMP counts accesses in atomic sections as atomic,
 while the shim implements atomic sections with a lock. A race on the store of
 a new thread's ID is labelled CREATE-RACE and gets no verdict: glibc's
-pthread_create stores the ID before the thread runs, GenMC's after.
+pthread_create stores the ID before the thread runs, GenMC's after. The
+shim's pthread_create stores it atomically, which tells that store from
+the task's own.
 
 GenMC runs with -svcomp where it has the option, so that a read of
 uninitialized memory, which SV-COMP does not count as a memory-safety
@@ -55,9 +57,10 @@ SHIM_PP = os.path.join(HERE, "svcomp-shim-pp.h")
 # Definitions for preprocessed tasks, in terms of GenMC's primitives. Each is
 # emitted only if the task mentions the function, so the types it uses exist.
 TAIL = {
+    # an atomic store, so that create_race() can tell it from the task's own
     "pthread_create": """int pthread_create(pthread_t *t, const pthread_attr_t *a,
 		   void *(*f)(void *), void *arg)
-{ *t = __VERIFIER_thread_create(0, f, arg); return 0; }""",
+{ __atomic_store_n(t, __VERIFIER_thread_create(0, f, arg), __ATOMIC_RELAXED); return 0; }""",
     "pthread_join": """int pthread_join(pthread_t t, void **r)
 { void *v = __VERIFIER_thread_join(t); if (r) *r = v; return 0; }""",
     "pthread_exit": "void pthread_exit(void *r) { __VERIFIER_thread_exit(r); }",
@@ -242,12 +245,14 @@ def atomic_race(out):
 
 def create_race(out):
     """A race on the store of a new thread's ID: pthread_create's store right
-    after the THREAD_CREATE of that thread, with no source location (GenMC's
-    pthread.h) or that of the THREAD_CREATE (the generated tail): a store of
-    the task's own on the next line may store the same value. glibc
-    stores the ID before the thread runs, so a read ordered after the
-    thread's start does not race with it there; GenMC creates the thread
-    first."""
+    after the THREAD_CREATE of that thread. The shim and the generated tail
+    store the ID atomically, at a line of svcomp-shim.h or at the line of
+    the THREAD_CREATE (the tail's pthread_create), so that the store is
+    told from a store of the task's own, which may store the same value
+    right after pthread_create and is printed without a location when it
+    is the racing event. glibc stores the ID before the thread runs, so a
+    read ordered after the thread's start does not race with it there;
+    GenMC creates the thread first."""
     m = re.search(r"Event \((\d+), (\d+)\) conflicts with event \((\d+), (\d+)\)", out)
     if not m:
         return False
@@ -257,9 +262,10 @@ def create_race(out):
     def is_id_store(tid, idx):
         create = re.fullmatch(r"THREAD_CREATE \[thread (\d+)\]\s*(\S*)",
                               events.get((tid, idx - 1), ""))
-        store = re.fullmatch(r"W\w* \(.*, (\d+)\)\s*(\S*)", events.get((tid, idx), ""))
+        store = re.fullmatch(r"W(?!na\b)\w* \(.*, (\d+)\)\s*(\S+)", events.get((tid, idx), ""))
         return bool(create and store and create.group(1) == store.group(1)
-                    and store.group(2) in ("", create.group(2)))
+                    and (store.group(2) == create.group(2)
+                         or store.group(2).startswith("svcomp-shim.h:")))
 
     a, b, c, d = map(int, m.groups())
     return is_id_store(a, b) or is_id_store(c, d)

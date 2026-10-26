@@ -142,6 +142,16 @@ static int __svc_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
 }
 #define pthread_cond_wait(c, m) __svc_cond_wait(c, m)
 
+/* GenMC's pthread_create, with an atomic store of the ID, which
+ * svcomp-run.py tells from the task's own stores (see create_race()) */
+static int __svc_pthread_create(pthread_t *t, const pthread_attr_t *a,
+				void *(*fn)(void *), void *arg)
+{
+	__atomic_store_n(t, __VERIFIER_thread_create(a, fn, arg), __ATOMIC_RELAXED);
+	return 0;
+}
+#define pthread_create __svc_pthread_create
+
 #define malloc __svc_malloc
 #define abort __svc_abort
 #define calloc __svc_calloc
