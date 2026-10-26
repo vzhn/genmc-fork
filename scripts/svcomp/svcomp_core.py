@@ -29,6 +29,7 @@ execution, instead of failing, if unreach-call is not.
 """
 import os
 import re
+import resource
 import subprocess
 import time
 
@@ -359,13 +360,17 @@ def genmc_options(genmc):
 
 
 def verify(genmc, task_src, workdir, properties, timeout=None, model="rc11", nondet_max=2,
-           max_choices=4, max_spurious=1, options=None):
+           max_choices=4, max_spurious=1, options=None, memlimit=None):
     """Runs GenMC on TASK_SRC for PROPERTIES. Returns what it found (a
     property, "ok", or why there is no verdict), its output and the file it
-    compiled (whose lines are the task's)"""
+    compiled (whose lines are the task's). MEMLIMIT caps each run's address
+    space, in bytes"""
     options = options if options is not None else genmc_options(genmc)
     name = os.path.splitext(os.path.basename(task_src))[0]
     src, shim, libdir, d, defs = prepare(task_src, workdir, name, properties)
+
+    def limit():
+        resource.setrlimit(resource.RLIMIT_AS, (memlimit, memlimit))
 
     def run(check_bounds, budget):
         p = subprocess.run([genmc, f"-{model}", "-disable-estimation",
@@ -382,7 +387,8 @@ def verify(genmc, task_src, workdir, properties, timeout=None, model="rc11", non
                             "-Wno-error=int-conversion",
                             "-Wno-error=incompatible-pointer-types",
                             "-include", shim, src],
-                           capture_output=True, text=True, timeout=budget)
+                           capture_output=True, text=True, timeout=budget,
+                           preexec_fn=limit if memlimit else None)
         return p.stdout + p.stderr
 
     t0 = time.time()
