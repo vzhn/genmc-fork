@@ -31,7 +31,12 @@
 #   thread runs, GenMC's after, so GenMC reports a race that SV-COMP does
 #   not have: the runner must label it CREATE-RACE, with no verdict;
 # - create-then-write: the task's own store of the same value right after
-#   pthread_create is a race SV-COMP has too, not a CREATE-RACE.
+#   pthread_create is a race SV-COMP has too, not a CREATE-RACE;
+# - bounded-*: errors beyond the shim's bounds (a fifth nondet value, a
+#   value of at least 20): every execution that could reach them is cut,
+#   and the bounds check must label them BOUNDED instead of "true";
+#   blocked-not-bounded: executions blocked for the task's own reasons,
+#   whose clean result stands.
 # Needs Python 3 with PyYAML; skipped (exit 77) without it. ctest target
 # "svcomp-shim".
 #
@@ -59,6 +64,7 @@ while IFS=$'\t' read -r d name exp got dt v first; do
 	want=AGREE
 	case "${name}" in
 	*create-order) want=CREATE-RACE ;;
+	bounded-*) want=BOUNDED ;;
 	esac
 	if [ "${v}" = "${want}" ]; then
 		echo "ok   ${name}: ${got}"

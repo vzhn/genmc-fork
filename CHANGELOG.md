@@ -378,6 +378,15 @@ released.
   runs, GenMC's after it creates the thread, so a read that the new thread
   orders after its start races with that store only in GenMC
   (`scripts/svcomp/selftest/create-order`, `uninit-read`).
+- `scripts/svcomp/svcomp-run.py` reported a task clean even when the
+  prelude's bounds had discarded every execution that could reach its error
+  (more nondet values than `--max-choices`, a value beyond `--nondet-max`):
+  21 tasks of `Concurrency.set` with a bug, each a wrong "true", most with
+  no complete execution at all. A clean result with blocked executions is
+  now checked again with the prelude's bounds check on, which stops at an
+  execution that asks for one value too many or aborts after reading the
+  range's largest value; the task is then labelled `BOUNDED`, with no
+  verdict (`scripts/svcomp/selftest/bounded-*`, `blocked-not-bounded`).
 
 
 ## [0.19.0-vzhn.14] - 2026.10.22
