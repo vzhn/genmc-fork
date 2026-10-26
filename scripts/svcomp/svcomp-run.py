@@ -7,7 +7,7 @@
 
 Usage: svcomp-run.py [-j JOBS] [-t TIMEOUT] [-m MODEL] [-o OUTDIR]
                      [--nondet-max N] [--max-choices N] [--max-spurious N]
-                     GENMC TASK_DIR...
+                     [--witness] GENMC TASK_DIR...
 
 For each <task>.yml, runs GenMC on the task's input file (input_files, which
 for most tasks is a preprocessed .i) with svcomp-shim.h and maps the outcome to the properties GenMC can decide:
@@ -38,7 +38,10 @@ declare the pthread API themselves, get svcomp-shim-pp.h and a copy of the task
 with a generated tail that defines the pthread functions the task mentions,
 using the task's own types.
 
-Writes OUTDIR/results.tsv and one OUTDIR/<dir>/<task>.out per task.
+Writes OUTDIR/results.tsv and one OUTDIR/<dir>/<task>.out per task; with
+--witness, also a violation witness for each error GenMC finds, in GraphML
+1.0 and YAML 2.2, as OUTDIR/<dir>/<task>.witness.{graphml,yml}
+(svcomp_witness.py).
 """
 import argparse
 import concurrent.futures as cf
@@ -49,10 +52,25 @@ import time
 
 import yaml
 
+import svcomp_witness
+
 PROPS = {"unreach-call", "no-data-race", "valid-memsafety"}
+# The specifications in SV-COMP's property files
+SPECS = {
+    "unreach-call": ["CHECK( init(main()), LTL(G ! call(reach_error())) )"],
+    "no-data-race": ["CHECK( init(main()), LTL(G ! data-race) )"],
+    "valid-memsafety": ["CHECK( init(main()), LTL(G valid-free) )",
+                        "CHECK( init(main()), LTL(G valid-deref) )",
+                        "CHECK( init(main()), LTL(G valid-memtrack) )"],
+}
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHIM = os.path.join(HERE, "svcomp-shim.h")
 SHIM_PP = os.path.join(HERE, "svcomp-shim-pp.h")
+
+# reach_error() of a task that defines it, in the header that GenMC reports
+# at its caller's line
+REACH_ERROR = """void reach_error(void)
+{ __VERIFIER_assert_fail("reach_error()", __FILE__, __LINE__); }"""
 
 # Definitions for preprocessed tasks, in terms of GenMC's primitives. Each is
 # emitted only if the task mentions the function, so the types it uses exist.
@@ -247,6 +265,11 @@ def classify(out):
     return "unknown"
 
 
+def memsafety_subproperty(out):
+    """The subproperty of valid-memsafety that GenMC's memory error violates"""
+    return "valid-free" if re.search(r"Double-free|Invalid free", out) else "valid-deref"
+
+
 def in_atomic_section(out, tid, idx):
     """Whether event (tid, idx) of the printed graph lies inside an atomic
     section, i.e. between taking and releasing __svc_atomic_lock."""
@@ -331,6 +354,7 @@ def run_task(args, d, yml):
     src = os.path.join(d, inputs[0]) if len(inputs) == 1 else ""
     if not os.path.exists(src):
         return (os.path.basename(d), name, expected, "no-input", 0.0, "NO-INPUT", "")
+    task_src = src
     od = os.path.join(args.outdir, os.path.basename(d))
     os.makedirs(od, exist_ok=True)
     code = open(src, errors="replace").read()
@@ -339,18 +363,33 @@ def run_task(args, d, yml):
                   r"\1 SVC_ATOMIC_FUNCTION_GUARD;", code)
     # preprocessed tasks declare pthread_t themselves (unsigned long, or int
     # in pthread-driver-races)
+    # The code the runner adds goes into a header of its own after the task,
+    # which GenMC reports at the line of the task that called it
+    # (-library-dir): the lines GenMC reports are the task's, as a witness
+    # needs. reach_error() moves there too, so that an error is reported
+    # at the call that reached it, not in reach_error()'s body
+    lib = []
+    # (keeping the definition's line breaks, so that the lines stay the task's)
+    code, renamed = re.subn(r"\bvoid\s+reach_error\s*\(\s*(void)?\s*\)\s*\{",
+                            lambda m: "void reach_error(void); void __svc_task_reach_error(void) {"
+                            + "\n" * m.group(0).count("\n"), code, count=1)
+    if renamed:
+        lib.append(REACH_ERROR)
     if not re.search(r"\btypedef\s+[^;{}]+\bpthread_t\s*;", code):
         shim, mode = SHIM, "A"
         src = os.path.join(od, name + ".c")
-        with open(src, "w") as f:
-            f.write(code)
     else:
         shim, mode = SHIM_PP, "B"
-        tail = [body for fn, body in TAIL.items()
+        lib += [body for fn, body in TAIL.items()
                 if re.search(r"\b" + fn + r"\s*\(", code) and not defines(code, fn)]
         src = os.path.join(od, name + ".pp.c")
-        with open(src, "w") as f:
-            f.write(code + "\n\n/* ---- svcomp-run tail ---- */\n" + "\n\n".join(tail) + "\n")
+    libdir = os.path.join(od, name + ".lib")
+    os.makedirs(libdir, exist_ok=True)
+    with open(os.path.join(libdir, "svcomp-lib.h"), "w") as f:
+        f.write("/* added by svcomp-run.py to " + os.path.basename(task_src) + " */\n"
+                + "\n\n".join(lib) + "\n")
+    with open(src, "w") as f:
+        f.write(code + '\n#include "' + os.path.abspath(libdir) + '/svcomp-lib.h"\n')
     main_argc = 1 if re.search(r"\bmain\s*\(\s*int\b", with_local_includes(code, d)) else 0
     recursive = 1 if mentions_recursive(code) else 0
     # SV-COMP's malloc may fail; only memory safety is about that
@@ -358,7 +397,9 @@ def run_task(args, d, yml):
 
     def genmc(check_bounds, timeout):
         p = subprocess.run([args.genmc, f"-{args.model}", "-disable-estimation",
-                            *args.genmc_flags, "--",
+                            *args.genmc_flags,
+                            *(f"-library-dir={x}" for x in (HERE, os.path.abspath(libdir))
+                              if args.library_dirs), "--",
                             "-I", os.path.abspath(d), f"-DSVC_MAIN_ARGC={main_argc}",
                             f"-DSVC_RECURSIVE_MUTEX={recursive}",
                             f"-DSVC_NONDET_MAX={args.nondet_max}",
@@ -389,6 +430,19 @@ def run_task(args, d, yml):
                 got = "unknown"
     except subprocess.TimeoutExpired:
         out, got = "", "timeout"
+    if args.witness and got in PROPS:
+        prp = next(p["property_file"] for p in task["properties"]
+                   if p["property_file"].endswith("/" + got + ".prp"))
+        # (SV-COMP's text, if the task's property file is not at hand)
+        path = os.path.join(d, prp)
+        checks = ([l.strip() for l in open(path) if l.startswith("CHECK")]
+                  if os.path.exists(path) else SPECS[got])
+        # valid-memsafety lists its subproperties: the witness names the violated one
+        sub = memsafety_subproperty(out) if got == "valid-memsafety" else None
+        spec = next((c for c in checks if sub and "G " + sub + ")" in c), checks[0])
+        svcomp_witness.write_witnesses(out, os.path.basename(src), task_src, spec,
+                                       task.get("options", {}).get("data_model", "ILP32"),
+                                       os.path.join(od, name + ".witness"))
     dt = time.time() - t0
     with open(os.path.join(od, name + ".out"), "w") as f:
         f.write(out)
@@ -409,10 +463,13 @@ def main():
                     help="nondet values per execution (default 4)")
     ap.add_argument("--max-spurious", type=int, default=1,
                     help="spurious condvar wake-ups per execution (default 1)")
+    ap.add_argument("--witness", action="store_true",
+                    help="write OUTDIR/<dir>/<task>.witness.{graphml,yml} for each error")
     ap.add_argument("genmc")
     ap.add_argument("dirs", nargs="+")
     args = ap.parse_args()
     help_text = subprocess.run([args.genmc, "--help"], capture_output=True, text=True).stdout
+    args.library_dirs = re.search(r"^\s*--?library-dir\b", help_text, re.M) is not None
     args.genmc_flags = ["-svcomp"] if re.search(r"^\s*--?svcomp\b", help_text, re.M) else []
 
     jobs = [(d, y) for d in args.dirs for y in sorted(os.listdir(d)) if y.endswith(".yml")]

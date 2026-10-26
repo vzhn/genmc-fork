@@ -107,6 +107,26 @@ so a clean result holds only up to those bounds:
   about passing a pointer as an int (`assume_abort_if_not(p)`); the runner
   makes clang warn too.
 
+## Witnesses
+
+With `--witness`, the runner writes a violation witness for each error GenMC
+finds, `<task>.witness.yml` (format 2.2, the first with threads) and
+`<task>.witness.graphml` (format 1.0 with `threadId`/`createThread`, SV-COMP
+2026's format for concurrency). A witness gives the thread creations, in an
+order the execution has, and the error: the call of `reach_error()`, the
+two accesses of a race, or the invalid access. The validator finds the rest
+of the interleaving. GenMC runs with `-library-dir`, so that the code the
+runner adds (the prelude, the generated tail and `reach_error()`) is
+reported at the task's line that called it: a witness may only name lines
+of the task.
+
+Of the 306 errors GenMC finds in `Concurrency.set`, the SV-COMP 2026
+validators confirm 235 witnesses within SV-COMP's 90 s (Dartagnan and
+CPAchecker on GraphML, UAutomizer on YAML; one is enough): 111 of 136
+`unreach-call`, 116 of 162 `no-data-race`, 8 of 8 `valid-memsafety`. In 20
+cases all three time out; in most others UAutomizer finds no violation
+along the witness, or Dartagnan cannot parse the task.
+
 ## Results
 
 With GenMC built from master (after 0.19.0-vzhn.14, with `-svcomp`) and
