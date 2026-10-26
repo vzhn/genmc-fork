@@ -52,7 +52,8 @@
 # are checked: a race in a task that includes <pthread.h> and in a
 # preprocessed one (both accesses at the task's lines, the code the runner
 # adds reported at its caller's), a call of reach_error() by threads created
-# in a loop, a NULL dereference after a failed malloc (valid-deref).
+# in a loop, a NULL dereference after a failed malloc (valid-deref). The
+# SV-COMP wrapper genmc-svcomp is run on one property of four tasks.
 # Needs Python 3 with PyYAML; skipped (exit 77) without it. ctest target
 # "svcomp-shim".
 #
@@ -88,6 +89,31 @@ while IFS=$'\t' read -r d name exp got dt v first; do
 		echo "FAIL ${name}: ${v}, not ${want} (expected ${exp})"; head -10 "${out}/${d}/${name}.out"; status=1
 	fi
 done < "${out}/results.tsv"
+# The SV-COMP wrapper, on one property of a task: SV-COMP's result as its
+# last line, and witness.yml for a false one; an error of another property
+# is unknown
+props="${out}/properties"
+mkdir -p "${props}"
+echo 'CHECK( init(main()), LTL(G ! call(reach_error())) )' > "${props}/unreach-call.prp"
+echo 'CHECK( init(main()), LTL(G ! data-race) )' > "${props}/no-data-race.prp"
+printf '%s\n' 'CHECK( init(main()), LTL(G valid-free) )' 'CHECK( init(main()), LTL(G valid-deref) )' \
+	'CHECK( init(main()), LTL(G valid-memtrack) )' > "${props}/valid-memsafety.prp"
+for t in "create-then-write.c no-data-race false(no-data-race) witness.yml" \
+	 "malloc-fail.c valid-memsafety false(valid-deref) witness.yml" \
+	 "create-then-write.c unreach-call unknown -" \
+	 "once.c unreach-call true -"; do
+	set -- ${t}
+	wd="${out}/wrapper-${1%.*}-$2"
+	mkdir -p "${wd}"
+	res=$(cd "${wd}" && "${SVCOMP}/genmc-svcomp" --genmc "${GenMC}" "${props}/$2.prp" \
+		"${TASKS}/$1" | tail -1)
+	if [ "${res}" = "SV-COMP result: $3" ] && { [ "$4" = - ] || [ -f "${wd}/$4" ]; }; then
+		echo "ok   genmc-svcomp $1 $2: $3"
+	else
+		echo "FAIL genmc-svcomp $1 $2: ${res}, not $3 (witness $4: $(ls "${wd}"))"; status=1
+	fi
+done
+
 # Each witness's specification and waypoints: (type, thread, line, column)
 python3 - "${out}/selftest" <<'PY' || status=1
 import sys, yaml

@@ -364,6 +364,18 @@ released.
 
 ### Added
 
+- `scripts/svcomp/genmc-svcomp`: GenMC as an SV-COMP verifier. It checks
+  one property of one task and prints SV-COMP's result as its last line
+  (`true`, `false(unreach-call)`, `false(no-data-race)`,
+  `false(valid-deref)`, `false(valid-free)`, `unknown`), and writes the
+  violation witness of a false one. An error of another property, a bound
+  that cut executions off, or unfreed memory under `valid-memsafety` gives
+  `unknown`. `scripts/svcomp/benchexec/genmc.py` is BenchExec's tool-info
+  module for it. `svcomp-run.py --per-property` checks each property of a
+  task alone, with a verdict per task/property pair; the code both share is
+  in `scripts/svcomp/svcomp_core.py` (`scripts/check-svcomp-shim.sh` runs
+  the wrapper on four tasks).
+
 - `scripts/svcomp/svcomp-run.py --witness` writes an SV-COMP violation
   witness for each error GenMC finds, in format 2.2 (YAML, with threads) and
   1.0 (GraphML): the thread creations and the error's call, accesses or

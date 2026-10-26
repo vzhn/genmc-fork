@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+#
+# This program is dual-licensed under the Apache License 2.0 and the MIT License.
+# You may choose to use, distribute, or modify this software under either license.
+
+"""GenMC as an SV-COMP verifier: checks one property of one task.
+
+Usage: genmc-svcomp [--genmc GENMC] [--data-model ILP32|LP64]
+                    [--witness-format yaml|graphml] [--timeout SECONDS]
+                    PROPERTY_FILE PROGRAM
+       genmc-svcomp --version
+
+Prints GenMC's output, then the result as a last line:
+  SV-COMP result: true
+  SV-COMP result: false(unreach-call)      (or no-data-race, valid-deref,
+                                            valid-free)
+  SV-COMP result: unknown
+and, for a false result, writes the violation witness to witness.yml
+(format 2.2) or witness.graphml (format 1.0) in the working directory.
+
+Only the property checked counts: an error of another one gives unknown,
+reach_error() ends the execution unless unreach-call is checked, and
+malloc() may fail only if valid-memsafety is. A result is unknown, too,
+when the prelude's bounds may have cut an error off (svcomp_core.py), and
+for valid-memsafety when memory is left unfreed: GenMC does not tell
+whether it is still reachable (valid-memtrack).
+"""
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import svcomp_witness  # noqa: E402
+from svcomp_core import specification, svcomp_result, verify  # noqa: E402
+
+# The property of each property file's text
+PROPERTIES = [
+    ("call(reach_error())", "unreach-call"),
+    ("data-race", "no-data-race"),
+    ("valid-memcleanup", None),
+    ("valid-deref", "valid-memsafety"),
+]
+
+
+def property_of(prp_file):
+    text = open(prp_file).read()
+    return next((prop for key, prop in PROPERTIES if key in text), None)
+
+
+def find_genmc(given):
+    if given:
+        return given
+    local = os.path.join(HERE, "genmc")
+    return local if os.access(local, os.X_OK) else shutil.which("genmc")
+
+
+def main():
+    ap = argparse.ArgumentParser(description="GenMC as an SV-COMP verifier")
+    ap.add_argument("--genmc", help="the GenMC executable (default: next to this script, or on PATH)")
+    ap.add_argument("--data-model", default="ILP32", choices=["ILP32", "LP64"])
+    ap.add_argument("--witness-format", default="yaml", choices=["yaml", "graphml"])
+    ap.add_argument("--timeout", type=float, help="seconds for GenMC's runs together")
+    ap.add_argument("--model", default="rc11")
+    ap.add_argument("--version", action="store_true")
+    ap.add_argument("property_file", nargs="?")
+    ap.add_argument("program", nargs="?")
+    args = ap.parse_args()
+
+    genmc = find_genmc(args.genmc)
+    if not genmc:
+        sys.exit("genmc-svcomp: no GenMC executable found")
+    if args.version:
+        out = subprocess.run([genmc, "--version"], capture_output=True, text=True).stdout
+        print(next((l.split()[1] for l in out.splitlines() if l.strip().startswith("GenMC v")),
+                   "unknown").lstrip("v"))
+        return
+    if not args.property_file or not args.program:
+        ap.error("a property file and a program are required")
+
+    prop = property_of(args.property_file)
+    if prop is None:
+        print("SV-COMP result: unknown")
+        return
+    workdir = tempfile.mkdtemp(prefix="genmc-svcomp-")
+    try:
+        got, out, compiled = verify(genmc, args.program, workdir, {prop}, args.timeout, args.model)
+        print(out, end="" if out.endswith("\n") else "\n")
+        res = svcomp_result(prop, got, out)
+        if res.startswith("false"):
+            prefix = os.path.join(workdir, "witness")
+            written = svcomp_witness.write_witnesses(
+                out, os.path.basename(compiled), args.program,
+                specification(got, out, args.property_file), args.data_model, prefix)
+            ext = "yml" if args.witness_format == "yaml" else "graphml"
+            if prefix + "." + ext in written:
+                shutil.copy(prefix + "." + ext, "witness." + ext)
+        print("SV-COMP result: " + res)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    main()

@@ -35,6 +35,32 @@ from outside the task. It needs Python 3 with PyYAML, and a GenMC whose
 assertion failure found under RC11 also exists under SC, unless it depends
 on weak behaviour of the task's atomics.
 
+With `--per-property`, each property of a task is checked alone, as SV-COMP
+does, with a verdict per task/property pair (see below).
+
+## The SV-COMP wrapper
+
+SV-COMP runs a verifier on one property of one task. `genmc-svcomp` does
+that with GenMC:
+
+    genmc-svcomp [--genmc GENMC] [--data-model ILP32|LP64] \
+        [--witness-format yaml|graphml] PROPERTY_FILE PROGRAM
+
+It prints GenMC's output, then SV-COMP's result as the last line:
+`SV-COMP result: true`, `false(unreach-call)`, `false(no-data-race)`,
+`false(valid-deref)`, `false(valid-free)` or `unknown`. For a false result
+it writes the violation witness to `witness.yml` (format 2.2) or
+`witness.graphml` (1.0) in the working directory. `benchexec/genmc.py` is
+the tool-info module through which BenchExec runs it.
+
+Only the property checked counts. An error of another property gives
+`unknown`, and so does a bound that cut executions off. `reach_error()`
+ends an execution, instead of failing, unless `unreach-call` is checked, and
+`malloc()` may fail only if `valid-memsafety` is. A clean `valid-memsafety`
+run that leaves memory unfreed is `unknown` as well: GenMC does not tell
+whether the memory is still reachable (`valid-memtrack`).
+`svcomp-run.py --per-property` checks each property the same way.
+
 ## Verdicts
 
 GenMC decides three of SV-COMP's properties:
