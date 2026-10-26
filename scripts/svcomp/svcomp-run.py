@@ -17,6 +17,10 @@ for most tasks is a preprocessed .i) with svcomp-shim.h and maps the outcome to 
 GenMC stops at the first error, so a task whose verdict is false for one
 property is only checked for that property.
 
+A clean result with blocked executions is checked again with the shim's
+bounds check on (svcomp-shim-core.h): if an execution may have been cut by
+the shim's bounds, the task is labelled BOUNDED and gets no verdict.
+
 A race where one side lies inside an atomic section is labelled ATOMIC-RACE
 and gets no verdict: SV-COMP counts accesses in atomic sections as atomic,
 while the shim implements atomic sections with a lock. A race on the store of
@@ -142,7 +146,7 @@ TAIL = {
 { __VERIFIER_assume(n > 0 && sz > 0); return __VERIFIER_calloc(n, sz); }""",
     "free": "void free(void *p) { __VERIFIER_free(p); }",
     # SV-COMP's abort() cuts off a path; GenMC's real abort() would kill GenMC
-    "abort": "void abort(void) { __VERIFIER_assume(0); }",
+    "abort": "void abort(void) { __svc_abort_path(); }",
     "pthread_detach": "int pthread_detach(pthread_t t) { return 0; }",
     "__assert_fail": """void __assert_fail(const char *e, const char *file, unsigned int line,
 		   const char *fn)
@@ -314,10 +318,10 @@ def run_task(args, d, yml):
         src = os.path.join(od, name + ".pp.c")
         with open(src, "w") as f:
             f.write(code + "\n\n/* ---- svcomp-run tail ---- */\n" + "\n\n".join(tail) + "\n")
-    t0 = time.time()
-    try:
-        main_argc = 1 if re.search(r"\bmain\s*\(\s*int\b", with_local_includes(code, d)) else 0
-        recursive = 1 if mentions_recursive(code) else 0
+    main_argc = 1 if re.search(r"\bmain\s*\(\s*int\b", with_local_includes(code, d)) else 0
+    recursive = 1 if mentions_recursive(code) else 0
+
+    def genmc(check_bounds, timeout):
         p = subprocess.run([args.genmc, f"-{args.model}", "-disable-estimation",
                             *args.genmc_flags, "--",
                             "-I", os.path.abspath(d), f"-DSVC_MAIN_ARGC={main_argc}",
@@ -325,10 +329,24 @@ def run_task(args, d, yml):
                             f"-DSVC_NONDET_MAX={args.nondet_max}",
                             f"-DSVC_MAX_CHOICES={args.max_choices}",
                             f"-DSVC_MAX_SPURIOUS={args.max_spurious}",
+                            f"-DSVC_CHECK_BOUNDS={check_bounds}",
                             "-include", shim, src],
-                           capture_output=True, text=True, timeout=args.timeout)
-        out = p.stdout + p.stderr
+                           capture_output=True, text=True, timeout=timeout)
+        return p.stdout + p.stderr
+
+    t0 = time.time()
+    try:
+        out = genmc(0, args.timeout)
         got = classify(out)
+        # a clean result holds only if no execution was cut by the shim's
+        # bounds: rerun to see whether one was (svcomp-shim-core.h)
+        if got == "ok" and "Number of blocked executions seen" in out:
+            check = genmc(1, max(1, args.timeout - (time.time() - t0)))
+            out += "\n---- bounds check ----\n" + check
+            if "__svc_bound_hit" in check:
+                got = "bounded"
+            elif classify(check) != "ok":
+                got = "unknown"
     except subprocess.TimeoutExpired:
         out, got = "", "timeout"
     dt = time.time() - t0
