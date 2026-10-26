@@ -226,16 +226,17 @@ a revisit keeps the model's prefix of the revisiting write without the
 events that exist because of what the revisited read read (those inside
 a branch it controls, and what depends on them): a read may be revisited
 by every write that does not depend on it and that the model orders
-after it only through those. The orderings of a path are checked again,
+after it only through those on the way to an event its thread keeps
+after the branch (or through the write of its RMW). The orderings of a path are checked again,
 on the whole graph,
 when a thread's path changes or an event is added before events a
 revisit kept, and a thread whose new path contradicts the events kept
 after it stops there (the run is not counted, but the other threads go
 on, as their writes may still revisit the reads of the run). This costs
-about a third more work on the kernel's litmus tests, much more on
-programs whose threads branch on shared state inside critical sections
-(the reads such a branch controls are executed anew; issue #261), and
-the exploration runs single-threaded. `-disable-lkmm-exhaustive` goes back to the optimal
+about a third more work on the kernel's litmus tests, more on programs
+whose threads branch on shared state inside critical sections (the reads
+such a branch controls are executed anew; issue #261) or take locks with
+`cmpxchg()` (issue #264), and the exploration runs single-threaded. `-disable-lkmm-exhaustive` goes back to the optimal
 exploration, which is faster and can run in parallel (`-nthreads`), but
 can miss such executions; so does `-disable-spin-assume`, as the
 exhaustive exploration of a spin loop that is not turned into an

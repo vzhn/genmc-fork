@@ -1,7 +1,7 @@
 # Classified disagreements of lkmm-diff.py --model lkmm (classify.py --allowlist)
 # <test> <result> <cause>
-manual/absperf/C-SB+l-o-o-u+l-o-o-u+l-o-o-u+l-o-o-u-C.litmus genmc-timeout four threads branching on shared state inside critical sections: the exhaustive exploration explores many more graphs than before (#261); 24 executions as herd7 given time
-manual/absperf/C-SB+l-o-o-u+l-o-o-u+l-o-o-u+l-o-o-u-X.litmus genmc-timeout four threads branching on shared state inside critical sections: the exhaustive exploration explores many more graphs than before (#261); 24 executions as herd7 given time
+manual/absperf/C-SB+l-o-o-u+l-o-o-u+l-o-o-u+l-o-o-u-C.litmus genmc-timeout four threads taking a lock with cmpxchg: the exhaustive exploration revisits a CAS's read whose write another thread's CAS reads, which a fix of #264 would make redundant (#261); 24 executions as herd7 given time
+manual/absperf/C-SB+l-o-o-u+l-o-o-u+l-o-o-u+l-o-o-u-X.litmus genmc-timeout four threads taking a lock with cmpxchg: the exhaustive exploration revisits a CAS's read whose write another thread's CAS reads, which a fix of #264 would make redundant (#261); 24 executions as herd7 given time
 manual/atomic/C-unlock-wait-00.litmus herd-error herd7 rejects the test (unknown macro or annotation)
 manual/memb/C-Goldblatt-memb-1.litmus herd-error herd7 rejects the test (unknown macro or annotation)
 manual/memb/C-Goldblatt-memb-2.litmus herd-error herd7 rejects the test (unknown macro or annotation)

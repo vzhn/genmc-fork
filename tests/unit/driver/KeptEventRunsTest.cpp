@@ -26,17 +26,28 @@ using Repeat = KeptEventRuns::Repeat;
 TEST(KeptEventRuns, ARunWithoutKeptEventsDoesNotRepeat)
 {
 	KeptEventRuns k;
-	k.startRun(Stamp(5), 3);
+	k.startRun(Stamp(5), 3, false);
 	EXPECT_EQ(k.runStartStamp(), Stamp(5));
 	EXPECT_EQ(k.runStartWork(), 3U);
 	EXPECT_FALSE(k.takeDeferredCheck());
 	EXPECT_EQ(k.endRun(false), Repeat::None);
 }
 
+TEST(KeptEventRuns, ARunRemembersWhetherItStartedWithKeptEvents)
+{
+	KeptEventRuns k;
+	k.startRun(Stamp(5), 3, false);
+	EXPECT_FALSE(k.startedWithKept());
+	EXPECT_EQ(k.endRun(false), Repeat::None);
+	k.startRun(Stamp(5), 3, true);
+	EXPECT_TRUE(k.startedWithKept());
+	EXPECT_EQ(k.endRun(false), Repeat::None);
+}
+
 TEST(KeptEventRuns, AnEventBeforeKeptOnesIsCheckedOnceAtTheEnd)
 {
 	KeptEventRuns k;
-	k.startRun(Stamp(0), 0);
+	k.startRun(Stamp(0), 0, true);
 	k.addedBeforeKept();
 	EXPECT_TRUE(k.takeAddedBeforeKept());
 	EXPECT_FALSE(k.takeAddedBeforeKept());
@@ -50,13 +61,13 @@ TEST(KeptEventRuns, AnEventBeforeKeptOnesIsCheckedOnceAtTheEnd)
 TEST(KeptEventRuns, AFailedDeferredCheckRepeatsTheRunEagerlyOnce)
 {
 	KeptEventRuns k;
-	k.startRun(Stamp(0), 0);
+	k.startRun(Stamp(0), 0, true);
 	k.repeatEagerly();
 	EXPECT_EQ(k.endRun(false), Repeat::Eagerly);
 	EXPECT_TRUE(k.eagerChecks());
 
 	/* The repeat is a run of its own; after it, checks are deferred again */
-	k.startRun(Stamp(0), 0);
+	k.startRun(Stamp(0), 0, true);
 	EXPECT_EQ(k.endRun(false), Repeat::None);
 	EXPECT_FALSE(k.eagerChecks());
 }
@@ -65,12 +76,12 @@ TEST(KeptEventRuns, RelocationsAreCountedUntilARunSettles)
 {
 	KeptEventRuns k;
 	for (auto i = 1U; i <= 3; i++) {
-		k.startRun(Stamp(0), 0);
+		k.startRun(Stamp(0), 0, true);
 		k.repeatAfterRelocation();
 		EXPECT_EQ(k.endRun(false), Repeat::AfterRelocation);
 		EXPECT_EQ(k.relocationsInRun(), i);
 	}
-	k.startRun(Stamp(0), 0);
+	k.startRun(Stamp(0), 0, true);
 	EXPECT_EQ(k.endRun(false), Repeat::None);
 	EXPECT_EQ(k.relocationsInRun(), 0U);
 }
@@ -78,7 +89,7 @@ TEST(KeptEventRuns, RelocationsAreCountedUntilARunSettles)
 TEST(KeptEventRuns, ARelocationGoesBeforeAnEagerRepeat)
 {
 	KeptEventRuns k;
-	k.startRun(Stamp(0), 0);
+	k.startRun(Stamp(0), 0, true);
 	k.repeatEagerly();
 	k.repeatAfterRelocation();
 	EXPECT_EQ(k.endRun(false), Repeat::AfterRelocation);
@@ -88,7 +99,7 @@ TEST(KeptEventRuns, ARelocationGoesBeforeAnEagerRepeat)
 TEST(KeptEventRuns, HaltingRepeatsNothing)
 {
 	KeptEventRuns k;
-	k.startRun(Stamp(0), 0);
+	k.startRun(Stamp(0), 0, true);
 	k.repeatAfterRelocation();
 	EXPECT_EQ(k.endRun(true), Repeat::None);
 	EXPECT_EQ(k.relocationsInRun(), 0U);
