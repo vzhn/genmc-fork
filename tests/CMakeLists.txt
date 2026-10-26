@@ -98,6 +98,30 @@ add_test(NAME oracle-diff
 )
 set_tests_properties(oracle-diff PROPERTIES LABELS "integration;fast" TIMEOUT 600)
 
+# A weaker model explores at least the executions of a stronger one
+# (scripts/oracle-diff.sh -p): SC against RC11 and IMM on the correct/ tests
+# with an expected.sc.mo.in, the larger ones (over 2000 executions) skipped
+set(MODEL_INCLUSION_DIRS
+    tests/correct/infr tests/correct/litmus tests/correct/saver tests/correct/ipr
+    tests/correct/sr tests/correct/liveness tests/correct/data-structures
+    tests/correct/classic tests/correct/gobench tests/correct/lkmm)
+string(REPLACE ";" " " MODEL_INCLUSION_DIRS_ARGS "${MODEL_INCLUSION_DIRS}")
+add_test(NAME model-inclusion
+    COMMAND bash -c "${SCRIPT_DIR}/oracle-diff.sh -p sc:rc11,sc:imm -c 2000 -t 60 -j 4 ${CMAKE_BINARY_DIR}/bin/genmc ${MODEL_INCLUSION_DIRS_ARGS} > ${SCRIPT_DIR}/model-inclusion.log"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(model-inclusion PROPERTIES LABELS "integration;fast" TIMEOUT 600)
+
+# RC11 against LKMM on the same tests, advisory (not in "fast"): LKMM orders
+# dependencies that RC11 does not, so the two are not ordered on every
+# program, and each disagreement is either a bug or a line in
+# scripts/oracle-diff-known.txt that says why (#264)
+add_test(NAME model-inclusion-lkmm
+    COMMAND bash -c "${SCRIPT_DIR}/oracle-diff.sh -p rc11:lkmm -c 100 -t 60 -j 4 ${CMAKE_BINARY_DIR}/bin/genmc ${MODEL_INCLUSION_DIRS_ARGS} > ${SCRIPT_DIR}/model-inclusion-lkmm.log"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(model-inclusion-lkmm PROPERTIES LABELS "integration;advisory" TIMEOUT 1200)
+
 add_test(NAME liveness-tip
     COMMAND bash -c "${SCRIPT_DIR}/check-liveness-tip.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
