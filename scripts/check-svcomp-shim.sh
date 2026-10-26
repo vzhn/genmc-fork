@@ -15,7 +15,7 @@
 # must not define what GenMC's pthread.h defines; once pthread.h got
 # pthread_once, the shim's own copy stopped every such task from compiling.
 # Runs svcomp-run.py on the tasks in scripts/svcomp/selftest and checks
-# that every verdict is AGREE:
+# that every verdict is AGREE, except where noted:
 # - once*: pthread_once with <pthread.h> (with and without the shim's
 #   recursive mutexes) and in a preprocessed task (svcomp-shim-pp.h plus
 #   the generated tail);
@@ -23,7 +23,15 @@
 #   so the runner must verify the input file, as SV-COMP does;
 # - pp-*: preprocessed tasks that check calls in if (...) { and use
 #   recursive mutexes, rwlocks and thread-specific data, which the
-#   generated tail must define.
+#   generated tail must define;
+# - uninit-read: a read of uninitialized memory, which SV-COMP does not
+#   count as a memory-safety violation (GenMC runs with -svcomp);
+# - create-order, pp-create-order: a thread reads another's ID once that
+#   thread has signalled. glibc's pthread_create stores the ID before the
+#   thread runs, GenMC's after, so GenMC reports a race that SV-COMP does
+#   not have: the runner must label it CREATE-RACE, with no verdict;
+# - create-then-write: the task's own store of the same value right after
+#   pthread_create is a race SV-COMP has too, not a CREATE-RACE.
 # Needs Python 3 with PyYAML; skipped (exit 77) without it. ctest target
 # "svcomp-shim".
 #
@@ -48,10 +56,14 @@ if [ "${nrows}" -ne "${ntasks}" ]; then
 	echo "FAIL ${nrows} results for ${ntasks} tasks"; status=1
 fi
 while IFS=$'\t' read -r d name exp got dt v first; do
-	if [ "${v}" = AGREE ]; then
+	want=AGREE
+	case "${name}" in
+	*create-order) want=CREATE-RACE ;;
+	esac
+	if [ "${v}" = "${want}" ]; then
 		echo "ok   ${name}: ${got}"
 	else
-		echo "FAIL ${name}: ${v} (expected ${exp})"; head -10 "${out}/${d}/${name}.out"; status=1
+		echo "FAIL ${name}: ${v}, not ${want} (expected ${exp})"; head -10 "${out}/${d}/${name}.out"; status=1
 	fi
 done < "${out}/results.tsv"
 exit ${status}

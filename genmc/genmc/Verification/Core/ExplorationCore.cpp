@@ -90,7 +90,8 @@ ExplorationCore::ExplorationCore(std::shared_ptr<const Config> conf, WorkSharing
 				  .exhaustive = userConf->exhaustive,
 				  .lkmmReference = userConf->lkmmReference});
 	stack_ = std::make_unique<ExplorationStack>(*consChecker, execState_,
-						    userConf->isDepTrackingModel);
+						    userConf->isDepTrackingModel,
+						    userConf->disableInitializationChecks);
 	stack_->reset(stack_->emptyFrame());
 
 	symmChecker = SymmetryChecker::create();

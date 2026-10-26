@@ -213,6 +213,11 @@ static llvm::cl::opt<bool>
 	clDisableWarnUnfreedMemory("disable-warn-on-unfreed-memory", llvm::cl::cat(clGeneral),
 				   llvm::cl::desc("Do not warn about unfreed memory"));
 
+static llvm::cl::opt<bool>
+	clSVCOMP("svcomp", llvm::cl::cat(clGeneral),
+		 llvm::cl::desc("Check properties as SV-COMP defines them: a read of uninitialized "
+				"memory reads 0 instead of being an error"));
+
 static llvm::cl::opt<std::string>
 	clCollectLinSpec("collect-lin-spec", llvm::cl::init(""), llvm::cl::value_desc("file"),
 			 llvm::cl::cat(clGeneral),
@@ -553,6 +558,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	}
 
 	conf.warnUnfreedMemory = !clDisableWarnUnfreedMemory;
+	conf.disableInitializationChecks = clSVCOMP;
 	conf.collectLinSpec = lliConfig.collectLinSpec;
 	conf.checkLinSpec = lliConfig.checkLinSpec;
 	conf.dotPrintOnlyClientEvents = clDotPrintOnlyClientEvents;
