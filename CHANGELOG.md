@@ -323,6 +323,30 @@ released.
   a macro of `genmc.h`) (`scripts/check-driver-last-line.sh`, ctest
   `driver-last-line`).
 
+### Performance
+
+- `-lkmm` explores fewer graphs on programs whose threads branch on
+  shared state inside critical sections, which #77's fix had made much
+  slower (#261). That fix let a write revisit a read that its prefix holds
+  only through the events of a branch the read controls. Such a revisit is
+  now taken only when the read reaches the write through an event its
+  thread keeps after the branch: the path-dependent prefix #77 was about.
+  When it reaches the write through another thread's read of a branch's
+  event instead (a lock taken after the read's thread released it inside
+  the branch), that read can read something else, and the graphs where it
+  does hold the revisit without that path. A read of an RMW whose write
+  another thread's CAS reads is still revisited, as the graphs where the
+  CAS reads something else can be cut short (#264). The whole graph is
+  checked with its views computed anew only at a revisit or at the end of
+  a run that has events kept after holes or after the read, as before #77
+  otherwise. The part of LKMM's `prop` that comes back to a thread finds a
+  thread's lock handovers in one pass and reuses each event's cumul-fence
+  step within a check. `tests/correct/lkmm/kept-free-access` takes 9 s
+  (45 s before, 3 s before #77), `tests/correct/gobench/cockroach10790`
+  under `-lkmm` 198 s (over 400 s, 66 s), and the `lkmm` and `infr` tests
+  91 s in all (150 s). The 3- and 4-lock `C-SB` tests of the corpus are
+  unchanged, waiting on #264.
+
 ### Added
 
 - `-print-addresses`: the printed graphs (the error graph,

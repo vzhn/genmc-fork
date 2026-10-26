@@ -396,10 +396,12 @@ protected:
 	bool checkPendingKept(const ExecutionGraph &g);
 
 	/* The checks of a run that ends (-lkmm, see checkPendingKept()): a
-	 * complete execution is checked as a whole; a mooted run's graph is
-	 * checked for what went before the moot (not atomicity, the cause of a
-	 * moot by an RMW) when an event went before kept ones. Returns whether
-	 * the run stands; a failed check has the run repeated with eager checks */
+	 * complete execution is checked as a whole if the run started with
+	 * kept events (see KeptEventRuns::startedWithKept()); a mooted run's
+	 * graph is checked for what went before the moot (not atomicity, the
+	 * cause of a moot by an RMW) when an event went before kept ones.
+	 * Returns whether the run stands; a failed check has the run repeated
+	 * with eager checks */
 	bool checkEndedRun(const ExecutionGraph &g, bool moot);
 
 	auto executionExceedsBound(BoundCalculationStrategy strategy) const -> bool;

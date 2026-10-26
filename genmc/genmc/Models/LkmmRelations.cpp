@@ -213,14 +213,28 @@ auto wmbPreds(const ExecutionGraph &g, const EventLabel *x) -> Labels
 	return out;
 }
 
-/* The y with (y, x) in po-unlock-lock-po */
+/* The y with (y, x) in po-unlock-lock-po: the events before an unlock of
+ * x's thread that a lock read before x follows (those before the po-latest
+ * such unlock), and those before the unlock of another thread that such a
+ * lock read reads */
 auto poUnlockLockPoPreds(const ExecutionGraph &g, const EventLabel *x) -> Labels
 {
 	Labels out;
-	for (const auto &lLab : g.po_preds(x))
-		if (isLKR(&lLab))
-			for (const auto *ul : unlocksBefore(g, &lLab))
-				poPredsIf(g, ul, [](const EventLabel *) { return true; }, out);
+	auto all = [](const EventLabel *) { return true; };
+	const EventLabel *ownUl = nullptr;
+	auto sawLkr = false;
+	for (const auto &pLab : g.po_preds(x)) {
+		if (isLKR(&pLab)) {
+			sawLkr = true;
+			const auto *rf = genmc::cast<ReadLabel>(&pLab)->getRf();
+			if (rf && isUL(rf) && rf->getThread() != pLab.getThread())
+				poPredsIf(g, rf, all, out);
+		} else if (sawLkr && ownUl == nullptr && isUL(&pLab)) {
+			ownUl = &pLab;
+		}
+	}
+	if (ownUl != nullptr)
+		poPredsIf(g, ownUl, all, out);
 	return out;
 }
 
@@ -272,13 +286,29 @@ auto cumulFenceStepPreds(const ExecutionGraph &g, const EventLabel *x) -> Labels
 namespace {
 /* The results of propIntPreds() while a PropIntCache lives, by stamp */
 thread_local std::unordered_map<unsigned, Labels> *propIntCache = nullptr;
+/* The results of cumulFenceStepPreds() meanwhile, by stamp (shared by the
+ * propIntPreds() of different labels) */
+thread_local std::unordered_map<unsigned, Labels> *stepCache = nullptr;
 auto computePropIntPreds(const ExecutionGraph &g, const EventLabel *lab) -> Labels;
+
+auto cachedCumulFenceStepPreds(const ExecutionGraph &g, const EventLabel *x) -> const Labels &
+{
+	static thread_local Labels uncached;
+	if (!stepCache)
+		return uncached = cumulFenceStepPreds(g, x);
+	auto [it, inserted] = stepCache->try_emplace(x->getStamp().get());
+	if (inserted)
+		it->second = cumulFenceStepPreds(g, x);
+	return it->second;
+}
 } // namespace
 
 lkmm::PropIntCache::PropIntCache() : owner(propIntCache == nullptr)
 {
-	if (owner)
+	if (owner) {
 		propIntCache = new std::unordered_map<unsigned, Labels>();
+		stepCache = new std::unordered_map<unsigned, Labels>();
+	}
 }
 
 lkmm::PropIntCache::~PropIntCache()
@@ -286,6 +316,8 @@ lkmm::PropIntCache::~PropIntCache()
 	if (owner) {
 		delete propIntCache;
 		propIntCache = nullptr;
+		delete stepCache;
+		stepCache = nullptr;
 	}
 }
 
@@ -321,7 +353,7 @@ auto computePropIntPreds(const ExecutionGraph &g, const EventLabel *lab) -> Labe
 		const auto *x = work.back();
 		work.pop_back();
 		for (const auto *src : rmwSequenceSources(g, x))
-			for (const auto *y : cumulFenceStepPreds(g, src))
+			for (const auto *y : cachedCumulFenceStepPreds(g, src))
 				add(y);
 	}
 

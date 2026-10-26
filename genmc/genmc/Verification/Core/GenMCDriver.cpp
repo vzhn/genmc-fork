@@ -158,6 +158,25 @@ static void reconstructState(ExecutionGraph &g, ExecutionState &state)
 		reconstructState(g.getLastThreadLabel(i), view, state);
 }
 
+/* Whether a revisit kept events of G after holes or after the read it
+ * revisited: a hole, a thread stopped before kept events, an event older
+ * than the one before it, or one after a read that is older than the
+ * write the read reads (the kept events existed before that write) */
+static auto hasKeptEvents(const ExecutionGraph &g) -> bool
+{
+	return std::ranges::any_of(g.labels(), [&g](const auto &lab) {
+		if (genmc::isa<EmptyLabel>(&lab) || genmc::isa<DeadPathBlockLabel>(&lab))
+			return true;
+		const auto *pLab = g.po_imm_pred(&lab);
+		if (pLab == nullptr)
+			return false;
+		if (pLab->getStamp() > lab.getStamp())
+			return true;
+		const auto *rLab = genmc::dyn_cast<ReadLabel>(pLab);
+		return rLab && rLab->getRf() && rLab->getRf()->getStamp() > lab.getStamp();
+	});
+}
+
 auto GenMCDriver::handleExecutionStart() -> bool
 {
 	auto &g = getExec().getGraph();
@@ -166,7 +185,8 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	/* Set various exploration options for this execution */
 	unmoot();
 	g.setKeptEventsUnreachable(false);
-	keptRuns_.startRun(g.getMaxStamp(), getExec().getWorkqueue().size());
+	keptRuns_.startRun(g.getMaxStamp(), getExec().getWorkqueue().size(),
+			   relocatesKeptEvents() && hasKeptEvents(g));
 	state.clear();
 	if constexpr (Config::emitNALabels)
 		reconstructState(g, state);

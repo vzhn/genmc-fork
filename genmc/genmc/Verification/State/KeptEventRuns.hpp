@@ -44,14 +44,21 @@ public:
 	enum class Repeat : unsigned char { None, AfterRelocation, Eagerly };
 
 	/** A run starts from a graph with maximum stamp MAXSTAMP and WORK
-	 * items in its work list */
-	void startRun(Stamp maxStamp, size_t work)
+	 * items in its work list; KEPT: the graph has events a revisit kept
+	 * after holes or after the read it revisited */
+	void startRun(Stamp maxStamp, size_t work, bool kept)
 	{
+		startedWithKept_ = kept;
 		addedBeforeKept_ = false;
 		checkPending_ = false;
 		startStamp_ = maxStamp;
 		startWork_ = work;
 	}
+
+	/** Whether the run started from a graph with kept events: without
+	 * them (and without events gone before kept ones), its checks were
+	 * those of any run */
+	[[nodiscard]] auto startedWithKept() const -> bool { return startedWithKept_; }
 
 	/** Where a repeat restarts from */
 	[[nodiscard]] auto runStartStamp() const -> Stamp { return startStamp_; }
@@ -101,6 +108,7 @@ public:
 private:
 	Stamp startStamp_{0};
 	size_t startWork_{};
+	bool startedWithKept_ = false;
 	bool addedBeforeKept_ = false;
 	bool checkPending_ = false;
 	bool eager_ = false;

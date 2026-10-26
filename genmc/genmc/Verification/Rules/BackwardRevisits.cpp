@@ -99,7 +99,8 @@ auto dependencyPrefixView(const ExecutionGraph &g, const EventLabel *lab)
 	return v;
 }
 
-auto dependentsOf(const ExecutionGraph &g, const ReadLabel *rLab, bool scoped) -> std::vector<char>
+auto dependentsOf(const ExecutionGraph &g, const ReadLabel *rLab, DependentSeeds seeds)
+	-> std::vector<char>
 {
 	std::vector<char> in(g.getMaxStamp().get() + 1, 0);
 	auto dependsOnOne = [&](const EventLabel *lab) {
@@ -121,13 +122,14 @@ auto dependentsOf(const ExecutionGraph &g, const ReadLabel *rLab, bool scoped) -
 			return true;
 		return false;
 	};
-	if (scoped) {
+	if (seeds != DependentSeeds::Read) {
 		for (const auto &lab : g.labels())
 			if (lab.getDeps().sctrl.contains(rLab->getPos()))
 				in[lab.getStamp().get()] = 1;
-		/* (RLAB itself: the revisit remakes it) */
 	}
-	in[rLab->getStamp().get()] = 1;
+	/* (RLAB itself: the revisit remakes it) */
+	if (seeds != DependentSeeds::Branches)
+		in[rLab->getStamp().get()] = 1;
 	/* (A kept event may depend on one with a newer stamp: iterate) */
 	for (auto changed = true; changed;) {
 		changed = false;
@@ -146,31 +148,43 @@ auto keptPrefixView(const ExecutionGraph &g, const GraphModel &model, const Read
 {
 	if (dependentsOf(g, rLab)[sLab->getStamp().get()])
 		return nullptr;
-	const auto dependents = dependentsOf(g, rLab, true);
-	/* Without other dependents, the model's prefix itself */
-	const auto others = std::ranges::any_of(g.labels(), [&](const auto &lab) {
-		return &lab != rLab && dependents[lab.getStamp().get()];
-	});
-	if (!others) {
+	/* RLAB in the model's prefix of SLAB through the write of its RMW (which
+	 * another thread's RMW reads, say): the prefix is computed without
+	 * every dependent of RLAB (see the header) */
+	const auto fullPrefix = model.calculatePrefixView(sLab);
+	const auto *wLab = genmc::dyn_cast_if_present<WriteLabel>(
+		rLab->isRMW() ? g.po_imm_succ(rLab) : nullptr);
+	const auto throughWrite = wLab && wLab->isRMW() && fullPrefix->contains(wLab->getPos());
+	auto masked = dependentsOf(
+		g, rLab, throughWrite ? DependentSeeds::Scoped : DependentSeeds::Branches);
+	masked[rLab->getStamp().get()] = 0;
+
+	/* With nothing to mask, the model's prefix itself (which has none of
+	 * RLAB's dependents if it does not have RLAB: it has the read of an
+	 * RMW's write, and the reads of the writes it has) */
+	if (std::ranges::none_of(g.labels(),
+				 [&](const auto &lab) { return masked[lab.getStamp().get()]; })) {
 		auto prefix = model.calculateRevisitPrefixView(sLab);
 		return prefix->contains(rLab->getPos()) ? nullptr : std::move(prefix);
 	}
 	/* The prefix is computed in a copy (positions name the same events in
-	 * both) where each dependent but RLAB is an inert event: a plain read
-	 * of a private location, with no dependencies, reading the initializer.
-	 * The model's prefix passes through it as po passes through anything,
-	 * but it ends no path of the prefix (a hole would: a hole is not plain,
-	 * so a release's ordering would reach past the plain read it stops at).
-	 * RLAB stays as it is: what orders it before SLAB by what it is (an
-	 * acquire read before all after it) orders it whatever it reads */
+	 * both) where each event of a branch RLAB controls and what depends on
+	 * one (with THROUGHWRITE, every dependent of RLAB) is an inert event: a
+	 * plain read of a private location, with no dependencies, reading the
+	 * initializer. The model's prefix passes through it as po passes
+	 * through anything, but it ends no path of the prefix (a hole would: a
+	 * hole is not plain, so a release's ordering would reach past the plain
+	 * read it stops at). RLAB stays as it is: what orders it before SLAB by
+	 * what it is (an acquire read before all after it) orders it whatever
+	 * it reads */
 	auto all = g.getViewFromStamp(g.getMaxStamp());
 	auto &dall = *genmc::cast<DepView>(&*all);
 	for (const auto &lab : g.labels())
-		if (dependents[lab.getStamp().get()] && &lab != rLab)
+		if (masked[lab.getStamp().get()])
 			dall.addHole(lab.getPos());
 	auto copy = g.getCopyUpTo(*all);
 	for (const auto &lab : g.labels()) {
-		if (!dependents[lab.getStamp().get()] || &lab == rLab)
+		if (!masked[lab.getStamp().get()])
 			continue;
 		/* (A dependent at the end of its thread is not in the copy at all) */
 		const auto *hole = copy->getEventLabelIfPresent(lab.getPos());
@@ -188,6 +202,23 @@ auto keptPrefixView(const ExecutionGraph &g, const GraphModel &model, const Read
 	 * reads) */
 	if (prefix->contains(rLab->getPos()))
 		return nullptr;
+
+	/* RLAB in the model's prefix of SLAB only through the branches: through
+	 * one on the way to an event of its thread after it that the prefix
+	 * keeps (and whose own prefix has RLAB) */
+	const auto dependents = dependentsOf(g, rLab, DependentSeeds::Scoped);
+	if (!throughWrite && fullPrefix->contains(rLab->getPos())) {
+		auto throughKept = false;
+		for (auto i = rLab->getIndex() + 1;
+		     !throughKept && i < g.getThreadSize(rLab->getThread()); i++) {
+			const auto *kLab = g.getEventLabel(Event(rLab->getThread(), i));
+			throughKept = !dependents[kLab->getStamp().get()] &&
+				      prefix->contains(kLab->getPos()) &&
+				      model.calculatePrefixView(kLab)->contains(rLab->getPos());
+		}
+		if (!throughKept)
+			return nullptr;
+	}
 	auto &dprefix = *genmc::cast<DepView>(&*prefix);
 	for (const auto &lab : g.labels())
 		if (dependents[lab.getStamp().get()] && dprefix.contains(lab.getPos()))
@@ -241,7 +272,7 @@ auto BackwardRevisits::revisitView(const ReadLabel *rLab, const WriteLabel *sLab
 
 		/* (The events before RLAB that exist because of what it read: kept
 		 * events, revisited since) */
-		const auto dependents = dependentsOf(g, rLab, true);
+		const auto dependents = dependentsOf(g, rLab, DependentSeeds::Scoped);
 		auto &dpreds = *genmc::cast<DepView>(&*preds);
 		for (const auto &lab : g.labels())
 			if (dependents[lab.getStamp().get()] && &lab != rLab &&

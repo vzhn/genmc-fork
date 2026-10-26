@@ -2219,7 +2219,7 @@ auto ExplorationCore::isExecutionConsistent(const ExecutionGraph &g, bool interm
 auto ExplorationCore::checkEndedRun(const ExecutionGraph &g, bool moot) -> bool
 {
 	const auto pending = keptRuns_.takeDeferredCheck();
-	if (moot && !pending)
+	if ((moot || !keptRuns_.startedWithKept()) && !pending)
 		return true;
 	if (isExecutionConsistent(g, moot, !moot))
 		return true;
@@ -2502,8 +2502,16 @@ auto ExplorationCore::backwardRevisit(const BackwardRevisit &br) -> bool
 	 * exploration otherwise ensures as it adds each event, do not cover the
 	 * kept events, and the revisit is not taken if the graph is not
 	 * consistent. (A revisit that pushed work of its own: it is dropped, so
-	 * that the execution is popped) */
-	const auto checksGraph = relocatesKeptEvents();
+	 * that the execution is popped.) The same under -lkmm when the revisit
+	 * keeps events after holes or after the read; without them, the read's
+	 * own check suffices, as in any TruSt revisit */
+	const auto &rg = getExec().getGraph();
+	const auto checksGraph =
+		relocatesKeptEvents() &&
+		((getConf()->exhaustive && getConf()->model == ModelType::IMM) ||
+		 rg.hasEventsAfter(br.getPos().thread, br.getPos().index) ||
+		 std::ranges::any_of(rg.labels(),
+				     [](const auto &lab) { return genmc::isa<EmptyLabel>(&lab); }));
 	auto succeeded = !checksGraph || recomputeViews(getExec().getGraph());
 	succeeded = succeeded && revisitRead(br);
 	/* (-exhaustive: a graph produced before is skipped (see
