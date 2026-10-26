@@ -376,8 +376,11 @@ released.
   also labels a race on the store of a new thread's ID `CREATE-RACE`, with
   no verdict: glibc's `pthread_create()` stores the ID before the thread
   runs, GenMC's after it creates the thread, so a read that the new thread
-  orders after its start races with that store only in GenMC
-  (`scripts/svcomp/selftest/create-order`, `uninit-read`).
+  orders after its start races with that store only in GenMC. The
+  prelude's `pthread_create` stores the ID atomically, so that the runner
+  tells that store from the task's own, which GenMC may print without a
+  location (`scripts/svcomp/selftest/create-order`, `create-then-write`,
+  `uninit-read`).
 
 
 ## [0.19.0-vzhn.14] - 2026.10.22

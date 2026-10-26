@@ -30,8 +30,10 @@
 #   thread has signalled. glibc's pthread_create stores the ID before the
 #   thread runs, GenMC's after, so GenMC reports a race that SV-COMP does
 #   not have: the runner must label it CREATE-RACE, with no verdict;
-# - create-then-write: the task's own store of the same value right after
-#   pthread_create is a race SV-COMP has too, not a CREATE-RACE.
+# - create-then-write, pp-create-then-write: the task's own store of the
+#   same value right after pthread_create is a race SV-COMP has too, not a
+#   CREATE-RACE (in the preprocessed task, GenMC prints that store without
+#   a location).
 # Needs Python 3 with PyYAML; skipped (exit 77) without it. ctest target
 # "svcomp-shim".
 #
