@@ -355,6 +355,14 @@ released.
 
 ### Added
 
+- `scripts/svcomp/svcomp-run.py --witness` writes an SV-COMP violation
+  witness for each error GenMC finds, in format 2.2 (YAML, with threads) and
+  1.0 (GraphML): the thread creations and the error's call, accesses or
+  invalid access, at the task's lines (`scripts/svcomp/svcomp_witness.py`).
+  The code the runner adds now goes into a header that GenMC reports at the
+  caller's line (`-library-dir`), and so does `reach_error()`. The SV-COMP
+  2026 validators confirm 235 of the 306 witnesses of `Concurrency.set`
+  (`scripts/check-svcomp-shim.sh` checks the waypoints of four).
 - `-library-dir=<dir>` (repeatable): the events of code in a header in
   `<dir>` are reported at the line of the program that called it, as those
   of GenMC's own headers are. A tool that reads the error report and adds

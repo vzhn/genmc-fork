@@ -48,6 +48,11 @@
 #   checks it passes the pointer as an int, which clang must only warn about;
 #   malloc-fail-after-nondet: its abort on a failed malloc, after reading
 #   the largest nondet value, is no bound hit.
+# The runner writes violation witnesses (--witness); the waypoints of four
+# are checked: a race in a task that includes <pthread.h> and in a
+# preprocessed one (both accesses at the task's lines, the code the runner
+# adds reported at its caller's), a call of reach_error() by threads created
+# in a loop, a NULL dereference after a failed malloc (valid-deref).
 # Needs Python 3 with PyYAML; skipped (exit 77) without it. ctest target
 # "svcomp-shim".
 #
@@ -63,7 +68,7 @@ python3 -c 'import yaml' 2>/dev/null || { echo "SKIP no PyYAML for python3"; exi
 out=$(mktemp -d)
 trap 'rm -rf "${out}"' EXIT
 
-"${SVCOMP}/svcomp-run.py" -j 4 -t 60 -o "${out}" "${GenMC}" "${TASKS}" > /dev/null || exit 1
+"${SVCOMP}/svcomp-run.py" -j 4 -t 60 --witness -o "${out}" "${GenMC}" "${TASKS}" > /dev/null || exit 1
 
 status=0
 ntasks=$(ls "${TASKS}"/*.yml | wc -l)
@@ -83,4 +88,31 @@ while IFS=$'\t' read -r d name exp got dt v first; do
 		echo "FAIL ${name}: ${v}, not ${want} (expected ${exp})"; head -10 "${out}/${d}/${name}.out"; status=1
 	fi
 done < "${out}/results.tsv"
+# Each witness's specification and waypoints: (type, thread, line, column)
+python3 - "${out}/selftest" <<'PY' || status=1
+import sys, yaml
+expected = {
+    "create-then-write": ("G ! data-race", [("function_enter", 0, 23, 33),
+                                            ("target", 1, 15, 2), ("target", 0, 24, 2)]),
+    "pp-create-then-write": ("G ! data-race", [("function_enter", 0, 31, 33),
+                                               ("target", 1, 23, 2), ("target", 0, 32, 2)]),
+    "once-reachable": ("G ! call(reach_error())", [("function_enter", 0, 31, 46),
+                                                    ("function_enter", 0, 31, 46),
+                                                    ("target", 0, 35, 3)]),
+    "malloc-fail": ("G valid-deref", [("target", 0, 14, 2)]),
+}
+ok = True
+for name, (spec, waypoints) in expected.items():
+    try:
+        w = yaml.safe_load(open(f"{sys.argv[1]}/{name}.witness.yml"))[0]
+    except OSError:
+        print(f"FAIL {name}: no witness"); ok = False; continue
+    got = [(x["waypoint"]["type"], x["waypoint"]["thread_id"], x["waypoint"]["location"]["line"],
+            x["waypoint"]["location"].get("column")) for s in w["content"] for x in s["segment"]]
+    if spec not in w["metadata"]["task"]["specification"] or got != waypoints:
+        print(f"FAIL {name} witness: {w['metadata']['task']['specification']} {got}"); ok = False
+    else:
+        print(f"ok   {name} witness")
+sys.exit(0 if ok else 1)
+PY
 exit ${status}
