@@ -86,8 +86,8 @@ auto dependencyPrefixView(const ExecutionGraph &g, const EventLabel *lab)
 		 * before its end and before a create, and the end of a thread
 		 * before its join; tc: a start's create */
 		add(Event(eLab->getThread(), 0));
-		if (const auto *bLab = genmc::dyn_cast<ThreadStartLabel>(eLab))
-			add(bLab->getCreateId());
+		if (const auto *bLab = genmc::dyn_cast<ThreadStartLabel>(eLab); bLab && bLab->getCreate())
+			add(bLab->getCreate()->getPos());
 		if (genmc::isa<ThreadCreateLabel>(eLab) || genmc::isa<ThreadFinishLabel>(eLab))
 			addBefore(eLab);
 		if (const auto *jLab = genmc::dyn_cast<ThreadJoinLabel>(eLab))
@@ -116,9 +116,10 @@ auto dependentsOf(const ExecutionGraph &g, const ReadLabel *rLab, DependentSeeds
 		if (const auto *wLab = genmc::dyn_cast<WriteLabel>(lab); wLab && wLab->isRMW() &&
 		    in[g.po_imm_pred(lab)->getStamp().get()])
 			return true;
+		/* (A thread whose create was cut keeps only its begin, which
+		 * records the create's old position: no create to depend on) */
 		const auto *bLab = genmc::cast<ThreadStartLabel>(g.getFirstThreadLabel(lab->getThread()));
-		if (!bLab->getCreateId().isInitializer() &&
-		    in[g.getEventLabel(bLab->getCreateId())->getStamp().get()])
+		if (const auto *tcLab = bLab->getCreate(); tcLab && in[tcLab->getStamp().get()])
 			return true;
 		return false;
 	};
@@ -391,8 +392,8 @@ auto BackwardRevisits::keepRMWReads(const ReadLabel *rLab, const WriteLabel *sLa
 		if (isRMWWrite(lab))
 			work.push_back(e.prev());
 		const auto *bLab = genmc::cast<ThreadStartLabel>(g.getFirstThreadLabel(e.thread));
-		if (!bLab->getCreateId().isInitializer())
-			work.push_back(bLab->getCreateId());
+		if (bLab->getCreate())
+			work.push_back(bLab->getCreate()->getPos());
 	}
 	return v;
 }
