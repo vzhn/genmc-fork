@@ -22,8 +22,10 @@
 
 auto ExplorationStack::emptyFrame() const -> ExecutionFrame
 {
-	auto cfg = ExecutionGraph::Config{
-		.execState = &state_, .memModel = &model_, .emitNALabels = Config::emitNALabels};
+	auto cfg = ExecutionGraph::Config{.execState = &state_,
+					  .memModel = &model_,
+					  .emitNALabels = Config::emitNALabels,
+					  .allowUninitReads = allowUninitReads_};
 	auto g = depTracking_ ? std::make_unique<DepExecutionGraph>(cfg)
 			      : std::make_unique<ExecutionGraph>(cfg);
 	return {std::move(g), WorkList(), ChoiceMap()};

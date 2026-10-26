@@ -19,7 +19,13 @@ property is only checked for that property.
 
 A race where one side lies inside an atomic section is labelled ATOMIC-RACE
 and gets no verdict: SV-COMP counts accesses in atomic sections as atomic,
-while the shim implements atomic sections with a lock.
+while the shim implements atomic sections with a lock. A race on the store of
+a new thread's ID is labelled CREATE-RACE and gets no verdict: glibc's
+pthread_create stores the ID before the thread runs, GenMC's after.
+
+GenMC runs with -svcomp where it has the option, so that a read of
+uninitialized memory, which SV-COMP does not count as a memory-safety
+violation, reads 0; older releases report such reads, which get no verdict.
 
 Tasks that include <pthread.h> get svcomp-shim.h. Preprocessed tasks, which
 declare the pthread API themselves, get svcomp-shim-pp.h and a copy of the task
@@ -180,8 +186,10 @@ def classify(out):
     if "Safety violation" in out:
         return "unreach-call"
     if "Non-atomic race" in out:
-        return "atomic-race" if atomic_race(out) else "no-data-race"
-    if re.search(r"access (freed|non-allocated) memory|Double-free|uninitialized memory"
+        if atomic_race(out):
+            return "atomic-race"
+        return "create-race" if create_race(out) else "no-data-race"
+    if re.search(r"access (freed|non-allocated) memory|Double-free"
                  r"|Attempt to access|Invalid free", out):
         return "valid-memsafety"
     if "Liveness violation" in out:
@@ -226,6 +234,31 @@ def atomic_race(out):
         return False
     a, b, c, d = map(int, m.groups())
     return in_atomic_section(out, a, b) or in_atomic_section(out, c, d)
+
+
+def create_race(out):
+    """A race on the store of a new thread's ID: pthread_create's store right
+    after the THREAD_CREATE of that thread, with no source location (GenMC's
+    pthread.h) or that of the THREAD_CREATE (the generated tail): a store of
+    the task's own on the next line may store the same value. glibc
+    stores the ID before the thread runs, so a read ordered after the
+    thread's start does not race with it there; GenMC creates the thread
+    first."""
+    m = re.search(r"Event \((\d+), (\d+)\) conflicts with event \((\d+), (\d+)\)", out)
+    if not m:
+        return False
+    events = {(int(e[0]), int(e[1])): e[2]
+              for e in re.findall(r"^\s*\((\d+), (\d+)\): (.*)$", out, re.M)}
+
+    def is_id_store(tid, idx):
+        create = re.fullmatch(r"THREAD_CREATE \[thread (\d+)\]\s*(\S*)",
+                              events.get((tid, idx - 1), ""))
+        store = re.fullmatch(r"W\w* \(.*, (\d+)\)\s*(\S*)", events.get((tid, idx), ""))
+        return bool(create and store and create.group(1) == store.group(1)
+                    and store.group(2) in ("", create.group(2)))
+
+    a, b, c, d = map(int, m.groups())
+    return is_id_store(a, b) or is_id_store(c, d)
 
 
 def verdict(expected, got):
@@ -279,7 +312,8 @@ def run_task(args, d, yml):
     try:
         main_argc = 1 if re.search(r"\bmain\s*\(\s*int\b", with_local_includes(code, d)) else 0
         recursive = 1 if mentions_recursive(code) else 0
-        p = subprocess.run([args.genmc, f"-{args.model}", "-disable-estimation", "--",
+        p = subprocess.run([args.genmc, f"-{args.model}", "-disable-estimation",
+                            *args.genmc_flags, "--",
                             "-I", os.path.abspath(d), f"-DSVC_MAIN_ARGC={main_argc}",
                             f"-DSVC_RECURSIVE_MUTEX={recursive}",
                             f"-DSVC_NONDET_MAX={args.nondet_max}",
@@ -314,6 +348,8 @@ def main():
     ap.add_argument("genmc")
     ap.add_argument("dirs", nargs="+")
     args = ap.parse_args()
+    help_text = subprocess.run([args.genmc, "--help"], capture_output=True, text=True).stdout
+    args.genmc_flags = ["-svcomp"] if re.search(r"^\s*--?svcomp\b", help_text, re.M) else []
 
     jobs = [(d, y) for d in args.dirs for y in sorted(os.listdir(d)) if y.endswith(".yml")]
     rows = []

@@ -34,8 +34,10 @@ class GraphModel;
  */
 class ExplorationStack {
 public:
-	ExplorationStack(GraphModel &model, ExecutionState &state, bool depTracking)
-		: model_(model), state_(state), depTracking_(depTracking)
+	ExplorationStack(GraphModel &model, ExecutionState &state, bool depTracking,
+			 bool allowUninitReads)
+		: model_(model), state_(state), depTracking_(depTracking),
+		  allowUninitReads_(allowUninitReads)
 	{}
 
 	/** A frame with the empty graph (only the initializer) */
@@ -66,6 +68,7 @@ private:
 	GraphModel &model_;
 	ExecutionState &state_;
 	bool depTracking_;
+	bool allowUninitReads_;
 	std::vector<ExecutionFrame> frames_;
 };
 

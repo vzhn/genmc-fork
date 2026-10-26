@@ -367,6 +367,17 @@ released.
   fitted to the type), and GenMC prints the same warning. The `float`,
   `double` and pointer variants are still unsupported
   (`tests/correct/infr/nondet-variants`).
+- `-svcomp`: checks properties as SV-COMP defines them. For now that means
+  that a read of uninitialized memory reads 0 instead of being an error:
+  SV-COMP does not count it as a memory-safety violation, so GenMC's report
+  was a false alarm in `valid-memsafety` tasks and stopped the check of
+  their other properties (`tests/correct/infr/svcomp-uninit-read`).
+  `scripts/svcomp/svcomp-run.py` passes it when GenMC has it. The runner
+  also labels a race on the store of a new thread's ID `CREATE-RACE`, with
+  no verdict: glibc's `pthread_create()` stores the ID before the thread
+  runs, GenMC's after it creates the thread, so a read that the new thread
+  orders after its start races with that store only in GenMC
+  (`scripts/svcomp/selftest/create-order`, `uninit-read`).
 
 
 ## [0.19.0-vzhn.14] - 2026.10.22

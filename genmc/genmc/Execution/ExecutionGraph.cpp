@@ -53,8 +53,9 @@ static constexpr uint64_t BYTE_MASK = 0xFF;
 	/* Special case for initializer */
 	if (lab->getPos().isInitializer()) {
 		/* Dynamic-loc accesses can read init only if the graph has been cut,
-		 * or if the block was zero-initialized by its allocation (calloc()) */
-		VERIFY(!(haveNAs_ && access.addr.isDynamic() && !pruned_ &&
+		 * if the block was zero-initialized by its allocation (calloc()),
+		 * or if uninitialized reads are allowed (they read 0) */
+		VERIFY(!(haveNAs_ && access.addr.isDynamic() && !pruned_ && !allowUninitReads_ &&
 			 !state.isInitialized(access)));
 		auto val = (access.addr.isDynamic() && !initVals_.contains(access.addr))
 				   ? SVal(0)
@@ -819,7 +820,8 @@ auto ExecutionGraph::getCopyUpTo(const VectorClock &v) const -> std::unique_ptr<
 	auto og = std::make_unique<ExecutionGraph>(
 		ExecutionGraph::Config{.execState = this->state_,
 				       .memModel = this->memModel_,
-				       .emitNALabels = this->haveNAs_});
+				       .emitNALabels = this->haveNAs_,
+				       .allowUninitReads = this->allowUninitReads_});
 	copyGraphUpTo(*og, v);
 	return og;
 }

@@ -45,6 +45,10 @@ GenMC decides three of SV-COMP's properties:
 | `no-data-race` | a non-atomic race |
 | `valid-memsafety` | an access to freed or unallocated memory, a double free |
 
+The runner passes GenMC `-svcomp` where it has the option: a read of
+uninitialized memory, which SV-COMP does not count as a memory-safety
+violation, then reads 0 instead of being reported.
+
 GenMC stops at the first error, so a task is only checked for the property it
 fails first. Each task gets one of:
 
@@ -54,7 +58,7 @@ fails first. Each task gets one of:
 - **UNCHECKED:** an error on a property the task does not state.
 - Otherwise a label saying why there is no verdict: `TIMEOUT`, `COMPILE-ERROR`,
   `UNSUPPORTED-CALL` (a call to a function GenMC cannot run), `NO-INPUT`
-  (the task's input file is missing) and so on.
+  (the task's input file is missing), `CREATE-RACE` (see below) and so on.
 
 ## What the shim approximates
 
@@ -77,33 +81,38 @@ so a clean result holds only up to those bounds:
   preprocessed task defines them the same way), except that a condvar wait
   may wake up without a signal, at most `--max-spurious` times per
   execution (default 1).
+- **`pthread_create`** stores the new thread's ID after creating the
+  thread; glibc stores it before the thread runs. A thread that reads the ID
+  once the new thread has signalled it races with the store only in GenMC,
+  so a race on that store is labelled `CREATE-RACE`, with no verdict.
 - **`abort()`** and **`malloc(0)`** discard the execution. SV-COMP uses
   `abort()` to cut off paths, and GenMC itself would die on it (#44, #47).
 
 ## Results
 
-With GenMC 0.19.0-vzhn.14 and every folder of `Concurrency.set`
-(sv-benchmarks of 2026-10-21: 1154 tasks, 1143 with a property GenMC
-decides), 60 s per task:
+With GenMC built from master (after 0.19.0-vzhn.14, with `-svcomp`) and
+every folder of `Concurrency.set` (sv-benchmarks of 2026-10-26: 1154 tasks,
+1143 with a property GenMC decides), 60 s per task:
 
 | Verdict | Tasks |
 |---|---|
-| AGREE | 631 |
+| AGREE | 640 |
 | MISSED | 29 |
-| FALSE-ALARM | 1 |
-| UNCHECKED, ATOMIC-RACE | 16, 40 |
+| FALSE-ALARM | 0 |
+| UNCHECKED, ATOMIC-RACE, CREATE-RACE | 6, 40, 5 |
 | TIMEOUT | 372 |
 | COMPILE-ERROR | 26 |
 | UNSUPPORTED-CALL | 17 |
-| UNKNOWN, OTHER-ERROR | 6, 5 |
+| UNKNOWN, OTHER-ERROR | 3, 5 |
 
-Most timeouts are in `pthread-wmm` (201): its tasks simulate weak memory
+Most timeouts are in `pthread-wmm` (204): its tasks simulate weak memory
 with many small atomic sections, and the one lock that implements them
-makes GenMC explore every order of the sections. The false alarm is a read
-of uninitialised memory, which GenMC reports and SV-COMP does not count.
+makes GenMC explore every order of the sections.
 
-The missed bugs fall into four groups:
+The missed bugs fall into five groups:
 - races hidden by the atomic-section lock;
+- tasks whose every execution asks for more than `--max-choices` values:
+  no execution completes, and the run is reported clean;
 - bugs that need a specific value (`x == 42`) or integer overflow, beyond the small
   `nondet` range;
 - memory leaks, which GenMC does not check;

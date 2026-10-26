@@ -92,6 +92,9 @@ public:
 		ExecutionState *execState{};
 		GraphModel *memModel{};
 		bool emitNALabels{};
+		/* Reads of uninitialized heap memory read 0 instead of being
+		 * reported (Config::disableInitializationChecks) */
+		bool allowUninitReads{};
 	};
 
 	/**
@@ -142,7 +145,8 @@ public:
 
 	/* Constructors */
 	ExecutionGraph(Config cfg)
-		: memModel_(cfg.memModel), haveNAs_(cfg.emitNALabels), state_(cfg.execState)
+		: memModel_(cfg.memModel), haveNAs_(cfg.emitNALabels),
+		  allowUninitReads_(cfg.allowUninitReads), state_(cfg.execState)
 	{
 		/* Create an entry for main() and push the "initializer" label */
 		events.emplace_back();
@@ -1330,6 +1334,8 @@ protected:
 	GraphModel *memModel_{};
 	// NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
 	bool haveNAs_{};
+	// NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
+	bool allowUninitReads_{};
 	// NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
 	ExecutionState *state_{};
 
