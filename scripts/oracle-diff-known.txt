@@ -15,14 +15,15 @@ rc11:lkmm data-structures/qu dependency
 rc11:lkmm data-structures/qu-opt dependency
 rc11:lkmm data-structures/stc-opt dependency
 
+# Nor on release cumulativity (#270, LKMM's prop): if t0 writes x0, then t2
+# writes x0 and release-stores x2, which an RMW po-before t0's write reads,
+# LKMM orders that RMW after t0's write ((prop \ id) & int is in hb), closing
+# an hb cycle through t0's acquire load; RC11 needs an acquire read of x2. -lkmm explores 1039 executions of imm-sched-dup-revisit,
+# as many as herd7 does on its kernel version (seq_cst as acquire/release).
+rc11:lkmm infr/imm-sched-dup-revisit prop
+
 # -lkmm misses an execution: the exhaustive dedup ignores the order of a
 # refilled hole
 rc11:lkmm gobench/grpc3017 #264
-# -lkmm explores 1039 executions, -rc11 1468, since at least 3300599; not yet
-# known whether LKMM forbids them or -lkmm misses them
-rc11:lkmm infr/imm-sched-dup-revisit #270
 # -lkmm does not finish (-rc11 -exhaustive: 4 executions)
 rc11:lkmm saver/loop-peel2 #271
-# -lkmm -schedule-policy=arbitrary segfaults (seeds 1 and 3), since 1b9ce333;
-# a fix is in progress
-rc11:lkmm infr/nested-create-symm segfault
