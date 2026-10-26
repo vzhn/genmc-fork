@@ -15,6 +15,7 @@
 #ifndef GENMC_ERROR_REPLAY_HPP
 #define GENMC_ERROR_REPLAY_HPP
 
+#include "genmc/Execution/EventLabel.hpp"
 #include "genmc/Support/Error.hpp"
 #include "genmc/Support/Event.hpp"
 #include "genmc/Support/VerificationError.hpp"
@@ -38,6 +39,8 @@ public:
 	void start(Event target, const ErrorDetails &details)
 	{
 		scheduler_.setErrorReplayEvent(target);
+		scheduler_.setErrorReplayPartner(details.racyLab ? std::optional(details.racyLab->getPos())
+								 : std::nullopt);
 		buffered_ = details;
 	}
 
@@ -74,6 +77,7 @@ public:
 	void stop()
 	{
 		scheduler_.setErrorReplayEvent(std::nullopt);
+		scheduler_.setErrorReplayPartner(std::nullopt);
 		dbgInfo_.clear();
 		buffered_ = std::nullopt;
 	}

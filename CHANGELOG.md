@@ -11,6 +11,12 @@ released.
 
 ### Fixed
 
+- The error graph of a race printed the access that the race was found
+  with, if it came later than the reported one, without its variable's name
+  or its source location: `Wna (, 5)`. The error replay, which collects the
+  source information, ran up to the reported access only, and the other one
+  is not in its prefix (the two race). The replay now runs the other access
+  too (`tests/wrong/racy/race-partner-location`).
 - `-lkmm` missed executions that LKMM allows when the events a revisit
   kept depended on the path a branch took (#77). The prefix of a write
   (what its revisits keep) had every fence before every later event
@@ -349,6 +355,12 @@ released.
 
 ### Added
 
+- `-library-dir=<dir>` (repeatable): the events of code in a header in
+  `<dir>` are reported at the line of the program that called it, as those
+  of GenMC's own headers are. A tool that reads the error report and adds
+  code of its own (the SV-COMP runner, whose witnesses may only name lines
+  of the task) gets the program's lines (`scripts/check-library-dir.sh`,
+  ctest `library-dir`).
 - `-print-addresses`: the printed graphs (the error graph,
   `-dump-error-graph`, `-print-exec-graphs`) show the address of each
   access, as in `Wna (@H#(0, 52), 0)`, and the block each allocation and

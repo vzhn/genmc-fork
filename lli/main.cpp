@@ -218,6 +218,11 @@ static llvm::cl::opt<bool>
 		 llvm::cl::desc("Check properties as SV-COMP defines them: a read of uninitialized "
 				"memory reads 0 instead of being an error"));
 
+static llvm::cl::list<std::string> clLibraryDirs(
+	"library-dir", llvm::cl::cat(clGeneral), llvm::cl::value_desc("dir"),
+	llvm::cl::desc("Report an event of code in a header in <dir> at the line of the "
+		       "program that called it, as for GenMC's own headers (repeatable)"));
+
 static llvm::cl::opt<std::string>
 	clCollectLinSpec("collect-lin-spec", llvm::cl::init(""), llvm::cl::value_desc("file"),
 			 llvm::cl::cat(clGeneral),
@@ -436,6 +441,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 {
 	/* LLI */
 	lliConfig.cflags.insert(lliConfig.cflags.end(), clCFLAGS.begin(), clCFLAGS.end());
+	lliConfig.libraryDirs.assign(clLibraryDirs.begin(), clLibraryDirs.end());
 	/* <lkmm.h> uses the LKMM intrinsics under -lkmm and C11 atomics otherwise */
 	if (clModelType == ModelType::LKMM)
 		lliConfig.cflags.emplace_back("-D__GENMC_LKMM__");
