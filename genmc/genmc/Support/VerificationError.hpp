@@ -72,6 +72,7 @@ enum class VerificationError : std::uint8_t {
 	VE_Annotation,
 	VE_MixedSize,
 	VE_LinearizabilityError,
+	VE_SerializabilityError,
 	VE_SystemError,
 };
 
@@ -181,6 +182,8 @@ template <> struct std::formatter<VerificationError> {
 			FORMAT_CASE(VerificationError::VE_MixedSize, "Mixed-size accesses");
 			FORMAT_CASE(VerificationError::VE_LinearizabilityError,
 				    "Linearizability error");
+			FORMAT_CASE(VerificationError::VE_SerializabilityError,
+				    "Serializability violation");
 			FORMAT_CASE(VerificationError::VE_SystemError, systemErrorNumber);
 		default:
 			return std::format_to(ctx.out(), "Unknown status");

@@ -827,3 +827,55 @@ Number of checked hints: 1
 Relinche time: 0.00s
 Total wall-clock time: 0.03s
 ```
+
+## Checking Serializability
+
+With `-check-serializability`, GenMC checks that every execution it explores
+is conflict-serializable with respect to the atomic regions that the program
+marks with `__VERIFIER_serial_begin()` and `__VERIFIER_serial_end()`
+(declared in `genmc.h`). Unlike `-check-lin-spec`, the check needs no
+specification: a region must just behave as if it ran without interruption.
+
+For each complete execution, GenMC contracts the events of each region into
+one node and keeps every event outside a region as a node of its own. The
+edges are program order, reads-from, coherence and from-read (plus thread
+creation and joining) between different nodes. If a cycle goes through a
+region, GenMC reports a `Serializability violation`, names two regions on
+the cycle, and lists the edges of the cycle.
+
+```c
+atomic_int counter;
+
+void *increment(void *unused)
+{
+	__VERIFIER_serial_begin();
+	int c = atomic_load_explicit(&counter, memory_order_relaxed);
+	atomic_store_explicit(&counter, c + 1, memory_order_relaxed);
+	__VERIFIER_serial_end();
+	return NULL;
+}
+```
+
+With two threads running `increment()`, GenMC reports the lost update. When
+both loads read 0, thread 2's load is fr-before thread 1's store, which is
+co-before thread 2's store:
+
+```
+Atomic regions are not serializable: region "serial" #1 of thread 1 [(1, 1)..(1, 4)] and region "serial" #1 of thread 2 [(2, 1)..(2, 4)] are on a cycle of conflicts:
+  (1, 3) --co--> (2, 3)
+  (2, 2) --fr--> (1, 3)
+```
+
+Some notes:
+
+- The markers are the method markers of `__VERIFIER_method_begin()` and
+  `__VERIFIER_method_end()` under the name `serial`, so every method is
+  checked as a region too. Nested markers belong to the outermost region.
+- The check is conflict serializability, which is stronger than producing
+  the results of some serial run: regions whose writes conflict in an
+  interleaved order are reported even if their results match a serial run.
+- The regions are checked against SC. Under a weaker model, a cycle through
+  a region that the model allows without regions is reported too.
+- The failed iterations of a spinloop are removed by the spin-assume
+  transformation. With `-disable-spin-assume`, a failed lock attempt inside a
+  region reads the other region's state midway, which is reported.

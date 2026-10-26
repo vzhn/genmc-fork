@@ -72,6 +72,7 @@ set(GENMC_VERIFICATION_SOURCES
   genmc/Verification/Relinche/Linearization.cpp
   genmc/Verification/Relinche/Observation.cpp
   genmc/Verification/Relinche/Specification.cpp
+  genmc/Verification/Serializability/SerializabilityChecker.cpp
   genmc/Verification/State/ResumePointStore.cpp
   genmc/Verification/Rules/RfReductions.cpp
   genmc/Verification/Rules/SpinloopRules.cpp

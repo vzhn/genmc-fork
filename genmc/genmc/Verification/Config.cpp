@@ -144,6 +144,9 @@ auto Config::validate(std::vector<std::string> &warnings) -> ValidationStatus
 		schedulePolicy = SchedulePolicy::LTR;
 	}
 
+	if (checkSerializability && mode == ExplorationMode::random)
+		warnings.emplace_back("--check-serializability has no effect in --mode=random.");
+
 	/* Check Relinche options */
 	if (collectLinSpec.has_value() && checkLinSpec.has_value()) {
 		errors.emplace_back(

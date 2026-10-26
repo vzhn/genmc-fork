@@ -9,6 +9,16 @@ released.
 
 - Merge of MIXER [POPL'25] into mainline GenMC
 
+### Added
+
+- `-check-serializability` checks that the atomic regions a program marks
+  with `__VERIFIER_serial_begin()` and `__VERIFIER_serial_end()` are
+  conflict-serializable in every execution: the po, rf, co and fr edges
+  between regions (each contracted to one node) and the events outside them
+  must form no cycle through a region. A cycle is reported as a
+  `Serializability violation` naming two regions and the edges of the cycle
+  (`tests/correct/serializability`, `tests/wrong/serializability`).
+
 ### Fixed
 
 - A loop or an `assume()` comparing a loaded pointer with a global's

@@ -164,6 +164,11 @@ static llvm::cl::opt<bool> clCheckReplayKeys(
 static llvm::cl::opt<bool> clCheckLiveness("check-liveness", llvm::cl::cat(clGeneral),
 					   llvm::cl::desc("Check for liveness violations"));
 
+static llvm::cl::opt<bool> clCheckSerializability(
+	"check-serializability", llvm::cl::cat(clGeneral),
+	llvm::cl::desc("Check that the atomic regions (__VERIFIER_serial_begin/_end) are "
+		       "conflict-serializable"));
+
 #if EMIT_NA_LABELS
 static llvm::cl::opt<bool> clCacheInstructions(
 	"cache-instructions", llvm::cl::cat(clGeneral),
@@ -523,6 +528,7 @@ static void saveConfigOptions(Config &conf, LLIConfig &lliConfig)
 	conf.printErrorTrace = clPrintErrorTrace;
 	conf.printAddresses = clPrintAddresses;
 	conf.checkLiveness = clCheckLiveness;
+	conf.checkSerializability = clCheckSerializability;
 	conf.lkmmReference = clLkmmReference;
 	/* Under LKMM, the prefix of an event can depend on the path of a branch
 	 * before it, which the optimality of the revisits assumes it does not:
