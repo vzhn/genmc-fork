@@ -113,8 +113,8 @@ add_test(NAME model-inclusion
 set_tests_properties(model-inclusion PROPERTIES LABELS "integration;fast" TIMEOUT 600)
 
 # RC11 against LKMM on the same tests, advisory (not in "fast"): LKMM orders
-# dependencies that RC11 does not, so the two are not ordered on every
-# program, and each disagreement is either a bug or a line in
+# dependencies and release chains that RC11 does not, so the two are not
+# ordered on every program, and each disagreement is either a bug or a line in
 # scripts/oracle-diff-known.txt that says why (#264)
 add_test(NAME model-inclusion-lkmm
     COMMAND bash -c "${SCRIPT_DIR}/oracle-diff.sh -p rc11:lkmm -c 100 -t 60 -j 4 ${CMAKE_BINARY_DIR}/bin/genmc ${MODEL_INCLUSION_DIRS_ARGS} > ${SCRIPT_DIR}/model-inclusion-lkmm.log"
