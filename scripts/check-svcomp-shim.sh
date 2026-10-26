@@ -38,7 +38,16 @@
 #   value of at least 20): every execution that could reach them is cut,
 #   and the bounds check must label them BOUNDED instead of "true";
 #   blocked-not-bounded: executions blocked for the task's own reasons,
-#   whose clean result stands.
+#   whose clean result stands;
+# - pp-libc, pp-sem-race: sleep, strcpy, ffs and semaphores in the tail (a
+#   semaphore of 1 orders the workers, one of 2 does not); scanf: scanf in
+#   a task that includes <stdio.h>;
+# - pp-int-pthread-t: a preprocessed task that declares pthread_t as int,
+#   as pthread-driver-races does;
+# - malloc-fail, malloc-fail-checked: malloc may return NULL; the task that
+#   checks it passes the pointer as an int, which clang must only warn about;
+#   malloc-fail-after-nondet: its abort on a failed malloc, after reading
+#   the largest nondet value, is no bound hit.
 # Needs Python 3 with PyYAML; skipped (exit 77) without it. ctest target
 # "svcomp-shim".
 #

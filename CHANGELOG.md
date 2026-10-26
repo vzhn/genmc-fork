@@ -390,6 +390,18 @@ released.
   execution that asks for one value too many or aborts after reading the
   range's largest value; the task is then labelled `BOUNDED`, with no
   verdict (`scripts/svcomp/selftest/bounded-*`, `blocked-not-bounded`).
+- `scripts/svcomp/svcomp-run.py` could not run 43 tasks of
+  `Concurrency.set`. The 22 of `pthread-driver-races` declare `pthread_t`
+  as `int`, so the runner took them for tasks that include `<pthread.h>`
+  and they clashed with GenMC's; others called `sleep`, `strcpy`, `ffs`,
+  POSIX semaphores or `scanf`, which GenMC lacks, or passed a pointer as an
+  int, which clang rejects and gcc only warns about. The prelude now
+  defines those functions (`time` and `mmap` stay unsupported) and clang
+  only warns. With `strcpy`, a task whose error is a NULL dereference after
+  a failed `malloc` became a wrong "true": as in SV-COMP, `malloc` and
+  `calloc` now may fail, at most once per execution, in tasks that check
+  `valid-memsafety` (`scripts/svcomp/selftest/pp-libc`, `pp-sem-race`,
+  `scanf`, `pp-int-pthread-t`, `malloc-fail*`).
 
 
 ## [0.19.0-vzhn.14] - 2026.10.22

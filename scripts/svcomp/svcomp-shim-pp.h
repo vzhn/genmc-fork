@@ -164,6 +164,32 @@ static int __svc_setspecific(unsigned int key, const void *p)
 	return 0;
 }
 
+/* POSIX semaphores: the count is the first int of sem_t. A wait takes one
+ * once the count is positive; the count's acquire/release order is what
+ * sem_post and sem_wait synchronise by. */
+static int __svc_sem_wait(int *c)
+{
+	for (;;) {
+		int v;
+
+		__VERIFIER_await((v = __atomic_load_n(c, __ATOMIC_ACQUIRE)) > 0);
+		if (__atomic_compare_exchange_n(c, &v, v - 1, 0, __ATOMIC_ACQ_REL,
+						__ATOMIC_ACQUIRE))
+			return 0;
+	}
+}
+
+static int __svc_sem_trywait(int *c)
+{
+	int v = __atomic_load_n(c, __ATOMIC_ACQUIRE);
+
+	while (v > 0)
+		if (__atomic_compare_exchange_n(c, &v, v - 1, 0, __ATOMIC_ACQ_REL,
+						__ATOMIC_ACQUIRE))
+			return 0;
+	return -1; /* EAGAIN, in errno */
+}
+
 #if SVC_RECURSIVE_MUTEX
 /* Recursive mutexes, as in svcomp-shim.h: pthread_mutex_init registers a
  * mutex whose attribute says PTHREAD_MUTEX_RECURSIVE, which then keeps an

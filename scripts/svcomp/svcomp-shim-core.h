@@ -21,6 +21,11 @@
  *   in the explored executions where it reads the helper thread's 1. At most
  *   SVC_MAX_SPURIOUS (default 1) wait calls per execution may wake spuriously;
  *   later calls always wait for a signal, so a waiting loop still ends.
+ * - Failing allocations: SV-COMP's malloc and calloc may return NULL. With
+ *   SVC_MALLOC_FAIL=1 (svcomp-run.py sets it for tasks that check
+ *   valid-memsafety), each allocation asks __svc_malloc_fails(), which says
+ *   yes in the explored executions where it reads the helper thread's 1,
+ *   for the first such allocation only: one allocation per execution fails.
  * - __VERIFIER_atomic_begin/end: a global mutex. Correct for atomic sections
  *   that neither nest nor block, but it differs from SV-COMP's semantics
  *   for data races in both directions. The lock adds synchronisation that
@@ -56,11 +61,19 @@ static int __svc_choice[SVC_MAX_CHOICES];
 static int __svc_next_choice;
 static int __svc_spurious[SVC_MAX_SPURIOUS > 0 ? SVC_MAX_SPURIOUS : 1];
 static int __svc_next_spurious;
+#ifndef SVC_MALLOC_FAIL
+# define SVC_MALLOC_FAIL 0
+#endif
+static int __svc_malloc_fail;
+static int __svc_malloc_failed;
 static __VERIFIER_mutex_t __svc_atomic_lock = { 0 }; /* unlocked */
 
 #if SVC_CHECK_BOUNDS
 extern void __svc_bound_hit(void);
 static _Thread_local int __svc_saw_max;
+/* an abort after a failed allocation is the task's NULL check, not a value
+ * out of range */
+static _Thread_local int __svc_alloc_failed;
 #endif
 
 static int __svc_choose(void)
@@ -97,7 +110,7 @@ static int __svc_nondet_bit(void)
 static void __svc_abort_path(void)
 {
 #if SVC_CHECK_BOUNDS
-	if (__svc_saw_max)
+	if (__svc_saw_max && !__svc_alloc_failed)
 		__svc_bound_hit();
 #endif
 	__VERIFIER_assume(0);
@@ -151,6 +164,18 @@ static void __svc_atomic_guard_release(int *unused)
 	__attribute__((cleanup(__svc_atomic_guard_release))) int __svc_guard =	\
 		(__VERIFIER_atomic_begin(), 0)
 
+static int __svc_malloc_fails(void)
+{
+	if (!SVC_MALLOC_FAIL || !__atomic_load_n(&__svc_malloc_fail, __ATOMIC_RELAXED))
+		return 0;
+	if (__atomic_exchange_n(&__svc_malloc_failed, 1, __ATOMIC_RELAXED))
+		return 0;
+#if SVC_CHECK_BOUNDS
+	__svc_alloc_failed = 1;
+#endif
+	return 1;
+}
+
 static void *__svc_chooser(void *arg)
 {
 	for (int i = 0; i < SVC_MAX_CHOICES; i++)
@@ -158,6 +183,8 @@ static void *__svc_chooser(void *arg)
 			__atomic_store_n(&__svc_choice[i], v, __ATOMIC_RELAXED);
 	for (int i = 0; i < SVC_MAX_SPURIOUS; i++)
 		__atomic_store_n(&__svc_spurious[i], 1, __ATOMIC_RELAXED);
+	if (SVC_MALLOC_FAIL)
+		__atomic_store_n(&__svc_malloc_fail, 1, __ATOMIC_RELAXED);
 	return 0;
 }
 
