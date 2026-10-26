@@ -51,7 +51,7 @@ static void *__svc_calloc(size_t n, size_t sz)
 
 static void __svc_abort(void)
 {
-	__VERIFIER_assume(0);
+	__svc_abort_path();
 }
 
 int pthread_detach(pthread_t t) { return 0; }

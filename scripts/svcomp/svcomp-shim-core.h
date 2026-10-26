@@ -33,6 +33,14 @@
  *   which takes the atomic-section lock and releases it on every return.
  * - main(argc, argv): the shim's main passes a dummy argc/argv when
  *   svcomp-run.py defines SVC_MAIN_ARGC=1.
+ * - Bounds check: with SVC_CHECK_BOUNDS=1, an execution that the bounds
+ *   above may have cut calls __svc_bound_hit(), which nothing defines, so
+ *   GenMC stops with "unknown external function". That is an execution
+ *   that asks for more than SVC_MAX_CHOICES values, or one that abort()s
+ *   (assume_abort_if_not()) in a thread that has read the largest nondet
+ *   value: the task wanted a value out of range, as in
+ *   assume_abort_if_not(n >= 20). svcomp-run.py reruns a clean task with
+ *   blocked executions so, and gives no verdict if the bound was hit.
  */
 #ifndef SVC_MAX_CHOICES
 # define SVC_MAX_CHOICES 4
@@ -50,20 +58,49 @@ static int __svc_spurious[SVC_MAX_SPURIOUS > 0 ? SVC_MAX_SPURIOUS : 1];
 static int __svc_next_spurious;
 static __VERIFIER_mutex_t __svc_atomic_lock = { 0 }; /* unlocked */
 
-static int __svc_nondet_val(void)
+#if SVC_CHECK_BOUNDS
+extern void __svc_bound_hit(void);
+static _Thread_local int __svc_saw_max;
+#endif
+
+static int __svc_choose(void)
 {
 	int i = __atomic_fetch_add(&__svc_next_choice, 1, __ATOMIC_RELAXED);
+#if SVC_CHECK_BOUNDS
+	if (i >= SVC_MAX_CHOICES)
+		__svc_bound_hit();
+#endif
 	/* out of choices: end this execution, like an unroll bound */
 	__VERIFIER_assume(i < SVC_MAX_CHOICES);
 	return __atomic_load_n(&__svc_choice[i], __ATOMIC_RELAXED);
 }
 
+static int __svc_nondet_val(void)
+{
+	int v = __svc_choose();
+#if SVC_CHECK_BOUNDS
+	if (v == SVC_NONDET_MAX)
+		__svc_saw_max = 1;
+#endif
+	return v;
+}
+
 static int __svc_nondet_bit(void)
 {
-	int v = __svc_nondet_val();
+	int v = __svc_choose();
 	/* drop the larger values instead of exploring each one as "true" */
 	__VERIFIER_assume(v <= 1);
 	return v;
+}
+
+/* abort(): SV-COMP cuts off a path with it */
+static void __svc_abort_path(void)
+{
+#if SVC_CHECK_BOUNDS
+	if (__svc_saw_max)
+		__svc_bound_hit();
+#endif
+	__VERIFIER_assume(0);
 }
 
 int __svc_nondet_int(void) { return __svc_nondet_val(); }

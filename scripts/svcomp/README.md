@@ -58,7 +58,8 @@ fails first. Each task gets one of:
 - **UNCHECKED:** an error on a property the task does not state.
 - Otherwise a label saying why there is no verdict: `TIMEOUT`, `COMPILE-ERROR`,
   `UNSUPPORTED-CALL` (a call to a function GenMC cannot run), `NO-INPUT`
-  (the task's input file is missing), `CREATE-RACE` (see below) and so on.
+  (the task's input file is missing), `CREATE-RACE` and `BOUNDED` (see
+  below) and so on.
 
 ## What the shim approximates
 
@@ -68,6 +69,11 @@ so a clean result holds only up to those bounds:
 - **`__VERIFIER_nondet_*`** returns a value in `0..N` (`--nondet-max`, default 2),
   and every value is explored. An execution that asks for more than
   `--max-choices` values (default 4) is discarded, like an unroll bound.
+  A clean result with discarded (blocked) executions is checked again: if
+  an execution asked for more values, or aborted (`assume_abort_if_not`)
+  in a thread that had read the largest value, as when a task wants
+  `n >= 20`, the bounds may have cut an error off, and the task is
+  labelled `BOUNDED`, with no verdict.
 - **Atomic sections** (`__VERIFIER_atomic_begin/end` and functions named
   `__VERIFIER_atomic_*`) take one global lock. The lock orders the sections
   it protects, so it can hide a data race that SV-COMP reports. SV-COMP also
@@ -96,27 +102,31 @@ every folder of `Concurrency.set` (sv-benchmarks of 2026-10-26: 1154 tasks,
 
 | Verdict | Tasks |
 |---|---|
-| AGREE | 640 |
-| MISSED | 29 |
+| AGREE | 475 |
+| MISSED | 8 |
 | FALSE-ALARM | 0 |
+| BOUNDED | 190 |
 | UNCHECKED, ATOMIC-RACE, CREATE-RACE | 6, 40, 5 |
-| TIMEOUT | 372 |
+| TIMEOUT | 368 |
 | COMPILE-ERROR | 26 |
 | UNSUPPORTED-CALL | 17 |
 | UNKNOWN, OTHER-ERROR | 3, 5 |
 
-Most timeouts are in `pthread-wmm` (204): its tasks simulate weak memory
+Most timeouts are in `pthread-wmm` (201): its tasks simulate weak memory
 with many small atomic sections, and the one lock that implements them
 makes GenMC explore every order of the sections.
 
-The missed bugs fall into five groups:
-- races hidden by the atomic-section lock;
-- tasks whose every execution asks for more than `--max-choices` values:
-  no execution completes, and the run is reported clean;
-- bugs that need a specific value (`x == 42`) or integer overflow, beyond the small
-  `nondet` range;
-- memory leaks, which GenMC does not check;
-- out-of-bounds accesses that land in a neighbouring object.
+Almost every `BOUNDED` task (184 of 190, 159 of them in `weaver`) has no
+complete execution at all: each execution asks for more nondet values than
+`--max-choices` allows, or wants a value beyond the range. 21 of them are
+bugs that a clean result would have missed; 168 were "true" only by luck,
+and one timed out. A larger `--max-choices` completes few of them (with 8,
+9 more AGREE; with 16, 11, and many more timeouts).
+
+The missed bugs need a value beyond the small `nondet` range that no
+`assume` asks for (an index that reaches a neighbouring object, as in
+the `goblint-regression` ones), or a race hidden by the atomic-section
+lock; GenMC also does not check memory leaks.
 
 The `UNSUPPORTED-CALL` tasks call library functions that neither GenMC nor
 the prelude provides (`sleep`, `time`, `ffs`, `sem_init`, `strcpy`, `mmap`)
