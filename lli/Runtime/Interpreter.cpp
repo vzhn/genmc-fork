@@ -622,9 +622,12 @@ Interpreter::Interpreter(std::unique_ptr<Module> M, std::unique_ptr<ModuleInfo> 
 		}
 	}
 
-	for (const auto &dir : userConf->runtimeIncludeDirs) {
-		auto path = std::filesystem::path(dir).lexically_normal();
-		runtimeIncludeDirs_.push_back(path.has_filename() ? path : path.parent_path());
+	for (const auto *dirs : {&userConf->runtimeIncludeDirs, &userConf->libraryDirs}) {
+		for (const auto &dir : *dirs) {
+			auto path = std::filesystem::path(dir).lexically_normal();
+			runtimeIncludeDirs_.push_back(path.has_filename() ? path
+									  : path.parent_path());
+		}
 	}
 
 	memset(&dynState.ExitValue.Untyped, 0, sizeof(dynState.ExitValue.Untyped));

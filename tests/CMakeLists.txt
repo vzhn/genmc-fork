@@ -170,6 +170,13 @@ add_test(NAME print-addresses
 set_tests_properties(print-addresses PROPERTIES LABELS "integration;fast" TIMEOUT 120
     ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
 
+add_test(NAME library-dir
+    COMMAND bash -c "${SCRIPT_DIR}/check-library-dir.sh"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(library-dir PROPERTIES LABELS "integration;fast" TIMEOUT 120
+    ENVIRONMENT "GenMC=${CMAKE_BINARY_DIR}/bin/genmc")
+
 add_test(NAME nondet-warning
     COMMAND bash -c "${SCRIPT_DIR}/check-nondet-warning.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}

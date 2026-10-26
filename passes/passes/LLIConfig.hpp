@@ -26,6 +26,9 @@ struct LLIConfig {
 	std::string inputFile;
 	/* The directories of GenMC's runtime headers (<pthread.h>, ...) */
 	std::vector<std::string> runtimeIncludeDirs;
+	/* Directories of library code that is reported at its caller's line,
+	 * like the runtime headers' (-library-dir) */
+	std::vector<std::string> libraryDirs;
 
 	/*** Exploration options ***/
 	unsigned int threads{};
