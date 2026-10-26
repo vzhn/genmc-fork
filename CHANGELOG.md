@@ -11,6 +11,15 @@ released.
 
 ### Fixed
 
+- A loop or an `assume()` comparing a loaded pointer with a global's
+  address made GenMC abort while transforming the program
+  (`isa<ConstantPointerNull>(constant)` in `InstAnnotator`, #267): the pass
+  that annotates a load with the values the next assume rejects modeled
+  only integer and null constants. A constant it cannot model (a global's
+  address, a constant expression) now leaves the load without an
+  annotation, which claims nothing (`tests/correct/infr/assume-global-addr`,
+  `tests/wrong/liveness/spin-global-addr`).
+
 - The error graph of a race printed the access that the race was found
   with, if it came later than the reported one, without its variable's name
   or its source location: `Wna (, 5)`. The error replay, which collects the

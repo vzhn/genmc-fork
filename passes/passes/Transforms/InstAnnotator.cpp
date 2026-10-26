@@ -62,31 +62,38 @@ void InstAnnotator::setAnnot(Instruction *i, InstAnnotator::IRExprUP annot)
 	annotMap[getAnnotMapKey(i)] = std::move(annot);
 }
 
+/* Whether generateOperandExpr() models the constant C: an integer or a null
+ * pointer, or undef of either type. A global's address and a constant
+ * expression have no value before the program runs (#267) */
+static auto isModeledConstant(const Constant *c) -> bool
+{
+	if (isa<UndefValue>(c))
+		return c->getType()->isIntegerTy() || c->getType()->isPointerTy();
+	return isa<ConstantInt>(c) || isa<ConstantPointerNull>(c);
+}
+
 auto InstAnnotator::generateOperandExpr(Module *mod, Value *op) -> InstAnnotator::IRExprUP
 {
 	const auto &DL = mod->getDataLayout();
 	constexpr SVal concUndefVal(42);
 
-	/* First, check if the expression is a constant */
+	/* First, check if the expression is a constant. Other constants (e.g.,
+	 * floats, a global's address) cannot be modeled */
 	if (auto *constant = dyn_cast<Constant>(op)) {
+		if (!isModeledConstant(constant))
+			return nullptr;
 		auto *typ = constant->getType();
 		if (typ->isIntegerTy()) {
 			auto bitWidth = typ->getIntegerBitWidth();
 			if (isa<UndefValue>(constant))
 				return ConcreteExpr<Value *>::create(bitWidth, concUndefVal);
-			auto *ci = dyn_cast<ConstantInt>(constant);
-			VERIFY(ci); /* will fire for ConstantExpr (being deprecated) */
-			return ConcreteExpr<Value *>::create(bitWidth, SVal(ci->getLimitedValue()));
+			return ConcreteExpr<Value *>::create(
+				bitWidth, SVal(cast<ConstantInt>(constant)->getLimitedValue()));
 		}
-		if (typ->isPointerTy()) {
-			auto bitWidth = DL.getPointerTypeSizeInBits(typ);
-			if (isa<UndefValue>(constant))
-				return ConcreteExpr<Value *>::create(bitWidth, concUndefVal);
-			VERIFY(isa<ConstantPointerNull>(constant)); /* will fire for GlobalValue */
-			return ConcreteExpr<Value *>::create(bitWidth, SVal(0));
-		}
-		/* Other constants (e.g., floats) cannot be modeled */
-		return nullptr;
+		auto bitWidth = DL.getPointerTypeSizeInBits(typ);
+		if (isa<UndefValue>(constant))
+			return ConcreteExpr<Value *>::create(bitWidth, concUndefVal);
+		return ConcreteExpr<Value *>::create(bitWidth, SVal(0));
 	}
 
 	/* Otherwise, it has to be an instruction or an argument */
@@ -104,8 +111,8 @@ auto InstAnnotator::generateInstExpr(Instruction *curr) -> InstAnnotator::IRExpr
 	 * instruction is then left in the annotation, so that its evaluation reports
 	 * an unknown (annotate() drops such annotations altogether).
 	 * generateOperandExpr() never returns nullptr for the operands of the handled
-	 * instructions: non-constant operands become registers, and constants of
-	 * other types are rejected by the check below.
+	 * instructions: non-constant operands become registers, and the constants
+	 * it cannot model are rejected by the check below.
 	 */
 #define HANDLE_INST(op, ...)                                                                       \
 	case Instruction::op:                                                                      \
@@ -116,7 +123,8 @@ auto InstAnnotator::generateInstExpr(Instruction *curr) -> InstAnnotator::IRExpr
 	if (!isModelable(curr->getType()))
 		return nullptr;
 	if (std::ranges::any_of(curr->operands(), [&](const Use &op) {
-		    return isa<Constant>(op.get()) && !isModelable(op->getType());
+		    const auto *c = dyn_cast<Constant>(op.get());
+		    return c && !isModeledConstant(c);
 	    }))
 		return nullptr;
 
@@ -351,8 +359,11 @@ void InstAnnotator::annotateDFS(Instruction *curr)
 	if (succs.empty()) {
 		if (auto *ci = dyn_cast<CallInst>(curr)) {
 			if (isAssumeFunction(getCalledFunOrStripValName(*ci))) {
-				setAnnot(curr,
-					 generateOperandExpr(curr->getModule(), ci->getOperand(0)));
+				/* (TRUE if the condition cannot be modeled) */
+				auto cond =
+					generateOperandExpr(curr->getModule(), ci->getOperand(0));
+				setAnnot(curr, cond ? std::move(cond)
+						    : ConcreteExpr<Value *>::createTrue());
 				return;
 			}
 		}
@@ -412,7 +423,10 @@ auto InstAnnotator::annotateBBCond(BasicBlock *bb, BasicBlock *pred /* = nullptr
 	 * neither has the block then: a constant in its place would be taken
 	 * for a proof, of the opposite claim once negated (the loop jump
 	 * threading pass found a CAS loop's header always entering the body) */
-	setAnnot(bi, generateOperandExpr(bi->getModule(), bi->getCondition()));
+	auto cond = generateOperandExpr(bi->getModule(), bi->getCondition());
+	if (!cond)
+		return nullptr;
+	setAnnot(bi, std::move(cond));
 	for (auto irit = ++bb->rbegin(); irit != bb->rend(); ++irit) {
 		if (irit->mayReadOrWriteMemory())
 			return nullptr;
@@ -488,8 +502,11 @@ auto InstAnnotator::propagateAnnotFromSuccInLoop(Instruction *curr, Instruction 
 	/* Transform assume()s into disjunctions */
 	if (auto *ci = dyn_cast<CallInst>(curr)) {
 		VERIFY(isAssumeFunction(getCalledFunOrStripValName(*ci)));
-		return ConjunctionExpr<Value *>::create(generateOperandExpr(mod, ci->getOperand(0)),
-							std::move(succExp));
+		/* (A condition that cannot be modeled claims nothing) */
+		auto cond = generateOperandExpr(mod, ci->getOperand(0));
+		if (!cond)
+			return succExp;
+		return ConjunctionExpr<Value *>::create(std::move(cond), std::move(succExp));
 	}
 
 	auto currOp = generateInstExpr(curr);
