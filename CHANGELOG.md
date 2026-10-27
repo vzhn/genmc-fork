@@ -21,6 +21,17 @@ released.
 
 ### Fixed
 
+- `-lkmm` did not report a data race in an execution that ends with a
+  thread waiting forever in `__VERIFIER_await()` or a spinloop (#288):
+  races are checked on a whole execution, and a blocked graph was never
+  checked. A blocked graph is now checked when it is a final, infinite
+  execution: every thread has finished or waits forever, at a spinloop or
+  an await whose reads see the last write in coherence (as for
+  `-check-liveness`), or at a join of such a thread. A graph that later
+  events extend, such as a lock acquisition that reads a held lock, is
+  still not checked. Outside `-check-liveness`, SpinAssume does not mark
+  where a spinloop's iteration starts: such a loop is judged by all the
+  reads of its thread (`tests/wrong/racy/stuck-await-race-lkmm`).
 - IMM is not extensible (vzhn/kater-fork#38): in `addr ; po?`, a read
   that depends by address on another orders it before every later write,
   whatever it reads, so a revisit could delete such a read, keep the
