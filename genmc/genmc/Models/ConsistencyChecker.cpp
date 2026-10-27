@@ -12,7 +12,7 @@
  */
 
 #include "genmc/Models/ConsistencyChecker.hpp"
-#include "genmc/Models/IMMChecker.hpp"  // NOLINT(misc-include-cleaner)
+#include "genmc/Models/IMMFullChecker.hpp" // NOLINT(misc-include-cleaner)
 #include "genmc/Models/LKMMRcuChecker.hpp" // NOLINT(misc-include-cleaner)
 #include "genmc/Models/RAChecker.hpp"   // NOLINT(misc-include-cleaner)
 #include "genmc/Models/RC11Checker.hpp" // NOLINT(misc-include-cleaner)
@@ -35,7 +35,8 @@ static auto createChecker(ModelType model) -> std::unique_ptr<ConsistencyChecker
 		CREATE_CHECKER(TSO);
 		CREATE_CHECKER(RA);
 		CREATE_CHECKER(RC11);
-		CREATE_CHECKER(IMM);
+	case ModelType::IMM:
+		return std::make_unique<IMMFullChecker>(nullptr);
 	case ModelType::LKMM:
 		return std::make_unique<LKMMRcuChecker>(nullptr);
 	default:

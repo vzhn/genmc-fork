@@ -59,9 +59,11 @@ public:
 			       bool atomicity = true) const -> bool;
 
 	/** Whether G (a complete execution, or the graph of an error) is
-	 * consistent, checked on a copy whose views are computed anew */
+	 * consistent, checked on a copy whose views are computed anew; EXTRAS:
+	 * with the axioms the exploration leaves out too (see
+	 * ModelConsistency::satisfiesExtraAxioms()) */
 	auto isExecutionConsistent(const ExecutionGraph &g, bool intermediate = false,
-				   bool atomicity = true) -> bool;
+				   bool atomicity = true, bool extras = false) -> bool;
 
 	/** Runs CHECK on a copy of G whose views are computed anew (positions
 	 * name the same events in both) */

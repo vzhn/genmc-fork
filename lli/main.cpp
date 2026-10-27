@@ -998,6 +998,12 @@ static void printVerificationResults(const std::shared_ptr<const Config> &conf,
 		VERIFY(conf->boundType != BoundType::round);
 		PRINT(VerbosityLevel::Error, " ({} exceeded bound)", res.boundExceeding);
 	}
+	/* IMM: executions of the explored model that IMM's full ar forbids
+	 * (see IMMFullChecker) */
+	if (!conf->exhaustive && res.exploredInconsistent) {
+		PRINT(VerbosityLevel::Error, "\nNumber of inconsistent executions not counted: {}",
+		      res.exploredInconsistent);
+	}
 	if (res.exploredBlocked != 0U) {
 		PRINT(VerbosityLevel::Error, "\nNumber of blocked executions seen: {}",
 		      res.exploredBlocked);

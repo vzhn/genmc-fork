@@ -21,6 +21,20 @@ released.
 
 ### Fixed
 
+- IMM is not extensible (vzhn/kater-fork#38): in `addr ; po?`, a read
+  that depends by address on another orders it before every later write,
+  whatever it reads, so a revisit could delete such a read, keep the
+  write, and leave a hole that no way of filling keeps consistent. GenMC
+  then explored graphs it could not complete, and could report an error
+  that no execution has. IMM is now explored without the `po?`, a weaker
+  model that is extensible, and IMM's own `ar` (Kater's `arFull`, an
+  `export extra`) is checked of every complete or blocked execution
+  (those that fail are not counted: `Number of inconsistent executions not
+  counted`) and of the events an error needs, those before it in po and
+  rf (an error whose events fail it is not reported). After Bouajjani et
+  al. (2023), as Mixer (POPL 2025, Section 2.4) describes. The checker is
+  generated from Kater's `kat/imm-genmc.kat` on
+  `claude/issue-38-imm-addr-po` (#286, `tests/correct/litmus/addr-po-hole`).
 - `__VERIFIER_nondet_int128()` and `__VERIFIER_nondet_uint128()` crashed
   GenMC built with LLVM 20 or older (`visitExtractValueInst`): clang
   returns an `__int128` there as two 64-bit halves (`{ i64, i64 }`), and

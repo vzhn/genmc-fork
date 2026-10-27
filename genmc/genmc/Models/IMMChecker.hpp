@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/imm-genmc.kat, Kater v0.4.0-vzhn.3-2-g2967209 (scripts/lkmm/kater-export.sh).
+ * From kat/imm-genmc.kat, Kater v0.4.0-vzhn.3-24-g3b45ea2 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_IMM_CHECKER_HPP
@@ -248,17 +248,17 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	auto getHbRelincheViewIndex() const -> unsigned { return 1; }
 
 	auto checkCalc77(const EventLabel *lab) const;
-	mutable NodeStatusVector<uint32_t> visitedCalc87_0;
-	mutable NodeStatusVector<uint32_t> visitedCalc87_1;
-	mutable NodeStatusVector<uint32_t> visitedCalc87_2;
+	mutable NodeStatusVector<uint32_t> visitedCalc90_0;
+	mutable NodeStatusVector<uint32_t> visitedCalc90_1;
+	mutable NodeStatusVector<uint32_t> visitedCalc90_2;
 
-	bool visitCalc87Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
+	bool visitCalc90Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const;
 
-	View visitCalc87(const EventLabel *lab) const;
+	View visitCalc90(const EventLabel *lab) const;
 	auto getPorfView(const EventLabel *lab) const -> const View & { return lab->view(2); }
 	auto getPorfViewIndex() const -> unsigned { return 2; }
 
-	auto checkCalc87(const EventLabel *lab) const;
+	auto checkCalc90(const EventLabel *lab) const;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_0;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_1;
 	mutable NodeStatusVector<uint32_t> visitedCoherence_2;
@@ -328,7 +328,6 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable NodeSCCVector visitedConsAcyclic2_14;
 	mutable NodeSCCVector visitedConsAcyclic2_15;
 	mutable NodeSCCVector visitedConsAcyclic2_16;
-	mutable NodeSCCVector visitedConsAcyclic2_17;
 	mutable SCCSearch visitedConsAcyclic2Search;
 
 	bool visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &worklist) const;
@@ -340,22 +339,41 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	bool checkUnlessConsAcyclic2([[maybe_unused]] const EventLabel *lab) { return false; }
 	bool checkConsAcyclic2(const EventLabel *lab) const;
 	bool checkConsAcyclic2(const ExecutionGraph &g) const;
-	bool visitError3(const EventLabel *lab) const;
-	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError3_0;
-	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError3_1;
+	mutable NodeSCCVector visitedConsAcyclic3_0;
+	mutable NodeSCCVector visitedConsAcyclic3_1;
+	mutable NodeSCCVector visitedConsAcyclic3_2;
+	mutable NodeSCCVector visitedConsAcyclic3_3;
+	mutable NodeSCCVector visitedConsAcyclic3_4;
+	mutable NodeSCCVector visitedConsAcyclic3_5;
+	mutable NodeSCCVector visitedConsAcyclic3_6;
+	mutable NodeSCCVector visitedConsAcyclic3_7;
+	mutable NodeSCCVector visitedConsAcyclic3_8;
+	mutable NodeSCCVector visitedConsAcyclic3_9;
+	mutable NodeSCCVector visitedConsAcyclic3_10;
+	mutable NodeSCCVector visitedConsAcyclic3_11;
+	mutable NodeSCCVector visitedConsAcyclic3_12;
+	mutable NodeSCCVector visitedConsAcyclic3_13;
+	mutable NodeSCCVector visitedConsAcyclic3_14;
+	mutable NodeSCCVector visitedConsAcyclic3_15;
+	mutable NodeSCCVector visitedConsAcyclic3_16;
+	mutable NodeSCCVector visitedConsAcyclic3_17;
+	mutable SCCSearch visitedConsAcyclic3Search;
 
-	bool visitLHSUnlessError3Iterative(std::vector<DFSWorklistEntry> &worklist,
-					   const View &v) const;
+	bool visitConsAcyclic3Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 
-	bool visitUnlessError3(const EventLabel *lab) const;
-	bool checkError3(const EventLabel *lab) const;
+	bool visitConsAcyclic3(const EventLabel *lab) const;
+
+	bool visitConsAcyclic3Full(const ExecutionGraph &g) const;
+
+	bool checkUnlessConsAcyclic3([[maybe_unused]] const EventLabel *lab) { return false; }
+	bool checkConsAcyclic3(const EventLabel *lab) const;
+	bool checkConsAcyclic3(const ExecutionGraph &g) const;
 	bool visitError4(const EventLabel *lab) const;
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError4_0;
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError4_1;
 
-	bool visitLHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &worklist) const;
-
-	bool visitRHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &worklist) const;
+	bool visitLHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &worklist,
+					   const View &v) const;
 
 	bool visitUnlessError4(const EventLabel *lab) const;
 	bool checkError4(const EventLabel *lab) const;
@@ -363,8 +381,9 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError5_0;
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError5_1;
 
-	bool visitLHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &worklist,
-					   const View &v) const;
+	bool visitLHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &worklist) const;
+
+	bool visitRHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 
 	bool visitUnlessError5(const EventLabel *lab) const;
 	bool checkError5(const EventLabel *lab) const;
@@ -372,9 +391,8 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError6_0;
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError6_1;
 
-	bool visitLHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &worklist) const;
-
-	bool visitRHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &worklist) const;
+	bool visitLHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &worklist,
+					   const View &v) const;
 
 	bool visitUnlessError6(const EventLabel *lab) const;
 	bool checkError6(const EventLabel *lab) const;
@@ -382,8 +400,9 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError7_0;
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError7_1;
 
-	bool visitLHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &worklist,
-					   const View &v) const;
+	bool visitLHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &worklist) const;
+
+	bool visitRHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 
 	bool visitUnlessError7(const EventLabel *lab) const;
 	bool checkError7(const EventLabel *lab) const;
@@ -391,9 +410,8 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError8_0;
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError8_1;
 
-	bool visitLHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &worklist) const;
-
-	bool visitRHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &worklist) const;
+	bool visitLHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &worklist,
+					   const View &v) const;
 
 	bool visitUnlessError8(const EventLabel *lab) const;
 	bool checkError8(const EventLabel *lab) const;
@@ -401,20 +419,31 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError9_0;
 	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError9_1;
 
-	bool visitLHSUnlessError9Iterative(std::vector<DFSWorklistEntry> &worklist,
-					   const View &v) const;
+	bool visitLHSUnlessError9Iterative(std::vector<DFSWorklistEntry> &worklist) const;
+
+	bool visitRHSUnlessError9Iterative(std::vector<DFSWorklistEntry> &worklist) const;
 
 	bool visitUnlessError9(const EventLabel *lab) const;
 	bool checkError9(const EventLabel *lab) const;
-	bool visitWarning10(const EventLabel *lab) const;
-	mutable NodeStatusVector<uint32_t> visitedLHSUnlessWarning10_0;
-	mutable NodeStatusVector<uint32_t> visitedLHSUnlessWarning10_1;
+	bool visitError10(const EventLabel *lab) const;
+	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError10_0;
+	mutable NodeStatusVector<uint32_t> visitedLHSUnlessError10_1;
 
-	bool visitLHSUnlessWarning10Iterative(std::vector<DFSWorklistEntry> &worklist,
+	bool visitLHSUnlessError10Iterative(std::vector<DFSWorklistEntry> &worklist,
+					    const View &v) const;
+
+	bool visitUnlessError10(const EventLabel *lab) const;
+	bool checkError10(const EventLabel *lab) const;
+	bool visitWarning11(const EventLabel *lab) const;
+	mutable NodeStatusVector<uint32_t> visitedLHSUnlessWarning11_0;
+	mutable NodeStatusVector<uint32_t> visitedLHSUnlessWarning11_1;
+
+	bool visitLHSUnlessWarning11Iterative(std::vector<DFSWorklistEntry> &worklist,
 					      const View &v) const;
 
-	bool visitUnlessWarning10(const EventLabel *lab) const;
-	bool checkWarning10(const EventLabel *lab) const;
+	bool visitUnlessWarning11(const EventLabel *lab) const;
+	bool checkWarning11(const EventLabel *lab) const;
+	bool arFull(const EventLabel *lab) { return checkConsAcyclic3(lab); }
 
 	void visitPPoRf0(const EventLabel *lab, DepView &pporf) const;
 	void visitPPoRf1(const EventLabel *lab, DepView &pporf) const;
@@ -423,7 +452,6 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	void visitPPoRf4(const EventLabel *lab, DepView &pporf) const;
 	void visitPPoRf5(const EventLabel *lab, DepView &pporf) const;
 	void visitPPoRf6(const EventLabel *lab, DepView &pporf) const;
-	void visitPPoRf7(const EventLabel *lab, DepView &pporf) const;
 
 	DepView calcPPoRfBefore(const EventLabel *lab) const;
 
@@ -434,7 +462,6 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 	mutable std::vector<NodeStatus> visitedPPoRf4;
 	mutable std::vector<NodeStatus> visitedPPoRf5;
 	mutable std::vector<NodeStatus> visitedPPoRf6;
-	mutable std::vector<NodeStatus> visitedPPoRf7;
 };
 
 // NOLINTEND

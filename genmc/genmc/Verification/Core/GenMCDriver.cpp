@@ -296,6 +296,17 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 			getExec().getWorkqueue().add(std::make_unique<RerunForwardRevisit>());
 	}
 
+	/* IMM is explored without the po? of its addr ; po? (see IMMFullChecker):
+	 * an execution, blocked or not, is one of IMM only if IMM's full ar is
+	 * acyclic in it. (-exhaustive: a complete one is checked below, on the
+	 * copy its other axioms are checked on) */
+	const auto checkedAnew =
+		getConf()->exhaustive && getConf()->model == ModelType::IMM && !g.isBlocked();
+	if (!checkedAnew && !satisfiesExtraAxioms(g)) {
+		++result.exploredInconsistent;
+		return {};
+	}
+
 	/* Ignore the execution if some assume has failed */
 	if (g.isBlocked()) {
 		++result.exploredBlocked;
@@ -330,9 +341,8 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 	 * views of the kept events after it are those they had when they were
 	 * kept: the complete execution is counted only if it is consistent when
 	 * checked anew (on a copy, so that the exploration from the graph is not
-	 * changed) */
-	if (getConf()->exhaustive && getConf()->model == ModelType::IMM &&
-	    !isExecutionConsistent(g)) {
+	 * changed), IMM's full ar included */
+	if (checkedAnew && !isExecutionConsistent(g, false, true, /*extras=*/true)) {
 		++result.exploredInconsistent;
 		return {};
 	}

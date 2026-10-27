@@ -25,8 +25,9 @@ struct VerificationResult {
 					  in explored) */
 	unsigned graphsVisited{};      /**< -exhaustive: distinct graphs produced by revisits */
 	unsigned revisitsRepeated{}; /**< -exhaustive: revisits skipped, their graph seen before */
-	unsigned exploredInconsistent{}; /**< -exhaustive under IMM: complete executions not
-					    counted, inconsistent when checked anew */
+	unsigned exploredInconsistent{}; /**< Executions not counted: under IMM, inconsistent
+					    with its full ar (or, -exhaustive, when checked
+					    anew) */
 	long double estimationMean{};	  /**< The mean of estimations */
 	long double estimationVariance{}; /**< The (biased) variance of the estimations */
 	bool inferredSymmetryError{}; /**< Whether the error is unordered writes, an error

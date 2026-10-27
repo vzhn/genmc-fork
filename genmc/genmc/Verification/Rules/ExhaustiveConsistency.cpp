@@ -190,12 +190,13 @@ auto ExhaustiveConsistency::isGraphConsistentImpl(const ExecutionGraph &g, bool 
 }
 
 auto ExhaustiveConsistency::isExecutionConsistent(const ExecutionGraph &g, bool intermediate,
-						   bool atomicity) -> bool
+						   bool atomicity, bool extras) -> bool
 {
 	auto copy = g.clone();
 	model_.recomputeCacheCounters(*copy);
-	const auto consistent =
-		recomputeViews(*copy) && isGraphConsistent(*copy, intermediate, atomicity);
+	const auto consistent = recomputeViews(*copy) &&
+				isGraphConsistent(*copy, intermediate, atomicity) &&
+				(!extras || model_.satisfiesExtraAxioms(*copy));
 	model_.recomputeCacheCounters(g);
 	return consistent;
 }
