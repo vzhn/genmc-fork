@@ -27,6 +27,11 @@ released.
   the handler only filled in an integer. It now splits the value over the
   halves, low half first; a variant declared with a non-integer return type
   is reported as an error (`tests/correct/infr/nondet-variants`).
+- The driver tests did not build since `-svcomp` was added
+  (`ExplorationStack` takes whether uninitialized reads are allowed, and
+  `ExplorationStackTest` did not pass it), and a debugging message
+  (`DBG dangling read`) left in `isErrorGraphConsistent()` went to stderr
+  when an error graph had a read without a write.
 - A loop or an `assume()` comparing a loaded pointer with a global's
   address made GenMC abort while transforming the program
   (`isa<ConstantPointerNull>(constant)` in `InstAnnotator`, #267): the pass
@@ -377,6 +382,33 @@ released.
   under `-lkmm` 198 s (over 400 s, 66 s), and the `lkmm` and `infr` tests
   91 s in all (150 s). The 3- and 4-lock `C-SB` tests of the corpus are
   unchanged, waiting on #264.
+- `-lkmm` spends less on each graph of its exhaustive exploration (#261).
+  A run that started from a graph with kept events was checked as a whole
+  when it ended, on a copy with its views computed anew; over the `lkmm`
+  and `infr` tests and the 800 fuzz seeds that check never failed unless
+  an event had gone before kept ones during the run, which the deferred
+  check covers: the graph the run starts from is checked as a whole by the
+  revisit that makes it, and each event added since in its place. The
+  check at the end now runs only when an event went before kept ones, when
+  the run ended on an intermediate check (a forward revisit of a read with
+  kept events after it, an eager check), or under `-lkmm-reference`;
+  `-check-invariants` checks every counted execution as a whole instead
+  (I5, which took LKMM's executions as consistent before). The prefix a
+  revisit keeps (`keptPrefixView()`) computes the write's prefixes once
+  for all its candidate reads, not once per read, and computes the masked
+  prefix on a copy of the graph without its views. The canonical
+  description a graph is hashed by is built without `std::format`. Every
+  count on the `lkmm`, `infr` and `lapor` tests, the fuzz seeds and the
+  litmus corpus is the same. CPU time, in parentheses master before this
+  change and master before #77:
+  `tests/correct/infr/imm-exhaustive-kept-deps-1070` 4.1 s (6.0, 1.1),
+  `tests/correct/lkmm/kept-free-access` 8.7 s (9.8, 2.1),
+  `tests/correct/lkmm/inverted-co-range` 1.1 s (1.8, 0.8),
+  `tests/correct/gobench/grpc3017` 2.3 s (3.6, 1.9), `cockroach10790`
+  under `-check-liveness` 127 s (168, 55), the 800 fuzz seeds 94 s in all
+  (123).
+  What is left is the number of graphs: the revisits of an RMW's read
+  whose write another RMW reads, which wait on #264.
 
 ### Added
 

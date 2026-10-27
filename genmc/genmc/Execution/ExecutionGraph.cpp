@@ -610,7 +610,7 @@ static auto viewWithin(const VectorClock &pv, const VectorClock &v) -> bool
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void ExecutionGraph::copyGraphUpTo(ExecutionGraph &other, const VectorClock &v) const
+void ExecutionGraph::copyGraphUpTo(ExecutionGraph &other, const VectorClock &v, bool withViews) const
 {
 	/* We resize up to g.size() (instead of v.size()) because there might be a create
 	 * that is contained in v, but its respective begin is not.
@@ -719,6 +719,10 @@ void ExecutionGraph::copyGraphUpTo(ExecutionGraph &other, const VectorClock &v) 
 
 	/* Fix pointers and views */
 	for (auto &lab : other.labels()) {
+		if (!withViews) {
+			lab.calculatedViews.clear();
+			lab.prefixView = nullptr;
+		}
 		for (auto &view : lab.calculatedViews)
 			fixView(view);
 		/* Prefix views are DepViews under dependency-tracking models; their
@@ -823,6 +827,18 @@ auto ExecutionGraph::getCopyUpTo(const VectorClock &v) const -> std::unique_ptr<
 				       .emitNALabels = this->haveNAs_,
 				       .allowUninitReads = this->allowUninitReads_});
 	copyGraphUpTo(*og, v);
+	return og;
+}
+
+auto ExecutionGraph::getStructuralCopyUpTo(const VectorClock &v) const
+	-> std::unique_ptr<ExecutionGraph>
+{
+	auto og = std::make_unique<ExecutionGraph>(
+		ExecutionGraph::Config{.execState = this->state_,
+				       .memModel = this->memModel_,
+				       .emitNALabels = this->haveNAs_,
+				       .allowUninitReads = this->allowUninitReads_});
+	copyGraphUpTo(*og, v, false);
 	return og;
 }
 

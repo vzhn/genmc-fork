@@ -29,7 +29,7 @@ namespace {
 struct Fixture {
 	std::unique_ptr<ConsistencyChecker> model = ConsistencyChecker::create(ModelType::SC);
 	ExecutionState state;
-	ExplorationStack stack{*model, state, false};
+	ExplorationStack stack{*model, state, false, false};
 };
 
 } // namespace

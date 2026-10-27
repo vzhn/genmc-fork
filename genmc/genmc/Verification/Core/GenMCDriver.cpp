@@ -159,25 +159,6 @@ static void reconstructState(ExecutionGraph &g, ExecutionState &state)
 		reconstructState(g.getLastThreadLabel(i), view, state);
 }
 
-/* Whether a revisit kept events of G after holes or after the read it
- * revisited: a hole, a thread stopped before kept events, an event older
- * than the one before it, or one after a read that is older than the
- * write the read reads (the kept events existed before that write) */
-static auto hasKeptEvents(const ExecutionGraph &g) -> bool
-{
-	return std::ranges::any_of(g.labels(), [&g](const auto &lab) {
-		if (genmc::isa<EmptyLabel>(&lab) || genmc::isa<DeadPathBlockLabel>(&lab))
-			return true;
-		const auto *pLab = g.po_imm_pred(&lab);
-		if (pLab == nullptr)
-			return false;
-		if (pLab->getStamp() > lab.getStamp())
-			return true;
-		const auto *rLab = genmc::dyn_cast<ReadLabel>(pLab);
-		return rLab && rLab->getRf() && rLab->getRf()->getStamp() > lab.getStamp();
-	});
-}
-
 auto GenMCDriver::handleExecutionStart() -> bool
 {
 	auto &g = getExec().getGraph();
@@ -186,8 +167,7 @@ auto GenMCDriver::handleExecutionStart() -> bool
 	/* Set various exploration options for this execution */
 	unmoot();
 	g.setKeptEventsUnreachable(false);
-	keptRuns_.startRun(g.getMaxStamp(), getExec().getWorkqueue().size(),
-			   relocatesKeptEvents() && hasKeptEvents(g));
+	keptRuns_.startRun(g.getMaxStamp(), getExec().getWorkqueue().size());
 	state.clear();
 	if constexpr (Config::emitNALabels)
 		reconstructState(g, state);
@@ -384,8 +364,13 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 	 * (see GraphModel::setIntermediateChecks()): the execution is checked
 	 * as a whole, with its views computed anew, and is not counted if it
 	 * fails */
+	/* (With kept events, the views of the live graph may be stale: the
+	 * execution is checked on a copy with its views computed anew, as
+	 * checkEndedRun() does where it checks; this is the check it leaves
+	 * out where the run's own checks suffice, issue #261) */
 	if (checksInvariants() || executionHook_) {
-		const auto consistent = relocatesKeptEvents() || getConsChecker().isConsistent(g);
+		const auto consistent = relocatesKeptEvents() ? isExecutionConsistent(g)
+							      : getConsChecker().isConsistent(g);
 		if (executionHook_)
 			executionHook_(g, consistent);
 		if (checksInvariants())
@@ -436,10 +421,13 @@ auto GenMCDriver::scheduleNext(std::span<Action> runnable) -> ScheduleResult
 		 * stale: computed anew, so that the choices made next (a store's
 		 * places in coherence, a read's writes) see the event */
 		recomputeViews(g);
-		if (!keptRuns_.eagerChecks())
+		if (!keptRuns_.eagerChecks()) {
 			keptRuns_.deferCheck();
-		else if (!isExecutionConsistent(g, true))
+		} else if (!isExecutionConsistent(g, true)) {
 			moot();
+		} else {
+			keptRuns_.checkedIntermediately();
+		}
 	}
 	if (g.keptEventsUnreachable()) {
 		g.setKeptEventsUnreachable(false);

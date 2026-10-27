@@ -20,8 +20,8 @@
 #include "genmc/Support/SVal.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cstring>
-#include <format>
 #include <unordered_map>
 #include <vector>
 
@@ -161,6 +161,23 @@ auto murmurHash128(const void *data, std::size_t len, std::uint64_t seed) -> Gra
 
 namespace {
 
+/* (The description is built with std::to_chars, not std::format: it is
+ * computed for every graph a revisit produces and every complete execution,
+ * and formatting was most of its cost, issue #261) */
+template <typename T> void appendInt(std::string &s, T v)
+{
+	char buf[24];
+	auto [end, ec] = std::to_chars(buf, buf + sizeof(buf), v);
+	s.append(buf, end);
+}
+
+template <typename T> void appendHex(std::string &s, T v)
+{
+	char buf[24];
+	auto [end, ec] = std::to_chars(buf, buf + sizeof(buf), v, 16);
+	s.append(buf, end);
+}
+
 /* Thread naming and the rewriting of thread ids embedded in addresses */
 struct ThreadNames {
 	/* The creation path of each thread (empty for the main thread) */
@@ -205,49 +222,80 @@ struct ThreadNames {
 		return t >= 0 && t < static_cast<int>(rank.size()) && rank[t] >= 0;
 	}
 
-	[[nodiscard]] auto name(int t) const -> std::string
+	void name(std::string &s, int t) const
 	{
-		return isLive(t) ? std::format("T{}", rank[t]) : std::format("T?{}", t);
+		if (isLive(t)) {
+			s += 'T';
+			appendInt(s, rank[t]);
+		} else {
+			s += "T?";
+			appendInt(s, t);
+		}
 	}
 
-	[[nodiscard]] auto event(Event e) const -> std::string
+	void event(std::string &s, Event e) const
 	{
-		if (e.isInitializer())
-			return "init";
-		return std::format("{}@{}", name(e.thread), e.index);
+		if (e.isInitializer()) {
+			s += "init";
+			return;
+		}
+		name(s, e.thread);
+		s += '@';
+		appendInt(s, e.index);
 	}
 
 	/* A dynamic address embeds the allocating thread's id (SAddr), and so
 	 * does another thread's copy of a thread-local: rewrite it as the
 	 * thread's rank. (A value that looks like one is rewritten the same way;
 	 * small integers have thread 0, whose rank is 0.) */
-	[[nodiscard]] auto addr(SAddr::Width a) const -> std::string
+	void addr(std::string &s, SAddr::Width a) const
 	{
 		auto t = SAddr(a).getThread();
 		if (SAddr(a).isStatic()) {
-			if (t == 0 || !isLive(t))
-				return std::format("G{:x}", a);
-			return std::format("G{:x}:{}", SAddr(a).withThread(0).get(), rank[t]);
+			s += 'G';
+			if (t == 0 || !isLive(t)) {
+				appendHex(s, a);
+				return;
+			}
+			appendHex(s, SAddr(a).withThread(0).get());
+			s += ':';
+			appendInt(s, rank[t]);
+			return;
 		}
-		if (!isLive(t))
-			return std::format("D{:x}", a);
+		s += 'D';
+		if (!isLive(t)) {
+			appendHex(s, a);
+			return;
+		}
 		auto storage = a & SAddr::storageMask;
 		auto idx = a & SAddr::indexMask;
-		return std::format("D{:x}:{}:{:x}", storage >> 60U, rank[t], idx);
+		appendHex(s, storage >> 60U);
+		s += ':';
+		appendInt(s, rank[t]);
+		s += ':';
+		appendHex(s, idx);
 	}
-	[[nodiscard]] auto addr(SAddr a) const -> std::string { return addr(a.get()); }
-	[[nodiscard]] auto value(SVal v) const -> std::string { return addr(v.get()); }
+	void addr(std::string &s, SAddr a) const { addr(s, a.get()); }
+	void value(std::string &s, SVal v) const { addr(s, v.get()); }
 };
 
-auto describeLabel(const ExecutionGraph &g, const EventLabel &lab, const ThreadNames &names,
-		   const std::unordered_map<const EventLabel *, int> &coIndex) -> std::string
+void describeLabel(std::string &s, const ExecutionGraph &g, const EventLabel &lab,
+		   const ThreadNames &names,
+		   const std::unordered_map<const EventLabel *, int> &coIndex)
 {
-	auto s = std::format("{}:k{}:o{}", lab.getIndex(), static_cast<int>(lab.getKind()),
-			     static_cast<int>(lab.getOrdering()));
+	appendInt(s, lab.getIndex());
+	s += ":k";
+	appendInt(s, static_cast<int>(lab.getKind()));
+	s += ":o";
+	appendInt(s, static_cast<int>(lab.getOrdering()));
 
 	/* Accesses, allocations and frees: location and size */
-	if (const auto *mLab = genmc::dyn_cast<MemLabel>(&lab))
-		s += std::format(":a{}:s{}", names.addr(mLab->getAddr()), mLab->getSize().get());
+	if (const auto *mLab = genmc::dyn_cast<MemLabel>(&lab)) {
+		s += ":a";
+		names.addr(s, mLab->getAddr());
+		s += ":s";
+		appendInt(s, mLab->getSize().get());
+	}
 	if (const auto *rLab = genmc::dyn_cast<ReadLabel>(&lab)) {
 		/* (A read of the initializer of dynamic memory not initialized
 		 * yet has no value: a run that found it an error was dropped, as
@@ -257,17 +305,24 @@ auto describeLabel(const ExecutionGraph &g, const EventLabel &lab, const ThreadN
 				    rLab->getAddr().isDynamic() &&
 				    !g.getState().isInitialized(rLab->getAccess());
 		if (rf && uninit) {
-			s += std::format(":rf{}:v?", names.event(rf->getPos()));
+			s += ":rf";
+			names.event(s, rf->getPos());
+			s += ":v?";
 		} else if (rf) {
-			s += std::format(":rf{}:v{}", names.event(rf->getPos()),
-					 names.value(rf->getAccessValue(rLab->getAccess())));
+			s += ":rf";
+			names.event(s, rf->getPos());
+			s += ":v";
+			names.value(s, rf->getAccessValue(rLab->getAccess()));
 		} else {
 			s += ":rf-";
 		}
 		if (const auto *cLab = genmc::dyn_cast<CasReadLabel>(&lab)) {
-			s += std::format(":e{}:w{}:fo{}", names.value(cLab->getExpected()),
-					 names.value(cLab->getSwapVal()),
-					 static_cast<int>(cLab->getFailOrdering()));
+			s += ":e";
+			names.value(s, cLab->getExpected());
+			s += ":w";
+			names.value(s, cLab->getSwapVal());
+			s += ":fo";
+			appendInt(s, static_cast<int>(cLab->getFailOrdering()));
 			/* A weak CAS that fails spuriously performs no write; a
 			 * failed one is the same read whichever flag it carries */
 			if (cLab->isWeak() && cLab->failsSpuriously() && cLab->getRf() &&
@@ -275,48 +330,82 @@ auto describeLabel(const ExecutionGraph &g, const EventLabel &lab, const ThreadN
 				    cLab->getRf()->getAccessValue(cLab->getAccess())))
 				s += ":spurious";
 		}
-		if (const auto *fLab = genmc::dyn_cast<FaiReadLabel>(&lab))
-			s += std::format(":op{}:ov{}", static_cast<int>(fLab->getOp()),
-					 names.value(fLab->getOpVal()));
+		if (const auto *fLab = genmc::dyn_cast<FaiReadLabel>(&lab)) {
+			s += ":op";
+			appendInt(s, static_cast<int>(fLab->getOp()));
+			s += ":ov";
+			names.value(s, fLab->getOpVal());
+		}
 	}
 	if (const auto *wLab = genmc::dyn_cast<WriteLabel>(&lab)) {
 		auto coIt = coIndex.find(&lab);
 		/* WWRacy is set when the write is added, from the graph of that
 		 * moment: not a property of this graph */
 		auto attr = wLab->getAttr() & ~WriteAttr::WWRacy;
-		s += std::format(":v{}:co{}:at{}", names.value(wLab->getVal()),
-				 coIt == coIndex.end() ? -1 : coIt->second,
-				 static_cast<unsigned>(attr));
+		s += ":v";
+		names.value(s, wLab->getVal());
+		s += ":co";
+		appendInt(s, coIt == coIndex.end() ? -1 : coIt->second);
+		s += ":at";
+		appendInt(s, static_cast<unsigned>(attr));
 	}
-	if (const auto *fLab = genmc::dyn_cast<LkmmFenceLabel>(&lab))
-		s += std::format(":f{}", static_cast<int>(fLab->getFenceKind()));
-	if (const auto *cLab = genmc::dyn_cast<ThreadCreateLabel>(&lab))
-		s += std::format(":c{}", names.name(cLab->getChildId()));
-	if (const auto *jLab = genmc::dyn_cast<ThreadJoinLabel>(&lab))
-		s += std::format(":j{}", names.name(jLab->getChildId()));
-	if (const auto *bLab = genmc::dyn_cast<ThreadStartLabel>(&lab); bLab && lab.getIndex() == 0)
-		s += std::format(":p{}", names.event(bLab->getCreateId()));
-	if (const auto *eLab = genmc::dyn_cast<ThreadFinishLabel>(&lab))
-		s += std::format(":r{}", names.value(eLab->getRetVal()));
+	if (const auto *fLab = genmc::dyn_cast<LkmmFenceLabel>(&lab)) {
+		s += ":f";
+		appendInt(s, static_cast<int>(fLab->getFenceKind()));
+	}
+	if (const auto *cLab = genmc::dyn_cast<ThreadCreateLabel>(&lab)) {
+		s += ":c";
+		names.name(s, cLab->getChildId());
+	}
+	if (const auto *jLab = genmc::dyn_cast<ThreadJoinLabel>(&lab)) {
+		s += ":j";
+		names.name(s, jLab->getChildId());
+	}
+	if (const auto *bLab = genmc::dyn_cast<ThreadStartLabel>(&lab);
+	    bLab && lab.getIndex() == 0) {
+		s += ":p";
+		names.event(s, bLab->getCreateId());
+	}
+	if (const auto *eLab = genmc::dyn_cast<ThreadFinishLabel>(&lab)) {
+		s += ":r";
+		names.value(s, eLab->getRetVal());
+	}
 	if (const auto *oLab = genmc::dyn_cast<OptionalLabel>(&lab))
 		s += oLab->isExpanded() ? ":expanded" : ":folded";
-	if (const auto *bLab = genmc::dyn_cast<ReadOptBlockLabel>(&lab))
-		s += std::format(":a{}", names.addr(bLab->getAddr()));
-	if (const auto *hLab = genmc::dyn_cast<HpProtectLabel>(&lab))
-		s += std::format(":h{}:a{}", names.addr(hLab->getHpAddr()),
-				 names.addr(hLab->getProtectedAddr()));
-	if (const auto *hLab = genmc::dyn_cast<HelpingCasLabel>(&lab))
-		s += std::format(":a{}:e{}:w{}", names.addr(hLab->getAddr()),
-				 names.value(hLab->getExpected()), names.value(hLab->getSwapVal()));
-	if (const auto *mLab = genmc::dyn_cast<MethodBeginLabel>(&lab))
-		s += std::format(":m{}", mLab->getName());
-	if (const auto *mLab = genmc::dyn_cast<MethodEndLabel>(&lab))
-		s += std::format(":m{}", mLab->getName());
-	if (const auto *oLab = genmc::dyn_cast<OutputLabel>(&lab))
-		s += std::format(":msg{}", oLab->getMsg());
-	if (const auto *eLab = genmc::dyn_cast<ErrorLabel>(&lab))
-		s += std::format(":msg{}", eLab->getMsg());
-	return s;
+	if (const auto *bLab = genmc::dyn_cast<ReadOptBlockLabel>(&lab)) {
+		s += ":a";
+		names.addr(s, bLab->getAddr());
+	}
+	if (const auto *hLab = genmc::dyn_cast<HpProtectLabel>(&lab)) {
+		s += ":h";
+		names.addr(s, hLab->getHpAddr());
+		s += ":a";
+		names.addr(s, hLab->getProtectedAddr());
+	}
+	if (const auto *hLab = genmc::dyn_cast<HelpingCasLabel>(&lab)) {
+		s += ":a";
+		names.addr(s, hLab->getAddr());
+		s += ":e";
+		names.value(s, hLab->getExpected());
+		s += ":w";
+		names.value(s, hLab->getSwapVal());
+	}
+	if (const auto *mLab = genmc::dyn_cast<MethodBeginLabel>(&lab)) {
+		s += ":m";
+		s += mLab->getName();
+	}
+	if (const auto *mLab = genmc::dyn_cast<MethodEndLabel>(&lab)) {
+		s += ":m";
+		s += mLab->getName();
+	}
+	if (const auto *oLab = genmc::dyn_cast<OutputLabel>(&lab)) {
+		s += ":msg";
+		s += oLab->getMsg();
+	}
+	if (const auto *eLab = genmc::dyn_cast<ErrorLabel>(&lab)) {
+		s += ":msg";
+		s += eLab->getMsg();
+	}
 }
 
 } // namespace
@@ -340,10 +429,12 @@ auto canonicalGraphDescription(const ExecutionGraph &g) -> std::string
 	std::ranges::sort(order, [&](int a, int b) { return names.rank[a] < names.rank[b]; });
 
 	std::string s;
+	s.reserve(64 * (g.getMaxStamp().get() + 1));
 	for (auto t : order) {
-		s += std::format("{}[", names.name(t));
+		names.name(s, t);
+		s += '[';
 		for (const auto &lab : g.po(t)) {
-			s += describeLabel(g, lab, names, coIndex);
+			describeLabel(s, g, lab, names, coIndex);
 			s += ';';
 		}
 		s += "]\n";
@@ -356,3 +447,4 @@ auto canonicalGraphHash(const ExecutionGraph &g) -> GraphHash
 	auto s = canonicalGraphDescription(g);
 	return murmurHash128(s.data(), s.size());
 }
+

@@ -1210,6 +1210,13 @@ public:
 	 */
 	virtual auto getCopyUpTo(const VectorClock &v) const -> std::unique_ptr<ExecutionGraph>;
 
+	/* The copy up to V without the labels' views (and prefix views): for
+	 * a computation on the graph's structure alone (po, rf, co, deps), such
+	 * as a prefix (see keptPrefixView()), which costs less than copying
+	 * the views and computing them anew */
+	virtual auto getStructuralCopyUpTo(const VectorClock &v) const
+		-> std::unique_ptr<ExecutionGraph>;
+
 	auto clone() const -> std::unique_ptr<ExecutionGraph>
 	{
 		return getCopyUpTo(*getViewFromStamp(getMaxStamp()));
@@ -1272,7 +1279,7 @@ protected:
 	void resetStamp(Stamp val) { timestamp = val; }
 
 	void trackCoherenceAtLoc(SAddr addr);
-	void copyGraphUpTo(ExecutionGraph &other, const VectorClock &v) const;
+	void copyGraphUpTo(ExecutionGraph &other, const VectorClock &v, bool withViews = true) const;
 	void addInitRfToLoc(ReadLabel *rLab) { getInitLabel()->addReader(rLab); }
 
 	void removeInitRfToLoc(ReadLabel *rLab)
