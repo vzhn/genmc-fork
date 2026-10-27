@@ -44,21 +44,27 @@ public:
 	enum class Repeat : unsigned char { None, AfterRelocation, Eagerly };
 
 	/** A run starts from a graph with maximum stamp MAXSTAMP and WORK
-	 * items in its work list; KEPT: the graph has events a revisit kept
-	 * after holes or after the read it revisited */
-	void startRun(Stamp maxStamp, size_t work, bool kept)
+	 * items in its work list */
+	void startRun(Stamp maxStamp, size_t work)
 	{
-		startedWithKept_ = kept;
 		addedBeforeKept_ = false;
 		checkPending_ = false;
 		startStamp_ = maxStamp;
 		startWork_ = work;
 	}
 
-	/** Whether the run started from a graph with kept events: without
-	 * them (and without events gone before kept ones), its checks were
-	 * those of any run */
-	[[nodiscard]] auto startedWithKept() const -> bool { return startedWithKept_; }
+	/** The last consistency check was an intermediate one of the whole
+	 * graph (a revisit that keeps events after the read, an eager check
+	 * of an event gone before kept ones), which leaves out what the check
+	 * of a complete execution decides (see
+	 * GraphModel::setIntermediateChecks()); the next event's check decides
+	 * it for the graph it is added to. A run that ends on such a check is
+	 * checked as a whole (see ExplorationCore::checkEndedRun()). (Not reset
+	 * by startRun(): the check of the revisit a run starts from comes
+	 * before it) */
+	void checkedIntermediately() { lastCheckIntermediate_ = true; }
+	void checkedEvent() { lastCheckIntermediate_ = false; }
+	[[nodiscard]] auto lastCheckIntermediate() const -> bool { return lastCheckIntermediate_; }
 
 	/** Where a repeat restarts from */
 	[[nodiscard]] auto runStartStamp() const -> Stamp { return startStamp_; }
@@ -108,7 +114,7 @@ public:
 private:
 	Stamp startStamp_{0};
 	size_t startWork_{};
-	bool startedWithKept_ = false;
+	bool lastCheckIntermediate_ = false;
 	bool addedBeforeKept_ = false;
 	bool checkPending_ = false;
 	bool eager_ = false;

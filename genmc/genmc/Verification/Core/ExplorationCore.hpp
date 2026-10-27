@@ -396,12 +396,18 @@ protected:
 	bool checkPendingKept(const ExecutionGraph &g);
 
 	/* The checks of a run that ends (-lkmm, see checkPendingKept()): a
-	 * complete execution is checked as a whole if the run started with
-	 * kept events (see KeptEventRuns::startedWithKept()); a mooted run's
-	 * graph is checked for what went before the moot (not atomicity, the
-	 * cause of a moot by an RMW) when an event went before kept ones.
-	 * Returns whether the run stands; a failed check has the run repeated
-	 * with eager checks */
+	 * complete execution is checked as a whole if an event went before
+	 * kept ones during the run (deferred, see KeptEventRuns) or its last
+	 * check was an intermediate one (see
+	 * KeptEventRuns::lastCheckIntermediate()); a mooted run's graph is
+	 * checked for what went before the moot (not atomicity, the cause of a
+	 * moot by an RMW) when an event went before kept ones. Otherwise the
+	 * run's checks were those of any run: the graph it started from was
+	 * checked as a whole by the revisit that made it, with its views
+	 * computed anew, and each event added since was checked in its place
+	 * (issue #261: the check was run for every run that started with kept
+	 * events, and never failed). Returns whether the run stands; a failed
+	 * check has the run repeated with eager checks */
 	bool checkEndedRun(const ExecutionGraph &g, bool moot);
 
 	auto executionExceedsBound(BoundCalculationStrategy strategy) const -> bool;

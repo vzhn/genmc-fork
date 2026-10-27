@@ -382,11 +382,16 @@ auto ExplorationCore::checkPendingKept(const ExecutionGraph &g) -> bool
 auto ExplorationCore::isExecutionValid(const EventLabel *lab) -> bool
 {
 	const auto *rLab = genmc::dyn_cast<ReadLabel>(lab);
-	return (!getConf()->symmetryReduction || getSymmChecker().isSymmetryOK(lab)) &&
-	       ((rLab && rLab->getRf() == getExec().getGraph().co_max(rLab->getAddr()) &&
-		 getConsChecker().isCoMaxReadConsistent(rLab)) ||
-		getConsChecker().isConsistent(lab)) &&
-	       !partialExecutionExceedsBound();
+	if (!getConf()->symmetryReduction || getSymmChecker().isSymmetryOK(lab)) {
+		if (rLab && rLab->getRf() == getExec().getGraph().co_max(rLab->getAddr()) &&
+		    getConsChecker().isCoMaxReadConsistent(rLab))
+			return !partialExecutionExceedsBound();
+		/* (The model's check of LAB in the graph as it is, whole where it
+		 * needs to be, see KeptEventRuns::checkedEvent()) */
+		keptRuns_.checkedEvent();
+		return getConsChecker().isConsistent(lab) && !partialExecutionExceedsBound();
+	}
+	return false;
 }
 
 auto ExplorationCore::isRevisitValid(const Revisit &revisit) -> bool
@@ -413,6 +418,7 @@ auto ExplorationCore::isRevisitValid(const Revisit &revisit) -> bool
 	    g.hasEventsAfter(pos.thread, pos.index)) {
 		if (!isExecutionConsistent(g, true))
 			return false;
+		keptRuns_.checkedIntermediately();
 	}
 
 	/* If an extra event is added, re-check consistency */
@@ -840,9 +846,6 @@ auto ExplorationCore::getErrorPrefix(const ExecutionGraph &g) const
 auto ExplorationCore::isErrorGraphConsistent(const ExecutionGraph &g) const -> bool
 {
 	auto prefix = getErrorPrefix(g);
-	for (const auto &lab : (prefix ? *prefix : g).labels())
-		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(&lab); rLab && !rLab->getRf())
-			fprintf(stderr, "DBG dangling read %s in:\n%s\n", std::format("{}", rLab->getPos()).c_str(), std::format("{}", prefix ? *prefix : g).c_str());
 	return getConsChecker().isConsistentWithSectionsClosed(prefix ? *prefix : g);
 }
 
@@ -2220,7 +2223,12 @@ auto ExplorationCore::isExecutionConsistent(const ExecutionGraph &g, bool interm
 auto ExplorationCore::checkEndedRun(const ExecutionGraph &g, bool moot) -> bool
 {
 	const auto pending = keptRuns_.takeDeferredCheck();
-	if ((moot || !keptRuns_.startedWithKept()) && !pending)
+	/* (A complete execution whose last check was an intermediate one:
+	 * nothing was added since, so the whole-graph check decides the rest.
+	 * -lkmm-reference compares the checker with the model on it as well) */
+	const auto onIntermediate =
+		!moot && (keptRuns_.lastCheckIntermediate() || getConf()->lkmmReference);
+	if (!pending && !onIntermediate)
 		return true;
 	if (isExecutionConsistent(g, moot, !moot))
 		return true;
@@ -2294,8 +2302,9 @@ void ExplorationCore::calcRevisits(WriteLabel *sLab)
 	}
 
 	GENMC_DEBUG(LOG(VerbosityLevel::Debug3, "Revisitable (optimized): {}", loads););
+	/* (One object for the write: it caches the write's prefixes) */
+	auto revisits = getBackwardRevisits();
 	for (auto *rLab : loads) {
-		auto revisits = getBackwardRevisits();
 		auto br = revisits.construct(rLab, sLab);
 		/* -exhaustive: every revisit whose graph is well formed and can be
 		 * consistent (the visited set, not maximality, bounds the exploration) */

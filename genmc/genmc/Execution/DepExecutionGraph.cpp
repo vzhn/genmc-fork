@@ -155,3 +155,15 @@ auto DepExecutionGraph::getCopyUpTo(const VectorClock &v) const -> std::unique_p
 	copyGraphUpTo(*og, v);
 	return og;
 }
+
+auto DepExecutionGraph::getStructuralCopyUpTo(const VectorClock &v) const
+	-> std::unique_ptr<ExecutionGraph>
+{
+	auto og = std::make_unique<DepExecutionGraph>(
+		ExecutionGraph::Config{.execState = this->state_,
+				       .memModel = this->memModel_,
+				       .emitNALabels = this->haveNAs_,
+				       .allowUninitReads = this->allowUninitReads_});
+	copyGraphUpTo(*og, v, false);
+	return og;
+}

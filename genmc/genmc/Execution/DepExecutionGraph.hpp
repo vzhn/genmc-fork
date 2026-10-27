@@ -40,6 +40,8 @@ public:
 	void cutToStamp(Stamp st) override;
 
 	auto getCopyUpTo(const VectorClock &v) const -> std::unique_ptr<ExecutionGraph> override;
+	auto getStructuralCopyUpTo(const VectorClock &v) const
+		-> std::unique_ptr<ExecutionGraph> override;
 };
 
 #endif /* GENMC_DEP_EXECUTION_GRAPH_HPP */

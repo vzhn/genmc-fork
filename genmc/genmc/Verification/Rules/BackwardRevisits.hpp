@@ -79,6 +79,14 @@ enum class DependentSeeds : unsigned char {
 auto dependentsOf(const ExecutionGraph &g, const ReadLabel *rLab,
 		  DependentSeeds seeds = DependentSeeds::Read) -> std::vector<char>;
 
+/** The model's prefixes of a write, which keptPrefixView() needs for each
+ * of the write's candidate reads: computed once per write (issue #261) */
+struct WritePrefixes {
+	const WriteLabel *sLab{};
+	std::unique_ptr<VectorClock> full;    /**< GraphModel::calculatePrefixView() */
+	std::unique_ptr<VectorClock> revisit; /**< GraphModel::calculateRevisitPrefixView() */
+};
+
 /** -exhaustive under -lkmm: what a revisit of RLAB by SLAB keeps of SLAB's
  * prefix: the model's prefix (its revisit prefix, rppo and rf: a kept event
  * with its locks, fences and the same-location writes before it) without
@@ -105,7 +113,8 @@ auto dependentsOf(const ExecutionGraph &g, const ReadLabel *rLab,
  * deduplication of the exhaustive exploration may cut short (issue #264);
  * the revisit is taken */
 auto keptPrefixView(const ExecutionGraph &g, const GraphModel &model, const ReadLabel *rLab,
-		    const WriteLabel *sLab) -> std::unique_ptr<VectorClock>;
+		    const WriteLabel *sLab, WritePrefixes *cache = nullptr)
+	-> std::unique_ptr<VectorClock>;
 
 class BackwardRevisits {
 public:
@@ -207,6 +216,9 @@ private:
 	const ExecutionGraph &g_;
 	const GraphModel &model_;
 	Options opts_;
+	/* (The revisits of one write are constructed with one object, see
+	 * ExplorationCore::calcRevisits()) */
+	mutable WritePrefixes prefixes_;
 };
 
 #endif /* GENMC_BACKWARD_REVISITS_HPP */

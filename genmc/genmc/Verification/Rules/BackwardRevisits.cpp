@@ -145,14 +145,22 @@ auto dependentsOf(const ExecutionGraph &g, const ReadLabel *rLab, DependentSeeds
 }
 
 auto keptPrefixView(const ExecutionGraph &g, const GraphModel &model, const ReadLabel *rLab,
-		    const WriteLabel *sLab) -> std::unique_ptr<VectorClock>
+		    const WriteLabel *sLab, WritePrefixes *cache) -> std::unique_ptr<VectorClock>
 {
 	if (dependentsOf(g, rLab)[sLab->getStamp().get()])
 		return nullptr;
+	/* (SLAB's prefixes serve every candidate read of SLAB) */
+	WritePrefixes local;
+	auto &prefixes = cache ? *cache : local;
+	if (prefixes.sLab != sLab) {
+		prefixes.sLab = sLab;
+		prefixes.full = model.calculatePrefixView(sLab);
+		prefixes.revisit = nullptr;
+	}
 	/* RLAB in the model's prefix of SLAB through the write of its RMW (which
 	 * another thread's RMW reads, say): the prefix is computed without
 	 * every dependent of RLAB (see the header) */
-	const auto fullPrefix = model.calculatePrefixView(sLab);
+	const auto &fullPrefix = prefixes.full;
 	const auto *wLab = genmc::dyn_cast_if_present<WriteLabel>(
 		rLab->isRMW() ? g.po_imm_succ(rLab) : nullptr);
 	const auto throughWrite = wLab && wLab->isRMW() && fullPrefix->contains(wLab->getPos());
@@ -165,25 +173,28 @@ auto keptPrefixView(const ExecutionGraph &g, const GraphModel &model, const Read
 	 * RMW's write, and the reads of the writes it has) */
 	if (std::ranges::none_of(g.labels(),
 				 [&](const auto &lab) { return masked[lab.getStamp().get()]; })) {
-		auto prefix = model.calculateRevisitPrefixView(sLab);
-		return prefix->contains(rLab->getPos()) ? nullptr : std::move(prefix);
+		if (!prefixes.revisit)
+			prefixes.revisit = model.calculateRevisitPrefixView(sLab);
+		const auto &prefix = prefixes.revisit;
+		return prefix->contains(rLab->getPos()) ? nullptr : prefix->clone();
 	}
 	/* The prefix is computed in a copy (positions name the same events in
-	 * both) where each event of a branch RLAB controls and what depends on
-	 * one (with THROUGHWRITE, every dependent of RLAB) is an inert event: a
-	 * plain read of a private location, with no dependencies, reading the
-	 * initializer. The model's prefix passes through it as po passes
-	 * through anything, but it ends no path of the prefix (a hole would: a
-	 * hole is not plain, so a release's ordering would reach past the plain
-	 * read it stops at). RLAB stays as it is: what orders it before SLAB by
-	 * what it is (an acquire read before all after it) orders it whatever
-	 * it reads */
+	 * both; the model's prefix is a matter of the graph's structure, so the
+	 * copy carries no views) where each event of a branch RLAB controls and
+	 * what depends on one (with THROUGHWRITE, every dependent of RLAB) is
+	 * an inert event: a plain read of a private location, with no
+	 * dependencies, reading the initializer. The model's prefix passes
+	 * through it as po passes through anything, but it ends no path of the
+	 * prefix (a hole would: a hole is not plain, so a release's ordering
+	 * would reach past the plain read it stops at). RLAB stays as it is:
+	 * what orders it before SLAB by what it is (an acquire read before all
+	 * after it) orders it whatever it reads */
 	auto all = g.getViewFromStamp(g.getMaxStamp());
 	auto &dall = *genmc::cast<DepView>(&*all);
 	for (const auto &lab : g.labels())
 		if (masked[lab.getStamp().get()])
 			dall.addHole(lab.getPos());
-	auto copy = g.getCopyUpTo(*all);
+	auto copy = g.getStructuralCopyUpTo(*all);
 	for (const auto &lab : g.labels()) {
 		if (!masked[lab.getStamp().get()])
 			continue;
@@ -267,7 +278,7 @@ auto BackwardRevisits::revisitView(const ReadLabel *rLab, const WriteLabel *sLab
 	 * the path-dependent part of the prefix, issue #77). What was in the
 	 * prefix only through them stays: it does not depend on RLAB */
 	if (opts_.keepsDependencies) {
-		auto prefix = keptPrefixView(g, model_, rLab, sLab);
+		auto prefix = keptPrefixView(g, model_, rLab, sLab, &prefixes_);
 		if (!prefix)
 			return nullptr;
 

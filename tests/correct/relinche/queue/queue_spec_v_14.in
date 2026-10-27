@@ -1,0 +1,30 @@
+# Specification
+# Statistics:  Size: 2  Hints: 7  Lins: 48
+# Observations:
+## Observation (Lins: 24):
+## Outcome:
+5   dequeue 0 0   dequeue 0 0   dequeue 0 0   dequeue 0 0   enqueue 101 0
+## RF:
+0
+## HB:
+0
+## Hints:
+4
+1   4 3
+1   4 2
+1   4 1
+1   4 0
+
+## Observation (Lins: 24):
+## Outcome:
+5   dequeue 0 0   dequeue 0 0   dequeue 0 0   dequeue 0 101   enqueue 101 0
+## RF:
+0
+## HB:
+1   4 3
+## Hints:
+3
+2   2 3   4 2
+2   1 3   4 1
+2   0 3   4 0
+
