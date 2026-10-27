@@ -247,6 +247,8 @@ static const auto maybeTimeRelinche = [](auto &&relinche, auto &&g) {
 	return res;
 };
 
+static auto isStuckForever(const ExecutionGraph &g) -> bool;
+
 auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 {
 	auto &g = getExec().getGraph();
@@ -321,6 +323,12 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 				   getConf()->printAddresses);
 		if (const auto err = checkExhaustiveRace())
 			return err;
+		/* -lkmm: a thread waiting forever ends an (infinite) execution,
+		 * whose races are real; a graph that later events extend is not
+		 * checked, as they can order its accesses (#288) */
+		if (getConf()->model == ModelType::LKMM && isStuckForever(g))
+			if (const auto err = checkLkmmRace())
+				return err;
 		if (getConf()->checkLiveness)
 			return checkLiveness();
 		return {};
@@ -556,7 +564,10 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 	};
 
 	/* Helper to get the co-max label */
-	auto getCoMax = [&](auto &rLab) {
+	auto getCoMax = [&](auto &rLab) -> const EventLabel * {
+		/* (A location nobody stores to has no coherence order) */
+		if (!g.containsLoc(rLab->getAddr()))
+			return g.getInitLabel();
 		/* Exclude RMW successor for ZNE spinloops */
 		auto rco = g.rco(rLab->getAddr());
 		auto coIt = std::ranges::find_if(rco, [&](auto &sLab) {
@@ -604,7 +615,7 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 		observable |= genmc::isa<UnlockWriteLabel>(lab);
 	}
 	auto getReachableCoMax = [&](auto &rLab) -> const EventLabel * {
-		if (!observable)
+		if (!observable || !g.containsLoc(rLab->getAddr()))
 			return getCoMax(rLab);
 		auto rco = g.rco(rLab->getAddr());
 		auto coIt = std::ranges::find_if(rco, [&](auto &sLab) {
@@ -618,14 +629,37 @@ static auto threadReadsMaximal(const ExecutionGraph &g, int tid) -> bool
 		const auto *lab = g.getEventLabel(Event(tid, j));
 		if (isIterStart(lab))
 			return true;
-		VERIFY(!genmc::isa<LoopBeginLabel>(lab) ||
-		       (loop && genmc::cast<LoopBeginLabel>(lab)->getLoop() != *loop));
+		VERIFY(!genmc::isa<LoopBeginLabel>(lab) || !loop ||
+		       genmc::cast<LoopBeginLabel>(lab)->getLoop() != *loop);
 		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab)) {
 			if (rLab->getRf() != getReachableCoMax(rLab))
 				return false;
 		}
 	}
-	UNREACHABLE();
+	/* No iteration start: SpinAssume marks the start of a loop it proves
+	 * a spinloop only under -check-liveness. Every read of the thread was
+	 * checked, those of the iteration among them (#288) */
+	return true;
+}
+
+/* Whether a blocked graph is a final execution, one where every thread has
+ * finished or waits forever: a thread blocked at a spinloop or an await whose
+ * reads are maximal (as for liveness: no write in coherence after the ones it
+ * reads, and every other thread finished or waiting too, so none comes later),
+ * or one joining such a thread. Any other blockage (a failed assume, a lock
+ * taken later, an exploration block) is a graph that later events extend */
+static auto isStuckForever(const ExecutionGraph &g) -> bool
+{
+	return std::ranges::all_of(g.thr_ids(), [&](auto tid) {
+		const auto *lab = g.getLastThreadLabel(tid);
+		if (genmc::isa<ThreadFinishLabel>(lab))
+			return true;
+		if (const auto *jLab = genmc::dyn_cast<JoinBlockLabel>(lab))
+			return !genmc::isa<ThreadFinishLabel>(
+				g.getLastThreadLabel(jLab->getChildId()));
+		return (genmc::isa<SpinloopBlockLabel>(lab) || genmc::isa<AwaitBlockLabel>(lab)) &&
+		       threadReadsMaximal(g, tid);
+	});
 }
 
 auto GenMCDriver::checkLiveness() -> std::optional<VerificationError>

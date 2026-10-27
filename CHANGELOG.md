@@ -9,6 +9,11 @@ released.
 
 - Merge of MIXER [POPL'25] into mainline GenMC
 
+
+## [0.19.0-vzhn.15] - 2026.10.27
+
+Fork release on top of 0.19.0 (https://github.com/vzhn/genmc-fork).
+
 ### Added
 
 - `-check-serializability` checks that the atomic regions a program marks
@@ -19,8 +24,99 @@ released.
   `Serializability violation` naming two regions and the edges of the cycle
   (`tests/correct/serializability`, `tests/wrong/serializability`).
 
+- `scripts/svcomp/genmc-svcomp`: GenMC as an SV-COMP verifier. It checks
+  one property of one task and prints SV-COMP's result as its last line
+  (`true`, `false(unreach-call)`, `false(no-data-race)`,
+  `false(valid-deref)`, `false(valid-free)`, `unknown`), and writes the
+  violation witness of a false one. An error of another property, a bound
+  that cut executions off, or unfreed memory under `valid-memsafety` gives
+  `unknown`. `scripts/svcomp/benchexec/genmc.py` is BenchExec's tool-info
+  module for it. `svcomp-run.py --per-property` checks each property of a
+  task alone, with a verdict per task/property pair; the code both share is
+  in `scripts/svcomp/svcomp_core.py` (`scripts/check-svcomp-shim.sh` runs
+  the wrapper on four tasks).
+
+- `scripts/svcomp/svcomp-run.py --witness` writes an SV-COMP violation
+  witness for each error GenMC finds, in format 2.2 (YAML, with threads) and
+  1.0 (GraphML): the thread creations and the error's call, accesses or
+  invalid access, at the task's lines (`scripts/svcomp/svcomp_witness.py`).
+  The code the runner adds now goes into a header that GenMC reports at the
+  caller's line (`-library-dir`), and so does `reach_error()`. The SV-COMP
+  2026 validators confirm 235 of the 306 witnesses of `Concurrency.set`
+  (`scripts/check-svcomp-shim.sh` checks the waypoints of four).
+- `-library-dir=<dir>` (repeatable): the events of code in a header in
+  `<dir>` are reported at the line of the program that called it, as those
+  of GenMC's own headers are. A tool that reads the error report and adds
+  code of its own (the SV-COMP runner, whose witnesses may only name lines
+  of the task) gets the program's lines (`scripts/check-library-dir.sh`,
+  ctest `library-dir`).
+- `-print-addresses`: the printed graphs (the error graph,
+  `-dump-error-graph`, `-print-exec-graphs`) show the address of each
+  access, as in `Wna (@H#(0, 52), 0)`, and the block each allocation and
+  free spans, as in `MALLOC  @H#(0, 48) size=8` and `FREE @H#(0, 48) size=8`.
+  A heap access was printed with an empty name, or one guessed from the
+  allocation site, so a tool reading the graph could not tell which block
+  an access or a free touches. Off by default: the graphs are unchanged
+  without it (`scripts/check-print-addresses.sh`, ctest `print-addresses`).
+- The other integer `__VERIFIER_nondet_X()` of SV-COMP (#48): `bool`,
+  `char`, `uchar`, `short`, `ushort`, `uint`, `unsigned`, `long`, `ulong`,
+  `longlong`, `ulonglong`, `size_t`, `int128` and `uint128`, declared in
+  `genmc.h`, and `u32`, `loff_t` and `sector_t`, which a program declares
+  itself. Before, a call to any of them stopped GenMC with "Tried to
+  execute an unknown external function". Like `__VERIFIER_nondet_int()`,
+  each call returns one value (an `int` of the same pseudo-random sequence,
+  fitted to the type), and GenMC prints the same warning. The `float`,
+  `double` and pointer variants are still unsupported
+  (`tests/correct/infr/nondet-variants`).
+- `-svcomp`: checks properties as SV-COMP defines them. For now that means
+  that a read of uninitialized memory reads 0 instead of being an error:
+  SV-COMP does not count it as a memory-safety violation, so GenMC's report
+  was a false alarm in `valid-memsafety` tasks and stopped the check of
+  their other properties (`tests/correct/infr/svcomp-uninit-read`).
+  `scripts/svcomp/svcomp-run.py` passes it when GenMC has it. The runner
+  also labels a race on the store of a new thread's ID `CREATE-RACE`, with
+  no verdict: glibc's `pthread_create()` stores the ID before the thread
+  runs, GenMC's after it creates the thread, so a read that the new thread
+  orders after its start races with that store only in GenMC. The
+  prelude's `pthread_create` stores the ID atomically, so that the runner
+  tells that store from the task's own, which GenMC may print without a
+  location (`scripts/svcomp/selftest/create-order`, `create-then-write`,
+  `uninit-read`).
+- `scripts/svcomp/svcomp-run.py` reported a task clean even when the
+  prelude's bounds had discarded every execution that could reach its error
+  (more nondet values than `--max-choices`, a value beyond `--nondet-max`):
+  21 tasks of `Concurrency.set` with a bug, each a wrong "true", most with
+  no complete execution at all. A clean result with blocked executions is
+  now checked again with the prelude's bounds check on, which stops at an
+  execution that asks for one value too many or aborts after reading the
+  range's largest value; the task is then labelled `BOUNDED`, with no
+  verdict (`scripts/svcomp/selftest/bounded-*`, `blocked-not-bounded`).
+- `scripts/svcomp/svcomp-run.py` could not run 43 tasks of
+  `Concurrency.set`. The 22 of `pthread-driver-races` declare `pthread_t`
+  as `int`, so the runner took them for tasks that include `<pthread.h>`
+  and they clashed with GenMC's; others called `sleep`, `strcpy`, `ffs`,
+  POSIX semaphores or `scanf`, which GenMC lacks, or passed a pointer as an
+  int, which clang rejects and gcc only warns about. The prelude now
+  defines those functions (`time` and `mmap` stay unsupported) and clang
+  only warns. With `strcpy`, a task whose error is a NULL dereference after
+  a failed `malloc` became a wrong "true": as in SV-COMP, `malloc` and
+  `calloc` now may fail, at most once per execution, in tasks that check
+  `valid-memsafety` (`scripts/svcomp/selftest/pp-libc`, `pp-sem-race`,
+  `scanf`, `pp-int-pthread-t`, `malloc-fail*`).
+
 ### Fixed
 
+- `-lkmm` did not report a data race in an execution that ends with a
+  thread waiting forever in `__VERIFIER_await()` or a spinloop (#288):
+  races are checked on a whole execution, and a blocked graph was never
+  checked. A blocked graph is now checked when it is a final, infinite
+  execution: every thread has finished or waits forever, at a spinloop or
+  an await whose reads see the last write in coherence (as for
+  `-check-liveness`), or at a join of such a thread. A graph that later
+  events extend, such as a lock acquisition that reads a held lock, is
+  still not checked. Outside `-check-liveness`, SpinAssume does not mark
+  where a spinloop's iteration starts: such a loop is judged by all the
+  reads of its thread (`tests/wrong/racy/stuck-await-race-lkmm`).
 - IMM is not extensible (vzhn/kater-fork#38): in `addr ; po?`, a read
   that depends by address on another orders it before every later write,
   whatever it reads, so a revisit could delete such a read, keep the
@@ -392,6 +488,144 @@ released.
   a macro of `genmc.h`) (`scripts/check-driver-last-line.sh`, ctest
   `driver-last-line`).
 
+- `-tso` counted executions that TSO forbids (#189): the write part of an
+  RMW goes right after the write its read reads in coherence, which need
+  not be the last one, and its new coherence edges could close a cycle
+  that the check of the read part did not see. Only `-lkmm` checked the
+  graph again after placing it; `-tso` and `-imm` do now, and SC, RA and
+  RC11 provably need not (`proofs/alloy/rmw-placement.als`, ctest
+  `formal-models`). A 3-thread program with two `fetch_add()`s had 13
+  executions under `-tso` instead of 12
+  (`tests/correct/infr/tso-rmw-placement`).
+- A helping CAS that does not see the stores before a matching helped CAS
+  was never reported (#193): the check compared the helped CAS's view
+  with itself, and always passed. It now uses the helping CAS's view
+  (`tests/wrong/saver/help-annot3`, ctest `helping-cas-annotation`).
+- `-exhaustive -imm` crashed (heap-use-after-free, then a segmentation
+  fault in the IMM checker) on `tests/correct/synthetic/lockinc` with
+  `-DN=5` (#180): restricting a graph for a revisit could leave a thread
+  ending with a hole, and the thread's next event went after the hole
+  instead of into it. Such holes are now dropped, and an event takes its
+  slot wherever the slot is (#197).
+- A double free, or an access after a free, named a wrong event as the
+  one it conflicts with, or none (#199): the checkers left the
+  conflicting event of an earlier check in place. Under `-exhaustive
+  -imm`, that event could belong to a graph already destroyed, and GenMC
+  crashed in about half the runs of
+  `tests/wrong/memory/list-channel-double-free`. The report now names the
+  free (`tests/wrong/memory/{double-free-conflict,access-freed-conflict}`,
+  ctest `free-conflict`).
+- `-lkmm` crashed with `-disable-race-detection` reporting a store to
+  non-allocated memory, such as a NULL store, made under a lock (#202):
+  the check of the error's graph asked for the coherence successors of the
+  store, which had not been placed in coherence yet
+  (`tests/wrong/memory/locked-null-store-lkmm`).
+- `-lkmm` reported an assertion that fails inside an RCU or SRCU
+  read-side critical section on values the grace period forbids (#201):
+  the graph was consistent only because the reader's `rcu_read_unlock()`
+  had not been added yet. Under `-lkmm`, the graph of an error is now
+  checked with every open read-side section closed at the end of its
+  thread; the other models provably need no such check
+  (`proofs/alloy/open-section.als`)
+  (`tests/correct/lkmm/{rcu-assert-inside,srcu-assert-inside}`).
+- `-cache-instructions` crashed (`UNREACHABLE`) when it replayed a thread
+  that calls `__VERIFIER_output()` (#208), as in
+  `tests/correct/infr/imm-resume-holes`, which now also runs with it.
+- Floating-point code crashed GenMC (#209): negation (`-x`) had no
+  interpreter handler, and LLVM aborted on `x * y + z` (contracted into
+  `llvm.fmuladd`), `fabs()`, `isnan()`, `isinf()`, `isfinite()`,
+  `isnormal()`, `fpclassify()`, `fmin()` and `fmax()`. These now run;
+  `fma()` and the other libm functions are still unsupported
+  (`tests/correct/infr/{float-ops,float-intrinsics}`).
+- `__builtin_shufflevector()` and vectorized code crashed the interpreter,
+  which read the shuffle mask as an operand; and so did a call to
+  `exit()`, after which the interpreter went on running the thread
+  (#210). `exit()` now ends the program after its `atexit()` handlers
+  (`tests/correct/infr/{vector-ops,exit-call}`,
+  `tests/wrong/safety/exit-atexit`).
+- `sprintf()`, `sscanf()` and `scanf()`, declared by the program itself,
+  ran as host calls on GenMC's addresses (#211): `sscanf()` into a local
+  crashed, `sprintf()` into a global left it unwritten (false assertion
+  failures), and `scanf()` read GenMC's own stdin. They are now rejected
+  as unknown external functions; `printf()` and `fprintf()` still work
+  (`scripts/check-external-stdio.sh`, ctest `external-stdio`).
+- A function that calls `va_start()` aborted LLVM ("Broken module
+  found"), as GenMC inlined it, and could not run anyway, its `va_arg()`
+  reads being reported as reads of uninitialized memory. Such functions
+  are now rejected; a variadic function that never calls `va_start()`
+  still runs (#213, `scripts/check-variadic.sh`, ctest `variadic`).
+- A memory access wider than 64 bits stored a wrong value: an `__int128`
+  of 2^64 or more, or a negative one, was stored as all ones, and a
+  16-byte atomic struct or a `long double` as garbage, which gave false
+  assertion failures or a crash. Such an access is now an error, unless
+  it is an integer access whose values fit in 64 bits (#214,
+  `scripts/check-wide-accesses.sh`, ctest `wide-accesses`).
+- Symmetry reduction lost executions under `-schedule-policy=wfr` or
+  `arbitrary` (#217) when the threads read their own ID, as GenMC's
+  pthread rwlocks do (a mutex per thread ID): `synthetic/rwlock-w` had 6
+  executions instead of 8. A thread that may read its ID, through
+  `pthread_self()` or an indirect call, is no longer taken as symmetric;
+  `__VERIFIER_spawn_symmetric()` still declares symmetry
+  (`tests/correct/synthetic/rwlock-w`,
+  `tests/correct/infr/pthread-rwlock-trywrlock`).
+- `-lkmm -exhaustive` (now the default of `-lkmm`) crashed in
+  `revisitRead()` (#223): a backward revisit could keep the write part of
+  a `fetch_add()` without its read, and later cut the graph between them.
+  A revisit that keeps an RMW's write part now keeps its read, and what
+  that read reads; the executions completed from such graphs are checked
+  as a whole (ctest `lkmm-exhaustive-rmw`). It also kept that closure
+  short when the RMW was already in the revisit's view: a `cmpxchg()`
+  that a revisit made succeed lost the store it read, and executions
+  under some schedules (5 instead of 7, #256,
+  `tests/correct/lkmm/cas-kept-read-revisit`).
+- `-lkmm` counted some executions twice (#230): whether the events after
+  an acquire or fully ordered `cmpxchg()` are ordered after it depends on
+  whether it succeeds, and they did not depend on it, so a revisit could
+  delete a failed CAS and keep a later store, and its new run succeeded
+  into graphs already explored (8 executions instead of 6). Under
+  `-disable-lkmm-exhaustive`, the events after such a CAS now depend on
+  its read (`tests/correct/lkmm/cas-acquire-fail-kept-write`).
+- `-imm` missed executions, depending on the schedule (#228): a write
+  placed earlier in coherence by a coherence revisit only revisited the
+  reads of the writes after it, not those of the writes before it that a
+  hole left by a backward revisit could read
+  (`tests/correct/infr/{imm-co-revisit-hole-read,imm-policy-independent}`:
+  15 and 144 executions, were 14 and 126).
+- Under `-imm` and `-lkmm`, a read that was not added reading the last
+  write was never revisited, though a revisit that keeps later events of
+  its thread can bound what it reads to an earlier write; `-imm` missed
+  the executions with such a load-buffering cycle (#243,
+  `tests/correct/infr/imm-revisit-bounded-read`: 102, was 100). The
+  revisiting write must respect the same bound
+  (`tests/correct/infr/imm-revisit-bounded-coherence`).
+- `-lkmm` lost executions when a revisit deleted an RMW before a kept
+  read of its location (#239): the optimal exploration (the default before
+  this release, now `-disable-lkmm-exhaustive`) gave 4 of herd7's 6, and
+  under some schedules the exhaustive one counted an incoherent seventh,
+  the RMW executed anew reading the write the kept read reads
+  (`tests/correct/lkmm/fai-hole-kept-read`).
+- `-lkmm` lost an execution in which a kept read reads the write part of
+  an `xchg()` that a revisit makes read another write (#251): the
+  revisit was refused. Such a write part now stays, and moves after the
+  revisiting write in coherence
+  (`tests/correct/lkmm/xchg-kept-write-revisit`: 8, was 7).
+- GenMC's LKMM lacked the dependency of a fetch-and-op's write on its
+  read (herd7's `iico_data`), so `-lkmm` could count executions LKMM
+  forbids through an `rfi` from that write to a marked read (#252,
+  `tests/correct/lkmm/fai-rfi-acquire-order`).
+- `-lkmm` stopped with `Internal check failed: !stores.empty()` when an
+  RMW executed into a hole before kept events had no write left to read,
+  as in `if (READ_ONCE(x)) cmpxchg_acquire(&l, 0, 1);` followed by
+  another `cmpxchg_acquire(&l, 0, 1)` against a thread spinning on `l`.
+  Such a run is now dropped, as under `-exhaustive -imm` (#255,
+  `tests/correct/lkmm/rmw-hole-kept-read`).
+- `-lkmm` counted executions that break an RMW's atomicity, depending on
+  the schedule (#257): a store executed anew could be placed in coherence
+  between an RMW's write and the write its read reads (25 executions
+  under `-schedule-policy=ltr` instead of herd7's 24). Such a placing is
+  no longer offered, and a store left with no placing drops the run
+  (`tests/correct/lkmm/{rmw-placing-range-end,fai-three-threads-policy}`).
+
 ### Performance
 
 - `-lkmm` explores fewer graphs on programs whose threads branch on
@@ -443,87 +677,11 @@ released.
   What is left is the number of graphs: the revisits of an RMW's read
   whose write another RMW reads, which wait on #264.
 
-### Added
-
-- `scripts/svcomp/genmc-svcomp`: GenMC as an SV-COMP verifier. It checks
-  one property of one task and prints SV-COMP's result as its last line
-  (`true`, `false(unreach-call)`, `false(no-data-race)`,
-  `false(valid-deref)`, `false(valid-free)`, `unknown`), and writes the
-  violation witness of a false one. An error of another property, a bound
-  that cut executions off, or unfreed memory under `valid-memsafety` gives
-  `unknown`. `scripts/svcomp/benchexec/genmc.py` is BenchExec's tool-info
-  module for it. `svcomp-run.py --per-property` checks each property of a
-  task alone, with a verdict per task/property pair; the code both share is
-  in `scripts/svcomp/svcomp_core.py` (`scripts/check-svcomp-shim.sh` runs
-  the wrapper on four tasks).
-
-- `scripts/svcomp/svcomp-run.py --witness` writes an SV-COMP violation
-  witness for each error GenMC finds, in format 2.2 (YAML, with threads) and
-  1.0 (GraphML): the thread creations and the error's call, accesses or
-  invalid access, at the task's lines (`scripts/svcomp/svcomp_witness.py`).
-  The code the runner adds now goes into a header that GenMC reports at the
-  caller's line (`-library-dir`), and so does `reach_error()`. The SV-COMP
-  2026 validators confirm 235 of the 306 witnesses of `Concurrency.set`
-  (`scripts/check-svcomp-shim.sh` checks the waypoints of four).
-- `-library-dir=<dir>` (repeatable): the events of code in a header in
-  `<dir>` are reported at the line of the program that called it, as those
-  of GenMC's own headers are. A tool that reads the error report and adds
-  code of its own (the SV-COMP runner, whose witnesses may only name lines
-  of the task) gets the program's lines (`scripts/check-library-dir.sh`,
-  ctest `library-dir`).
-- `-print-addresses`: the printed graphs (the error graph,
-  `-dump-error-graph`, `-print-exec-graphs`) show the address of each
-  access, as in `Wna (@H#(0, 52), 0)`, and the block each allocation and
-  free spans, as in `MALLOC  @H#(0, 48) size=8` and `FREE @H#(0, 48) size=8`.
-  A heap access was printed with an empty name, or one guessed from the
-  allocation site, so a tool reading the graph could not tell which block
-  an access or a free touches. Off by default: the graphs are unchanged
-  without it (`scripts/check-print-addresses.sh`, ctest `print-addresses`).
-- The other integer `__VERIFIER_nondet_X()` of SV-COMP (#48): `bool`,
-  `char`, `uchar`, `short`, `ushort`, `uint`, `unsigned`, `long`, `ulong`,
-  `longlong`, `ulonglong`, `size_t`, `int128` and `uint128`, declared in
-  `genmc.h`, and `u32`, `loff_t` and `sector_t`, which a program declares
-  itself. Before, a call to any of them stopped GenMC with "Tried to
-  execute an unknown external function". Like `__VERIFIER_nondet_int()`,
-  each call returns one value (an `int` of the same pseudo-random sequence,
-  fitted to the type), and GenMC prints the same warning. The `float`,
-  `double` and pointer variants are still unsupported
-  (`tests/correct/infr/nondet-variants`).
-- `-svcomp`: checks properties as SV-COMP defines them. For now that means
-  that a read of uninitialized memory reads 0 instead of being an error:
-  SV-COMP does not count it as a memory-safety violation, so GenMC's report
-  was a false alarm in `valid-memsafety` tasks and stopped the check of
-  their other properties (`tests/correct/infr/svcomp-uninit-read`).
-  `scripts/svcomp/svcomp-run.py` passes it when GenMC has it. The runner
-  also labels a race on the store of a new thread's ID `CREATE-RACE`, with
-  no verdict: glibc's `pthread_create()` stores the ID before the thread
-  runs, GenMC's after it creates the thread, so a read that the new thread
-  orders after its start races with that store only in GenMC. The
-  prelude's `pthread_create` stores the ID atomically, so that the runner
-  tells that store from the task's own, which GenMC may print without a
-  location (`scripts/svcomp/selftest/create-order`, `create-then-write`,
-  `uninit-read`).
-- `scripts/svcomp/svcomp-run.py` reported a task clean even when the
-  prelude's bounds had discarded every execution that could reach its error
-  (more nondet values than `--max-choices`, a value beyond `--nondet-max`):
-  21 tasks of `Concurrency.set` with a bug, each a wrong "true", most with
-  no complete execution at all. A clean result with blocked executions is
-  now checked again with the prelude's bounds check on, which stops at an
-  execution that asks for one value too many or aborts after reading the
-  range's largest value; the task is then labelled `BOUNDED`, with no
-  verdict (`scripts/svcomp/selftest/bounded-*`, `blocked-not-bounded`).
-- `scripts/svcomp/svcomp-run.py` could not run 43 tasks of
-  `Concurrency.set`. The 22 of `pthread-driver-races` declare `pthread_t`
-  as `int`, so the runner took them for tasks that include `<pthread.h>`
-  and they clashed with GenMC's; others called `sleep`, `strcpy`, `ffs`,
-  POSIX semaphores or `scanf`, which GenMC lacks, or passed a pointer as an
-  int, which clang rejects and gcc only warns about. The prelude now
-  defines those functions (`time` and `mmap` stay unsupported) and clang
-  only warns. With `strcpy`, a task whose error is a NULL dereference after
-  a failed `malloc` became a wrong "true": as in SV-COMP, `malloc` and
-  `calloc` now may fail, at most once per execution, in tasks that check
-  `valid-memsafety` (`scripts/svcomp/selftest/pp-libc`, `pp-sem-race`,
-  `scanf`, `pp-int-pthread-t`, `malloc-fail*`).
+- `-cache-instructions` took time quadratic in a thread's length (#218):
+  each new event re-read the thread's whole value prefix. The cache now
+  keeps a cursor per thread: a thread of 20000 relaxed reads takes 0.16 s
+  (24.6 s before), and `synthetic/barrier-det -DDIM=7` 5.6 s (over 300 s)
+  (#220, `scripts/check-cache-long-thread.sh`, ctest `cache-long-thread`).
 
 
 ## [0.19.0-vzhn.14] - 2026.10.22
