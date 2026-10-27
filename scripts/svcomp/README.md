@@ -44,14 +44,16 @@ SV-COMP runs a verifier on one property of one task. `genmc-svcomp` does
 that with GenMC:
 
     genmc-svcomp [--genmc GENMC] [--data-model ILP32|LP64] \
-        [--witness-format yaml|graphml] PROPERTY_FILE PROGRAM
+        [--witness-format yaml|graphml] [--timeout SECONDS] PROPERTY_FILE PROGRAM
 
 It prints GenMC's output, then SV-COMP's result as the last line:
 `SV-COMP result: true`, `false(unreach-call)`, `false(no-data-race)`,
 `false(valid-deref)`, `false(valid-free)` or `unknown`. For a false result
 it writes the violation witness to `witness.yml` (format 2.2) or
 `witness.graphml` (1.0) in the working directory. `benchexec/genmc.py` is
-the tool-info module through which BenchExec runs it.
+the tool-info module through which BenchExec runs it. GenMC's runs share
+`--timeout` seconds (default 800, within SV-COMP's 900 s of CPU time): the
+runs with more nondet values above take what the first run leaves.
 
 Only the property checked counts. An error of another property gives
 `unknown`, and so does a bound that cut executions off. `reach_error()`
@@ -100,6 +102,15 @@ so a clean result holds only up to those bounds:
   in a thread that had read the largest value, as when a task wants
   `n >= 20`, the bounds may have cut an error off, and the task is
   labelled `BOUNDED`, with no verdict.
+  A task that calls an integer `__VERIFIER_nondet_*` and gets a clean or
+  `BOUNDED` result is then run again for each of a few more values, in a
+  share of the time left: 3, 4, -1, the constants the task compares with
+  and their neighbours, its `case` labels, 2^30+1 (a size that wraps around
+  when multiplied by 4 in 32 bits) and `INT_MAX`. In each run the nondet
+  calls return 0..N or that value, and calls past `--max-choices` return 0
+  instead of ending the execution. An error found so is reported: each
+  value is one the type can hold. These runs only look for errors, so they
+  leave a result without one as it was.
 - **Atomic sections** (`__VERIFIER_atomic_begin/end` and functions named
   `__VERIFIER_atomic_*`) take one global lock. The lock orders the sections
   it protects, so it can hide a data race that SV-COMP reports. SV-COMP also

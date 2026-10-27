@@ -39,6 +39,9 @@
 #   and the bounds check must label them BOUNDED instead of "true";
 #   blocked-not-bounded: executions blocked for the task's own reasons,
 #   whose clean result stands;
+# - nondet-*: errors that need a nondet value beyond 0..2 (42, which the
+#   task compares with; a thread count of 4, with more nondet calls than
+#   the shim's bound), which the runs with more values must find;
 # - pp-libc, pp-sem-race: sleep, strcpy, ffs and semaphores in the tail (a
 #   semaphore of 1 orders the workers, one of 2 does not); scanf: scanf in
 #   a task that includes <stdio.h>;

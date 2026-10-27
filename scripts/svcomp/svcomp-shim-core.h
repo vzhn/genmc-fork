@@ -16,6 +16,10 @@
  *   __VERIFIER_nondet_bool gives 0 or 1. An execution that asks for more than
  *   SVC_MAX_CHOICES values is discarded, which bounds nondet-driven loops like
  *   -unroll: a clean result only holds up to that bound.
+ *   With SVC_NONDET_VALUES (a list of values; svcomp-run.py sets it in the
+ *   runs that try more values after a clean one), a nondet call returns 0
+ *   or one of them, and calls past SVC_MAX_CHOICES return 0 instead of
+ *   ending the execution: those runs only look for errors.
  * - Spurious wake-ups: pthread_cond_wait may return without a signal, as
  *   POSIX allows. Each wait call asks __svc_spurious_wakeup(), which says yes
  *   in the explored executions where it reads the helper thread's 1. At most
@@ -83,19 +87,35 @@ static int __svc_choose(void)
 	if (i >= SVC_MAX_CHOICES)
 		__svc_bound_hit();
 #endif
+#ifdef SVC_NONDET_VALUES
+	/* (a run that only looks for errors: past the choices, 0 will do) */
+	if (i >= SVC_MAX_CHOICES)
+		return 0;
+#endif
 	/* out of choices: end this execution, like an unroll bound */
 	__VERIFIER_assume(i < SVC_MAX_CHOICES);
 	return __atomic_load_n(&__svc_choice[i], __ATOMIC_RELAXED);
 }
 
-static int __svc_nondet_val(void)
+#ifdef SVC_NONDET_VALUES
+/* the values a nondet call may return, in place of 0..SVC_NONDET_MAX */
+static const long __svc_values[] = { 0, SVC_NONDET_VALUES };
+# undef SVC_NONDET_MAX
+# define SVC_NONDET_MAX ((int) (sizeof(__svc_values) / sizeof(__svc_values[0])) - 1)
+#endif
+
+static long __svc_nondet_val(void)
 {
 	int v = __svc_choose();
 #if SVC_CHECK_BOUNDS
 	if (v == SVC_NONDET_MAX)
 		__svc_saw_max = 1;
 #endif
+#ifdef SVC_NONDET_VALUES
+	return __svc_values[v];
+#else
 	return v;
+#endif
 }
 
 static int __svc_nondet_bit(void)

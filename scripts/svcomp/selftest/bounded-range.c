@@ -3,7 +3,9 @@
  * You may choose to use, distribute, or modify this software under either license.
  */
 /* The task wants a value of at least 20, beyond the shim's nondet range
- * (0..2): every execution aborts, so a clean result would be a wrong "true" */
+ * (0..2): every execution aborts, so a clean result would be a wrong "true".
+ * The error needs 25, which the task compares with only as 20 + 5, so the
+ * runs with more nondet values (19..21 from n >= 20) do not find it either */
 #include <pthread.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -22,7 +24,7 @@ int main(void)
 	unsigned int n = __VERIFIER_nondet_uint();
 
 	assume_abort_if_not(n >= 20);
-	if (n == 25)
+	if (n == 20 + 5)
 		reach_error();
 	return 0;
 }

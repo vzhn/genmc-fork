@@ -365,6 +365,34 @@ def genmc_options(genmc):
     return {"svcomp": has("svcomp"), "library_dirs": has("library-dir")}
 
 
+NONDET_CALL = re.compile(r"\b__VERIFIER_nondet_(?:u?int|u?char|u?short|u?long)\s*\(")
+# a comparison of something with an integer constant, either way round, and
+# a case label
+CONSTANT_USE = re.compile(r"(?:[=!]=|[<>]=?)\s*\(?\s*(-?\s*\d+)[uUlL]*\b(?!\s*[*/%+.])"
+                          r"|\b(\d+)[uUlL]*\s*\)?\s*(?:[=!]=|[<>]=?)"
+                          r"|\bcase\s+(-?\s*\d+)\s*:")
+MAX_NONDET_VALUES = 16
+
+
+def nondet_values(code):
+    """More values for the nondet calls than 0..2, to try when those find no
+    error: the small values 3 and 4 (thread counts), -1, the constants the
+    task compares with (and their neighbours) or switches on, and two large
+    values (a size times 4 that wraps around in 32 bits, INT_MAX). Empty if
+    the task calls no integer nondet function"""
+    if not NONDET_CALL.search(code):
+        return []
+    values = [3, 4, -1]
+    found = []
+    for m in CONSTANT_USE.finditer(code):
+        c = int(re.sub(r"\s", "", next(g for g in m.groups() if g is not None)))
+        found += [c - 1, c, c + 1] if m.group(1) is not None or m.group(2) is not None else [c]
+    # the small ones first: they are the likelier inputs of a branch
+    values += sorted({c for c in found if -2**31 <= c < 2**31}, key=lambda c: (abs(c), c))
+    values = [v for i, v in enumerate(values) if v not in (0, 1, 2) and v not in values[:i]]
+    return values[:MAX_NONDET_VALUES - 2] + [2**30 + 1, 2**31 - 1]
+
+
 def verify(genmc, task_src, workdir, properties, timeout=None, model="rc11", nondet_max=2,
            max_choices=4, max_spurious=1, options=None, memlimit=None):
     """Runs GenMC on TASK_SRC for PROPERTIES. Returns what it found (a
@@ -378,7 +406,7 @@ def verify(genmc, task_src, workdir, properties, timeout=None, model="rc11", non
     def limit():
         resource.setrlimit(resource.RLIMIT_AS, (memlimit, memlimit))
 
-    def run(check_bounds, budget):
+    def run(check_bounds, budget, values=None):
         p = subprocess.run([genmc, f"-{model}", "-disable-estimation",
                             *(["-svcomp"] if options["svcomp"] else []),
                             *(f"-library-dir={x}" for x in (HERE, os.path.abspath(libdir))
@@ -388,6 +416,8 @@ def verify(genmc, task_src, workdir, properties, timeout=None, model="rc11", non
                             f"-DSVC_MAX_CHOICES={max_choices}",
                             f"-DSVC_MAX_SPURIOUS={max_spurious}",
                             f"-DSVC_CHECK_BOUNDS={check_bounds}",
+                            *([f"-DSVC_NONDET_VALUES={','.join(map(str, [1, 2] + values))}"]
+                              if values else []),
                             # gcc, which SV-COMP's tasks are written for,
                             # only warns about these
                             "-Wno-error=int-conversion",
@@ -413,6 +443,25 @@ def verify(genmc, task_src, workdir, properties, timeout=None, model="rc11", non
                 got = "unknown"
     except subprocess.TimeoutExpired:
         out, got = "", "timeout"
+    # no error with nondet values 0..2: try more, each in a run of its own
+    # (in which the nondet calls return 0..2 or that value) and a share of
+    # the time left, so that a value that makes the task large (a thread
+    # count) leaves time for the others. An error found so is the task's:
+    # each value is one its type can hold. No error, or no time, leaves the
+    # result as it was
+    values = nondet_values(open(src, errors="replace").read()) if got in ("ok", "bounded") else []
+    for i, v in enumerate(values):
+        left = None if timeout is None else timeout - (time.time() - t0)
+        if left is not None and left < 1:
+            break
+        try:
+            more = run(0, None if left is None else left / (len(values) - i), [v])
+        except subprocess.TimeoutExpired:
+            continue
+        if classify(more) in properties:
+            got = classify(more)
+            out += f"\n---- nondet value {v} ----\n" + more
+            break
     return got, out, src
 
 

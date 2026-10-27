@@ -64,7 +64,8 @@ def main():
     ap.add_argument("--genmc", help="the GenMC executable (default: next to this script, or on PATH)")
     ap.add_argument("--data-model", default="ILP32", choices=["ILP32", "LP64"])
     ap.add_argument("--witness-format", default="yaml", choices=["yaml", "graphml"])
-    ap.add_argument("--timeout", type=float, help="seconds for GenMC's runs together")
+    ap.add_argument("--timeout", type=float, default=800,
+                    help="seconds for GenMC's runs together (default 800, in SV-COMP's 900 s)")
     ap.add_argument("--model", default="rc11")
     ap.add_argument("--version", action="store_true")
     ap.add_argument("property_file", nargs="?")
