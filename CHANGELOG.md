@@ -21,6 +21,12 @@ released.
 
 ### Fixed
 
+- `__VERIFIER_nondet_int128()` and `__VERIFIER_nondet_uint128()` crashed
+  GenMC built with LLVM 20 or older (`visitExtractValueInst`): clang
+  returns an `__int128` there as two 64-bit halves (`{ i64, i64 }`), and
+  the handler only filled in an integer. It now splits the value over the
+  halves, low half first; a variant declared with a non-integer return type
+  is reported as an error (`tests/correct/infr/nondet-variants`).
 - A loop or an `assume()` comparing a loaded pointer with a global's
   address made GenMC abort while transforming the program
   (`isa<ConstantPointerNull>(constant)` in `InstAnnotator`, #267): the pass
