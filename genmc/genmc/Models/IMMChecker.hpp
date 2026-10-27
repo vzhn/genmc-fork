@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/imm-genmc.kat, Kater v0.4.0-vzhn.3-24-g3b45ea2 (scripts/lkmm/kater-export.sh).
+ * From kat/imm-genmc.kat, Kater v0.4.0-vzhn.3-25-g0c366e6 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 #ifndef GENMC_IMM_CHECKER_HPP
@@ -443,7 +443,8 @@ protected: // subclasses may refine the generated checks (e.g., hand-written axi
 
 	bool visitUnlessWarning11(const EventLabel *lab) const;
 	bool checkWarning11(const EventLabel *lab) const;
-	bool arFull(const EventLabel *lab) { return checkConsAcyclic3(lab); }
+	bool arFull(const EventLabel *lab) const { return checkConsAcyclic3(lab); }
+	bool arFull(const ExecutionGraph &g) const { return checkConsAcyclic3(g); }
 
 	void visitPPoRf0(const EventLabel *lab, DepView &pporf) const;
 	void visitPPoRf1(const EventLabel *lab, DepView &pporf) const;

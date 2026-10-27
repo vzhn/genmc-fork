@@ -28,16 +28,9 @@ class IMMFullChecker : public IMMChecker {
 public:
 	IMMFullChecker(const Config *conf) : IMMChecker(conf) {}
 
+	/* (The whole-graph arFull(g): arFull(lab) is incremental, a check of
+	 * the cycles through an event just added at the end of its thread) */
 	auto satisfiesExtraAxioms(const ExecutionGraph &g) -> bool override;
-
-private:
-	/* IMM's full ar is acyclic in G. The generated arFull(lab) is an
-	 * incremental check, of the cycles through an event just added at the
-	 * end of its thread: checked of every event of a graph, it misses
-	 * cycles. This is the generated whole-graph check of the export
-	 * (checkConsAcyclic3() is the acyclicity of arFull in IMMChecker.cpp),
-	 * until Kater emits it under the export's name */
-	auto arFull(const ExecutionGraph &g) const -> bool { return checkConsAcyclic3(g); }
 };
 
 #endif /* GENMC_IMM_FULL_CHECKER_HPP */
