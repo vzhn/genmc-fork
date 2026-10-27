@@ -13,7 +13,7 @@
 
 /*******************************************************************************
  * CAUTION: This file is generated automatically by Kater -- DO NOT EDIT.
- * From kat/imm-genmc.kat, Kater v0.4.0-vzhn.3-2-g2967209 (scripts/lkmm/kater-export.sh).
+ * From kat/imm-genmc.kat, Kater v0.4.0-vzhn.3-25-g0c366e6 (scripts/lkmm/kater-export.sh).
  *******************************************************************************/
 
 // NOLINTBEGIN
@@ -808,7 +808,7 @@ auto IMMChecker::checkCalc77(const EventLabel *lab) const
 	return visitCalc77(lab);
 }
 
-bool IMMChecker::visitCalc87Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
+bool IMMChecker::visitCalc90Iterative(std::vector<DFSWorklistEntry> &worklist, View &calcRes) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -898,7 +898,7 @@ bool IMMChecker::visitCalc87Iterative(std::vector<DFSWorklistEntry> &worklist, V
 	return true;
 }
 
-View IMMChecker::visitCalc87(const EventLabel *lab) const
+View IMMChecker::visitCalc90(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 	View calcRes;
@@ -910,15 +910,15 @@ View IMMChecker::visitCalc87(const EventLabel *lab) const
 		{2, lab},
 	};
 
-	visitCalc87Iterative(startStates, calcRes);
+	visitCalc90Iterative(startStates, calcRes);
 	return calcRes;
 }
 
-auto IMMChecker::checkCalc87(const EventLabel *lab) const
+auto IMMChecker::checkCalc90(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	return visitCalc87(lab);
+	return visitCalc90(lab);
 }
 
 void IMMChecker::calculateSaved([[maybe_unused]] EventLabel *lab) {}
@@ -940,7 +940,7 @@ void IMMChecker::calculateViews(EventLabel *lab)
 
 	{
 		lab->addView({});
-		lab->setView(std::move(checkCalc87(lab)), 2);
+		lab->setView(std::move(checkCalc90(lab)), 2);
 	}
 }
 
@@ -4394,6 +4394,19 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic2_0.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(0, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_0,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
 			for (auto &tmp : g.ctrl_preds(lab))
 				if (auto *pLab = &tmp; true) {
 					auto status = visitedConsAcyclic2_0.getStatus(
@@ -4432,62 +4445,38 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					return false; /* cycle detected */
 				}
 			}
-			for (auto &tmp : g.ctrl_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_1.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(1, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_1,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			for (auto &tmp : g.data_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_1.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(1, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_1,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.rfi_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_1.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(1, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_1,
-									   pLab->getStamp().get(),
-									   false)) {
-					return false; /* cycle detected */
-				}
-			}
 			if (auto pLab = g.rfi_pred(lab); pLab)
 				if (true && genmc::isa<WriteLabel>(pLab) &&
 				    ((genmc::isa<ReadLabel>(pLab) &&
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					worklist.emplace_back(2, pLab);
+					worklist.emplace_back(1, pLab);
 				}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isDependable()) {
+						auto status = visitedConsAcyclic2_16.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(16, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_16,
+								   pLab->getStamp().get(), true)) {
+							return false; /* cycle detected */
+						}
+					}
 			for (auto &tmp : g.ctrl_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && pLab->isDependable()) {
-						auto status = visitedConsAcyclic2_17.getStatus(
+						auto status = visitedConsAcyclic2_16.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(17, pLab);
+							worklist.emplace_back(16, pLab);
 						} else if (status == NodeStatus::entered &&
 							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_17,
+								   visitedConsAcyclic2_16,
 								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
@@ -4495,13 +4484,13 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			for (auto &tmp : g.data_preds(lab))
 				if (auto *pLab = &tmp; true)
 					if (true && pLab->isDependable()) {
-						auto status = visitedConsAcyclic2_17.getStatus(
+						auto status = visitedConsAcyclic2_16.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(17, pLab);
+							worklist.emplace_back(16, pLab);
 						} else if (status == NodeStatus::entered &&
 							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_17,
+								   visitedConsAcyclic2_16,
 								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
@@ -4511,81 +4500,6 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 		}
 		case 1: {
 			if (isFinishing) {
-				visitedConsAcyclic2Search.finish(false);
-				break;
-			}
-
-			auto status = visitedConsAcyclic2_1.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2Search.enter(visitedConsAcyclic2_1,
-								lab->getStamp().get(), false);
-				worklist.emplace_back(1, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_1,
-								   lab->getStamp().get(), false)) {
-				return false; /* cycle detected */
-			} else {
-				break; /* already explored */
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_0.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(0, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_0,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_1.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(1, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_1,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_1.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(1, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_1,
-									   pLab->getStamp().get(),
-									   false)) {
-					return false; /* cycle detected */
-				}
-			}
-			for (auto &tmp : g.addr_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && pLab->isDependable()) {
-						auto status = visitedConsAcyclic2_17.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(17, pLab);
-						} else if (status == NodeStatus::entered &&
-							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_17,
-								   pLab->getStamp().get(), true)) {
-							return false; /* cycle detected */
-						}
-					}
-
-			break;
-		}
-		case 2: {
-			if (isFinishing) {
 				break;
 			}
 
@@ -4603,23 +4517,6 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
 							   visitedConsAcyclic2_0,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_1.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(1, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_1,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -4631,17 +4528,64 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
 				    pLab->isDependable()) {
-					auto status = visitedConsAcyclic2_17.getStatus(
+					auto status = visitedConsAcyclic2_16.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
+						worklist.emplace_back(16, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
+							   visitedConsAcyclic2_16,
 							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
+
+			break;
+		}
+		case 2: {
+			if (isFinishing) {
+				visitedConsAcyclic2Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic2_2.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic2Search.enter(visitedConsAcyclic2_2,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(2, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_2,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_2.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(2, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_2,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_16.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(16, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_16,
+									   pLab->getStamp().get(),
+									   true)) {
+					return false; /* cycle detected */
+				}
+			}
 
 			break;
 		}
@@ -4677,18 +4621,45 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_17.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(17, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_17,
-									   pLab->getStamp().get(),
-									   true)) {
-					return false; /* cycle detected */
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_16,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
 				}
-			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_16,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic2_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_16,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
 
 			break;
 		}
@@ -4712,7 +4683,7 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
+			if (auto pLab = g.poloc_imm_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic2_4.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
@@ -4724,28 +4695,16 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_17.getStatus(
+			if (auto pLab = g.poloc_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_16.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
+						worklist.emplace_back(16, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
-							   pLab->getStamp().get(), true)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire()) {
-					auto status = visitedConsAcyclic2_17.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
+							   visitedConsAcyclic2_16,
 							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
@@ -4773,7 +4732,20 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.poloc_imm_pred(lab); pLab) {
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic2_5.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(5, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_5,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic2_5.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
@@ -4785,16 +4757,94 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.poloc_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<WriteLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_17.getStatus(
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_5.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(5, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_5,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_5.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(5, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_5,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isAtLeastAcquire()) {
+						auto status = visitedConsAcyclic2_7.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(7, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_7,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic2_7.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
+						worklist.emplace_back(7, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
+							   visitedConsAcyclic2_7,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_9.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(9, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_9,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<ThreadJoinLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_9.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(9, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_9,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isSC() && genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_16,
 							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
@@ -4822,15 +4872,30 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_6.getStatus(
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_5.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(5, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_6,
+							   visitedConsAcyclic2_5,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadCreateLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_5.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(5, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_5,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -4847,94 +4912,44 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.tc_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_6.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(6, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_6,
-									   pLab->getStamp().get(),
-									   false)) {
-					return false; /* cycle detected */
-				}
-			}
-			if (auto pLab = g.tj_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_6.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(6, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_6,
-									   pLab->getStamp().get(),
-									   false)) {
-					return false; /* cycle detected */
-				}
-			}
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && pLab->isAtLeastAcquire()) {
-						auto status = visitedConsAcyclic2_8.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(8, pLab);
-						} else if (status == NodeStatus::entered &&
-							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_8,
-								   pLab->getStamp().get(), false)) {
-							return false; /* cycle detected */
-						}
-					}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire()) {
-					auto status = visitedConsAcyclic2_8.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_8,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() &&
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
 				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_10.getStatus(
+					auto status = visitedConsAcyclic2_7.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(10, pLab);
+						worklist.emplace_back(7, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_10,
+							   visitedConsAcyclic2_7,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() &&
-				    genmc::isa<ThreadJoinLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_10.getStatus(
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_9.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(10, pLab);
+						worklist.emplace_back(9, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_10,
+							   visitedConsAcyclic2_9,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isSC() && genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_17.getStatus(
+				if (true && pLab->isAtLeastRelease() && pLab->isSC() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_16.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
+						worklist.emplace_back(16, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
+							   visitedConsAcyclic2_16,
 							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
@@ -4962,34 +4977,101 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_6.getStatus(
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
+					auto status = visitedConsAcyclic2_5.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(5, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_6,
+							   visitedConsAcyclic2_5,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<ThreadCreateLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_6.getStatus(
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_6.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(6, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_6,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease()) {
+					auto status = visitedConsAcyclic2_7.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(7, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_6,
+							   visitedConsAcyclic2_7,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					worklist.emplace_back(8, pLab);
+				}
+
+			break;
+		}
+		case 8: {
+			if (isFinishing) {
+				break;
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic2_7.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(7, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_7,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 9: {
+			if (isFinishing) {
+				visitedConsAcyclic2Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic2_9.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic2Search.enter(visitedConsAcyclic2_9,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(9, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_9,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic2_7.getStatus(pLab->getStamp().get());
@@ -5002,143 +5084,18 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_8.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_8,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_10.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(10, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_10,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() && pLab->isSC() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_17.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
-							   pLab->getStamp().get(), true)) {
-						return false; /* cycle detected */
-					}
-				}
-
-			break;
-		}
-		case 8: {
-			if (isFinishing) {
-				visitedConsAcyclic2Search.finish(false);
-				break;
-			}
-
-			auto status = visitedConsAcyclic2_8.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2Search.enter(visitedConsAcyclic2_8,
-								lab->getStamp().get(), false);
-				worklist.emplace_back(8, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_8,
-								   lab->getStamp().get(), false)) {
-				return false; /* cycle detected */
-			} else {
-				break; /* already explored */
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease()) {
-					auto status = visitedConsAcyclic2_6.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_6,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.rf_pred(lab); pLab) {
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_7.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_9.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(7, pLab);
+					worklist.emplace_back(9, pLab);
 				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_7,
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_9,
 									   pLab->getStamp().get(),
 									   false)) {
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease()) {
-					auto status = visitedConsAcyclic2_8.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_8,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && genmc::isa<WriteLabel>(pLab) &&
-				    ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					worklist.emplace_back(9, pLab);
-				}
-
-			break;
-		}
-		case 9: {
-			if (isFinishing) {
-				break;
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && genmc::isa<ReadLabel>(pLab) &&
-				    ((genmc::isa<ReadLabel>(pLab) &&
-				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-				     (genmc::isa<WriteLabel>(pLab) &&
-				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_8.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_8,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
 
 			break;
 		}
@@ -5162,19 +5119,109 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
+			for (auto &tmp : g.fr_imm_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic2_5.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(5, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_5,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.co_imm_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_8.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_5.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(8, pLab);
+					worklist.emplace_back(5, pLab);
 				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_8,
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_5,
 									   pLab->getStamp().get(),
 									   false)) {
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_5.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(5, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_5,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			for (auto &tmp : g.fr_imm_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isAtLeastAcquire()) {
+						auto status = visitedConsAcyclic2_7.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(7, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_7,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (auto pLab = g.co_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic2_7.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(7, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_7,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic2_7.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(7, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_7,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.fr_imm_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic2_10.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(10, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_10,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.co_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_10.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(10, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_10,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.rf_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic2_10.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
@@ -5209,84 +5256,56 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.fr_imm_preds(lab))
+			for (auto &tmp : g.lin_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_6.getStatus(
+					auto status = visitedConsAcyclic2_10.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(6, pLab);
+						worklist.emplace_back(10, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_6,
+							   visitedConsAcyclic2_10,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.co_imm_pred(lab); pLab) {
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_6.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_10.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(6, pLab);
+					worklist.emplace_back(10, pLab);
 				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_6,
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_10,
 									   pLab->getStamp().get(),
 									   false)) {
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.rf_pred(lab); pLab) {
+			if (auto pLab = g.tc_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_6.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_10.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(6, pLab);
+					worklist.emplace_back(10, pLab);
 				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_6,
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_10,
 									   pLab->getStamp().get(),
 									   false)) {
 					return false; /* cycle detected */
 				}
 			}
-			for (auto &tmp : g.fr_imm_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && pLab->isAtLeastAcquire()) {
-						auto status = visitedConsAcyclic2_8.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(8, pLab);
-						} else if (status == NodeStatus::entered &&
-							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_8,
-								   pLab->getStamp().get(), false)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (auto pLab = g.co_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire()) {
-					auto status = visitedConsAcyclic2_8.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_8,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_10.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(10, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_10,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
 				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire()) {
-					auto status = visitedConsAcyclic2_8.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(8, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_8,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			for (auto &tmp : g.fr_imm_preds(lab))
+			}
+			for (auto &tmp : g.lin_preds(lab))
 				if (auto *pLab = &tmp; true) {
 					auto status = visitedConsAcyclic2_11.getStatus(
 						pLab->getStamp().get());
@@ -5299,7 +5318,7 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.co_imm_pred(lab); pLab) {
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic2_11.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
@@ -5311,7 +5330,7 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.rf_pred(lab); pLab) {
+			if (auto pLab = g.tc_pred(lab); pLab) {
 				auto status =
 					visitedConsAcyclic2_11.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
@@ -5323,6 +5342,73 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					return false; /* cycle detected */
 				}
 			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic2_11.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(11, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_11,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isAtLeastAcquire()) {
+						auto status = visitedConsAcyclic2_13.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(13, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic2Search.reach(
+								   visitedConsAcyclic2_13,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic2_13.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(13, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_13,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_15.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(15, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_15,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<ThreadJoinLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_15.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(15, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_15,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
 
 			break;
 		}
@@ -5346,8 +5432,51 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true) {
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_10.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(10, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_10,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadCreateLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_10.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(10, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_10,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_11.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(11, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_11,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadCreateLabel>(pLab)) {
 					auto status = visitedConsAcyclic2_11.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
@@ -5361,55 +5490,6 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_11.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(11, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_11,
-									   pLab->getStamp().get(),
-									   false)) {
-					return false; /* cycle detected */
-				}
-			}
-			if (auto pLab = g.tc_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_11.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(11, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_11,
-									   pLab->getStamp().get(),
-									   false)) {
-					return false; /* cycle detected */
-				}
-			}
-			if (auto pLab = g.tj_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_11.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(11, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_11,
-									   pLab->getStamp().get(),
-									   false)) {
-					return false; /* cycle detected */
-				}
-			}
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_12.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(12, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_12,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
 					visitedConsAcyclic2_12.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
 					worklist.emplace_back(12, pLab);
@@ -5420,81 +5500,30 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					return false; /* cycle detected */
 				}
 			}
-			if (auto pLab = g.tc_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_12.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(12, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_12,
-									   pLab->getStamp().get(),
-									   false)) {
-					return false; /* cycle detected */
-				}
-			}
-			if (auto pLab = g.tj_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_12.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(12, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_12,
-									   pLab->getStamp().get(),
-									   false)) {
-					return false; /* cycle detected */
-				}
-			}
-			for (auto &tmp : g.lin_preds(lab))
-				if (auto *pLab = &tmp; true)
-					if (true && pLab->isAtLeastAcquire()) {
-						auto status = visitedConsAcyclic2_14.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(14, pLab);
-						} else if (status == NodeStatus::entered &&
-							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_14,
-								   pLab->getStamp().get(), false)) {
-							return false; /* cycle detected */
-						}
-					}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire()) {
-					auto status = visitedConsAcyclic2_14.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(14, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_14,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() &&
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
 				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_16.getStatus(
+					auto status = visitedConsAcyclic2_13.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(16, pLab);
+						worklist.emplace_back(13, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_16,
+							   visitedConsAcyclic2_13,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() &&
-				    genmc::isa<ThreadJoinLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_16.getStatus(
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_15.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(16, pLab);
+						worklist.emplace_back(15, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_16,
+							   visitedConsAcyclic2_15,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -5522,125 +5551,19 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 
 			[[maybe_unused]] auto &g = *lab->getParent();
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_11.getStatus(
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
+					auto status = visitedConsAcyclic2_10.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(11, pLab);
+						worklist.emplace_back(10, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_11,
+							   visitedConsAcyclic2_10,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<ThreadCreateLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_11.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(11, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_11,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_12.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(12, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_12,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease() &&
-				    genmc::isa<ThreadCreateLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_12.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(12, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_12,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab) {
-				auto status =
-					visitedConsAcyclic2_13.getStatus(pLab->getStamp().get());
-				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(13, pLab);
-				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_13,
-									   pLab->getStamp().get(),
-									   false)) {
-					return false; /* cycle detected */
-				}
-			}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_14.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(14, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_14,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.po_imm_pred(lab); pLab)
-				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
-				    genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_16.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(16, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_16,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-
-			break;
-		}
-		case 14: {
-			if (isFinishing) {
-				visitedConsAcyclic2Search.finish(false);
-				break;
-			}
-
-			auto status = visitedConsAcyclic2_14.getStatus(lab->getStamp().get());
-			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2Search.enter(visitedConsAcyclic2_14,
-								lab->getStamp().get(), false);
-				worklist.emplace_back(14, lab, true /* isFinishing */);
-			} else if (status == NodeStatus::entered &&
-				   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_14,
-								   lab->getStamp().get(), false)) {
-				return false; /* cycle detected */
-			} else {
-				break; /* already explored */
-			}
-
-			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.rf_pred(lab); pLab)
 				if (true && pLab->isAtLeastRelease()) {
 					auto status = visitedConsAcyclic2_11.getStatus(
@@ -5650,30 +5573,17 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
 							   visitedConsAcyclic2_11,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
-			if (auto pLab = g.rf_pred(lab); pLab)
-				if (true && pLab->isAtLeastRelease()) {
-					auto status = visitedConsAcyclic2_12.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(12, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_12,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.rf_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_13.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_12.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(13, pLab);
+					worklist.emplace_back(12, pLab);
 				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_13,
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_12,
 									   pLab->getStamp().get(),
 									   false)) {
 					return false; /* cycle detected */
@@ -5681,13 +5591,13 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 			if (auto pLab = g.rf_pred(lab); pLab)
 				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease()) {
-					auto status = visitedConsAcyclic2_14.getStatus(
+					auto status = visitedConsAcyclic2_13.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(14, pLab);
+						worklist.emplace_back(13, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_14,
+							   visitedConsAcyclic2_13,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -5698,12 +5608,12 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					worklist.emplace_back(15, pLab);
+					worklist.emplace_back(14, pLab);
 				}
 
 			break;
 		}
-		case 15: {
+		case 14: {
 			if (isFinishing) {
 				break;
 			}
@@ -5715,13 +5625,13 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 				     (genmc::isa<WriteLabel>(pLab) &&
 				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-					auto status = visitedConsAcyclic2_14.getStatus(
+					auto status = visitedConsAcyclic2_13.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(14, pLab);
+						worklist.emplace_back(13, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_14,
+							   visitedConsAcyclic2_13,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -5729,19 +5639,19 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 
 			break;
 		}
-		case 16: {
+		case 15: {
 			if (isFinishing) {
 				visitedConsAcyclic2Search.finish(false);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_16.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic2_15.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2Search.enter(visitedConsAcyclic2_16,
+				visitedConsAcyclic2Search.enter(visitedConsAcyclic2_15,
 								lab->getStamp().get(), false);
-				worklist.emplace_back(16, lab, true /* isFinishing */);
+				worklist.emplace_back(15, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_16,
+				   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_15,
 								   lab->getStamp().get(), false)) {
 				return false; /* cycle detected */
 			} else {
@@ -5751,11 +5661,11 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			[[maybe_unused]] auto &g = *lab->getParent();
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_14.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_13.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(14, pLab);
+					worklist.emplace_back(13, pLab);
 				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_14,
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_13,
 									   pLab->getStamp().get(),
 									   false)) {
 					return false; /* cycle detected */
@@ -5763,11 +5673,11 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_16.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_15.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(16, pLab);
+					worklist.emplace_back(15, pLab);
 				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_16,
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_15,
 									   pLab->getStamp().get(),
 									   false)) {
 					return false; /* cycle detected */
@@ -5776,19 +5686,19 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 
 			break;
 		}
-		case 17: {
+		case 16: {
 			if (isFinishing) {
 				visitedConsAcyclic2Search.finish(true);
 				break;
 			}
 
-			auto status = visitedConsAcyclic2_17.getStatus(lab->getStamp().get());
+			auto status = visitedConsAcyclic2_16.getStatus(lab->getStamp().get());
 			if (status == NodeStatus::unseen) {
-				visitedConsAcyclic2Search.enter(visitedConsAcyclic2_17,
+				visitedConsAcyclic2Search.enter(visitedConsAcyclic2_16,
 								lab->getStamp().get(), true);
-				worklist.emplace_back(17, lab, true /* isFinishing */);
+				worklist.emplace_back(16, lab, true /* isFinishing */);
 			} else if (status == NodeStatus::entered &&
-				   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_17,
+				   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_16,
 								   lab->getStamp().get(), true)) {
 				return false; /* cycle detected */
 			} else {
@@ -5860,116 +5770,52 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 							return false; /* cycle detected */
 						}
 					}
-			if (true && genmc::isa<WriteLabel>(lab) &&
-			    ((genmc::isa<ReadLabel>(lab) &&
-			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
-			     (genmc::isa<WriteLabel>(lab) &&
-			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
-				if (auto pLab = g.po_imm_pred(lab); pLab)
-					if (true && genmc::isa<ReadLabel>(pLab) &&
-					    ((genmc::isa<ReadLabel>(pLab) &&
-					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-					     (genmc::isa<WriteLabel>(pLab) &&
-					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-						auto status = visitedConsAcyclic2_1.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(1, pLab);
-						} else if (status == NodeStatus::entered &&
-							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_1,
-								   pLab->getStamp().get(), false)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.addr_preds(lab))
-					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic2_1.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(1, pLab);
-						} else if (status == NodeStatus::entered &&
-							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_1,
-								   pLab->getStamp().get(), false)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.ctrl_preds(lab))
-					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic2_1.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(1, pLab);
-						} else if (status == NodeStatus::entered &&
-							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_1,
-								   pLab->getStamp().get(), false)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<WriteLabel>(lab))
-				for (auto &tmp : g.data_preds(lab))
-					if (auto *pLab = &tmp; true) {
-						auto status = visitedConsAcyclic2_1.getStatus(
-							pLab->getStamp().get());
-						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(1, pLab);
-						} else if (status == NodeStatus::entered &&
-							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_1,
-								   pLab->getStamp().get(), false)) {
-							return false; /* cycle detected */
-						}
-					}
-			if (true && genmc::isa<WriteLabel>(lab))
+			if (true && genmc::isa<FenceLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_1.getStatus(
+					auto status = visitedConsAcyclic2_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(1, pLab);
+						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_1,
+							   visitedConsAcyclic2_2,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
-			if (true && genmc::isa<FenceLabel>(lab))
+			if (true && genmc::isa<ThreadJoinLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_3.getStatus(
+					auto status = visitedConsAcyclic2_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(3, pLab);
+						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_3,
+							   visitedConsAcyclic2_2,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (true && lab->isAtLeastRelease())
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_3.getStatus(
+					auto status = visitedConsAcyclic2_2.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(3, pLab);
+						worklist.emplace_back(2, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_3,
+							   visitedConsAcyclic2_2,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_4.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_3.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(4, pLab);
+					worklist.emplace_back(3, pLab);
 				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_4,
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_3,
 									   pLab->getStamp().get(),
 									   false)) {
 					return false; /* cycle detected */
@@ -5977,13 +5823,26 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 			if (true && genmc::isa<WriteLabel>(lab))
 				if (auto pLab = g.poloc_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_5.getStatus(
+					auto status = visitedConsAcyclic2_4.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(5, pLab);
+						worklist.emplace_back(4, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_5,
+							   visitedConsAcyclic2_4,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && lab->isSC() && genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic2_10.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(10, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_10,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -6001,29 +5860,16 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 						return false; /* cycle detected */
 					}
 				}
-			if (true && lab->isSC() && genmc::isa<FenceLabel>(lab))
-				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_12.getStatus(
-						pLab->getStamp().get());
-					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(12, pLab);
-					} else if (status == NodeStatus::entered &&
-						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_12,
-							   pLab->getStamp().get(), false)) {
-						return false; /* cycle detected */
-					}
-				}
 			if (true && lab->isAtLeastAcquire() && lab->isSC() &&
 			    genmc::isa<FenceLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_14.getStatus(
+					auto status = visitedConsAcyclic2_13.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(14, pLab);
+						worklist.emplace_back(13, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_14,
+							   visitedConsAcyclic2_13,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -6031,13 +5877,13 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			if (true && lab->isSC() && genmc::isa<FenceLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && pLab->isAtLeastAcquire()) {
-						auto status = visitedConsAcyclic2_14.getStatus(
+						auto status = visitedConsAcyclic2_13.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(14, pLab);
+							worklist.emplace_back(13, pLab);
 						} else if (status == NodeStatus::entered &&
 							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_14,
+								   visitedConsAcyclic2_13,
 								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
@@ -6045,13 +5891,13 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			if (true && lab->isAtLeastAcquire() && lab->isSC() &&
 			    genmc::isa<FenceLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_16.getStatus(
+					auto status = visitedConsAcyclic2_15.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(16, pLab);
+						worklist.emplace_back(15, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_16,
+							   visitedConsAcyclic2_15,
 							   pLab->getStamp().get(), false)) {
 						return false; /* cycle detected */
 					}
@@ -6060,13 +5906,13 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && pLab->isAtLeastAcquire() &&
 					    genmc::isa<FenceLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_16.getStatus(
+						auto status = visitedConsAcyclic2_15.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(16, pLab);
+							worklist.emplace_back(15, pLab);
 						} else if (status == NodeStatus::entered &&
 							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_16,
+								   visitedConsAcyclic2_15,
 								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
@@ -6075,63 +5921,76 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 				if (auto pLab = g.po_imm_pred(lab); pLab)
 					if (true && pLab->isAtLeastAcquire() &&
 					    genmc::isa<ThreadJoinLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_16.getStatus(
+						auto status = visitedConsAcyclic2_15.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(16, pLab);
+							worklist.emplace_back(15, pLab);
 						} else if (status == NodeStatus::entered &&
 							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_16,
+								   visitedConsAcyclic2_15,
 								   pLab->getStamp().get(), false)) {
 							return false; /* cycle detected */
 						}
 					}
 			for (auto &tmp : g.detour_preds(lab))
 				if (auto *pLab = &tmp; true) {
-					auto status = visitedConsAcyclic2_17.getStatus(
+					auto status = visitedConsAcyclic2_16.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
+						worklist.emplace_back(16, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
+							   visitedConsAcyclic2_16,
 							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && genmc::isa<FenceLabel>(pLab)) {
-					auto status = visitedConsAcyclic2_17.getStatus(
+					auto status = visitedConsAcyclic2_16.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
+						worklist.emplace_back(16, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
+							   visitedConsAcyclic2_16,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
+					auto status = visitedConsAcyclic2_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_16,
 							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.po_imm_pred(lab); pLab)
 				if (true && pLab->isAtLeastAcquire()) {
-					auto status = visitedConsAcyclic2_17.getStatus(
+					auto status = visitedConsAcyclic2_16.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
+						worklist.emplace_back(16, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
+							   visitedConsAcyclic2_16,
 							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
 				}
 			if (auto pLab = g.rfe_pred(lab); pLab) {
 				auto status =
-					visitedConsAcyclic2_17.getStatus(pLab->getStamp().get());
+					visitedConsAcyclic2_16.getStatus(pLab->getStamp().get());
 				if (status == NodeStatus::unseen) {
-					worklist.emplace_back(17, pLab);
+					worklist.emplace_back(16, pLab);
 				} else if (status == NodeStatus::entered &&
-					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_17,
+					   visitedConsAcyclic2Search.reach(visitedConsAcyclic2_16,
 									   pLab->getStamp().get(),
 									   true)) {
 					return false; /* cycle detected */
@@ -6139,13 +5998,26 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 			}
 			if (true && genmc::isa<FenceLabel>(lab))
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_17.getStatus(
+					auto status = visitedConsAcyclic2_16.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
+						worklist.emplace_back(16, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
+							   visitedConsAcyclic2_16,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && genmc::isa<ThreadJoinLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic2_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic2Search.reach(
+							   visitedConsAcyclic2_16,
 							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
@@ -6162,13 +6034,13 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					     (genmc::isa<WriteLabel>(pLab) &&
 					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
 					    pLab->isDependable()) {
-						auto status = visitedConsAcyclic2_17.getStatus(
+						auto status = visitedConsAcyclic2_16.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(17, pLab);
+							worklist.emplace_back(16, pLab);
 						} else if (status == NodeStatus::entered &&
 							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_17,
+								   visitedConsAcyclic2_16,
 								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
@@ -6178,13 +6050,13 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					if (auto *pLab = &tmp; true)
 						if (true && pLab->isDependable()) {
 							auto status =
-								visitedConsAcyclic2_17.getStatus(
+								visitedConsAcyclic2_16.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(17, pLab);
+								worklist.emplace_back(16, pLab);
 							} else if (status == NodeStatus::entered &&
 								   visitedConsAcyclic2Search.reach(
-									   visitedConsAcyclic2_17,
+									   visitedConsAcyclic2_16,
 									   pLab->getStamp().get(),
 									   true)) {
 								return false; /* cycle detected */
@@ -6195,13 +6067,13 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					if (auto *pLab = &tmp; true)
 						if (true && pLab->isDependable()) {
 							auto status =
-								visitedConsAcyclic2_17.getStatus(
+								visitedConsAcyclic2_16.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(17, pLab);
+								worklist.emplace_back(16, pLab);
 							} else if (status == NodeStatus::entered &&
 								   visitedConsAcyclic2Search.reach(
-									   visitedConsAcyclic2_17,
+									   visitedConsAcyclic2_16,
 									   pLab->getStamp().get(),
 									   true)) {
 								return false; /* cycle detected */
@@ -6212,13 +6084,13 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 					if (auto *pLab = &tmp; true)
 						if (true && pLab->isDependable()) {
 							auto status =
-								visitedConsAcyclic2_17.getStatus(
+								visitedConsAcyclic2_16.getStatus(
 									pLab->getStamp().get());
 							if (status == NodeStatus::unseen) {
-								worklist.emplace_back(17, pLab);
+								worklist.emplace_back(16, pLab);
 							} else if (status == NodeStatus::entered &&
 								   visitedConsAcyclic2Search.reach(
-									   visitedConsAcyclic2_17,
+									   visitedConsAcyclic2_16,
 									   pLab->getStamp().get(),
 									   true)) {
 								return false; /* cycle detected */
@@ -6228,26 +6100,26 @@ bool IMMChecker::visitConsAcyclic2Iterative(std::vector<DFSWorklistEntry> &workl
 				if (auto pLab = g.poloc_imm_pred(lab); pLab)
 					if (true && pLab->isAtLeastRelease() &&
 					    genmc::isa<WriteLabel>(pLab)) {
-						auto status = visitedConsAcyclic2_17.getStatus(
+						auto status = visitedConsAcyclic2_16.getStatus(
 							pLab->getStamp().get());
 						if (status == NodeStatus::unseen) {
-							worklist.emplace_back(17, pLab);
+							worklist.emplace_back(16, pLab);
 						} else if (status == NodeStatus::entered &&
 							   visitedConsAcyclic2Search.reach(
-								   visitedConsAcyclic2_17,
+								   visitedConsAcyclic2_16,
 								   pLab->getStamp().get(), true)) {
 							return false; /* cycle detected */
 						}
 					}
 			if (true && lab->isAtLeastRelease())
 				if (auto pLab = g.po_imm_pred(lab); pLab) {
-					auto status = visitedConsAcyclic2_17.getStatus(
+					auto status = visitedConsAcyclic2_16.getStatus(
 						pLab->getStamp().get());
 					if (status == NodeStatus::unseen) {
-						worklist.emplace_back(17, pLab);
+						worklist.emplace_back(16, pLab);
 					} else if (status == NodeStatus::entered &&
 						   visitedConsAcyclic2Search.reach(
-							   visitedConsAcyclic2_17,
+							   visitedConsAcyclic2_16,
 							   pLab->getStamp().get(), true)) {
 						return false; /* cycle detected */
 					}
@@ -6268,24 +6140,23 @@ bool IMMChecker::visitConsAcyclic2(const EventLabel *lab) const
 
 	visitedConsAcyclic2Search.reset();
 	visitedConsAcyclic2_0.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic2_1.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_2.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_3.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_4.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_5.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_6.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_7.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic2_8.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_9.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_10.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_11.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_12.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_13.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic2_14.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_15.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_16.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic2_17.maybeClearResize(g.getMaxStamp().get() + 1);
 
 	/* States we need to explore from using DFS */
 	std::vector<DFSWorklistEntry> startStates = {
-		{14, lab}, {12, lab}, {11, lab}, {8, lab}, {6, lab},
+		{13, lab}, {11, lab}, {10, lab}, {7, lab}, {5, lab},
 	};
 
 	return visitConsAcyclic2Iterative(startStates);
@@ -6295,25 +6166,24 @@ bool IMMChecker::visitConsAcyclic2Full(const ExecutionGraph &g) const
 {
 	visitedConsAcyclic2Search.reset();
 	visitedConsAcyclic2_0.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic2_1.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_2.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_3.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_4.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_5.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_6.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_7.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic2_8.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_9.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_10.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_11.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_12.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_13.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic2_14.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic2_15.maybeClearResize(g.getMaxStamp().get() + 1);
 	visitedConsAcyclic2_16.maybeClearResize(g.getMaxStamp().get() + 1);
-	visitedConsAcyclic2_17.maybeClearResize(g.getMaxStamp().get() + 1);
 
 	auto exploreLab = [&](auto &lab) {
 		/* Explore from all accepting states using DFS */
 		std::vector<DFSWorklistEntry> startStates = {
-			{17, &lab},
+			{16, &lab},
 		};
 
 		return visitConsAcyclic2Iterative(startStates);
@@ -6334,9 +6204,2027 @@ bool IMMChecker::checkConsAcyclic2(const ExecutionGraph &g) const
 	return visitConsAcyclic2Full(g);
 }
 
-bool IMMChecker::visitError3([[maybe_unused]] const EventLabel *lab) const { return false; }
+bool IMMChecker::visitConsAcyclic3Iterative(std::vector<DFSWorklistEntry> &worklist) const
+{
+	while (!worklist.empty()) {
+		auto [stateId, lab, isFinishing] = worklist.back();
+		worklist.pop_back();
+		switch (stateId) {
+		case 0: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
 
-bool IMMChecker::visitLHSUnlessError3Iterative(std::vector<DFSWorklistEntry> &worklist,
+			auto status = visitedConsAcyclic3_0.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_0,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(0, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_0,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			for (auto &tmp : g.ctrl_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_0.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(0, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_0,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_0.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(0, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_0,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rfi_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_0.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(0, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_0,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			for (auto &tmp : g.ctrl_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_1.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(1, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_1,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_1.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(1, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_1,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rfi_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_1.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(1, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_1,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.rfi_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					worklist.emplace_back(2, pLab);
+				}
+			for (auto &tmp : g.ctrl_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isDependable()) {
+						auto status = visitedConsAcyclic3_17.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(17, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_17,
+								   pLab->getStamp().get(), true)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.data_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isDependable()) {
+						auto status = visitedConsAcyclic3_17.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(17, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_17,
+								   pLab->getStamp().get(), true)) {
+							return false; /* cycle detected */
+						}
+					}
+
+			break;
+		}
+		case 1: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_1.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_1,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(1, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_1,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_0.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(0, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_0,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_1.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(1, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_1,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_1.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(1, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_1,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			for (auto &tmp : g.addr_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isDependable()) {
+						auto status = visitedConsAcyclic3_17.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(17, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_17,
+								   pLab->getStamp().get(), true)) {
+							return false; /* cycle detected */
+						}
+					}
+
+			break;
+		}
+		case 2: {
+			if (isFinishing) {
+				break;
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic3_0.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(0, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_0,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic3_1.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(1, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_1,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
+				    pLab->isDependable()) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 3: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_3.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_3,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(3, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_3,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_3.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(3, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_3,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_17.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(17, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_17,
+									   pLab->getStamp().get(),
+									   true)) {
+					return false; /* cycle detected */
+				}
+			}
+
+			break;
+		}
+		case 4: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_4.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_4,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(4, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_4,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_4.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(4, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_4,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 5: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_5.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_5,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(5, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_5,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.poloc_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_5.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(5, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_5,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.poloc_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<WriteLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 6: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_6.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_6,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(6, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_6,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_6,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_6.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(6, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_6,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_6.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(6, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_6,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_6.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(6, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_6,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isAtLeastAcquire()) {
+						auto status = visitedConsAcyclic3_8.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(8, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_8,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic3_8.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(8, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_8,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_10.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(10, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_10,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<ThreadJoinLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_10.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(10, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_10,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isSC() && genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 7: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_7.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_7,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(7, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_7,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_6,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadCreateLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_6,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_7.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(7, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_7,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_8.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(8, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_8,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_10.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(10, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_10,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() && pLab->isSC() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 8: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_8.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_8,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(8, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_8,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
+					auto status = visitedConsAcyclic3_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_6,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_7.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(7, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_7,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease()) {
+					auto status = visitedConsAcyclic3_8.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(8, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_8,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					worklist.emplace_back(9, pLab);
+				}
+
+			break;
+		}
+		case 9: {
+			if (isFinishing) {
+				break;
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic3_8.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(8, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_8,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 10: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_10.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_10,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(10, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_10,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_8.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(8, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_8,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_10.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(10, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_10,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+
+			break;
+		}
+		case 11: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_11.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_11,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(11, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_11,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			for (auto &tmp : g.fr_imm_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_6.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(6, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_6,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.co_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_6.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(6, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_6,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_6.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(6, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_6,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			for (auto &tmp : g.fr_imm_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isAtLeastAcquire()) {
+						auto status = visitedConsAcyclic3_8.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(8, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_8,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (auto pLab = g.co_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic3_8.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(8, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_8,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic3_8.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(8, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_8,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			for (auto &tmp : g.fr_imm_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_11.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(11, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_11,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.co_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_11.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(11, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_11,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_11.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(11, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_11,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+
+			break;
+		}
+		case 12: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_12.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_12,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(12, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_12,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_11.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(11, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_11,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_11.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(11, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_11,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_11.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(11, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_11,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_11.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(11, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_11,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_12.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(12, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_12,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_12.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(12, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_12,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.tc_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_12.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(12, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_12,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.tj_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_12.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(12, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_12,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			for (auto &tmp : g.lin_preds(lab))
+				if (auto *pLab = &tmp; true)
+					if (true && pLab->isAtLeastAcquire()) {
+						auto status = visitedConsAcyclic3_14.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(14, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_14,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic3_14.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(14, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_14,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_16,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() &&
+				    genmc::isa<ThreadJoinLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_16,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 13: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_13.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_13,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(13, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_13,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_11.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(11, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_11,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadCreateLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_11.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(11, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_11,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_12.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(12, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_12,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease() &&
+				    genmc::isa<ThreadCreateLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_12.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(12, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_12,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_13.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(13, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_13,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_14.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(14, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_14,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease() &&
+				    genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_16,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 14: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_14.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_14,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(14, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_14,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
+					auto status = visitedConsAcyclic3_11.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(11, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_11,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastRelease()) {
+					auto status = visitedConsAcyclic3_12.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(12, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_12,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rf_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_13.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(13, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_13,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire() && pLab->isAtLeastRelease()) {
+					auto status = visitedConsAcyclic3_14.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(14, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_14,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rf_pred(lab); pLab)
+				if (true && genmc::isa<WriteLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					worklist.emplace_back(15, pLab);
+				}
+
+			break;
+		}
+		case 15: {
+			if (isFinishing) {
+				break;
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ReadLabel>(pLab) &&
+				    ((genmc::isa<ReadLabel>(pLab) &&
+				      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+				     (genmc::isa<WriteLabel>(pLab) &&
+				      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+					auto status = visitedConsAcyclic3_14.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(14, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_14,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		case 16: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(false);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_16.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_16,
+								lab->getStamp().get(), false);
+				worklist.emplace_back(16, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_16,
+								   lab->getStamp().get(), false)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_14.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(14, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_14,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_16.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(16, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_16,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+
+			break;
+		}
+		case 17: {
+			if (isFinishing) {
+				visitedConsAcyclic3Search.finish(true);
+				break;
+			}
+
+			auto status = visitedConsAcyclic3_17.getStatus(lab->getStamp().get());
+			if (status == NodeStatus::unseen) {
+				visitedConsAcyclic3Search.enter(visitedConsAcyclic3_17,
+								lab->getStamp().get(), true);
+				worklist.emplace_back(17, lab, true /* isFinishing */);
+			} else if (status == NodeStatus::entered &&
+				   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_17,
+								   lab->getStamp().get(), true)) {
+				return false; /* cycle detected */
+			} else {
+				break; /* already explored */
+			}
+
+			[[maybe_unused]] auto &g = *lab->getParent();
+			if (true && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic3_0.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(0, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_0,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.addr_preds(lab))
+					if (auto *pLab = &tmp; true) {
+						auto status = visitedConsAcyclic3_0.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(0, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_0,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.ctrl_preds(lab))
+					if (auto *pLab = &tmp; true) {
+						auto status = visitedConsAcyclic3_0.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(0, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_0,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.data_preds(lab))
+					if (auto *pLab = &tmp; true) {
+						auto status = visitedConsAcyclic3_0.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(0, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_0,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
+						auto status = visitedConsAcyclic3_1.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(1, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_1,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.addr_preds(lab))
+					if (auto *pLab = &tmp; true) {
+						auto status = visitedConsAcyclic3_1.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(1, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_1,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.ctrl_preds(lab))
+					if (auto *pLab = &tmp; true) {
+						auto status = visitedConsAcyclic3_1.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(1, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_1,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.data_preds(lab))
+					if (auto *pLab = &tmp; true) {
+						auto status = visitedConsAcyclic3_1.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(1, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_1,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_1.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(1, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_1,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_3.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(3, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_3,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && genmc::isa<ThreadJoinLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_3.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(3, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_3,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && lab->isAtLeastRelease())
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_3.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(3, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_3,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_4.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(4, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_4,
+									   pLab->getStamp().get(),
+									   false)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (true && genmc::isa<WriteLabel>(lab))
+				if (auto pLab = g.poloc_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_5.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(5, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_5,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && lab->isSC() && genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_11.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(11, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_11,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && lab->isSC() && genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_12.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(12, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_12,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && lab->isAtLeastAcquire() && lab->isSC() &&
+			    genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_14.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(14, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_14,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && lab->isSC() && genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && pLab->isAtLeastAcquire()) {
+						auto status = visitedConsAcyclic3_14.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(14, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_14,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && lab->isAtLeastAcquire() && lab->isSC() &&
+			    genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_16.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(16, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_16,
+							   pLab->getStamp().get(), false)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && lab->isSC() && genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && pLab->isAtLeastAcquire() &&
+					    genmc::isa<FenceLabel>(pLab)) {
+						auto status = visitedConsAcyclic3_16.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(16, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_16,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && lab->isSC() && genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && pLab->isAtLeastAcquire() &&
+					    genmc::isa<ThreadJoinLabel>(pLab)) {
+						auto status = visitedConsAcyclic3_16.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(16, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_16,
+								   pLab->getStamp().get(), false)) {
+							return false; /* cycle detected */
+						}
+					}
+			for (auto &tmp : g.detour_preds(lab))
+				if (auto *pLab = &tmp; true) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<FenceLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.po_imm_pred(lab); pLab)
+				if (true && pLab->isAtLeastAcquire()) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (auto pLab = g.rfe_pred(lab); pLab) {
+				auto status =
+					visitedConsAcyclic3_17.getStatus(pLab->getStamp().get());
+				if (status == NodeStatus::unseen) {
+					worklist.emplace_back(17, pLab);
+				} else if (status == NodeStatus::entered &&
+					   visitedConsAcyclic3Search.reach(visitedConsAcyclic3_17,
+									   pLab->getStamp().get(),
+									   true)) {
+					return false; /* cycle detected */
+				}
+			}
+			if (true && genmc::isa<FenceLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && genmc::isa<ThreadJoinLabel>(lab))
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+			if (true && genmc::isa<WriteLabel>(lab) &&
+			    ((genmc::isa<ReadLabel>(lab) &&
+			      genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
+			     (genmc::isa<WriteLabel>(lab) &&
+			      genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
+				if (auto pLab = g.po_imm_pred(lab); pLab)
+					if (true && genmc::isa<ReadLabel>(pLab) &&
+					    ((genmc::isa<ReadLabel>(pLab) &&
+					      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
+					     (genmc::isa<WriteLabel>(pLab) &&
+					      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
+					    pLab->isDependable()) {
+						auto status = visitedConsAcyclic3_17.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(17, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_17,
+								   pLab->getStamp().get(), true)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.addr_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && pLab->isDependable()) {
+							auto status =
+								visitedConsAcyclic3_17.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(17, pLab);
+							} else if (status == NodeStatus::entered &&
+								   visitedConsAcyclic3Search.reach(
+									   visitedConsAcyclic3_17,
+									   pLab->getStamp().get(),
+									   true)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.ctrl_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && pLab->isDependable()) {
+							auto status =
+								visitedConsAcyclic3_17.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(17, pLab);
+							} else if (status == NodeStatus::entered &&
+								   visitedConsAcyclic3Search.reach(
+									   visitedConsAcyclic3_17,
+									   pLab->getStamp().get(),
+									   true)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && genmc::isa<WriteLabel>(lab))
+				for (auto &tmp : g.data_preds(lab))
+					if (auto *pLab = &tmp; true)
+						if (true && pLab->isDependable()) {
+							auto status =
+								visitedConsAcyclic3_17.getStatus(
+									pLab->getStamp().get());
+							if (status == NodeStatus::unseen) {
+								worklist.emplace_back(17, pLab);
+							} else if (status == NodeStatus::entered &&
+								   visitedConsAcyclic3Search.reach(
+									   visitedConsAcyclic3_17,
+									   pLab->getStamp().get(),
+									   true)) {
+								return false; /* cycle detected */
+							}
+						}
+			if (true && genmc::isa<WriteLabel>(lab))
+				if (auto pLab = g.poloc_imm_pred(lab); pLab)
+					if (true && pLab->isAtLeastRelease() &&
+					    genmc::isa<WriteLabel>(pLab)) {
+						auto status = visitedConsAcyclic3_17.getStatus(
+							pLab->getStamp().get());
+						if (status == NodeStatus::unseen) {
+							worklist.emplace_back(17, pLab);
+						} else if (status == NodeStatus::entered &&
+							   visitedConsAcyclic3Search.reach(
+								   visitedConsAcyclic3_17,
+								   pLab->getStamp().get(), true)) {
+							return false; /* cycle detected */
+						}
+					}
+			if (true && lab->isAtLeastRelease())
+				if (auto pLab = g.po_imm_pred(lab); pLab) {
+					auto status = visitedConsAcyclic3_17.getStatus(
+						pLab->getStamp().get());
+					if (status == NodeStatus::unseen) {
+						worklist.emplace_back(17, pLab);
+					} else if (status == NodeStatus::entered &&
+						   visitedConsAcyclic3Search.reach(
+							   visitedConsAcyclic3_17,
+							   pLab->getStamp().get(), true)) {
+						return false; /* cycle detected */
+					}
+				}
+
+			break;
+		}
+		default:
+			UNREACHABLE();
+		}
+	}
+	return true;
+}
+
+bool IMMChecker::visitConsAcyclic3(const EventLabel *lab) const
+{
+	[[maybe_unused]] auto &g = *lab->getParent();
+
+	visitedConsAcyclic3Search.reset();
+	visitedConsAcyclic3_0.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_1.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_3.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_4.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_5.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_6.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_7.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_8.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_10.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_11.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_12.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_13.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_14.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_16.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_17.maybeClearResize(g.getMaxStamp().get() + 1);
+
+	/* States we need to explore from using DFS */
+	std::vector<DFSWorklistEntry> startStates = {
+		{14, lab}, {12, lab}, {11, lab}, {8, lab}, {6, lab},
+	};
+
+	return visitConsAcyclic3Iterative(startStates);
+}
+
+bool IMMChecker::visitConsAcyclic3Full(const ExecutionGraph &g) const
+{
+	visitedConsAcyclic3Search.reset();
+	visitedConsAcyclic3_0.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_1.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_3.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_4.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_5.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_6.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_7.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_8.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_10.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_11.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_12.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_13.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_14.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_16.maybeClearResize(g.getMaxStamp().get() + 1);
+	visitedConsAcyclic3_17.maybeClearResize(g.getMaxStamp().get() + 1);
+
+	auto exploreLab = [&](auto &lab) {
+		/* Explore from all accepting states using DFS */
+		std::vector<DFSWorklistEntry> startStates = {
+			{17, &lab},
+		};
+
+		return visitConsAcyclic3Iterative(startStates);
+	};
+
+	return std::ranges::all_of(g.labels(), exploreLab);
+}
+
+bool IMMChecker::checkConsAcyclic3(const EventLabel *lab) const
+{
+	[[maybe_unused]] auto &g = *lab->getParent();
+
+	return visitConsAcyclic3(lab);
+}
+
+bool IMMChecker::checkConsAcyclic3(const ExecutionGraph &g) const
+{
+	return visitConsAcyclic3Full(g);
+}
+
+bool IMMChecker::visitError4([[maybe_unused]] const EventLabel *lab) const { return false; }
+
+bool IMMChecker::visitLHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &worklist,
 					       const View &v) const
 {
 	while (!worklist.empty()) {
@@ -6379,7 +8267,7 @@ bool IMMChecker::visitLHSUnlessError3Iterative(std::vector<DFSWorklistEntry> &wo
 	return true;
 }
 
-bool IMMChecker::visitUnlessError3(const EventLabel *lab) const
+bool IMMChecker::visitUnlessError4(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -6390,22 +8278,22 @@ bool IMMChecker::visitUnlessError3(const EventLabel *lab) const
 		{1, lab},
 	};
 
-	return visitLHSUnlessError3Iterative(startStatesLHS, v);
+	return visitLHSUnlessError4Iterative(startStatesLHS, v);
 }
 
-bool IMMChecker::checkError3(const EventLabel *lab) const
+bool IMMChecker::checkError4(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	if (visitUnlessError3(lab))
+	if (visitUnlessError4(lab))
 		return true;
 
-	return visitError3(lab);
+	return visitError4(lab);
 }
 
-bool IMMChecker::visitError4([[maybe_unused]] const EventLabel *lab) const { return false; }
+bool IMMChecker::visitError5([[maybe_unused]] const EventLabel *lab) const { return false; }
 
-bool IMMChecker::visitLHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &worklist) const
+bool IMMChecker::visitLHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &worklist) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -6448,7 +8336,7 @@ bool IMMChecker::visitLHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &wo
 	return true;
 }
 
-bool IMMChecker::visitRHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &worklist) const
+bool IMMChecker::visitRHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &worklist) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -6461,7 +8349,7 @@ bool IMMChecker::visitRHSUnlessError4Iterative(std::vector<DFSWorklistEntry> &wo
 	return true;
 }
 
-bool IMMChecker::visitUnlessError4(const EventLabel *lab) const
+bool IMMChecker::visitUnlessError5(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -6470,25 +8358,25 @@ bool IMMChecker::visitUnlessError4(const EventLabel *lab) const
 		{1, lab},
 	};
 
-	if (!visitLHSUnlessError4Iterative(startStatesLHS))
+	if (!visitLHSUnlessError5Iterative(startStatesLHS))
 		return false;
 
 	return true;
 }
 
-bool IMMChecker::checkError4(const EventLabel *lab) const
+bool IMMChecker::checkError5(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	if (visitUnlessError4(lab))
+	if (visitUnlessError5(lab))
 		return true;
 
-	return visitError4(lab);
+	return visitError5(lab);
 }
 
-bool IMMChecker::visitError5([[maybe_unused]] const EventLabel *lab) const { return false; }
+bool IMMChecker::visitError6([[maybe_unused]] const EventLabel *lab) const { return false; }
 
-bool IMMChecker::visitLHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &worklist,
+bool IMMChecker::visitLHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &worklist,
 					       const View &v) const
 {
 	while (!worklist.empty()) {
@@ -6553,7 +8441,7 @@ bool IMMChecker::visitLHSUnlessError5Iterative(std::vector<DFSWorklistEntry> &wo
 	return true;
 }
 
-bool IMMChecker::visitUnlessError5(const EventLabel *lab) const
+bool IMMChecker::visitUnlessError6(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -6564,22 +8452,22 @@ bool IMMChecker::visitUnlessError5(const EventLabel *lab) const
 		{1, lab},
 	};
 
-	return visitLHSUnlessError5Iterative(startStatesLHS, v);
+	return visitLHSUnlessError6Iterative(startStatesLHS, v);
 }
 
-bool IMMChecker::checkError5(const EventLabel *lab) const
+bool IMMChecker::checkError6(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	if (visitUnlessError5(lab))
+	if (visitUnlessError6(lab))
 		return true;
 
-	return visitError5(lab);
+	return visitError6(lab);
 }
 
-bool IMMChecker::visitError6([[maybe_unused]] const EventLabel *lab) const { return false; }
+bool IMMChecker::visitError7([[maybe_unused]] const EventLabel *lab) const { return false; }
 
-bool IMMChecker::visitLHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &worklist) const
+bool IMMChecker::visitLHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &worklist) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -6622,7 +8510,7 @@ bool IMMChecker::visitLHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &wo
 	return true;
 }
 
-bool IMMChecker::visitRHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &worklist) const
+bool IMMChecker::visitRHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &worklist) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -6635,7 +8523,7 @@ bool IMMChecker::visitRHSUnlessError6Iterative(std::vector<DFSWorklistEntry> &wo
 	return true;
 }
 
-bool IMMChecker::visitUnlessError6(const EventLabel *lab) const
+bool IMMChecker::visitUnlessError7(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -6644,25 +8532,25 @@ bool IMMChecker::visitUnlessError6(const EventLabel *lab) const
 		{1, lab},
 	};
 
-	if (!visitLHSUnlessError6Iterative(startStatesLHS))
+	if (!visitLHSUnlessError7Iterative(startStatesLHS))
 		return false;
 
 	return true;
 }
 
-bool IMMChecker::checkError6(const EventLabel *lab) const
+bool IMMChecker::checkError7(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	if (visitUnlessError6(lab))
+	if (visitUnlessError7(lab))
 		return true;
 
-	return visitError6(lab);
+	return visitError7(lab);
 }
 
-bool IMMChecker::visitError7([[maybe_unused]] const EventLabel *lab) const { return false; }
+bool IMMChecker::visitError8([[maybe_unused]] const EventLabel *lab) const { return false; }
 
-bool IMMChecker::visitLHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &worklist,
+bool IMMChecker::visitLHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &worklist,
 					       const View &v) const
 {
 	while (!worklist.empty()) {
@@ -6706,7 +8594,7 @@ bool IMMChecker::visitLHSUnlessError7Iterative(std::vector<DFSWorklistEntry> &wo
 	return true;
 }
 
-bool IMMChecker::visitUnlessError7(const EventLabel *lab) const
+bool IMMChecker::visitUnlessError8(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -6717,22 +8605,22 @@ bool IMMChecker::visitUnlessError7(const EventLabel *lab) const
 		{1, lab},
 	};
 
-	return visitLHSUnlessError7Iterative(startStatesLHS, v);
+	return visitLHSUnlessError8Iterative(startStatesLHS, v);
 }
 
-bool IMMChecker::checkError7(const EventLabel *lab) const
+bool IMMChecker::checkError8(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	if (visitUnlessError7(lab))
+	if (visitUnlessError8(lab))
 		return true;
 
-	return visitError7(lab);
+	return visitError8(lab);
 }
 
-bool IMMChecker::visitError8([[maybe_unused]] const EventLabel *lab) const { return false; }
+bool IMMChecker::visitError9([[maybe_unused]] const EventLabel *lab) const { return false; }
 
-bool IMMChecker::visitLHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &worklist) const
+bool IMMChecker::visitLHSUnlessError9Iterative(std::vector<DFSWorklistEntry> &worklist) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -6773,7 +8661,7 @@ bool IMMChecker::visitLHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &wo
 	return true;
 }
 
-bool IMMChecker::visitRHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &worklist) const
+bool IMMChecker::visitRHSUnlessError9Iterative(std::vector<DFSWorklistEntry> &worklist) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -6786,7 +8674,7 @@ bool IMMChecker::visitRHSUnlessError8Iterative(std::vector<DFSWorklistEntry> &wo
 	return true;
 }
 
-bool IMMChecker::visitUnlessError8(const EventLabel *lab) const
+bool IMMChecker::visitUnlessError9(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -6795,26 +8683,26 @@ bool IMMChecker::visitUnlessError8(const EventLabel *lab) const
 		{1, lab},
 	};
 
-	if (!visitLHSUnlessError8Iterative(startStatesLHS))
+	if (!visitLHSUnlessError9Iterative(startStatesLHS))
 		return false;
 
 	return true;
 }
 
-bool IMMChecker::checkError8(const EventLabel *lab) const
+bool IMMChecker::checkError9(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	if (visitUnlessError8(lab))
+	if (visitUnlessError9(lab))
 		return true;
 
-	return visitError8(lab);
+	return visitError9(lab);
 }
 
-bool IMMChecker::visitError9([[maybe_unused]] const EventLabel *lab) const { return false; }
+bool IMMChecker::visitError10([[maybe_unused]] const EventLabel *lab) const { return false; }
 
-bool IMMChecker::visitLHSUnlessError9Iterative(std::vector<DFSWorklistEntry> &worklist,
-					       const View &v) const
+bool IMMChecker::visitLHSUnlessError10Iterative(std::vector<DFSWorklistEntry> &worklist,
+						const View &v) const
 {
 	while (!worklist.empty()) {
 		auto [stateId, lab, isFinishing] = worklist.back();
@@ -6892,7 +8780,7 @@ bool IMMChecker::visitLHSUnlessError9Iterative(std::vector<DFSWorklistEntry> &wo
 	return true;
 }
 
-bool IMMChecker::visitUnlessError9(const EventLabel *lab) const
+bool IMMChecker::visitUnlessError10(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -6903,22 +8791,22 @@ bool IMMChecker::visitUnlessError9(const EventLabel *lab) const
 		{1, lab},
 	};
 
-	return visitLHSUnlessError9Iterative(startStatesLHS, v);
+	return visitLHSUnlessError10Iterative(startStatesLHS, v);
 }
 
-bool IMMChecker::checkError9(const EventLabel *lab) const
+bool IMMChecker::checkError10(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	if (visitUnlessError9(lab))
+	if (visitUnlessError10(lab))
 		return true;
 
-	return visitError9(lab);
+	return visitError10(lab);
 }
 
-bool IMMChecker::visitWarning10([[maybe_unused]] const EventLabel *lab) const { return false; }
+bool IMMChecker::visitWarning11([[maybe_unused]] const EventLabel *lab) const { return false; }
 
-bool IMMChecker::visitLHSUnlessWarning10Iterative(std::vector<DFSWorklistEntry> &worklist,
+bool IMMChecker::visitLHSUnlessWarning11Iterative(std::vector<DFSWorklistEntry> &worklist,
 						  const View &v) const
 {
 	while (!worklist.empty()) {
@@ -6962,7 +8850,7 @@ bool IMMChecker::visitLHSUnlessWarning10Iterative(std::vector<DFSWorklistEntry> 
 	return true;
 }
 
-bool IMMChecker::visitUnlessWarning10(const EventLabel *lab) const
+bool IMMChecker::visitUnlessWarning11(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
@@ -6973,36 +8861,31 @@ bool IMMChecker::visitUnlessWarning10(const EventLabel *lab) const
 		{1, lab},
 	};
 
-	return visitLHSUnlessWarning10Iterative(startStatesLHS, v);
+	return visitLHSUnlessWarning11Iterative(startStatesLHS, v);
 }
 
-bool IMMChecker::checkWarning10(const EventLabel *lab) const
+bool IMMChecker::checkWarning11(const EventLabel *lab) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	if (visitUnlessWarning10(lab))
+	if (visitUnlessWarning11(lab))
 		return true;
 
-	return visitWarning10(lab);
+	return visitWarning11(lab);
 }
 
 std::optional<VerificationError>
 IMMChecker::checkErrors([[maybe_unused]] const EventLabel *lab,
 			[[maybe_unused]] const EventLabel *&race) const
 {
-	if (!checkError3(lab)) {
+	if (!checkError4(lab)) {
 		race = cexLab;
 		return {VerificationError::VE_AccessNonMalloc};
 	}
 
-	if (!checkError4(lab)) {
-		race = cexLab;
-		return {VerificationError::VE_DoubleFree};
-	}
-
 	if (!checkError5(lab)) {
 		race = cexLab;
-		return {VerificationError::VE_AccessFreed};
+		return {VerificationError::VE_DoubleFree};
 	}
 
 	if (!checkError6(lab)) {
@@ -7022,6 +8905,11 @@ IMMChecker::checkErrors([[maybe_unused]] const EventLabel *lab,
 
 	if (!checkError9(lab)) {
 		race = cexLab;
+		return {VerificationError::VE_AccessFreed};
+	}
+
+	if (!checkError10(lab)) {
+		race = cexLab;
 		return {VerificationError::VE_RaceNotAtomic};
 	}
 
@@ -7034,7 +8922,7 @@ IMMChecker::checkWarnings(const EventLabel *lab, const VSet<VerificationError> &
 {
 	std::vector<VerificationError> result;
 
-	if (seenWarnings.count(VerificationError::VE_WWRace) == 0 && !checkWarning10(lab)) {
+	if (seenWarnings.count(VerificationError::VE_WWRace) == 0 && !checkWarning11(lab)) {
 		racyLabs.push_back(cexLab);
 		result.push_back(VerificationError::VE_WWRace);
 	}
@@ -7082,6 +8970,14 @@ void IMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 					if (status == NodeStatus::unseen)
 						visitPPoRf0(pLab, pporf);
 				}
+	for (auto &tmp : g.addr_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (true && pLab->isDependable())
+				if (pporf.updateIdx(pLab->getPos()); true) {
+					auto status = visitedPPoRf0[pLab->getStamp().get()];
+					if (status == NodeStatus::unseen)
+						visitPPoRf0(pLab, pporf);
+				}
 	for (auto &tmp : g.data_preds(lab))
 		if (auto *pLab = &tmp; true)
 			if (true && pLab->isDependable())
@@ -7091,6 +8987,12 @@ void IMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 						visitPPoRf0(pLab, pporf);
 				}
 	for (auto &tmp : g.ctrl_preds(lab))
+		if (auto *pLab = &tmp; true) {
+			auto status = visitedPPoRf1[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf1(pLab, pporf);
+		}
+	for (auto &tmp : g.addr_preds(lab))
 		if (auto *pLab = &tmp; true) {
 			auto status = visitedPPoRf1[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
@@ -7107,59 +9009,56 @@ void IMMChecker::visitPPoRf1(const EventLabel *lab, DepView &pporf) const
 		if (status == NodeStatus::unseen)
 			visitPPoRf1(pLab, pporf);
 	}
-	for (auto &tmp : g.ctrl_preds(lab))
-		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf2[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf2(pLab, pporf);
-		}
-	for (auto &tmp : g.data_preds(lab))
-		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf2[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf2(pLab, pporf);
-		}
-	if (auto pLab = g.rfi_pred(lab); pLab) {
-		auto status = visitedPPoRf2[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf2(pLab, pporf);
-	}
 	if (auto pLab = g.rfi_pred(lab); pLab)
 		if (true && genmc::isa<WriteLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-			auto status = visitedPPoRf3[pLab->getStamp().get()];
+			auto status = visitedPPoRf2[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf3(pLab, pporf);
+				visitPPoRf2(pLab, pporf);
 		}
 	for (auto &tmp : g.ctrl_preds(lab))
 		if (auto *pLab = &tmp; true)
 			if (true && pLab->isDependable()) {
-				auto status = visitedPPoRf4[pLab->getStamp().get()];
+				auto status = visitedPPoRf3[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf4(pLab, pporf);
+					visitPPoRf3(pLab, pporf);
+			}
+	for (auto &tmp : g.addr_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (true && pLab->isDependable()) {
+				auto status = visitedPPoRf3[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf3(pLab, pporf);
 			}
 	for (auto &tmp : g.data_preds(lab))
 		if (auto *pLab = &tmp; true)
 			if (true && pLab->isDependable()) {
-				auto status = visitedPPoRf4[pLab->getStamp().get()];
+				auto status = visitedPPoRf3[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf4(pLab, pporf);
+					visitPPoRf3(pLab, pporf);
 			}
 	for (auto &tmp : g.ctrl_preds(lab))
 		if (auto *pLab = &tmp; true)
 			if (true && pLab->isDependable()) {
-				auto status = visitedPPoRf6[pLab->getStamp().get()];
+				auto status = visitedPPoRf5[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf6(pLab, pporf);
+					visitPPoRf5(pLab, pporf);
+			}
+	for (auto &tmp : g.addr_preds(lab))
+		if (auto *pLab = &tmp; true)
+			if (true && pLab->isDependable()) {
+				auto status = visitedPPoRf5[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf5(pLab, pporf);
 			}
 	for (auto &tmp : g.data_preds(lab))
 		if (auto *pLab = &tmp; true)
 			if (true && pLab->isDependable()) {
-				auto status = visitedPPoRf6[pLab->getStamp().get()];
+				auto status = visitedPPoRf5[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf6(pLab, pporf);
+					visitPPoRf5(pLab, pporf);
 			}
 	visitedPPoRf1[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -7169,53 +9068,6 @@ void IMMChecker::visitPPoRf2(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf2[lab->getStamp().get()] = NodeStatus::entered;
-	for (auto &tmp : g.addr_preds(lab))
-		if (auto *pLab = &tmp; true)
-			if (true && pLab->isDependable())
-				if (pporf.updateIdx(pLab->getPos()); true) {
-					auto status = visitedPPoRf0[pLab->getStamp().get()];
-					if (status == NodeStatus::unseen)
-						visitPPoRf0(pLab, pporf);
-				}
-	for (auto &tmp : g.addr_preds(lab))
-		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf1[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf1(pLab, pporf);
-		}
-	for (auto &tmp : g.addr_preds(lab))
-		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf2[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf2(pLab, pporf);
-		}
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf2[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf2(pLab, pporf);
-	}
-	for (auto &tmp : g.addr_preds(lab))
-		if (auto *pLab = &tmp; true)
-			if (true && pLab->isDependable()) {
-				auto status = visitedPPoRf4[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf4(pLab, pporf);
-			}
-	for (auto &tmp : g.addr_preds(lab))
-		if (auto *pLab = &tmp; true)
-			if (true && pLab->isDependable()) {
-				auto status = visitedPPoRf6[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf6(pLab, pporf);
-			}
-	visitedPPoRf2[lab->getStamp().get()] = NodeStatus::left;
-}
-
-void IMMChecker::visitPPoRf3(const EventLabel *lab, DepView &pporf) const
-{
-	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedPPoRf3[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
@@ -7240,10 +9092,11 @@ void IMMChecker::visitPPoRf3(const EventLabel *lab, DepView &pporf) const
 		if (true && genmc::isa<ReadLabel>(pLab) &&
 		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
 		     (genmc::isa<WriteLabel>(pLab) &&
-		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-			auto status = visitedPPoRf2[pLab->getStamp().get()];
+		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
+		    pLab->isDependable()) {
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf2(pLab, pporf);
+				visitPPoRf3(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<ReadLabel>(pLab) &&
@@ -7251,28 +9104,18 @@ void IMMChecker::visitPPoRf3(const EventLabel *lab, DepView &pporf) const
 		     (genmc::isa<WriteLabel>(pLab) &&
 		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
 		    pLab->isDependable()) {
-			auto status = visitedPPoRf4[pLab->getStamp().get()];
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf4(pLab, pporf);
+				visitPPoRf5(pLab, pporf);
 		}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (true && genmc::isa<ReadLabel>(pLab) &&
-		    ((genmc::isa<ReadLabel>(pLab) && genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-		     (genmc::isa<WriteLabel>(pLab) &&
-		      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
-		    pLab->isDependable()) {
-			auto status = visitedPPoRf6[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf6(pLab, pporf);
-		}
-	visitedPPoRf3[lab->getStamp().get()] = NodeStatus::left;
+	visitedPPoRf2[lab->getStamp().get()] = NodeStatus::left;
 }
 
-void IMMChecker::visitPPoRf4(const EventLabel *lab, DepView &pporf) const
+void IMMChecker::visitPPoRf3(const EventLabel *lab, DepView &pporf) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedPPoRf4[lab->getStamp().get()] = NodeStatus::entered;
+	visitedPPoRf3[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.tc_pred(lab); pLab)
 		if (pporf.updateIdx(pLab->getPos()); true) {
 			auto status = visitedPPoRf0[pLab->getStamp().get()];
@@ -7389,109 +9232,69 @@ void IMMChecker::visitPPoRf4(const EventLabel *lab, DepView &pporf) const
 				if (status == NodeStatus::unseen)
 					visitPPoRf1(pLab, pporf);
 			}
-	if (true && genmc::isa<WriteLabel>(lab))
-		for (auto &tmp : g.ctrl_preds(lab))
-			if (auto *pLab = &tmp; true) {
-				auto status = visitedPPoRf2[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf2(pLab, pporf);
-			}
-	if (true && genmc::isa<WriteLabel>(lab))
-		for (auto &tmp : g.addr_preds(lab))
-			if (auto *pLab = &tmp; true) {
-				auto status = visitedPPoRf2[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf2(pLab, pporf);
-			}
-	if (true && genmc::isa<WriteLabel>(lab))
-		for (auto &tmp : g.data_preds(lab))
-			if (auto *pLab = &tmp; true) {
-				auto status = visitedPPoRf2[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf2(pLab, pporf);
-			}
-	if (true && genmc::isa<WriteLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf2[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf2(pLab, pporf);
-		}
-	if (true && genmc::isa<WriteLabel>(lab) &&
-	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
-	     (genmc::isa<WriteLabel>(lab) && genmc::dyn_cast<WriteLabel>(lab)->isRMW())))
-		if (auto pLab = g.po_imm_pred(lab); pLab)
-			if (true && genmc::isa<ReadLabel>(pLab) &&
-			    ((genmc::isa<ReadLabel>(pLab) &&
-			      genmc::dyn_cast<ReadLabel>(pLab)->isRMW()) ||
-			     (genmc::isa<WriteLabel>(pLab) &&
-			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW()))) {
-				auto status = visitedPPoRf2[pLab->getStamp().get()];
-				if (status == NodeStatus::unseen)
-					visitPPoRf2(pLab, pporf);
-			}
 	if (auto pLab = g.tc_pred(lab); pLab) {
-		auto status = visitedPPoRf4[pLab->getStamp().get()];
+		auto status = visitedPPoRf3[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf4(pLab, pporf);
+			visitPPoRf3(pLab, pporf);
 	}
 	if (auto pLab = g.tj_pred(lab); pLab) {
-		auto status = visitedPPoRf4[pLab->getStamp().get()];
+		auto status = visitedPPoRf3[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf4(pLab, pporf);
+			visitPPoRf3(pLab, pporf);
 	}
 	for (auto &tmp : g.lin_preds(lab))
 		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf4[pLab->getStamp().get()];
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf4(pLab, pporf);
+				visitPPoRf3(pLab, pporf);
 		}
 	if (auto pLab = g.rfe_pred(lab); pLab) {
-		auto status = visitedPPoRf4[pLab->getStamp().get()];
+		auto status = visitedPPoRf3[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf4(pLab, pporf);
+			visitPPoRf3(pLab, pporf);
 	}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.ctrl_preds(lab))
 			if (auto *pLab = &tmp; true)
 				if (true && pLab->isDependable()) {
-					auto status = visitedPPoRf4[pLab->getStamp().get()];
+					auto status = visitedPPoRf3[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
-						visitPPoRf4(pLab, pporf);
+						visitPPoRf3(pLab, pporf);
 				}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.addr_preds(lab))
 			if (auto *pLab = &tmp; true)
 				if (true && pLab->isDependable()) {
-					auto status = visitedPPoRf4[pLab->getStamp().get()];
+					auto status = visitedPPoRf3[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
-						visitPPoRf4(pLab, pporf);
+						visitPPoRf3(pLab, pporf);
 				}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.data_preds(lab))
 			if (auto *pLab = &tmp; true)
 				if (true && pLab->isDependable()) {
-					auto status = visitedPPoRf4[pLab->getStamp().get()];
+					auto status = visitedPPoRf3[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
-						visitPPoRf4(pLab, pporf);
+						visitPPoRf3(pLab, pporf);
 				}
 	for (auto &tmp : g.detour_preds(lab))
 		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf4[pLab->getStamp().get()];
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf4(pLab, pporf);
+				visitPPoRf3(pLab, pporf);
 		}
 	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.poloc_imm_pred(lab); pLab)
 			if (true && pLab->isAtLeastRelease() && genmc::isa<WriteLabel>(pLab)) {
-				auto status = visitedPPoRf4[pLab->getStamp().get()];
+				auto status = visitedPPoRf3[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf4(pLab, pporf);
+					visitPPoRf3(pLab, pporf);
 			}
 	if (true && lab->isAtLeastRelease())
 		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf4[pLab->getStamp().get()];
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf4(pLab, pporf);
+				visitPPoRf3(pLab, pporf);
 		}
 	if (true && genmc::isa<WriteLabel>(lab) &&
 	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
@@ -7503,93 +9306,106 @@ void IMMChecker::visitPPoRf4(const EventLabel *lab, DepView &pporf) const
 			     (genmc::isa<WriteLabel>(pLab) &&
 			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
 			    pLab->isDependable()) {
+				auto status = visitedPPoRf3[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf3(pLab, pporf);
+			}
+	if (true && genmc::isa<FenceLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab) {
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf3(pLab, pporf);
+		}
+	if (true && genmc::isa<ThreadJoinLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab) {
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf3(pLab, pporf);
+		}
+	if (true && lab->isAtLeastRelease())
+		if (auto pLab = g.po_imm_pred(lab); pLab)
+			if (pporf.updateIdx(pLab->getPos()); true) {
 				auto status = visitedPPoRf4[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
 					visitPPoRf4(pLab, pporf);
 			}
 	if (true && genmc::isa<FenceLabel>(lab))
-		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf4[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf4(pLab, pporf);
-		}
-	if (true && lab->isAtLeastRelease())
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf5[pLab->getStamp().get()];
+				auto status = visitedPPoRf4[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf5(pLab, pporf);
+					visitPPoRf4(pLab, pporf);
 			}
-	if (true && genmc::isa<FenceLabel>(lab))
+	if (true && genmc::isa<ThreadJoinLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab)
 			if (pporf.updateIdx(pLab->getPos()); true) {
-				auto status = visitedPPoRf5[pLab->getStamp().get()];
+				auto status = visitedPPoRf4[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf5(pLab, pporf);
+					visitPPoRf4(pLab, pporf);
 			}
 	if (auto pLab = g.tc_pred(lab); pLab) {
-		auto status = visitedPPoRf6[pLab->getStamp().get()];
+		auto status = visitedPPoRf5[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf6(pLab, pporf);
+			visitPPoRf5(pLab, pporf);
 	}
 	if (auto pLab = g.tj_pred(lab); pLab) {
-		auto status = visitedPPoRf6[pLab->getStamp().get()];
+		auto status = visitedPPoRf5[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf6(pLab, pporf);
+			visitPPoRf5(pLab, pporf);
 	}
 	for (auto &tmp : g.lin_preds(lab))
 		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf6[pLab->getStamp().get()];
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf6(pLab, pporf);
+				visitPPoRf5(pLab, pporf);
 		}
 	if (auto pLab = g.rfe_pred(lab); pLab) {
-		auto status = visitedPPoRf6[pLab->getStamp().get()];
+		auto status = visitedPPoRf5[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf6(pLab, pporf);
+			visitPPoRf5(pLab, pporf);
 	}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.ctrl_preds(lab))
 			if (auto *pLab = &tmp; true)
 				if (true && pLab->isDependable()) {
-					auto status = visitedPPoRf6[pLab->getStamp().get()];
+					auto status = visitedPPoRf5[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
-						visitPPoRf6(pLab, pporf);
+						visitPPoRf5(pLab, pporf);
 				}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.addr_preds(lab))
 			if (auto *pLab = &tmp; true)
 				if (true && pLab->isDependable()) {
-					auto status = visitedPPoRf6[pLab->getStamp().get()];
+					auto status = visitedPPoRf5[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
-						visitPPoRf6(pLab, pporf);
+						visitPPoRf5(pLab, pporf);
 				}
 	if (true && genmc::isa<WriteLabel>(lab))
 		for (auto &tmp : g.data_preds(lab))
 			if (auto *pLab = &tmp; true)
 				if (true && pLab->isDependable()) {
-					auto status = visitedPPoRf6[pLab->getStamp().get()];
+					auto status = visitedPPoRf5[pLab->getStamp().get()];
 					if (status == NodeStatus::unseen)
-						visitPPoRf6(pLab, pporf);
+						visitPPoRf5(pLab, pporf);
 				}
 	for (auto &tmp : g.detour_preds(lab))
 		if (auto *pLab = &tmp; true) {
-			auto status = visitedPPoRf6[pLab->getStamp().get()];
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf6(pLab, pporf);
+				visitPPoRf5(pLab, pporf);
 		}
 	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.poloc_imm_pred(lab); pLab)
 			if (true && pLab->isAtLeastRelease() && genmc::isa<WriteLabel>(pLab)) {
-				auto status = visitedPPoRf6[pLab->getStamp().get()];
+				auto status = visitedPPoRf5[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf6(pLab, pporf);
+					visitPPoRf5(pLab, pporf);
 			}
 	if (true && lab->isAtLeastRelease())
 		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf6[pLab->getStamp().get()];
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf6(pLab, pporf);
+				visitPPoRf5(pLab, pporf);
 		}
 	if (true && genmc::isa<WriteLabel>(lab) &&
 	    ((genmc::isa<ReadLabel>(lab) && genmc::dyn_cast<ReadLabel>(lab)->isRMW()) ||
@@ -7601,21 +9417,47 @@ void IMMChecker::visitPPoRf4(const EventLabel *lab, DepView &pporf) const
 			     (genmc::isa<WriteLabel>(pLab) &&
 			      genmc::dyn_cast<WriteLabel>(pLab)->isRMW())) &&
 			    pLab->isDependable()) {
-				auto status = visitedPPoRf6[pLab->getStamp().get()];
+				auto status = visitedPPoRf5[pLab->getStamp().get()];
 				if (status == NodeStatus::unseen)
-					visitPPoRf6(pLab, pporf);
+					visitPPoRf5(pLab, pporf);
 			}
 	if (true && genmc::isa<FenceLabel>(lab))
 		if (auto pLab = g.po_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf6[pLab->getStamp().get()];
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf6(pLab, pporf);
+				visitPPoRf5(pLab, pporf);
+		}
+	if (true && genmc::isa<ThreadJoinLabel>(lab))
+		if (auto pLab = g.po_imm_pred(lab); pLab) {
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf5(pLab, pporf);
 		}
 	if (true && genmc::isa<WriteLabel>(lab))
 		if (auto pLab = g.poloc_imm_pred(lab); pLab) {
-			auto status = visitedPPoRf7[pLab->getStamp().get()];
+			auto status = visitedPPoRf6[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf7(pLab, pporf);
+				visitPPoRf6(pLab, pporf);
+		}
+	visitedPPoRf3[lab->getStamp().get()] = NodeStatus::left;
+}
+
+void IMMChecker::visitPPoRf4(const EventLabel *lab, DepView &pporf) const
+{
+	[[maybe_unused]] auto &g = *lab->getParent();
+
+	visitedPPoRf4[lab->getStamp().get()] = NodeStatus::entered;
+	pporf.updateIdx(lab->getPos());
+	if (auto pLab = g.po_imm_pred(lab); pLab) {
+		auto status = visitedPPoRf3[pLab->getStamp().get()];
+		if (status == NodeStatus::unseen)
+			visitPPoRf3(pLab, pporf);
+	}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (pporf.updateIdx(pLab->getPos()); true) {
+			auto status = visitedPPoRf4[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf4(pLab, pporf);
 		}
 	visitedPPoRf4[lab->getStamp().get()] = NodeStatus::left;
 }
@@ -7625,26 +9467,6 @@ void IMMChecker::visitPPoRf5(const EventLabel *lab, DepView &pporf) const
 	[[maybe_unused]] auto &g = *lab->getParent();
 
 	visitedPPoRf5[lab->getStamp().get()] = NodeStatus::entered;
-	pporf.updateIdx(lab->getPos());
-	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf4[pLab->getStamp().get()];
-		if (status == NodeStatus::unseen)
-			visitPPoRf4(pLab, pporf);
-	}
-	if (auto pLab = g.po_imm_pred(lab); pLab)
-		if (pporf.updateIdx(pLab->getPos()); true) {
-			auto status = visitedPPoRf5[pLab->getStamp().get()];
-			if (status == NodeStatus::unseen)
-				visitPPoRf5(pLab, pporf);
-		}
-	visitedPPoRf5[lab->getStamp().get()] = NodeStatus::left;
-}
-
-void IMMChecker::visitPPoRf6(const EventLabel *lab, DepView &pporf) const
-{
-	[[maybe_unused]] auto &g = *lab->getParent();
-
-	visitedPPoRf6[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && pLab->isAtLeastAcquire())
 			if (pporf.updateIdx(pLab->getPos()); true) {
@@ -7660,42 +9482,61 @@ void IMMChecker::visitPPoRf6(const EventLabel *lab, DepView &pporf) const
 					visitPPoRf0(pLab, pporf);
 			}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ThreadJoinLabel>(pLab))
+			if (pporf.updateIdx(pLab->getPos()); true) {
+				auto status = visitedPPoRf0[pLab->getStamp().get()];
+				if (status == NodeStatus::unseen)
+					visitPPoRf0(pLab, pporf);
+			}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && pLab->isAtLeastAcquire()) {
-			auto status = visitedPPoRf4[pLab->getStamp().get()];
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf4(pLab, pporf);
+				visitPPoRf3(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<FenceLabel>(pLab)) {
-			auto status = visitedPPoRf4[pLab->getStamp().get()];
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf4(pLab, pporf);
+				visitPPoRf3(pLab, pporf);
+		}
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf3(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf6[pLab->getStamp().get()];
+		auto status = visitedPPoRf5[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf6(pLab, pporf);
+			visitPPoRf5(pLab, pporf);
 	}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && pLab->isAtLeastAcquire()) {
-			auto status = visitedPPoRf6[pLab->getStamp().get()];
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf6(pLab, pporf);
+				visitPPoRf5(pLab, pporf);
 		}
 	if (auto pLab = g.po_imm_pred(lab); pLab)
 		if (true && genmc::isa<FenceLabel>(pLab)) {
-			auto status = visitedPPoRf6[pLab->getStamp().get()];
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf6(pLab, pporf);
+				visitPPoRf5(pLab, pporf);
 		}
-	visitedPPoRf6[lab->getStamp().get()] = NodeStatus::left;
+	if (auto pLab = g.po_imm_pred(lab); pLab)
+		if (true && genmc::isa<ThreadJoinLabel>(pLab)) {
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
+			if (status == NodeStatus::unseen)
+				visitPPoRf5(pLab, pporf);
+		}
+	visitedPPoRf5[lab->getStamp().get()] = NodeStatus::left;
 }
 
-void IMMChecker::visitPPoRf7(const EventLabel *lab, DepView &pporf) const
+void IMMChecker::visitPPoRf6(const EventLabel *lab, DepView &pporf) const
 {
 	[[maybe_unused]] auto &g = *lab->getParent();
 
-	visitedPPoRf7[lab->getStamp().get()] = NodeStatus::entered;
+	visitedPPoRf6[lab->getStamp().get()] = NodeStatus::entered;
 	if (auto pLab = g.poloc_imm_pred(lab); pLab)
 		if (true && pLab->isAtLeastRelease() && genmc::isa<WriteLabel>(pLab))
 			if (pporf.updateIdx(pLab->getPos()); true) {
@@ -7705,22 +9546,22 @@ void IMMChecker::visitPPoRf7(const EventLabel *lab, DepView &pporf) const
 			}
 	if (auto pLab = g.poloc_imm_pred(lab); pLab)
 		if (true && pLab->isAtLeastRelease() && genmc::isa<WriteLabel>(pLab)) {
-			auto status = visitedPPoRf4[pLab->getStamp().get()];
+			auto status = visitedPPoRf3[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf4(pLab, pporf);
+				visitPPoRf3(pLab, pporf);
 		}
 	if (auto pLab = g.poloc_imm_pred(lab); pLab)
 		if (true && pLab->isAtLeastRelease() && genmc::isa<WriteLabel>(pLab)) {
-			auto status = visitedPPoRf6[pLab->getStamp().get()];
+			auto status = visitedPPoRf5[pLab->getStamp().get()];
 			if (status == NodeStatus::unseen)
-				visitPPoRf6(pLab, pporf);
+				visitPPoRf5(pLab, pporf);
 		}
 	if (auto pLab = g.poloc_imm_pred(lab); pLab) {
-		auto status = visitedPPoRf7[pLab->getStamp().get()];
+		auto status = visitedPPoRf6[pLab->getStamp().get()];
 		if (status == NodeStatus::unseen)
-			visitPPoRf7(pLab, pporf);
+			visitPPoRf6(pLab, pporf);
 	}
-	visitedPPoRf7[lab->getStamp().get()] = NodeStatus::left;
+	visitedPPoRf6[lab->getStamp().get()] = NodeStatus::left;
 }
 
 DepView IMMChecker::calcPPoRfBefore(const EventLabel *lab) const
@@ -7742,11 +9583,9 @@ DepView IMMChecker::calcPPoRfBefore(const EventLabel *lab) const
 	visitedPPoRf5.resize(g.getMaxStamp().get() + 1, NodeStatus::unseen);
 	visitedPPoRf6.clear();
 	visitedPPoRf6.resize(g.getMaxStamp().get() + 1, NodeStatus::unseen);
-	visitedPPoRf7.clear();
-	visitedPPoRf7.resize(g.getMaxStamp().get() + 1, NodeStatus::unseen);
 
-	visitPPoRf4(lab, pporf);
-	visitPPoRf6(lab, pporf);
+	visitPPoRf3(lab, pporf);
+	visitPPoRf5(lab, pporf);
 	return pporf;
 }
 

@@ -812,6 +812,16 @@ auto ExplorationCore::checkInitializedMem(const WriteLabel *wLab) -> std::option
 	return reportIfViolated(error_rules::invalidUnlock(wLab));
 }
 
+/* An access whose error is found before the model has its rf or coherence
+ * position (see getErrorPrefix()) */
+static auto isPendingAccess(const EventLabel *lab) -> bool
+{
+	if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab))
+		return !rLab->getRf();
+	const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
+	return wLab && !wLab->isInCo();
+}
+
 auto ExplorationCore::getErrorPrefix(const ExecutionGraph &g) const
 	-> std::unique_ptr<ExecutionGraph>
 {
@@ -821,15 +831,10 @@ auto ExplorationCore::getErrorPrefix(const ExecutionGraph &g) const
 	 * inconsistent (#221). Such a read is checked as not yet added. So is a
 	 * store checked before it is placed in coherence (an access to
 	 * non-allocated memory): the model has no coherence position for it */
-	auto isPending = [](const EventLabel *lab) {
-		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(lab))
-			return !rLab->getRf();
-		const auto *wLab = genmc::dyn_cast<WriteLabel>(lab);
-		return wLab && !wLab->isInCo();
-	};
 	/* (Before events a revisit kept after it (-lkmm), such an access is a
 	 * hole in the copy, not the end of its thread) */
-	auto pending = std::views::filter(g.labels(), [&](auto &lab) { return isPending(&lab); });
+	auto pending =
+		std::views::filter(g.labels(), [&](auto &lab) { return isPendingAccess(&lab); });
 	if (std::ranges::empty(pending))
 		return nullptr;
 
@@ -841,6 +846,59 @@ auto ExplorationCore::getErrorPrefix(const ExecutionGraph &g) const
 			genmc::cast<DepView>(&*v)->addHole(lab.getPos());
 	}
 	return g.getCopyUpTo(*v);
+}
+
+/* Adds the events before LAB in po and rf (and thread creation and join)
+ * to V. Returns false if one is missing: a hole, an event a revisit deleted
+ * before one it kept */
+static auto addPorfPrefix(const ExecutionGraph &g, const EventLabel *lab, DepView &v) -> bool
+{
+	if (!lab || v.contains(lab->getPos()))
+		return true;
+
+	/* (A thread's start, which a view always contains, after its create) */
+	const auto t = lab->getThread();
+	const auto *tsLab = genmc::dyn_cast<ThreadStartLabel>(g.getFirstThreadLabel(t));
+	auto i = v.getMax(t);
+	if (i == 0 && tsLab && !addPorfPrefix(g, tsLab->getCreate(), v))
+		return false;
+	/* (One by one: a DepView takes the events it skips as holes) */
+	for (++i; i <= lab->getIndex(); ++i) {
+		const auto *pLab = g.getEventLabel(Event(t, i));
+		if (genmc::isa<EmptyLabel>(pLab))
+			return false;
+		v.updateIdx(pLab->getPos());
+		auto added = true;
+		if (const auto *rLab = genmc::dyn_cast<ReadLabel>(pLab))
+			added = addPorfPrefix(g, rLab->getRf(), v);
+		else if (const auto *jLab = genmc::dyn_cast<ThreadJoinLabel>(pLab))
+			added = addPorfPrefix(g, g.getLastThreadLabel(jLab->getChildId()), v);
+		if (!added)
+			return false;
+	}
+	return true;
+}
+
+auto ExplorationCore::getErrorPorfPrefix(const ExecutionGraph &g, const ErrorDetails &details) const
+	-> std::optional<std::unique_ptr<ExecutionGraph>>
+{
+	const auto *lab = details.pos ? g.getEventLabelIfPresent(*details.pos) : nullptr;
+	if (!lab)
+		return g.clone();
+
+	DepView v;
+	if (!addPorfPrefix(g, lab, v) || !addPorfPrefix(g, details.racyLab, v))
+		return std::nullopt;
+	/* (Without the accesses still pending, see getErrorPrefix()) */
+	for (const auto &oLab : g.labels()) {
+		if (!v.contains(oLab.getPos()) || !isPendingAccess(&oLab))
+			continue;
+		if (v.getMax(oLab.getThread()) == oLab.getIndex())
+			v.setMax(oLab.getPos().prev());
+		else
+			v.addHole(oLab.getPos());
+	}
+	return g.getCopyUpTo(v);
 }
 
 auto ExplorationCore::isErrorGraphConsistent(const ExecutionGraph &g) const -> bool
@@ -1939,6 +1997,29 @@ void ExplorationCore::reportError(Event pos, const ErrorDetails &details)
 			return;
 	}
 
+	/* IMM is explored without the po? of its addr ; po? (see IMMFullChecker).
+	 * The events the error needs, those before it in po and rf, are a prefix
+	 * of an IMM execution if they have no hole and IMM's full ar is acyclic
+	 * in them: IMM can add each thread's next event to such a graph. If the
+	 * ar has a cycle, no execution has them, nor any graph the run goes on
+	 * to. They can have a hole (an event a revisit deleted before one it
+	 * kept) only while the threads fill their holes, which the replay does
+	 * before they add their next events (see Scheduler::
+	 * resetExplorationOptions()), or once a thread stopped before events
+	 * it keeps: the error is then found at an access that fills a hole,
+	 * by a check before its rf or coherence position is chosen (a race, an
+	 * invalid access; a branch on what a hole reads would have kept the
+	 * read), and the run cannot go on with the access to wait for the
+	 * holes to fill. Such an error is reported as it is, so as not to
+	 * lose a real one */
+	if (getConf()->model == ModelType::IMM && !scheduler.inErrorReplay()) {
+		auto prefix = getErrorPorfPrefix(g, details);
+		if (prefix && !satisfiesExtraAxioms(**prefix)) {
+			moot();
+			return;
+		}
+	}
+
 	/* An error inside an open read-side critical section: the unlock the
 	 * thread adds next orders the section's events against the grace
 	 * periods (LKMM's rcu-order), and can make the graph inconsistent. The
@@ -2214,10 +2295,30 @@ auto ExplorationCore::isGraphConsistent(const ExecutionGraph &g, bool intermedia
 	return getExhaustiveConsistency().isGraphConsistent(g, intermediate);
 }
 
-auto ExplorationCore::isExecutionConsistent(const ExecutionGraph &g, bool intermediate,
-					    bool atomicity) -> bool
+auto ExplorationCore::satisfiesExtraAxioms(const ExecutionGraph &g) -> bool
 {
-	return getExhaustiveConsistency().isExecutionConsistent(g, intermediate, atomicity);
+	if (!getConf()->exhaustive || getConf()->model != ModelType::IMM) {
+		/* (A copy, such as an error's prefix, needs the model's caches
+		 * sized for it, cf. ExhaustiveConsistency::isExecutionConsistent()) */
+		const auto &live = getExec().getGraph();
+		if (&g == &live)
+			return getConsChecker().satisfiesExtraAxioms(g);
+		getConsChecker().recomputeCacheCounters(g);
+		const auto satisfied = getConsChecker().satisfiesExtraAxioms(g);
+		getConsChecker().recomputeCacheCounters(live);
+		return satisfied;
+	}
+	auto satisfied = false;
+	getExhaustiveConsistency().checkWithViewsAnew(g, [&](const ExecutionGraph &cg) {
+		satisfied = getConsChecker().satisfiesExtraAxioms(cg);
+	});
+	return satisfied;
+}
+
+auto ExplorationCore::isExecutionConsistent(const ExecutionGraph &g, bool intermediate,
+					    bool atomicity, bool extras) -> bool
+{
+	return getExhaustiveConsistency().isExecutionConsistent(g, intermediate, atomicity, extras);
 }
 
 auto ExplorationCore::checkEndedRun(const ExecutionGraph &g, bool moot) -> bool

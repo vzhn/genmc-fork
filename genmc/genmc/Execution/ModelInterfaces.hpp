@@ -114,6 +114,17 @@ public:
 		return isConsistent(g);
 	}
 
+	/** Whether G satisfies the axioms the exploration leaves out (Kater's
+	 * `export extra`): ones that are not extensible, so that a graph
+	 * consistent without them can be one no way of adding events keeps
+	 * consistent with them (IMM's ar, vzhn/kater-fork#38). A complete
+	 * execution, and the graph of an error, are checked against them (see
+	 * ExplorationCore::satisfiesExtraAxioms()) */
+	[[nodiscard]] virtual auto satisfiesExtraAxioms(const ExecutionGraph & /*g*/) -> bool
+	{
+		return true;
+	}
+
 	/** Whether RLAB, reading the co-maximal write, keeps its graph consistent
 	 * without a check: it does for a model whose po-based orderings are all
 	 * in ppo, as nothing then leaves the read in a cycle */

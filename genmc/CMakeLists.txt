@@ -42,6 +42,7 @@ set(GENMC_MODELS_SOURCES
   genmc/Models/ConsistencyChecker.cpp
   genmc/Models/ContextBoundDecider.cpp
   genmc/Models/IMMChecker.cpp
+  genmc/Models/IMMFullChecker.cpp
   genmc/Models/LKMMChecker.cpp
   genmc/Models/LKMMRcuChecker.cpp
   genmc/Models/RAChecker.cpp

@@ -371,9 +371,9 @@ protected:
 
 	/** -exhaustive under IMM: whether G (a complete execution, or the
 	 * graph of an error) is consistent, checked on a copy whose views are
-	 * computed anew */
+	 * computed anew (EXTRAS: see satisfiesExtraAxioms()) */
 	auto isExecutionConsistent(const ExecutionGraph &g, bool intermediate = false,
-				   bool atomicity = true) -> bool;
+				   bool atomicity = true, bool extras = false) -> bool;
 
 	/** -exhaustive under IMM: computes the views of G's labels anew, in G,
 	 * and drops their cached prefix views. Returns false if they do not
@@ -384,6 +384,12 @@ protected:
 	 * whose views are computed anew (positions name the same events in
 	 * both) */
 	void checkWithViewsAnew(const std::function<void(const ExecutionGraph &)> &check);
+
+	/** Whether G (a complete execution, or the graph of an error) satisfies
+	 * the axioms the exploration leaves out (IMM's full ar, see
+	 * IMMFullChecker); -exhaustive under IMM: checked on a copy whose views
+	 * are computed anew */
+	auto satisfiesExtraAxioms(const ExecutionGraph &g) -> bool;
 
 	/** -lkmm: the thread's path cannot go on at POS (a hole) before the
 	 * events a revisit kept after it: it stops there (see deadEndThread()) */
@@ -460,6 +466,14 @@ private:
 	/** Whether the graph of an error is consistent once its open read-side
 	 * critical sections are closed (see reportError()) */
 	auto isErrorGraphConsistent(const ExecutionGraph &g) const -> bool;
+
+	/** IMM: a copy of the events the error DETAILS describes needs: those
+	 * before its event, and the other event of a race, in po and rf
+	 * (without the accesses still pending, see getErrorPrefix()); none if
+	 * one of them is missing (a hole: an event a revisit deleted before
+	 * events it kept) */
+	auto getErrorPorfPrefix(const ExecutionGraph &g, const ErrorDetails &details) const
+		-> std::optional<std::unique_ptr<ExecutionGraph>>;
 
 	/** Reports VIOLATION, if any (see ErrorRules.hpp), and returns its type */
 	auto reportIfViolated(const std::optional<ErrorDetails> &violation)
