@@ -3108,10 +3108,33 @@ void Interpreter::callNondetInt(Function *F, const std::vector<GenericValue> &Ar
 	Thread::MyDist dist(std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
 
 	/* The other __VERIFIER_nondet_X() share this: fit the int drawn to X */
+	auto *retTy = F->getReturnType();
+	auto value = APInt(32, dist(getCurThr().rng), true); // signed
 	GenericValue result;
-	result.IntVal = APInt(32, dist(getCurThr().rng), true) // signed
-				.sextOrTrunc(F->getReturnType()->getIntegerBitWidth());
-	returnValueToCaller(F->getReturnType(), result);
+
+	/* An X wider than a register (__int128) may be returned as the ABI's
+	 * { i64, i64 }: split the value over the fields, low part first */
+	if (auto *sTy = dyn_cast<StructType>(retTy)) {
+		auto width = 0u;
+		for (auto *eTy : sTy->elements()) {
+			ERROR_ON(!eTy->isIntegerTy(), "{}() must return an integer",
+				 F->getName().str());
+			width += eTy->getIntegerBitWidth();
+		}
+		auto wide = value.sextOrTrunc(width);
+		auto offset = 0u;
+		for (auto *eTy : sTy->elements()) {
+			GenericValue field;
+			field.IntVal = wide.extractBits(eTy->getIntegerBitWidth(), offset);
+			offset += eTy->getIntegerBitWidth();
+			result.AggregateVal.push_back(field);
+		}
+	} else {
+		ERROR_ON(!retTy->isIntegerTy(), "{}() must return an integer",
+			 F->getName().str());
+		result.IntVal = value.sextOrTrunc(retTy->getIntegerBitWidth());
+	}
+	returnValueToCaller(retTy, result);
 	return;
 }
 

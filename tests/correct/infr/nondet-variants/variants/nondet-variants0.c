@@ -7,7 +7,8 @@
  * The __VERIFIER_nondet_X() of SV-COMP, as genmc.h declares them, return a
  * value of their type (the same one in every execution). The sum keeps the
  * conversions of the values. A writer and a reader of x give two executions
- * with calls in three threads.
+ * with calls in three threads. The __int128 variants come back as two
+ * halves on x86-64; the int drawn is sign-extended over both.
  */
 
 long long sum;
@@ -46,8 +47,12 @@ int main()
 	sum += __VERIFIER_nondet_ulonglong();
 	sum += __VERIFIER_nondet_size_t();
 #ifdef __SIZEOF_INT128__
-	sum += __VERIFIER_nondet_int128();
-	sum += __VERIFIER_nondet_uint128();
+	__int128 w = __VERIFIER_nondet_int128();
+	assert(w == (int)w);
+	sum += w;
+	unsigned __int128 uw = __VERIFIER_nondet_uint128();
+	assert(uw == (unsigned __int128)(int)uw);
+	sum += uw;
 #endif
 
 	pthread_create(&tw, NULL, writer, NULL);
