@@ -287,6 +287,14 @@ released.
   thread-specific data. It now tells calls from definitions and has all
   three, as `svcomp-shim.h` and `pthread.h` do (self-test tasks `pp-*`).
 
+- The tail of a preprocessed SV-COMP task ignored key destructors, so an
+  error in one was missed (`pthread-divine/tls_destructor_worker`). A
+  thread that returns or calls `pthread_exit` now runs the destructors of
+  its non-NULL values, as POSIX says; such a thread starts through a
+  function of the prelude's, and the violation witness names the task's
+  start routine from the call of `pthread_create` (self-test tasks
+  `pp-key-dtors`, `pp-key-dtor-error`).
+
 - `__thread` and `_Thread_local` variables lived outside the execution
   graph, in a map per thread from address to value, with every thread's
   copy at the same address (#90). A thread-local struct or array aborted

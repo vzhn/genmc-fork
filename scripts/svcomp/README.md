@@ -108,7 +108,8 @@ so a clean result holds only up to those bounds:
 - **`pthread_detach`, mutex attributes and recursive mutexes** are modelled
   in the prelude; GenMC's `pthread.h` lacks them. Preprocessed tasks also
   get rwlocks and thread-specific data in the prelude, modelled as in
-  `pthread.h`, for up to 16 threads; a task with more threads gets no verdict. Condition variables and
+  `pthread.h` but with key destructors, which a thread that returns or
+  calls `pthread_exit` runs, for up to 16 threads; a task with more threads gets no verdict. Condition variables and
   `pthread_once` come from GenMC's `pthread.h` (the generated tail of a
   preprocessed task defines them the same way), except that a condvar wait
   may wake up without a signal, at most `--max-spurious` times per

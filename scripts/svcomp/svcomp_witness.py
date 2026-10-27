@@ -167,6 +167,44 @@ def call_close_paren(source, line, fn):
     return None
 
 
+def start_function(source, line):
+    """The start routine that the call of pthread_create at LINE names (its
+    third argument), or None if that is not a plain function name"""
+    end = call_close_paren(source, line, "pthread_create")
+    if not end:
+        return None
+    lines = source.splitlines()
+    text = "\n".join(lines[line - 1:end[0] - 1] + [lines[end[0] - 1][:end[1] - 1]])
+    text = text[re.search(r"\bpthread_create\s*\(", text).end():]
+    args, depth, cur = [], 0, ""
+    for ch in text:
+        if ch == "," and depth == 0:
+            args.append(cur)
+            cur = ""
+            continue
+        depth += (ch in "([{") - (ch in ")]}")
+        cur += ch
+    args.append(cur)
+    if len(args) != 4:
+        return None
+    m = re.fullmatch(r"\s*(?:\(\s*void\s*\*\s*\)\s*)?&?\s*([A-Za-z_]\w*)\s*", args[2])
+    return m.group(1) if m else None
+
+
+def name_start_routines(model, source):
+    """Names the threads that the shim starts through a helper of its own
+    (__svc_thread_start) after the task's start routine, from the call of
+    pthread_create; a name that cannot be told is dropped"""
+    names = {0: "main"}
+    for c in model["creations"]:
+        if c["function"].startswith("__svc_"):
+            c["function"] = start_function(source, c["line"])
+        names[c["creates"]] = c["function"]
+    for t in model["targets"]:
+        if t["function"].startswith("__svc_"):
+            t["function"] = names.get(t["thread"])
+
+
 def target_column(source, line, reach_error):
     """The column of the innermost statement or full expression at LINE:
     the call of reach_error(), or what follows a label, an opening brace, a
@@ -229,7 +267,8 @@ def yaml_witness(model, task_file, source, spec, data_model, producer):
         col = target_column(source, t["line"], t["reach_error"])
         if col:
             location["column"] = col
-        location["function"] = t["function"]
+        if t["function"]:
+            location["function"] = t["function"]
         final.append({"waypoint": {"type": "target", "action": "follow",
                                    "thread_id": t["thread"], "location": location}})
     content.append({"segment": final})
@@ -297,7 +336,10 @@ def graphml_witness(model, task_file, source, spec, data_model, producer):
         edge(cur, nxt, threadId=c["thread"], createThread=c["creates"],
              startline=c["line"], endline=c["line"])
         cur, nxt = nxt, node()
-        edge(cur, nxt, threadId=c["creates"], enterFunction=c["function"])
+        if c["function"]:
+            edge(cur, nxt, threadId=c["creates"], enterFunction=c["function"])
+        else:
+            edge(cur, nxt, threadId=c["creates"])
         cur = nxt
     for i, t in enumerate(model["targets"]):
         last = i + 1 == len(model["targets"])
@@ -319,6 +361,7 @@ def write_witnesses(out, compiled_name, task_file, spec, data_model, prefix):
     if not model:
         return []
     source = open(task_file, errors="replace").read()
+    name_start_routines(model, source)
     m = re.search(r"GenMC v(\S+)", out)
     producer = m.group(1) if m else "unknown"
     written = []

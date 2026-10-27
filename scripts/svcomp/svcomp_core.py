@@ -57,10 +57,10 @@ TAIL = {
     # an atomic store, so that create_race() can tell it from the task's own
     "pthread_create": """int pthread_create(pthread_t *t, const pthread_attr_t *a,
 		   void *(*f)(void *), void *arg)
-{ __atomic_store_n(t, __VERIFIER_thread_create(0, f, arg), __ATOMIC_RELAXED); return 0; }""",
+{ __atomic_store_n(t, __svc_thread_create(f, arg), __ATOMIC_RELAXED); return 0; }""",
     "pthread_join": """int pthread_join(pthread_t t, void **r)
 { void *v = __VERIFIER_thread_join(t); if (r) *r = v; return 0; }""",
-    "pthread_exit": "void pthread_exit(void *r) { __VERIFIER_thread_exit(r); }",
+    "pthread_exit": "void pthread_exit(void *r) { __svc_thread_exit(r); }",
     "pthread_self": "pthread_t pthread_self(void) { return __VERIFIER_thread_self(); }",
     "pthread_mutex_init": """int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
 {
@@ -131,7 +131,7 @@ TAIL = {
     "pthread_rwlock_unlock": """int pthread_rwlock_unlock(pthread_rwlock_t *l)
 { return __svc_rw_unlock((__VERIFIER_mutex_t *) l, SVC_RWLOCK_SLOTS); }""",
     "pthread_key_create": """int pthread_key_create(pthread_key_t *k, void (*destructor)(void *))
-{ return __svc_key_create((unsigned int *) k); }""",
+{ return __svc_key_create((unsigned int *) k, destructor); }""",
     "pthread_key_delete": "int pthread_key_delete(pthread_key_t k) { return 0; }",
     "pthread_getspecific": "void *pthread_getspecific(pthread_key_t k) { return __svc_getspecific(k); }",
     "pthread_setspecific": """int pthread_setspecific(pthread_key_t k, const void *p)
@@ -305,6 +305,11 @@ def create_race(out):
     return is_id_store(a, b) or is_id_store(c, d)
 
 
+def calls_key_create(code):
+    """Whether the task calls pthread_key_create, not just declares it"""
+    return re.search(r"(^|[;{}(=,!&|?:])\s*pthread_key_create\s*\(", code, re.M) is not None
+
+
 REACH_ERROR_CUT = """void reach_error(void)
 { __VERIFIER_assume(0); }"""
 
@@ -344,6 +349,7 @@ def prepare(task_src, workdir, name, properties):
     defs = {
         "SVC_MAIN_ARGC": 1 if re.search(r"\bmain\s*\(\s*int\b", with_local_includes(code, d)) else 0,
         "SVC_RECURSIVE_MUTEX": 1 if mentions_recursive(code) else 0,
+        "SVC_KEY_DESTRUCTORS": 1 if shim == SHIM_PP and calls_key_create(code) else 0,
         # SV-COMP's malloc may fail; only memory safety is about that
         "SVC_MALLOC_FAIL": 1 if "valid-memsafety" in properties else 0,
     }
