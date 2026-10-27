@@ -45,6 +45,7 @@
 #include "genmc/Verification/Checks/Invariants.hpp"
 #include "genmc/Verification/Relinche/LinearizabilityChecker.hpp"
 #include "genmc/Verification/Relinche/Specification.hpp"
+#include "genmc/Verification/Serializability/SerializabilityChecker.hpp"
 #include "genmc/Verification/State/Revisit.hpp"
 #include "genmc/Verification/State/Scheduler.hpp"
 #include "genmc/Verification/Rules/SymmetricThreads.hpp"
@@ -414,6 +415,13 @@ auto GenMCDriver::handleExecutionEnd() -> std::optional<VerificationError>
 				    {std::nullopt, *result.status,
 				     result.relincheResult.status->toString()});
 			return {VerificationError::VE_LinearizabilityError};
+		}
+	}
+	if (getConf()->checkSerializability) {
+		if (auto err = SerializabilityChecker::check(g)) {
+			result.status = VerificationError::VE_SerializabilityError;
+			reportError(err->pos, {err->pos, *result.status, err->msg});
+			return {VerificationError::VE_SerializabilityError};
 		}
 	}
 	return {};

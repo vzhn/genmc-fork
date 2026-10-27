@@ -65,6 +65,8 @@ struct Config {
 	bool warnUnfreedMemory{};
 	std::optional<std::string> collectLinSpec;
 	std::optional<std::string> checkLinSpec;
+	/* Check that the atomic regions are conflict-serializable */
+	bool checkSerializability{};
 	unsigned int maxExtSize{};
 	bool dotPrintOnlyClientEvents{};
 	bool replayCompletedThreads{false};

@@ -341,6 +341,26 @@ extern void __VERIFIER_method_begin(const char *name, int32_t argVal) __attribut
 extern void __VERIFIER_method_end(const char *name, int32_t retval) __attribute__ ((__nothrow__));
 
 /*
+ * Markers for an atomic region, checked by --check-serializability: every
+ * execution must be conflict-serializable, i.e., the po, rf, co and fr edges
+ * between regions (and the events outside them) must form no cycle through
+ * a region. A region is a method (see above), so these markers are the method
+ * markers under the name "serial"; any method is checked as a region too.
+ * Nested markers belong to the outermost region.
+ */
+__attribute__ ((__nothrow__, always_inline)) static inline
+void __VERIFIER_serial_begin(void)
+{
+	__VERIFIER_method_begin("serial", 0);
+}
+
+__attribute__ ((__nothrow__, always_inline)) static inline
+void __VERIFIER_serial_end(void)
+{
+	__VERIFIER_method_end("serial", 0);
+}
+
+/*
  * Datatype for the partial-lock specification device (Lahav et al. 2023).
  * Should only be used along with the --collect-spec flag
  */

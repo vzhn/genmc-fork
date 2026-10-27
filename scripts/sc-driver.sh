@@ -23,7 +23,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export GenMC="${GenMC:-$DIR/../RelWithDebInfo/bin/genmc}"
 
 # driver.sh's default correct/ categories
-CATEGORIES=(infr litmus saver ipr sr liveness synthetic data-structures classic gobench lkmm)
+CATEGORIES=(infr litmus saver ipr sr liveness synthetic data-structures classic gobench lkmm serializability)
 
 empty=$(mktemp -d)
 logs=$(mktemp -d)
