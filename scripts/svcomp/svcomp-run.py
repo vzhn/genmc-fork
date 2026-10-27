@@ -89,7 +89,8 @@ def run_task(args, d, yml):
     t0 = time.time()
     got, out, compiled = verify(args.genmc, src, od, set(expected), args.timeout, args.model,
                                 args.nondet_max, args.max_choices, args.max_spurious,
-                                args.options)
+                                args.options,
+                                args.memlimit)
     if args.witness and got in PROPS:
         prp = next(p["property_file"] for p in task["properties"]
                    if p["property_file"].endswith("/" + got + ".prp"))
@@ -123,7 +124,8 @@ def run_property(args, d, od, task, name, src, prop, exp):
     t0 = time.time()
     got, out, compiled = verify(args.genmc, src, pod, {prop}, args.timeout, args.model,
                                 args.nondet_max, args.max_choices, args.max_spurious,
-                                args.options)
+                                args.options,
+                                args.memlimit)
     res = svcomp_result(prop, got, out)
     if args.witness and res.startswith("false"):
         prp = next(p["property_file"] for p in task["properties"]
@@ -155,6 +157,8 @@ def main():
                     help="spurious condvar wake-ups per execution (default 1)")
     ap.add_argument("--witness", action="store_true",
                     help="write OUTDIR/<dir>/<task>.witness.{graphml,yml} for each error")
+    ap.add_argument("--memlimit", type=float,
+                    help="GB of address space for each GenMC run (no limit by default)")
     ap.add_argument("--per-property", action="store_true",
                     help="check each property of a task alone, as SV-COMP does, "
                     "with a verdict per task/property pair")
@@ -162,6 +166,7 @@ def main():
     ap.add_argument("dirs", nargs="+")
     args = ap.parse_args()
     args.options = genmc_options(args.genmc)
+    args.memlimit = int(args.memlimit * 2**30) if args.memlimit else None
 
     jobs = [(d, y) for d in args.dirs for y in sorted(os.listdir(d)) if y.endswith(".yml")]
     rows = []

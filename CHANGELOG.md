@@ -293,6 +293,25 @@ released.
   thread-specific data. It now tells calls from definitions and has all
   three, as `svcomp-shim.h` and `pthread.h` do (self-test tasks `pp-*`).
 
+- The tail of a preprocessed SV-COMP task ignored key destructors, so an
+  error in one was missed (`pthread-divine/tls_destructor_worker`). A
+  thread that returns or calls `pthread_exit` now runs the destructors of
+  its non-NULL values, as POSIX says; such a thread starts through a
+  function of the prelude's, and the violation witness names the task's
+  start routine from the call of `pthread_create` (self-test tasks
+  `pp-key-dtors`, `pp-key-dtor-error`).
+
+- The SV-COMP runner's nondet calls return only 0..2, so an error that
+  needs another value was reported "true" (6 of the 9 wrong "true" results
+  on Concurrency: `t == 42`, an index of 4, a fourth thread, a size whose
+  product wraps around). A clean or `BOUNDED` result of a task that calls
+  an integer nondet function is now followed by a run for each of a few
+  more values (3, 4, -1, the constants the task compares with and their
+  neighbours, 2^30+1, `INT_MAX`), in a share of the time left, in which
+  calls past `--max-choices` return 0; an error found so is reported.
+  `genmc-svcomp --timeout` defaults to 800 s, which these runs share
+  (self-test tasks `nondet-constant`, `nondet-threads`).
+
 - `__thread` and `_Thread_local` variables lived outside the execution
   graph, in a map per thread from address to value, with every thread's
   copy at the same address (#90). A thread-local struct or array aborted

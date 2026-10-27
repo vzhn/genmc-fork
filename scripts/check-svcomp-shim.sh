@@ -39,20 +39,27 @@
 #   and the bounds check must label them BOUNDED instead of "true";
 #   blocked-not-bounded: executions blocked for the task's own reasons,
 #   whose clean result stands;
+# - nondet-*: errors that need a nondet value beyond 0..2 (42, which the
+#   task compares with; a thread count of 4, with more nondet calls than
+#   the shim's bound), which the runs with more values must find;
 # - pp-libc, pp-sem-race: sleep, strcpy, ffs and semaphores in the tail (a
 #   semaphore of 1 orders the workers, one of 2 does not); scanf: scanf in
 #   a task that includes <stdio.h>;
+# - pp-key-dtors, pp-key-dtor-error: key destructors, which a thread that
+#   returns or calls pthread_exit runs on its non-NULL values;
 # - pp-int-pthread-t: a preprocessed task that declares pthread_t as int,
 #   as pthread-driver-races does;
 # - malloc-fail, malloc-fail-checked: malloc may return NULL; the task that
 #   checks it passes the pointer as an int, which clang must only warn about;
 #   malloc-fail-after-nondet: its abort on a failed malloc, after reading
 #   the largest nondet value, is no bound hit.
-# The runner writes violation witnesses (--witness); the waypoints of four
+# The runner writes violation witnesses (--witness); the waypoints of five
 # are checked: a race in a task that includes <pthread.h> and in a
 # preprocessed one (both accesses at the task's lines, the code the runner
 # adds reported at its caller's), a call of reach_error() by threads created
-# in a loop, a NULL dereference after a failed malloc (valid-deref). The
+# in a loop, a NULL dereference after a failed malloc (valid-deref), and a
+# call of reach_error() in a key destructor, whose thread the shim starts
+# through a function of its own: the witness names the task's. The
 # SV-COMP wrapper genmc-svcomp is run on one property of four tasks.
 # Needs Python 3 with PyYAML; skipped (exit 77) without it. ctest target
 # "svcomp-shim".
@@ -126,7 +133,11 @@ expected = {
                                                     ("function_enter", 0, 31, 46),
                                                     ("target", 0, 35, 3)]),
     "malloc-fail": ("G valid-deref", [("target", 0, 14, 2)]),
+    "pp-key-dtor-error": ("G ! call(reach_error())", [("function_enter", 0, 71, 36),
+                                                       ("target", 1, 56, 3)]),
 }
+# the function of each target waypoint, where it matters
+functions = {"pp-key-dtor-error": ["worker"]}
 ok = True
 for name, (spec, waypoints) in expected.items():
     try:
@@ -135,6 +146,10 @@ for name, (spec, waypoints) in expected.items():
         print(f"FAIL {name}: no witness"); ok = False; continue
     got = [(x["waypoint"]["type"], x["waypoint"]["thread_id"], x["waypoint"]["location"]["line"],
             x["waypoint"]["location"].get("column")) for s in w["content"] for x in s["segment"]]
+    funcs = [x["waypoint"]["location"].get("function") for s in w["content"] for x in s["segment"]
+             if x["waypoint"]["type"] == "target"]
+    if name in functions and funcs != functions[name]:
+        print(f"FAIL {name} witness: target functions {funcs}"); ok = False; continue
     if spec not in w["metadata"]["task"]["specification"] or got != waypoints:
         print(f"FAIL {name} witness: {w['metadata']['task']['specification']} {got}"); ok = False
     else:

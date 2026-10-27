@@ -132,17 +132,24 @@ static int __svc_rw_unlock(__VERIFIER_mutex_t *ms, long n)
 }
 
 /* Thread-specific data, as in GenMC's pthread.h: a row per thread and a
- * column per key; keys are handed out in order and never reused, and
- * destructors are not called. */
+ * column per key; keys are handed out in order and never reused. With
+ * SVC_KEY_DESTRUCTORS=1 (svcomp-run.py sets it for tasks that create keys),
+ * a thread that returns or calls pthread_exit runs the destructors of its
+ * non-NULL values, as POSIX says: each value is set to NULL before its
+ * destructor runs, and the round repeats while values are left, at most
+ * PTHREAD_DESTRUCTOR_ITERATIONS (4) times. The thread then starts through
+ * __svc_thread_start, which calls the task's function and the destructors. */
 static unsigned int __svc_key_next;
 static const void *__svc_key_values[SVC_MAX_THREADS][SVC_MAX_KEYS];
+static void (*__svc_key_dtors[SVC_MAX_KEYS])(void *);
 
-static int __svc_key_create(unsigned int *key)
+static int __svc_key_create(unsigned int *key, void (*dtor)(void *))
 {
 	unsigned int k = __atomic_fetch_add(&__svc_key_next, 1, __ATOMIC_RELAXED);
 
 	if (k >= SVC_MAX_KEYS)
 		return 11; /* EAGAIN */
+	__svc_key_dtors[k] = dtor;
 	*key = k;
 	return 0;
 }
@@ -163,6 +170,64 @@ static int __svc_setspecific(unsigned int key, const void *p)
 	__svc_key_values[self][key] = p;
 	return 0;
 }
+
+#if SVC_KEY_DESTRUCTORS
+static void __svc_run_key_dtors(void)
+{
+	long self = __svc_thread_slot(SVC_MAX_THREADS);
+	unsigned int n = __atomic_load_n(&__svc_key_next, __ATOMIC_RELAXED);
+
+	if (n > SVC_MAX_KEYS)
+		n = SVC_MAX_KEYS;
+	for (int round = 0; round < 4; round++) {
+		_Bool left = 0;
+
+		for (unsigned int k = 0; k < n; k++) {
+			void *v = (void *) __svc_key_values[self][k];
+
+			if (!v || !__svc_key_dtors[k])
+				continue;
+			__svc_key_values[self][k] = 0;
+			__svc_key_dtors[k](v);
+			left = 1;
+		}
+		if (!left)
+			break;
+	}
+}
+
+static struct { void *(*fn)(void *); void *arg; } __svc_starts[SVC_MAX_THREADS];
+static unsigned int __svc_next_start;
+
+static void *__svc_thread_start(void *p)
+{
+	void *(*fn)(void *) = ((__typeof__(&__svc_starts[0])) p)->fn;
+	void *r = fn(((__typeof__(&__svc_starts[0])) p)->arg);
+
+	__svc_run_key_dtors();
+	return r;
+}
+
+static long __svc_thread_create(void *(*fn)(void *), void *arg)
+{
+	unsigned int i = __atomic_fetch_add(&__svc_next_start, 1, __ATOMIC_RELAXED);
+
+	if (i >= SVC_MAX_THREADS)
+		__svc_too_many_threads();
+	__svc_starts[i].fn = fn;
+	__svc_starts[i].arg = arg;
+	return __VERIFIER_thread_create(0, __svc_thread_start, &__svc_starts[i]);
+}
+
+static void __svc_thread_exit(void *r)
+{
+	__svc_run_key_dtors();
+	__VERIFIER_thread_exit(r);
+}
+#else
+# define __svc_thread_create(fn, arg) __VERIFIER_thread_create(0, fn, arg)
+# define __svc_thread_exit(r) __VERIFIER_thread_exit(r)
+#endif
 
 /* POSIX semaphores: the count is the first int of sem_t. A wait takes one
  * once the count is positive; the count's acquire/release order is what

@@ -29,6 +29,7 @@ execution, instead of failing, if unreach-call is not.
 """
 import os
 import re
+import resource
 import subprocess
 import time
 
@@ -56,10 +57,10 @@ TAIL = {
     # an atomic store, so that create_race() can tell it from the task's own
     "pthread_create": """int pthread_create(pthread_t *t, const pthread_attr_t *a,
 		   void *(*f)(void *), void *arg)
-{ __atomic_store_n(t, __VERIFIER_thread_create(0, f, arg), __ATOMIC_RELAXED); return 0; }""",
+{ __atomic_store_n(t, __svc_thread_create(f, arg), __ATOMIC_RELAXED); return 0; }""",
     "pthread_join": """int pthread_join(pthread_t t, void **r)
 { void *v = __VERIFIER_thread_join(t); if (r) *r = v; return 0; }""",
-    "pthread_exit": "void pthread_exit(void *r) { __VERIFIER_thread_exit(r); }",
+    "pthread_exit": "void pthread_exit(void *r) { __svc_thread_exit(r); }",
     "pthread_self": "pthread_t pthread_self(void) { return __VERIFIER_thread_self(); }",
     "pthread_mutex_init": """int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a)
 {
@@ -130,7 +131,7 @@ TAIL = {
     "pthread_rwlock_unlock": """int pthread_rwlock_unlock(pthread_rwlock_t *l)
 { return __svc_rw_unlock((__VERIFIER_mutex_t *) l, SVC_RWLOCK_SLOTS); }""",
     "pthread_key_create": """int pthread_key_create(pthread_key_t *k, void (*destructor)(void *))
-{ return __svc_key_create((unsigned int *) k); }""",
+{ return __svc_key_create((unsigned int *) k, destructor); }""",
     "pthread_key_delete": "int pthread_key_delete(pthread_key_t k) { return 0; }",
     "pthread_getspecific": "void *pthread_getspecific(pthread_key_t k) { return __svc_getspecific(k); }",
     "pthread_setspecific": """int pthread_setspecific(pthread_key_t k, const void *p)
@@ -304,6 +305,11 @@ def create_race(out):
     return is_id_store(a, b) or is_id_store(c, d)
 
 
+def calls_key_create(code):
+    """Whether the task calls pthread_key_create, not just declares it"""
+    return re.search(r"(^|[;{}(=,!&|?:])\s*pthread_key_create\s*\(", code, re.M) is not None
+
+
 REACH_ERROR_CUT = """void reach_error(void)
 { __VERIFIER_assume(0); }"""
 
@@ -343,6 +349,7 @@ def prepare(task_src, workdir, name, properties):
     defs = {
         "SVC_MAIN_ARGC": 1 if re.search(r"\bmain\s*\(\s*int\b", with_local_includes(code, d)) else 0,
         "SVC_RECURSIVE_MUTEX": 1 if mentions_recursive(code) else 0,
+        "SVC_KEY_DESTRUCTORS": 1 if shim == SHIM_PP and calls_key_create(code) else 0,
         # SV-COMP's malloc may fail; only memory safety is about that
         "SVC_MALLOC_FAIL": 1 if "valid-memsafety" in properties else 0,
     }
@@ -358,16 +365,48 @@ def genmc_options(genmc):
     return {"svcomp": has("svcomp"), "library_dirs": has("library-dir")}
 
 
+NONDET_CALL = re.compile(r"\b__VERIFIER_nondet_(?:u?int|u?char|u?short|u?long)\s*\(")
+# a comparison of something with an integer constant, either way round, and
+# a case label
+CONSTANT_USE = re.compile(r"(?:[=!]=|[<>]=?)\s*\(?\s*(-?\s*\d+)[uUlL]*\b(?!\s*[*/%+.])"
+                          r"|\b(\d+)[uUlL]*\s*\)?\s*(?:[=!]=|[<>]=?)"
+                          r"|\bcase\s+(-?\s*\d+)\s*:")
+MAX_NONDET_VALUES = 16
+
+
+def nondet_values(code):
+    """More values for the nondet calls than 0..2, to try when those find no
+    error: the small values 3 and 4 (thread counts), -1, the constants the
+    task compares with (and their neighbours) or switches on, and two large
+    values (a size times 4 that wraps around in 32 bits, INT_MAX). Empty if
+    the task calls no integer nondet function"""
+    if not NONDET_CALL.search(code):
+        return []
+    values = [3, 4, -1]
+    found = []
+    for m in CONSTANT_USE.finditer(code):
+        c = int(re.sub(r"\s", "", next(g for g in m.groups() if g is not None)))
+        found += [c - 1, c, c + 1] if m.group(1) is not None or m.group(2) is not None else [c]
+    # the small ones first: they are the likelier inputs of a branch
+    values += sorted({c for c in found if -2**31 <= c < 2**31}, key=lambda c: (abs(c), c))
+    values = [v for i, v in enumerate(values) if v not in (0, 1, 2) and v not in values[:i]]
+    return values[:MAX_NONDET_VALUES - 2] + [2**30 + 1, 2**31 - 1]
+
+
 def verify(genmc, task_src, workdir, properties, timeout=None, model="rc11", nondet_max=2,
-           max_choices=4, max_spurious=1, options=None):
+           max_choices=4, max_spurious=1, options=None, memlimit=None):
     """Runs GenMC on TASK_SRC for PROPERTIES. Returns what it found (a
     property, "ok", or why there is no verdict), its output and the file it
-    compiled (whose lines are the task's)"""
+    compiled (whose lines are the task's). MEMLIMIT caps each run's address
+    space, in bytes"""
     options = options if options is not None else genmc_options(genmc)
     name = os.path.splitext(os.path.basename(task_src))[0]
     src, shim, libdir, d, defs = prepare(task_src, workdir, name, properties)
 
-    def run(check_bounds, budget):
+    def limit():
+        resource.setrlimit(resource.RLIMIT_AS, (memlimit, memlimit))
+
+    def run(check_bounds, budget, values=None):
         p = subprocess.run([genmc, f"-{model}", "-disable-estimation",
                             *(["-svcomp"] if options["svcomp"] else []),
                             *(f"-library-dir={x}" for x in (HERE, os.path.abspath(libdir))
@@ -377,12 +416,15 @@ def verify(genmc, task_src, workdir, properties, timeout=None, model="rc11", non
                             f"-DSVC_MAX_CHOICES={max_choices}",
                             f"-DSVC_MAX_SPURIOUS={max_spurious}",
                             f"-DSVC_CHECK_BOUNDS={check_bounds}",
+                            *([f"-DSVC_NONDET_VALUES={','.join(map(str, [1, 2] + values))}"]
+                              if values else []),
                             # gcc, which SV-COMP's tasks are written for,
                             # only warns about these
                             "-Wno-error=int-conversion",
                             "-Wno-error=incompatible-pointer-types",
                             "-include", shim, src],
-                           capture_output=True, text=True, timeout=budget)
+                           capture_output=True, text=True, timeout=budget,
+                           preexec_fn=limit if memlimit else None)
         return p.stdout + p.stderr
 
     t0 = time.time()
@@ -401,6 +443,25 @@ def verify(genmc, task_src, workdir, properties, timeout=None, model="rc11", non
                 got = "unknown"
     except subprocess.TimeoutExpired:
         out, got = "", "timeout"
+    # no error with nondet values 0..2: try more, each in a run of its own
+    # (in which the nondet calls return 0..2 or that value) and a share of
+    # the time left, so that a value that makes the task large (a thread
+    # count) leaves time for the others. An error found so is the task's:
+    # each value is one its type can hold. No error, or no time, leaves the
+    # result as it was
+    values = nondet_values(open(src, errors="replace").read()) if got in ("ok", "bounded") else []
+    for i, v in enumerate(values):
+        left = None if timeout is None else timeout - (time.time() - t0)
+        if left is not None and left < 1:
+            break
+        try:
+            more = run(0, None if left is None else left / (len(values) - i), [v])
+        except subprocess.TimeoutExpired:
+            continue
+        if classify(more) in properties:
+            got = classify(more)
+            out += f"\n---- nondet value {v} ----\n" + more
+            break
     return got, out, src
 
 
