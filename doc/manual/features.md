@@ -200,9 +200,19 @@ exceptions:
   to a location a marked write in the branch writes, and the events
   after a later fence, release or lock operation when the branch has a
   marked write or a fence. GenMC can also miss an
-  execution with a cycle of control dependencies and reads from plain
-  writes in branches, which the model allows (a plain write is in no
-  happens-before) but GenMC's exploration cannot build.
+  execution with a cycle of control dependencies and reads-from: a read
+  whose value comes, through other reads, from an event inside a branch
+  that the read's own value decides. The model allows such a cycle when
+  happens-before skips one of its edges: a read from a plain write in a
+  branch (a plain write is in no happens-before), or a read from a marked
+  write in a branch by a read of the same thread after the join (`ctrl ;
+  rfi`, which the model's `to-r` does not order: it has `dep ; rfi` only
+  for address and data dependencies). GenMC's exploration cannot build
+  it: a backward revisit keeps no event that depends on the read it
+  revisits. For example, herd7 allows `r0 = READ_ONCE(z); if (r0)
+  WRITE_ONCE(x, 1); r1 = READ_ONCE(x); WRITE_ONCE(y, r1);` in parallel
+  with `WRITE_ONCE(z, READ_ONCE(y));` to end with all reads 1, and GenMC
+  does not reach it.
 - The model's `mixed-accesses` flag is not reported.
 - herd7's symbolic values for thin-air cycles have no counterpart: no
   execution of the C program has them.
